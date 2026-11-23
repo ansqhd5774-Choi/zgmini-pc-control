@@ -1,6 +1,28 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {GROUPS,selectGroups} from '../tools/controller-ci-scope.mjs';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {execFileSync} from 'node:child_process';
+
+test('integration checkout contains newly required base tests and proposed feature together',t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-ci-consistent-tree-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const git=args=>execFileSync('git',args,{cwd:root,encoding:'utf8',windowsHide:true,stdio:['pipe','pipe','pipe']}).trim();
+ git(['init','-q']);git(['config','user.name','Fixture']);git(['config','user.email','fixture@example.invalid']);
+ fs.writeFileSync(path.join(root,'base.txt'),'base');git(['add','base.txt']);git(['commit','-qm','base']);const base=git(['rev-parse','HEAD']);
+ git(['switch','-qc','feature']);fs.writeFileSync(path.join(root,'feature.mjs'),'export const proposed=true;');
+ git(['add','feature.mjs']);git(['commit','-qm','feature']);const head=git(['rev-parse','HEAD']);
+ git(['switch','-qc','advanced-base',base]);fs.writeFileSync(path.join(root,'required.test.mjs'),'export const check=true;');
+ git(['add','required.test.mjs']);git(['commit','-qm','new required base check']);git(['merge','--no-edit','feature']);
+ assert.throws(()=>git(['cat-file','-e',head+':required.test.mjs']));
+ assert.equal(git(['show','HEAD:required.test.mjs']),'export const check=true;');
+ assert.equal(git(['show','HEAD:feature.mjs']),'export const proposed=true;');
+ const workflow=fs.readFileSync(new URL('../.github/workflows/controller-maintenance-source-tests.yml',import.meta.url),'utf8');
+ assert.match(workflow,/ref: \$\{\{ github\.sha \}\}/);
+ assert.match(workflow,/CI_TESTED_INTEGRATION_SHA=%GITHUB_SHA%/);
+});
 test('shared contracts and unclassified changes never skip families',()=>{
   for (const p of ['controller/operations.mjs','config/operations.json',
     '.github/workflows/controller-maintenance-source-tests.yml','unknown/shared.mjs']) {

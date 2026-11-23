@@ -10,6 +10,39 @@ import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {applyApprovedUpdate,maintenanceFailureCode,reconcileInterruptedRollback} from '../tools/maintenance-apply.mjs';
+import {isolatedControllerStage,recoveryOperatorProofStatus} from '../tools/update.mjs';
+
+test('independent recovery proof keeps strict identity and returns exact sanitized failure categories',()=>{
+ assert.deepEqual(recoveryOperatorProofStatus({exitCode:0,stdout:'INDEPENDENT_OPERATOR\r\n'}),{verified:true,code:'RECOVERY_OPERATOR_VERIFIED'});
+ for(const input of [{exitCode:2,stdout:'UNKNOWN'},{exitCode:0,stdout:'UNKNOWN'},
+  {exitCode:2,stdout:'INDEPENDENT_OPERATOR'},{stdout:'private identity token=SECRET'}]){
+  const result=recoveryOperatorProofStatus(input);
+  assert.equal(result.verified,false);assert.equal(result.code,'RECOVERY_OPERATOR_ATTESTATION_UNVERIFIED');assert.equal(JSON.stringify(result).includes('SECRET'),false);
+ }
+ assert.equal(recoveryOperatorProofStatus({errorCode:'ETIMEDOUT'}).code,'RECOVERY_OPERATOR_PROOF_TIMEOUT');
+ assert.equal(recoveryOperatorProofStatus({errorCode:'ENOENT'}).code,'RECOVERY_OPERATOR_PROOF_TOOL_UNAVAILABLE');
+});
+
+test('actual TEMP candidate namespace permits partial owned files and preserves their bytes',t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-isolated-stage-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ fs.mkdirSync(path.join(root,'stage','controller'),{recursive:true});
+ const file=path.join(root,'stage','controller','entry.mjs');fs.writeFileSync(file,'partial candidate');
+ assert.equal(isolatedControllerStage(root,['controller/entry.mjs']),true);
+ assert.equal(fs.readFileSync(file,'utf8'),'partial candidate');
+ fs.mkdirSync(path.join(root,'snapshot'));assert.equal(isolatedControllerStage(root,['controller/entry.mjs']),false);
+});
+test('unknown files, hard links, unavailable paths and invalid planned paths cannot prove isolation',t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-isolated-stage-bad-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ fs.mkdirSync(path.join(root,'stage','controller'),{recursive:true});
+ const outside=path.join(root,'outside');fs.writeFileSync(outside,'original');
+ assert.equal(isolatedControllerStage(root,['controller/entry.mjs']),false);
+ fs.linkSync(outside,path.join(root,'stage','controller','entry.mjs'));fs.unlinkSync(outside);
+ const second=path.join(root,'stage','controller','other.mjs');fs.linkSync(path.join(root,'stage','controller','entry.mjs'),second);
+ assert.equal(isolatedControllerStage(root,['controller/entry.mjs','controller/other.mjs']),false);
+ assert.equal(isolatedControllerStage(root,['../outside']),false);
+ const io={lstatSync(){throw Object.assign(Error(),{code:'EACCES'})},existsSync:()=>true};
+ assert.equal(isolatedControllerStage(root,['controller/entry.mjs'],{io}),false);
+});
 import {readControllerUpdateArtifacts,confirmExactWorkflowState,readMaintenanceRecoveryStatus,backlogPauseWindows,openRollbackPause,
   closeLatestPause,backlogIssueInPause,prevalidationInventory,admittedMaintenanceIssueState} from '../tools/update.mjs';
 import {INSTALLABLE_FILES} from '../tools/maintenance-contract.mjs';
@@ -127,6 +160,28 @@ test('stage-entry failure cannot be downgraded by a false untouched-proof callba
  assert.equal(r.firstFail,'VALIDATED');
  assert.equal(r.failureOperation,'stage');
  assert.equal(r.code,'UPDATE_STAGE_ENOSPC');
+});
+test('isolated preparation failure preserves artifacts and original intake without stop or restore',async()=>{
+ const f=fixture({stage:async()=>{throw Object.assign(Error(),{code:'ENOSPC'});},verifyStagingFailureIsolated:async()=>true});
+ const r=await applyApprovedUpdate(request,f.port);
+ assert.equal(r.status,'BLOCKED');assert.equal(r.substate,'STAGING_ONLY_ISOLATED_VERIFIED');
+ assert.equal(r.code,'UPDATE_STAGE_ENOSPC');assert.equal(r.actualInstalledSha,previous);
+ assert.equal(r.candidateArtifactsPreserved,true);assert.equal(r.operatingStateUnchanged,true);
+ assert.equal(r.workflowEnabled,true);assert.equal(f.paused,false);
+ for(const effect of ['pause','stop','switch','restore','reconnectPrevious','replay-missed-issues'])assert.equal(f.events.includes(effect),false);
+});
+test('isolation proof cannot override changed runtime, disabled intake or a missing observation',async()=>{
+ for(const observed of [{actualControllerSha:target,workflowState:'active'},
+  {actualControllerSha:previous,workflowState:'disabled_manually'},{}]){
+  const f=fixture({stage:async()=>{throw Error('stage');},verifyStagingFailureIsolated:async()=>true,inspectAfterUncertain:async()=>observed});
+  assert.equal((await applyApprovedUpdate(request,f.port)).status,'RECOVERY_REQUIRED');
+ }
+});
+test('failed or unavailable stage namespace proof keeps original recovery requirements',async()=>{
+ for(const proof of [async()=>false,async()=>{throw Error('unreadable')}]){
+  const f=fixture({stage:async()=>{throw Error('stage');},verifyStagingFailureIsolated:proof});
+  assert.equal((await applyApprovedUpdate(request,f.port)).status,'RECOVERY_REQUIRED');
+ }
 });
 test('prevalidation-only exception never changes stored failure into a new top-level status',async()=>{
  const f=fixture({validate:async()=>{throw Object.assign(Error('invalid digest'),{code:'ALLOWFILE_HASH_MISMATCH'});},

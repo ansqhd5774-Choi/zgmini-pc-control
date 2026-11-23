@@ -1046,17 +1046,47 @@ function readOwner() {
  need(status.mode==='LISTENING'&&status.children?.length===6,'SUPERVISOR_NOT_HEALTHY');
  return {owner,status};
 }
+export function recoveryOperatorProofStatus({exitCode,stdout,errorCode}={}){
+ if(exitCode===0&&typeof stdout==='string'&&stdout.trim()==='INDEPENDENT_OPERATOR')
+  return {verified:true,code:'RECOVERY_OPERATOR_VERIFIED'};
+ return {verified:false,code:errorCode==='ETIMEDOUT'?'RECOVERY_OPERATOR_PROOF_TIMEOUT':
+  errorCode==='ENOENT'?'RECOVERY_OPERATOR_PROOF_TOOL_UNAVAILABLE':'RECOVERY_OPERATOR_ATTESTATION_UNVERIFIED'};
+}
 export function verifyRecoveryOperator(supervisorPid=0){
  need(process.platform==='win32'&&!process.env.GITHUB_ACTIONS&&!process.env.RUNNER_NAME,'RECOVERY_OPERATOR_REQUIRED');
  const installed=json(path.join(maintenanceRoot,'MAINTENANCE_INSTALL.json'));
  for(const [rel,expected]of Object.entries(installed.files??{})){
   need(/^tools\/[a-z0-9.-]+$/.test(rel)&&sha256(fs.readFileSync(path.join(maintenanceRoot,rel)))===expected,'MAINTENANCE_SELF_DRIFT');
  }
- const result=execFileSync('cscript.exe',['//NoLogo',path.join(maintenanceRoot,'tools/maintenance-ancestry.vbs'),'OPERATOR',String(process.pid),String(supervisorPid)],{encoding:'utf8',windowsHide:true,timeout:12000,maxBuffer:4096}).trim();
- need(result==='INDEPENDENT_OPERATOR','RECOVERY_OPERATOR_NOT_INDEPENDENT');
+ let observation;
+ try{observation={exitCode:0,stdout:execFileSync('cscript.exe',['//NoLogo',path.join(maintenanceRoot,'tools/maintenance-ancestry.vbs'),'OPERATOR',String(process.pid),String(supervisorPid)],{encoding:'utf8',windowsHide:true,timeout:12000,maxBuffer:4096})};}
+ catch(error){observation={exitCode:error.status,errorCode:error.code};}
+ const proof=recoveryOperatorProofStatus(observation);
+ need(proof.verified,proof.code);
 }
 
 const hashFiles=(root,files)=>Object.fromEntries(files.map(rel=>[rel,sha256(fs.readFileSync(path.join(root,rel)))]));
+// Candidate files are not the running Controller. A failed preparation can be
+// isolated only inside this request's previously absent namespace. Never delete
+// artifacts, follow links, or use this check as a runtime/protection proof.
+export function isolatedControllerStage(backupRoot,plannedFiles,{io=fs}={}){
+ if(!path.isAbsolute(backupRoot)||!Array.isArray(plannedFiles)||
+  plannedFiles.some(p=>typeof p!=='string'||!/^(controller\/[a-z0-9-]+\.mjs|config\/operations\.json)$/.test(p)))return false;
+ const allowed=new Set(['stage','stage/controller','stage/config','stage/host.json',...plannedFiles.map(p=>'stage/'+p)]);
+ const visit=(dir,prefix='')=>{
+  const stat=io.lstatSync(dir);if(!stat.isDirectory()||stat.isSymbolicLink())return false;
+  for(const name of io.readdirSync(dir)){
+   const rel=prefix?prefix+'/'+name:name;
+   if(!allowed.has(rel))return false;
+   const file=path.join(dir,name),item=io.lstatSync(file);
+   if(item.isSymbolicLink())return false;
+   if(item.isDirectory()){if(!visit(file,rel))return false;}
+   else if(!item.isFile()||item.nlink>1)return false;
+  }
+  return true;
+ };
+ try{return visit(backupRoot);}catch(error){return error.code==='ENOENT'&&!io.existsSync(backupRoot);}
+}
 function installedManifest() {
  const host=json(hostPath),installedSha=host.controllerSourceSha;
  need(validSha(installedSha),'INSTALLED_SHA_INVALID');
@@ -1204,7 +1234,7 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
     'PREVALIDATION_SOURCE_MISMATCH');
    const files=prevalidationInventory(current.host);
    need(files!==null,'PREVALIDATION_FILES_INCOMPLETE');
-   prevalidationBaseline={installedSha:current.installedSha,ownerPid:owner.pid,
+   prevalidationBaseline={stageNamespaceInitiallyAbsent:!fs.existsSync(backupRoot),installedSha:current.installedSha,ownerPid:owner.pid,
     ownerNonce:owner.nonce,files,protected:protectedSnapshot()};
   },
   // A prevalidation exception has not reached stage/pause/stop/switch. A
@@ -1222,6 +1252,11 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
    try {process.kill(owner.pid,0);} catch {return false;}
    if(JSON.stringify(protectedSnapshot())!==JSON.stringify(prevalidationBaseline.protected))return false;
    return github('actions/workflows/pc-job.yml').state==='active';
+  },
+  verifyStagingFailureIsolated:async({installedSha})=>{
+   if(prevalidationBaseline?.stageNamespaceInitiallyAbsent!==true||
+    !isolatedControllerStage(backupRoot,plannedFiles))return false;
+   return await result.ports.verifyPrevalidationUntouched({installedSha})===true;
   },
   inspect:async()=>({installedSha:installedManifest().installedSha,
    insideRunnerTree:false,githubActions:Boolean(process.env.GITHUB_ACTIONS||process.env.RUNNER_NAME)}),

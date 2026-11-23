@@ -216,7 +216,9 @@ jobs:
           )
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          # PR workflows come from the integration context. Test that same tree:
+          # a newer base may add a required test that is absent from an old head.
+          ref: ${{ github.sha }}
           persist-credentials: false
           fetch-depth: 0 # verify immutable historical V2 B approval bytes
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -229,7 +231,9 @@ jobs:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: node tools/controller-ci-scope.mjs
       - name: Check CI scope selection regressions
-        run: node --test tests/controller-ci-scope.test.mjs
+        run: |
+          echo CI_TESTED_INTEGRATION_SHA=%GITHUB_SHA%
+          node --test tests/controller-ci-scope.test.mjs
       - name: Verify W05 independent operator receipt without operational access
         run: node --test --test-concurrency=1 tests/w05-2821-operator-readonly-receipt.test.mjs
       - name: Verify pc-job late-label intake remains opt-in and deduplicated
