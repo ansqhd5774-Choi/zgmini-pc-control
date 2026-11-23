@@ -670,7 +670,7 @@ export function createMaintenanceAgent({
       'INSTALLED_RECOVERY:'+INSTALLED_RECOVERY_ORIGINAL_ID)+'.json');
     try{
       fs.writeFileSync(effectFile,JSON.stringify({requestId:request.requestId,
-        issueNumber:issue.number,originalRequestId:INSTALLED_RECOVERY_ORIGINAL_ID})+'\\n',
+        issueNumber:issue.number,originalRequestId:INSTALLED_RECOVERY_ORIGINAL_ID})+'\n',
         {encoding:'utf8',flag:'wx',mode:0o600});
     }catch(error){
       const result=normalizedResult(request,{status:error?.code==='EEXIST'?'BLOCKED':'UNKNOWN',
