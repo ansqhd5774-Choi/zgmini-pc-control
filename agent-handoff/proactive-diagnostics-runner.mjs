@@ -305,10 +305,13 @@ export async function readBoundedLogEvidence(reader,{maxBytes=4194304}={}){
   if(total===0)stop('LOG_EMPTY');
   const decoder=new TextDecoder();
   if(total<=131072)return decoder.decode(tail.subarray(0,tailLen));
-  const excerpt=new Uint8Array(headLen+tailLen);
-  excerpt.set(head.subarray(0,headLen));
-  excerpt.set(tail.subarray(0,tailLen),headLen);
-  return decoder.decode(excerpt);
+  // Drop cut boundary lines, preventing fabricated words across joined parts.
+  const headText=decoder.decode(head.subarray(0,headLen));
+  const tailText=decoder.decode(tail.subarray(0,tailLen));
+  const headEnd=headText.lastIndexOf('\n');
+  const tailStart=tailText.indexOf('\n');
+  return (headEnd<0?'':headText.slice(0,headEnd+1))+'\n'+
+    (tailStart<0?'':tailText.slice(tailStart+1));
 }
 async function request(resource,{method='GET',body,text=false}={}){
   if(!process.env.GITHUB_TOKEN)stop('TOKEN_MISSING');
