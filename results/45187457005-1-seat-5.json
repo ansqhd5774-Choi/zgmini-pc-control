@@ -1,0 +1,95 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-45187457005-1-seat-5",
+  "requestId": "pc-98fb647d-1dca-4b81-859e-2f0d7601dd24",
+  "startedAt": "2026-11-23T13:48:06.776Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "b9a423cf38d0967d6ed336912a66433f79502d3d",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "2b69dcbc7ade75815e0c152fd0e2112ddaa5b333",
+  "sourceBranch": "main",
+  "operation": "earnings-bea-nipa-capture-readonly",
+  "seat": 5,
+  "status": "PASS",
+  "code": "BEA_NIPA_PRIVATE_ARCHIVE_READBACK_VERIFIED",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-w05-bea-stored-calc-a-20261123",
+  "effectClass": "REGISTERED_OPERATION",
+  "pcOperationalApprovedSha": "c62bd5aac3353d7e146d930dbb033b82d89010cd",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "BEA_NIPA_PRIVATE_ARCHIVE_READBACK_VERIFIED",
+    "attempts": 5,
+    "markedAttempts": 5,
+    "completedJournalAttempts": 2,
+    "storedSourceCount": 1,
+    "verifiedSourceCount": 1,
+    "latest": {
+      "sourceVersion": "ff5a5a3a88cfc2f8758d8cd1369818eff1f9875e6df70e81caef4baf119273c3",
+      "sourceHttpSha256": "8298273c7038aa57eb7f44c46eb0449ab66461d11748fc83083c54432a569a50",
+      "sourceStoredAt": 1795435085956,
+      "observedThrough": "2026-06-30",
+      "rowCount": 6
+    },
+    "providerCalls": 0,
+    "sqliteWrites": 0,
+    "d1Writes": 0,
+    "operationalWrites": 0,
+    "rawExposed": false,
+    "calculation": {
+      "status": "STORED_SOURCE_CALCULATED",
+      "sourceVersion": "ff5a5a3a88cfc2f8758d8cd1369818eff1f9875e6df70e81caef4baf119273c3",
+      "sourceStoredAt": 1795435085956,
+      "observationPeriodEnd": "2026-06-30",
+      "unit": "USD_PER_REAL_GVA_UNIT",
+      "historyPoints": 5,
+      "latestQuarter": "2026Q2",
+      "previousQuarter": "2026Q1",
+      "calculationSha256": "ab683f0b030b30f956343e9613d9e97dc073c48cf650d677a29dff3e7a77188e",
+      "providerCalls": 0,
+      "operationalWrites": 0,
+      "rawExposed": false
+    },
+    "attemptStatus": [
+      {
+        "requestId": "0ac25f3d-e307-41d4-8fcc-62c933f5b9d3",
+        "markerPresent": true,
+        "checkpointVerified": false
+      },
+      {
+        "requestId": "533159de-4c24-4626-a732-658409eb8401",
+        "markerPresent": true,
+        "checkpointVerified": false
+      },
+      {
+        "requestId": "740e3481-9cd8-46fd-b649-acfda3de8f84",
+        "markerPresent": true,
+        "checkpointVerified": false
+      },
+      {
+        "requestId": "95caf83d-43da-416d-b9d9-472b2e2d6e8d",
+        "markerPresent": true,
+        "checkpointVerified": true
+      },
+      {
+        "requestId": "9a623f8d-574f-4d31-b8a8-b553d240b584",
+        "markerPresent": true,
+        "checkpointVerified": true
+      }
+    ]
+  },
+  "protectedBeforeSha256": "4f558bd27adabdc39a8882c5270192cf60468076656339978843836c009e1283",
+  "protectedAfterSha256": "4f558bd27adabdc39a8882c5270192cf60468076656339978843836c009e1283",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "b9a423cf38d0967d6ed336912a66433f79502d3d",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-23T13:48:14.700Z",
+  "durationMs": 7924
+}
