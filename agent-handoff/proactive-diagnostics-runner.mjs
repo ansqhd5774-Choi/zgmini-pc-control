@@ -304,7 +304,16 @@ export async function readBoundedLogEvidence(reader,{maxBytes=4194304}={}){
   }
   if(total===0)stop('LOG_EMPTY');
   const decoder=new TextDecoder();
-  if(total<=131072)return decoder.decode(tail.subarray(0,tailLen));
+  if(total<=131072){
+    // The ring holds only 112 KiB. A 112-128 KiB response needs its first
+    // bytes from head before the tail, otherwise the initial error is lost.
+    if(total<=tail.length)return decoder.decode(tail.subarray(0,tailLen));
+    const prefix=total-tailLen;
+    const full=new Uint8Array(total);
+    full.set(head.subarray(0,prefix));
+    full.set(tail.subarray(0,tailLen),prefix);
+    return decoder.decode(full);
+  }
   // Drop cut boundary lines, preventing fabricated words across joined parts.
   const headText=decoder.decode(head.subarray(0,headLen));
   const tailText=decoder.decode(tail.subarray(0,tailLen));
