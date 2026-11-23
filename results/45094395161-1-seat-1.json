@@ -1,0 +1,260 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-45094395161-1-seat-1",
+  "requestId": "pc-346aeef2-8fd7-4502-933e-b3f2f8cb0d51",
+  "startedAt": "2026-11-23T01:24:38.960Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "d996f2c666955c6659c233d8840d13181571f02a",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "8a6dc683348ca549c110fabedd44c04d22183050",
+  "sourceBranch": "main",
+  "operation": "source-inventory-runtime-readonly",
+  "seat": 1,
+  "status": "PASS",
+  "code": "SOURCE_INVENTORY_STORED_READONLY",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": true,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-w04-r54-installed-event-readback-20261123",
+  "effectClass": "REGISTERED_OPERATION",
+  "pcOperationalApprovedSha": "af5374593a0d27ebaa5280f78187b075ffcabb23",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "SOURCE_INVENTORY_STORED_READONLY",
+    "scope": "STORED_PC_SQLITE_ONLY",
+    "overallUniqueSourceCount": null,
+    "declaredEnabledCalendarMapping": "NOT_INSPECTED",
+    "core": {
+      "status": "PASS",
+      "code": "STORED_INVENTORY_READONLY",
+      "sqliteOpened": true,
+      "coverageStatus": "ALL_TARGET_TABLES_PRESENT",
+      "observedTableCount": 8,
+      "targetTableCount": 8,
+      "tableAvailability": {
+        "batch": true,
+        "employment": true,
+        "employmentR6": true,
+        "breadth": true,
+        "breadthUniverse": true,
+        "earningsUniverse": true,
+        "consumption": true,
+        "feeds": true
+      },
+      "batch": {
+        "storedBatches": 775,
+        "latestStoredAt": 1795396835164,
+        "knownFamilies": {
+          "macro": {
+            "storedBatches": 53,
+            "latestStoredAt": 1795391428257,
+            "latestBodyKeys": {
+              "status": "OBSERVED_KEYS_NOT_ACTIVE_SERIES_PROOF",
+              "rootSeriesKeys": 42,
+              "rateR2SeriesKeys": null,
+              "externalKeys": 1,
+              "providerSummaryKeys": 1
+            }
+          },
+          "credit": {
+            "storedBatches": 52,
+            "latestStoredAt": 1795389623037,
+            "latestBodyKeys": {
+              "status": "OBSERVED_KEYS_NOT_ACTIVE_SERIES_PROOF",
+              "rootSeriesKeys": null,
+              "rateR2SeriesKeys": null,
+              "externalKeys": 3,
+              "providerSummaryKeys": null
+            }
+          },
+          "supply": {
+            "storedBatches": 52,
+            "latestStoredAt": 1795390823140,
+            "latestBodyKeys": {
+              "status": "OBSERVED_KEYS_NOT_ACTIVE_SERIES_PROOF",
+              "rootSeriesKeys": null,
+              "rateR2SeriesKeys": null,
+              "externalKeys": 2,
+              "providerSummaryKeys": null
+            }
+          },
+          "fundFlows": {
+            "storedBatches": 53,
+            "latestStoredAt": 1795393523651,
+            "latestBodyKeys": {
+              "status": "OBSERVED_KEYS_NOT_ACTIVE_SERIES_PROOF",
+              "rootSeriesKeys": null,
+              "rateR2SeriesKeys": null,
+              "externalKeys": 1,
+              "providerSummaryKeys": 1
+            }
+          },
+          "bisDsr": {
+            "storedBatches": 52,
+            "latestStoredAt": 1795391722847,
+            "latestBodyKeys": {
+              "status": "OBSERVED_KEYS_NOT_ACTIVE_SERIES_PROOF",
+              "rootSeriesKeys": null,
+              "rateR2SeriesKeys": null,
+              "externalKeys": 1,
+              "providerSummaryKeys": null
+            }
+          },
+          "bisTc": {
+            "storedBatches": 53,
+            "latestStoredAt": 1795392642297,
+            "latestBodyKeys": {
+              "status": "OBSERVED_KEYS_NOT_ACTIVE_SERIES_PROOF",
+              "rootSeriesKeys": null,
+              "rateR2SeriesKeys": null,
+              "externalKeys": 1,
+              "providerSummaryKeys": null
+            }
+          },
+          "rates": {
+            "storedBatches": 54,
+            "latestStoredAt": 1795396835164,
+            "latestBodyKeys": {
+              "status": "OBSERVED_KEYS_NOT_ACTIVE_SERIES_PROOF",
+              "rootSeriesKeys": null,
+              "rateR2SeriesKeys": 7,
+              "externalKeys": null,
+              "providerSummaryKeys": 1
+            }
+          }
+        },
+        "distinctSeriesInsideBodies": "NOT_INSPECTED"
+      },
+      "employment": {
+        "observationRows": 43555,
+        "uniqueProviderSeriesGeography": 192,
+        "latestRetrievedAt": "2026-11-23T01:10:30.683Z"
+      },
+      "employmentR6": {
+        "storedChunks": 1325,
+        "snapshots": 94,
+        "uniqueReleaseRequests": 43,
+        "latestRetrievedAt": "2026-11-22T08:20:22.055Z"
+      },
+      "breadth": {
+        "latestTradeDate": "2026-11-20",
+        "latestRows": 503,
+        "latestUniqueTickers": 503
+      },
+      "breadthUniverse": {
+        "latestTradeDate": "2026-11-20",
+        "reportedMemberCount": 503
+      },
+      "earningsUniverse": {
+        "latestPeriodEnd": "2026-06-30",
+        "reportedSecurityCount": 503,
+        "reportedIssuerCount": 500,
+        "retrievedAt": "2026-11-22T23:30:26.656Z"
+      },
+      "consumption": {
+        "latestScoreDate": "2026-09-30",
+        "storedRows": 52,
+        "uniqueSourceKeys": 52,
+        "uniqueProviders": 1
+      },
+      "publicFeeds": {
+        "currentOutputFeedKeys": 16,
+        "countedAsRawInput": false
+      },
+      "census2027Diagnostic": {
+        "status": "OBSERVED",
+        "year": 2027,
+        "collectionStatus": "READY_WITH_FALLBACK",
+        "attempts": [
+          {
+            "endpoint": "annual",
+            "code": "SOURCE_PARSE_OR_FORMAT_FAILED"
+          }
+        ],
+        "attemptedAt": "2026-11-23T00:00:22.597Z",
+        "storedAt": 1795392022597
+      },
+      "treasuryTawsInput": {
+        "status": "OBSERVED",
+        "storedAt": 1795392022597,
+        "fromDate": "2025-11-24",
+        "toDate": "2026-11-23",
+        "rawRowCount": 450,
+        "storedAwardedCount": 437,
+        "eligibleAwardedRows": 437,
+        "eligibleCountMatchesStored": true,
+        "textBytes": 3060357,
+        "textSha256": "d71e58ec2835c424a66d499454ade3eb39d8835a5f8cb61ab6ac2a64c4d7f564",
+        "scope": "ELIGIBLE_RESULT_COUNT_NOT_FULL_PARSER_REVALIDATION"
+      },
+      "r54StoredEvent": {
+        "status": "VERIFIED",
+        "reason": "STORED_EVENT_CONFIRMED",
+        "currentStoredAt": 1795396838781,
+        "asOfDate": "2026-11-23",
+        "methodologyVersion": "EMPLOYMENT_R54_STORED_4FACTOR_R1",
+        "score": 43.159125188536954,
+        "eventCalculatedAt": "2026-11-23T01:20:38.781Z",
+        "datedSnapshotMatched": true,
+        "trendLastDate": "2026-11-23",
+        "eventVerified": true
+      }
+    },
+    "history": {
+      "status": "PASS",
+      "code": "STORED_INVENTORY_READONLY",
+      "sqliteOpened": true,
+      "coverageStatus": "NO_TARGET_TABLES",
+      "observedTableCount": 0,
+      "targetTableCount": 8,
+      "tableAvailability": {
+        "batch": false,
+        "employment": false,
+        "employmentR6": false,
+        "breadth": false,
+        "breadthUniverse": false,
+        "earningsUniverse": false,
+        "consumption": false,
+        "feeds": false
+      },
+      "batch": null,
+      "employment": null,
+      "employmentR6": null,
+      "breadth": null,
+      "breadthUniverse": null,
+      "earningsUniverse": null,
+      "consumption": null,
+      "publicFeeds": null,
+      "census2027Diagnostic": null,
+      "treasuryTawsInput": null,
+      "r54StoredEvent": {
+        "status": "UNVERIFIED",
+        "reason": "TABLE_NOT_PRESENT",
+        "currentStoredAt": null,
+        "asOfDate": null,
+        "methodologyVersion": null,
+        "score": null,
+        "eventCalculatedAt": null,
+        "datedSnapshotMatched": false,
+        "trendLastDate": null,
+        "eventVerified": false
+      }
+    },
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "operationalWrites": 0,
+    "sqliteOpened": true
+  },
+  "protectedBeforeSha256": "0027554791e4341662226e06ec3908c736b6dfbbb9b97b181e64843971639d80",
+  "protectedAfterSha256": "0027554791e4341662226e06ec3908c736b6dfbbb9b97b181e64843971639d80",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "d996f2c666955c6659c233d8840d13181571f02a",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-23T01:25:22.645Z",
+  "durationMs": 43685
+}
