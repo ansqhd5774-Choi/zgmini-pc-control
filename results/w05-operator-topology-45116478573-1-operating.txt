@@ -1,0 +1,16 @@
+schema=ZGMINI_W05_OPERATOR_TOPOLOGY_RESULT_V1
+requestId=d71a3a04-2821-4c18-b62f-7a3e9a0bc745
+runId=45116478573
+attempt=1
+role=operating
+host=PC
+runner=zgmini-pc-03
+status=PASS
+code=W05_OPERATOR_CANDIDATE_TOPOLOGY_COLLECTED
+candidateTotal=2
+candidate.27308=SESSION_MISMATCH
+candidate.34668=RUNNER_ANCESTRY
+independentOperatorAttested=false
+recoveryEligible=false
+operationalWrites=0
+automaticRetries=0
