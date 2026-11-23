@@ -76,7 +76,7 @@ test('shared B dispatcher and report preserve proof without D1 or raw data',asyn
     raw:Buffer.from('approval'),controlSha:sha40};
   const approved=await applyApprovedOnce(auth,{
     beaCandidateRoot:'/test/pin',beaRunner:async()=>({
-      status:'PASS',providerRequests:1,...capture()})});
+      ...capture(),status:'PASS',providerRequests:1})});
   assert.equal(approved.status,'DIRECT_B_EFFECT_PASS_NOT_PUBLISHED');
   assert.equal(approved.mode,BEA_B_MODE);
   const raw={...approved,manifestSha256:sha64};
