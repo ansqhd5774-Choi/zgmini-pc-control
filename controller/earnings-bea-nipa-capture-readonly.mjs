@@ -67,7 +67,7 @@ function inspectStore(fsApi,base){
       !SHA.test(meta.sourceHttpSha256??'')||
       !Number.isSafeInteger(meta.sourceStoredAt)||meta.sourceStoredAt<=0||
       meta.sourceRetrievedAt!==new Date(meta.sourceStoredAt).toISOString()||
-      !/^20\d{2}Q[1-4]$/.test(meta.observedThrough??''))
+      !/^20\d{2}-(?:03-31|06-30|09-30|12-31)$/.test(meta.observedThrough??''))
       fail('BEA_NIPA_READONLY_METADATA_MISMATCH');
     const bea=data?.BEAAPI;
     if(!bea||Object.keys(bea).length!==1||
@@ -114,7 +114,7 @@ function inspectAttempts(fsApi,base){
     if(completions.length>1||completions.some(x=>
       !SHA.test(x.sourceVersion??'')||!SHA.test(x.sourceHttpSha256??'')||
       !Number.isSafeInteger(x.sourceStoredAt)||
-      !/^20\d{2}Q[1-4]$/.test(x.observedThrough??'')))
+      !/^20\d{2}-(?:03-31|06-30|09-30|12-31)$/.test(x.observedThrough??'')))
       fail('BEA_NIPA_READONLY_CHECKPOINT_INVALID');
     out.push({requestId:id,markerPresent:!!marker,
       attemptedAt:marker?.attemptedAt??null,completion:completions[0]??null});
