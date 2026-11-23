@@ -308,6 +308,57 @@ test('overfull single-day inventory remains incomplete rather than falsely verif
   status:'failure',count:200,complete:false
  });
 });
+test('empty day partitions cannot erase known status runs or report complete',async()=>{
+ const time=Date.parse('2026-11-16T15:00:00Z');
+ const baseline=Array.from({length:230},(_,i)=>({
+   id:4000+i,status:'completed',conclusion:'failure',
+   created_at:'2026-11-16T14:00:00Z'
+ })).reverse();
+ const requestRuns=async resource=>{
+   const q=new URL(resource,'https://api.github.com/').searchParams;
+   const page=Number(q.get('page')),created=q.get('created');
+   return {workflow_runs:q.get('status')==='failure'&&created.startsWith('>=')?
+     baseline.slice((page-1)*100,page*100):[]};
+ };
+ const result=await recentRuns(time,requestRuns);
+ assert.equal(result.complete,false);
+ assert.deepEqual(result.coverage.find(x=>x.status==='failure'),{
+   status:'failure',count:200,complete:false
+ });
+ assert.equal(result.items.length,200);
+ assert.ok(result.items.every(x=>baseline.some(y=>y.id===x.id)));
+});
+
+test('day-partition filter drift fails closed even when all baseline IDs appear',async()=>{
+ const time=Date.parse('2026-11-16T15:00:00Z');
+ const rows=[
+   ...Array.from({length:120},(_,i)=>({
+     id:5000+i,status:'completed',conclusion:'cancelled',
+     created_at:'2026-11-16T14:00:00Z'
+   })),
+   ...Array.from({length:81},(_,i)=>({
+     id:6000+i,status:'completed',conclusion:'cancelled',
+     created_at:'2026-11-15T14:00:00Z'
+   }))
+ ].sort((a,b)=>b.created_at.localeCompare(a.created_at)||b.id-a.id);
+ const rogue={id:9000,status:'completed',conclusion:'cancelled',
+   created_at:'2026-11-14T12:00:00Z'};
+ const requestRuns=async resource=>{
+   const q=new URL(resource,'https://api.github.com/').searchParams;
+   const page=Number(q.get('page')),created=q.get('created');
+   if(q.get('status')!=='cancelled')return {workflow_runs:[]};
+   let matches=created.startsWith('>=')?rows:
+     created==='2026-11-12'?[rogue]:
+     rows.filter(x=>x.created_at.slice(0,10)===created);
+   return {workflow_runs:matches.slice((page-1)*100,page*100)};
+ };
+ const result=await recentRuns(time,requestRuns);
+ assert.equal(result.complete,false);
+ assert.equal(result.coverage.find(x=>x.status==='cancelled').complete,false);
+ assert.equal(result.items.length,201);
+ assert.ok(!result.items.some(x=>x.id===rogue.id));
+});
+
 test('under-cap status inventory retains the existing one-page read pattern',async()=>{
  const time=Date.parse('2026-11-16T15:00:00Z');
  const calls=[];
