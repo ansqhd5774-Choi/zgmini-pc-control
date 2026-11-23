@@ -97,7 +97,17 @@ export function evaluateWideSnapshot({runs,issues,pulls,workflows,scheduleRunCou
     workflowStatus.push({file:w.file,state:w.state});
   }
   observations.sort((a,b)=>b.at-a.at||b.id-a.id);
-  const findings=observations.slice(0,WIDE_POLICY.maxFindings);
+  // A large number of possibly intentional PR/CI cancellations must not
+  // hide the actual pending handoff/approval/delay IDs from a 25-row report.
+  // Reserve up to four rows for actionable reviews, then fill the remainder
+  // with newest observations. The final list is still newest-first.
+  const actionable=new Set(['HANDOFF_AGE_REVIEW','PR_EVIDENCE_REVIEW',
+    'ACTION_REQUIRED_REVIEW','RUN_DELAY_REVIEW']);
+  const reserved=observations.filter(x=>actionable.has(x.kind)).slice(0,4);
+  const reservedSet=new Set(reserved);
+  const findings=[...reserved,...observations.filter(x=>!reservedSet.has(x))
+    .slice(0,WIDE_POLICY.maxFindings-reserved.length)]
+    .sort((a,b)=>b.at-a.at||b.id-a.id);
   return Object.freeze({
     version:WIDE_POLICY.version,cutoff:new Date(cutoff).toISOString(),
     inventory:{runs:runs.length,issues:issues.length,pulls:pulls.length,invalid,
