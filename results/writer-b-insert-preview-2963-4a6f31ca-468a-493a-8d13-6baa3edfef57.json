@@ -1,0 +1,28 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_RESULT_V1",
+  "requestId": "4a6f31ca-468a-493a-8d13-6baa3edfef57",
+  "chatId": "28bff557-de0f-4dd8-8443-0301236b971a",
+  "issueNumber": 2963,
+  "status": "BLOCKED",
+  "code": "WRITER_B_INSERT_ANCHOR_MATCH_STOP",
+  "pcSourceWrites": 0,
+  "taskWrites": 0,
+  "dbWrites": 0,
+  "d1Writes": 0,
+  "providerCalls": 0,
+  "beforeSha256": "49d2f7de1081257b298b8fecba285dd83b6a3dd486733602dba849712637e7ee",
+  "baseHead": "af5374593a0d27ebaa5280f78187b075ffcabb23",
+  "filePath": "scripts/pc-writer/alpaca-incremental.mjs",
+  "anchorEvidence": [
+    {
+      "index": 0,
+      "exactCount": 0,
+      "trimmedCount": 0
+    },
+    {
+      "index": 1,
+      "exactCount": 0,
+      "trimmedCount": 0
+    }
+  ]
+}
