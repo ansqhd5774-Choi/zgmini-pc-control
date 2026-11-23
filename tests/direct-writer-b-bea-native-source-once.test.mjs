@@ -28,7 +28,7 @@ const approval=()=>({
 });
 const capture=()=>({status:'SOURCE_STORED_READBACK_VERIFIED',
   providerRequests:1,sourceVersion:sha64,sourceHttpSha256:httpSha,
-  sourceStoredAt:1795400000000,observedThrough:'2026Q2'});
+  sourceStoredAt:1795400000000,observedThrough:'2026-06-30'});
 test('one narrowly authenticated BEA archive effect; no generic provider escalation',()=>{
   const m=approval();
   assert.equal(isApprovedBeaNativeSource(m),true);
@@ -55,7 +55,7 @@ test('hash, time, and period required for a claimed private archive readback',()
     {...valid,sourceVersion:'bogus'},
     {...valid,sourceHttpSha256:'bogus'},
     {...valid,sourceStoredAt:0},
-    {...valid,observedThrough:'2027Q5'}
+    {...valid,observedThrough:'2027Q5'}, {...valid,observedThrough:'2026-06-31'}
   ])assert.throws(()=>verifyBeaCapture(x),/ARCHIVE_READBACK_STOP/);
 });
 test('independent immutable archive readback must match four provenance fields',()=>{
