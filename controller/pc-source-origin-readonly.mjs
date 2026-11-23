@@ -88,15 +88,19 @@ export function inspectPcSourceOrigin({dataRoot,fsOps=fs,pathOps=path,git=defaul
    if(child&&stat(child)?.isDirectory())dirs.push(child);
   }
  }
- const distinct=[...new Set(dirs.map(s=>s.toLowerCase()))];
- if(distinct.length>MAX_CANDIDATES)output.inventoryTruncated=true;
- // A truncated inventory MUST NOT claim a unique candidate.
- const unique=[...new Map(dirs.map(dir=>[dir.toLowerCase(),dir])).values()].slice(0,MAX_CANDIDATES);
+ // Scan only the bounded parent inventory; unrelated directories must not
+ // consume the 130 eligible-Git-checkout budget.
+ const unique=[...new Map(dirs.map(dir=>[dir.toLowerCase(),dir])).values()];
  for(const dir of unique){
   const mark=pathOps.join(dir,'.git');
   const sourceFile=pathOps.join(dir,'scripts','pc-writer','local-cycle.mjs');
   const safeMark=safeReal(mark),markStat=safeMark&&stat(safeMark);
   if(!safeMark||!markStat||!stat(sourceFile)?.isFile()||!safeReal(sourceFile))continue;
+  // Stop only when the eligible Git candidate budget is exhausted.
+  // A truncated inventory must never certify a unique approved checkout.
+  if(output.candidates.length>=MAX_CANDIDATES){
+   output.inventoryTruncated=true;break;
+  }
   // A worktree .git pointer must not cause git to read a repository outside E:\ZGmini.
   if(markStat.isFile()){
    if(markStat.size>2048)continue;

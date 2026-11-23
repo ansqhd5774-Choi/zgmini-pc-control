@@ -14,6 +14,8 @@ on:
       - 'controller/supervisor.mjs'
       - 'controller/pc-source-readonly.mjs'
       - 'tests/pc-source-readonly.test.mjs'
+      - 'controller/pc-source-origin-readonly.mjs'
+      - 'tests/pc-source-origin-readonly.test.mjs'
       - 'controller/core-runtime-source-readonly.mjs'
       - 'controller/provider-activity-runtime-readonly.mjs'
       - 'controller/http32-two-host-checkpoints-readonly.mjs'
@@ -219,6 +221,9 @@ jobs:
         run: node --test tests/controller-ci-scope.test.mjs
       - name: Verify pc-job late-label intake remains opt-in and deduplicated
         run: node --test --test-concurrency=1 tests/pc-job-late-label-intake.test.mjs tests/preimage-manifest-contract.test.mjs
+      - name: Verify bounded PC Git-origin inventory and no false unique source attribution
+        if: steps.scope.outputs.core == 'true'
+        run: node --test --test-concurrency=1 tests/pc-source-origin-readonly.test.mjs
       - name: Verify exact HTTP host roster and connection evidence, no provider I/O
         if: steps.scope.outputs.core == 'true'
         run: node --test --test-concurrency=1 tests/provider-activity-runtime-readonly.test.mjs
