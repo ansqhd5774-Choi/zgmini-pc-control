@@ -114,6 +114,17 @@ export function verifyOperatingRunners(rows){
   runnersIdle:operating.length===6&&operating.every(x=>x.busy===false)};
 }
 
+// A GitHub runner-list 403 is an unknown observation, not proof of offline
+// runners. Preserve read-only ledger diagnostics but fail closed for recovery.
+export function inspectOperatingRunners(query){
+ let result;
+ try{result=query();}catch{return {
+  ...verifyOperatingRunners(null),runnerQueryStatus:'UNAVAILABLE'};}
+ if(!Array.isArray(result?.runners))return {
+  ...verifyOperatingRunners(null),runnerQueryStatus:'UNVERIFIED'};
+ return {...verifyOperatingRunners(result.runners),runnerQueryStatus:'VERIFIED'};
+}
+
 function observe(requestId){
  const ledgerFile=path.join(root,'ledger',requestId+'.json');
  const {bytes:ledgerBytes,value:ledger}=inspectEvidenceFile(ledgerFile,'RECOVERY_REQUEST_LEDGER');
@@ -134,8 +145,7 @@ function observe(requestId){
   Number.isFinite(Date.parse(owner.at))&&Date.parse(owner.at)<=Date.parse(marker.at)&&
   issue.user?.login==='ansqhd5774-Choi'&&issue.title==='pc-controller-update'&&
   body?.requestId===requestId&&body?.targetControllerSha===ledger.targetSha;
- const rows=github('actions/runners?per_page=100').runners;
- const operatingRunners=verifyOperatingRunners(rows);
+ const operatingRunners=inspectOperatingRunners(()=>github('actions/runners?per_page=100'));
  const state={ledger,identityVerified,ownerAlive:alive(owner.pid),actualSha:host.controllerSourceSha,controllerVerified,
   maintenanceVerified,backupExists:fs.existsSync(path.join(control,'backups','controller-update-'+requestId)),
   backlogExists:fs.existsSync(path.join(root,'backlog',requestId+'.json')),

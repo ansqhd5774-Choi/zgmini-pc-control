@@ -2,7 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {classifyRecovery,archiveUntouched,
- verifyMaintenanceManifest as recoveryInventory,verifyOperatingRunners,inspectEvidenceFile} from '../tools/maintenance-recovery.mjs';
+ verifyMaintenanceManifest as recoveryInventory,verifyOperatingRunners,inspectOperatingRunners,inspectEvidenceFile} from '../tools/maintenance-recovery.mjs';
 import {verifyMaintenanceManifest as statusInventory} from '../tools/automation-status.mjs';
 const sha='a'.repeat(40),id='pc-update-recovery-fixture';
 test('inspect evidence distinguishes missing, unreadable and malformed bytes without disclosing local paths',()=>{
@@ -116,4 +116,24 @@ test('operating runner duplicates, missing, offline and busy fail closed',()=>{
  const busy=six.map((x,i)=>i===0?{...x,busy:true}:x);
  assert.equal(verifyOperatingRunners(busy).runnersIdle,false);
  assert.equal(verifyOperatingRunners(null).runnerSetVerified,false);
+});
+
+test('W01 shared recovery inspect preserves read-only diagnostics on runner API HTTP 403, never approves',()=>{
+ const denied=inspectOperatingRunners(()=>{throw Object.assign(Error('forbidden'),{code:'RECOVERY_GITHUB_QUERY_UNAVAILABLE'});});
+ assert.deepEqual(denied,{runnerSetVerified:false,runnersIdle:false,runnerQueryStatus:'UNAVAILABLE'});
+ const recovery=state();Object.assign(recovery,denied);
+ const judged=classifyRecovery(recovery);
+ assert.equal(judged.status,'RECOVERY_REQUIRED');
+ assert.equal(judged.checks.RUNNERS_IDLE,false);
+ assert.notEqual(judged.code,'PREVALIDATION_ABORT_VERIFIED');
+});
+test('W01 runner inventory malformed/missing remains unknown; valid six verified unchanged',()=>{
+ const missing=inspectOperatingRunners(()=>({status:'HTTP_403_FORBIDDEN'}));
+ assert.deepEqual(missing,{runnerSetVerified:false,runnersIdle:false,runnerQueryStatus:'UNVERIFIED'});
+ assert.equal(classifyRecovery({...state(),...missing}).status,'RECOVERY_REQUIRED');
+ const ok=inspectOperatingRunners(()=>({runners:operating()}));
+ assert.deepEqual(ok,{runnerSetVerified:true,runnersIdle:true,runnerQueryStatus:'VERIFIED'});
+ const busy=inspectOperatingRunners(()=>({runners:operating().map((x,i)=>i===1?{...x,busy:true}:x)}));
+ assert.equal(busy.runnerSetVerified,true);
+ assert.equal(busy.runnersIdle,false);
 });
