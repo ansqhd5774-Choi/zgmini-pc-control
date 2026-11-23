@@ -171,6 +171,7 @@ test('R6 candidate second-stage memory guard is a verified no-execution resource
   // Historical #2307: memory admission passed but the per-operation guard
   // observed a later dip before launching the candidate child.
   report.actualExecutionSha=null;
+  delete report.result.operationalWrites; // Exact #2307 inner-result shape.
   report.memoryAdmission={admitted:true,minimumFreeMiB:1536,firstFreeMiB:1291,
     freeMiB:1547,minObservedMiB:976,samples:15};
   const txt=textReport(report);
@@ -187,6 +188,7 @@ test('R6 candidate memory guard must prove literal null SHA and intact no-effect
     r=>{delete r.actualExecutionSha;},
     r=>{r.actualExecutionSha='e'.repeat(40);},
     r=>{r.result.candidateExecuted=true;},
+    r=>{r.result.operationalWrites=1;},
     r=>{r.sqliteOpened=true;},
     r=>{r.protectedStateUnchanged=false;},
     r=>{r.protectedAfterSha256='d'.repeat(64);},
@@ -197,6 +199,7 @@ test('R6 candidate memory guard must prove literal null SHA and intact no-effect
   for(const change of changes){
     const {origin,report}=verifiedWorkerWait('employment-r6-candidate-stage-readonly');
     report.actualExecutionSha=null;
+    delete report.result.operationalWrites;
     change(report);
     const txt=textReport(report);
     assert.equal(preparePcSharedResourceWait({originIssue:origin,report,
@@ -204,6 +207,7 @@ test('R6 candidate memory guard must prove literal null SHA and intact no-effect
   }
   const {origin,report}=verifiedWorkerWait('employment-r6-candidate-stage-readonly');
   report.actualExecutionSha=null;
+  delete report.result.operationalWrites;
   const txt=textReport(report).replace('actualExecutionSha=null','actualExecutionSha=forged');
   assert.equal(preparePcSharedResourceWait({originIssue:origin,report,
     resultPath:pathJson,resultTxt:txt}).state,'WAIT_PROOF_UNVERIFIED');
