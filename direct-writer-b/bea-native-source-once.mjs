@@ -77,11 +77,20 @@ export function verifyBeaCapture(value){
     sourceStoredAt:value.sourceStoredAt,
     observedThrough:value.observedThrough};
 }
+export function verifyBeaReadback(capture,readback){
+  need(readback?.status==='SOURCE_READBACK_VERIFIED'&&
+    readback.sourceVersion===capture.sourceVersion&&
+    readback.sourceHttpSha256===capture.sourceHttpSha256&&
+    readback.sourceStoredAt===capture.sourceStoredAt&&
+    readback.observedThrough===capture.observedThrough,
+    'DIRECT_B_BEA_INDEPENDENT_READBACK_STOP');
+  return true;
+}
 // Installed source is used only as a CAS preimage; the effect implementation is
 // the immutable, reviewed Actions candidate checkout pinned by manifest.sourceSha.
 export async function runBeaNativeSourceOnce(auth,{candidateRoot,
   installedHead=safeGitHead,installedConfig=readBoundConfig,
-  providerLoader=null,collector=null}={}){
+  providerLoader=null,collector=null,archiveReader=null}={}){
   const m=auth?.manifest;
   need(isApprovedBeaNativeSource(m),'DIRECT_B_BEA_EFFECT_SCOPE_STOP');
   need(process.platform==='win32'||(providerLoader&&collector),
@@ -93,7 +102,9 @@ export async function runBeaNativeSourceOnce(auth,{candidateRoot,
   const root=path.resolve(candidateRoot);
   const sourceFile=path.join(root,...RUNNER.split('/'));
   const envFile=path.join(root,'scripts','pc-writer','local-env.mjs');
-  for(const filename of [sourceFile,envFile]){
+  const archiveFile=path.join(root,'scripts','pc-writer',
+    'EARNINGS_BEA_UNIT_NIPA_ARCHIVE_R1.mjs');
+  for(const filename of [sourceFile,envFile,archiveFile]){
     const st=fs.lstatSync(filename);
     need(st.isFile()&&!st.isSymbolicLink()&&st.size<200000,
       'DIRECT_B_BEA_CANDIDATE_FILE_STOP');
@@ -110,10 +121,19 @@ export async function runBeaNativeSourceOnce(auth,{candidateRoot,
   const perform=collector??(await import(pathToFileURL(sourceFile).href))
     .collectBeaUnitNipaSourceOnce;
   need(typeof perform==='function','DIRECT_B_BEA_COLLECTOR_UNAVAILABLE');
+  const readArchive=archiveReader??(await import(pathToFileURL(archiveFile).href))
+    .readBeaUnitNipaArchive;
+  need(typeof readArchive==='function','DIRECT_B_BEA_READBACK_UNAVAILABLE');
   const markerDir=path.join(PC_ROOT,'bea-nipa-source-b-once');
   // The only persistent control write is a create-only attempt marker; an
   // unknown/partial provider operation is reconciled, never silently replayed.
   fs.mkdirSync(markerDir,{recursive:true});
+  const markerStat=fs.lstatSync(markerDir);
+  const dataRootReal=fs.realpathSync(PC_ROOT);
+  const markerReal=fs.realpathSync(markerDir);
+  need(markerStat.isDirectory()&&!markerStat.isSymbolicLink()&&
+    path.relative(dataRootReal,markerReal)==='bea-nipa-source-b-once',
+    'DIRECT_B_BEA_MARKER_DIRECTORY_UNSAFE');
   const marker=path.join(markerDir,auth.request.requestId+'.json');
   const manifestSha=auth.request.approvalManifestSha256;
   let attempted=false;
@@ -125,6 +145,8 @@ export async function runBeaNativeSourceOnce(auth,{candidateRoot,
     })+'\n',{flag:'wx'});attempted=true;
     const value=await perform({pcBase:PC_ROOT,providers});
     const capture=verifyBeaCapture(value);
+    verifyBeaReadback(capture,await readArchive({pcBase:PC_ROOT,
+      sourceSha:capture.sourceVersion}));
     return {status:'PASS',providerRequests:1,privateArchiveWrites:1,...capture};
   }catch(error){
     if(attempted)return {status:'STATE_UNKNOWN',
