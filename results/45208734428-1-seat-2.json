@@ -1,0 +1,320 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-45208734428-1-seat-2",
+  "requestId": "pc-adf32f9e-f760-4b6a-b733-41f911a7c677",
+  "startedAt": "2026-11-23T15:45:30.494Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "b9a423cf38d0967d6ed336912a66433f79502d3d",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "1ee0231fde631662555f0efcd646575b48ee98aa",
+  "sourceBranch": "codex/d05-independent-fourfile-writer-release-20261124",
+  "operation": "writer-install-preimage-readonly",
+  "seat": 2,
+  "status": "PASS",
+  "code": "WRITER_APPROVED_PREIMAGE_READONLY",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-issues-d05-fourfile-20261124",
+  "effectClass": "FIXED_READONLY_NO_PROVIDER_NO_DB",
+  "pcOperationalApprovedSha": "37f9048705793da5e49c4ff271f90dff444ec44b",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "WRITER_APPROVED_PREIMAGE_READONLY",
+    "observedAt": "2026-11-23T15:45:36.673Z",
+    "evidenceLevel": "FIXED_CHECKOUT_NOT_LIVE_CORE_PROCESS",
+    "runtimeSourceVerified": false,
+    "sourceRoot": "projects/zgmini-earnings-history-pc-release",
+    "sourceRootAbsolute": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+    "sourceHead": "37f9048705793da5e49c4ff271f90dff444ec44b",
+    "approvedConfigSource": "37f9048705793da5e49c4ff271f90dff444ec44b",
+    "checkpointSource": "8c1a7738fe71770d666f09b40fb1c435262a75fa",
+    "sourceIdentityConsistent": false,
+    "coreTaskSourceLinked": false,
+    "taskLaunchers": [
+      {
+        "path": "data/pc-writer/archive-sidecar-r7/run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c"
+      },
+      {
+        "path": "data/pc-writer/cutover-evidence/inflation-r37-2026-10-20T19-39-19-549Z/run-local-core.vbs",
+        "sha256": "bb3e11c0b5c8da07162b1c824e7b52e7a7c2f987c079f29713211a2413932b01"
+      },
+      {
+        "path": "data/pc-writer/archive-sidecar-r7/archive-run.mjs",
+        "sha256": "ce07af0b5e8d17625644e204f2815c1f754aff2468bc5434ac13c0dadcecd907"
+      },
+      {
+        "path": "data/pc-writer/earnings-risk-provisional-r23/ZGMINI_EARNINGS_R38_AUTO_DISPATCH.mjs",
+        "sha256": "4346e5e4406f893ede75e994e3a1e7253bde2bb8eacd7656b365e3a82e3704f1"
+      },
+      {
+        "path": "data/pc-writer/archive-sidecar-r7/archive-core-r10.mjs",
+        "sha256": "e96d9ba669ee053d0b3558db36f1f5f7a28648b8ea26b7937f62a19bb4495c84"
+      },
+      {
+        "path": "data/pc-writer/archive-sidecar-r7/verified-checks-r10.mjs",
+        "sha256": "f88f7b25a1a6f9157e1e7b23901a30076927f0a63e98e9aff88643a02854a02f"
+      },
+      {
+        "path": "data/pc-writer/earnings-risk-provisional-r23/ZGMINI_EARNINGS_R31_SCOPED_PUBLICATION.mjs",
+        "sha256": "ffa71643748e79eedacf26b72880804cbab0edfb2eb32435da2346ec4bd0ad19"
+      },
+      {
+        "path": "data/pc-writer/earnings-risk-provisional-r23/ZGMINI_EARNINGS_R33_OBSERVE_PUBLISH_CYCLE.mjs",
+        "sha256": "7bd792d1ed84067846ca3ef0748b4a5eac8e5ba78feb18c9a3fcaf46b58ee58b"
+      }
+    ],
+    "r6Config": {
+      "status": "PASS",
+      "configSha256": "a95b3abdb9aaa8ed4a522db0b2ccba3c0fbeb15583c64ccbf3d88fab7e66598a",
+      "keys": {
+        "employmentR6AutoCollection": "ENABLED",
+        "employmentR6OneYearAutoPublication": "ENABLED"
+      },
+      "reason": null
+    },
+    "calendar": [
+      {
+        "path": "lib/market-calendar-company-ko.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-calendar-issuer-alias-coverage.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/market-calendar-er1-auto-output.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      }
+    ],
+    "employmentR6": [
+      {
+        "path": "lib/market-score/employment-r4-bed-provider.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r4-shadow-store.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-collector.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-contract.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-feature-engine.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-observation-reader.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-provider.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-scheduler.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-store.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/collect-local.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/run-local.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-one-year-read-model.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-window.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/employment-r6-auto-collection.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/employment-r6-auto-publication.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/employment-r6-candidate-locator.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/employment-r6-one-year-stage.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/employment-r6-pit-coverage.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "worker/employment-r6-public-display.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      }
+    ],
+    "operationalWrites": 0,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "sqliteOpened": false,
+    "scopedPreimage": {
+      "manifestPath": "approvals/writer-preimage/d05-independent-fourfile-20261124.json",
+      "manifestSha256": "5efb0efd045295f120891f0a961078d1ceda1e878326a876cc7f556c86331067",
+      "files": [
+        {
+          "path": "scripts/pc-writer/market.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "6fda08a55a072a9d9bdb9671e17c97b412912bb52554cbd9dc740a63f24bce80",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "lib/score-history/d05-independent-input-selector-witness-r1.mjs",
+          "expectedEffect": "A",
+          "exists": true,
+          "sha256": "4b68af6a2758dbeabff7925814c2eac94698d0c9f796b31ab6ba1479650fe091",
+          "state": "PRESENT",
+          "trackedDirty": null,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": true
+        },
+        {
+          "path": "lib/score-history/composite-archive-lineage-link-r1.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "ac64e2f60a5a2223f4457d35232c2cef47c09d9e8c82cc3a89c76e62e9150be6",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "lib/score-history/d05-lineage-event-contract-r1.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "3bac8815b85a4c1933088a28bb6c68e7fa7a4aee5d292dc4045fba4e43d87678",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        }
+      ]
+    }
+  },
+  "protectedBeforeSha256": "45701dd39e4b6f32d1dbc4772bd1dfaca105b08a5a65163195e19e132b1450b9",
+  "protectedAfterSha256": "45701dd39e4b6f32d1dbc4772bd1dfaca105b08a5a65163195e19e132b1450b9",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "b9a423cf38d0967d6ed336912a66433f79502d3d",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-23T15:45:41.371Z",
+  "durationMs": 10877
+}
