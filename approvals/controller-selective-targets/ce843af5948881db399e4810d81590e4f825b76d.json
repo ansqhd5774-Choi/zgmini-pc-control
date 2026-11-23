@@ -1,0 +1,15 @@
+{
+  "schema": "ZGMINI_CONTROLLER_SELECTIVE_PIN_V1",
+  "installedSha": "6777a56b7d17487ae327942013ee66673bf5492b",
+  "targetSha": "ce843af5948881db399e4810d81590e4f825b76d",
+  "sourceMainSha": "3fa1d81bc9c75585413a307819035023e7aea8c6",
+  "targetBranch": "codex/controller-bea-nipa-date-a-after-d05-20261123",
+  "customPaths": [],
+  "allowFiles": [
+    {
+      "path": "controller/earnings-bea-nipa-capture-readonly.mjs",
+      "sha256": "f5809ec9ee6e24b0acf9a6f1aef46cce46ff2c3636c231ca74a57651da9e0140"
+    }
+  ],
+  "approvalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2935"
+}
