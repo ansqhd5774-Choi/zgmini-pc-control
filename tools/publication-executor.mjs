@@ -100,6 +100,54 @@ export function validateQfrPinnedNoWrite(text,preflight,expectedKey){
   return true;
 }
 
+// Independent WPSFD42 publishing is accepted only under its own B manifest.
+export function validateWpsfd42ServicePreflight(text,expectedKey){
+  const rows=parseLogRows(text);
+  const sourceStoredAt=Number(rows.SOURCE_STORED_AT);
+  const snapshots=Number(rows.WPSFD42_VERIFIED_SNAPSHOTS);
+  if(rows.MODE!=='READ_ONLY_PREFLIGHT'
+    ||rows.RESULT!=='PASS_EARNINGS_C_SERVICE_D1_PREFLIGHT_ONLY'
+    ||rows.SNAPSHOT_KEY!==expectedKey||rows.SOURCE_GATES!=='PASS'
+    ||rows.SOURCE_HTTP_REQUESTS!=='0'||rows.PC_SQLITE_WRITES!=='0'
+    ||rows.D1_QUERIES!=='0'||rows.D1_WRITES!=='0'
+    ||rows.BASE_SNAPSHOT_KEY_WRITES!=='0'||rows.SCORE_WRITES!=='0'
+    ||rows.SCHEDULER_CHANGED!=='NO'||rows.WORKER_DEPLOYED!=='NO'
+    ||rows.ROW_COUNT!=='2'||rows.FRESH_READY_ROWS!=='2'
+    ||!Number.isSafeInteger(snapshots)||snapshots<1
+    ||!SHA256.test(rows.SOURCE_VERSION??'')
+    ||!Number.isSafeInteger(sourceStoredAt)||sourceStoredAt<=0)
+    throw Error('PUBLICATION_WPSFD42_PREFLIGHT_SOURCE_MISMATCH');
+  return Object.freeze({sourceVersion:rows.SOURCE_VERSION,sourceStoredAt});
+}
+
+export function validateWpsfd42ServiceApplySource(preflight,evidence){
+  if(!preflight||!evidence
+    ||evidence.sourceVersion!==preflight.sourceVersion
+    ||evidence.sourceStoredAt!==preflight.sourceStoredAt)
+    throw Error('PUBLICATION_WPSFD42_APPLY_SOURCE_MISMATCH');
+  return true;
+}
+
+// Only proof of zero D1 calls permits BLOCKED after an APPLY-time source drift.
+// Every incomplete or remote outcome is STATE_UNKNOWN, with its lease held.
+export function validateWpsfd42PinnedNoWrite(text,preflight,expectedKey){
+  const rows=parseLogRows(text);
+  const sourceStoredAt=Number(rows.SOURCE_STORED_AT);
+  if(!preflight
+    ||rows.MODE!=='APPLY_EXPLICIT'||rows.SNAPSHOT_KEY!==expectedKey
+    ||rows.SOURCE_GATES!=='PASS'||rows.SOURCE_HTTP_REQUESTS!=='0'
+    ||rows.PC_SQLITE_WRITES!=='0'
+    ||rows.D1_QUERIES!=='0'||rows.D1_WRITES!=='0'
+    ||rows.ERROR!=='EARNINGS_C_SERVICE_SOURCE_DRIFT'
+    ||rows.RESULT!=='FAIL_EARNINGS_C_SERVICE_D1'
+    ||!SHA256.test(rows.SOURCE_VERSION??'')
+    ||!Number.isSafeInteger(sourceStoredAt)||sourceStoredAt<=0
+    ||(rows.SOURCE_VERSION===preflight.sourceVersion
+      &&sourceStoredAt===preflight.sourceStoredAt))
+    throw Error('PUBLICATION_WPSFD42_NO_WRITE_EVIDENCE_INVALID');
+  return true;
+}
+
 export function parsePublisherLog(text,operation,expectedKey){
   const rows=parseLogRows(text);
   if(operation==='bea-unit-profit-once'
@@ -109,7 +157,9 @@ export function parsePublisherLog(text,operation,expectedKey){
     throw Error('PUBLICATION_BEA_NOT_STORED_SOURCE');
   const expectedResult=operation==='bea-unit-profit-once'
     ?['PASS_BEA_UNIT_READBACK_VERIFIED','PASS_BEA_UNIT_ALREADY_STORED']
-    :['PASS_QFR_D1_EXACT_READBACK','PASS_QFR_D1_ALREADY_STORED'];
+    :operation==='bls-wpsfd42-service-once'
+      ?['PASS_EARNINGS_C_SERVICE_D1_READBACK','PASS_EARNINGS_C_SERVICE_ALREADY_STORED']
+      :['PASS_QFR_D1_EXACT_READBACK','PASS_QFR_D1_ALREADY_STORED'];
   if(!expectedResult.includes(rows.RESULT)||!['READBACK_VERIFIED','ALREADY_STORED'].includes(rows.D1_RESULT))
     throw Error('PUBLICATION_RESULT_NOT_VERIFIED');
   if(operation==='census-qfr-margin-once'){
@@ -132,13 +182,31 @@ export function parsePublisherLog(text,operation,expectedKey){
         &&rows.D1_READBACK==='PREVIOUS_IDENTICAL'))
       throw Error('PUBLICATION_QFR_APPLY_EVIDENCE_INVALID');
   }
+  if(operation==='bls-wpsfd42-service-once'){
+    if(rows.SNAPSHOT_KEY!==expectedKey||rows.MODE!=='APPLY_EXPLICIT'
+      ||rows.SOURCE_GATES!=='PASS'||rows.PREFLIGHT_SOURCE_PIN!=='VERIFIED'
+      ||rows.SOURCE_HTTP_REQUESTS!=='0'||rows.PC_SQLITE_WRITES!=='0'
+      ||rows.EXISTING_C_CHECKPOINT_WRITES!=='0'
+      ||rows.BASE_SNAPSHOT_KEY_WRITES!=='0'||rows.SCORE_WRITES!=='0'
+      ||rows.SCHEDULER_CHANGED!=='NO'||rows.WORKER_DEPLOYED!=='NO'
+      ||rows.ROW_COUNT!=='2'||rows.FRESH_READY_ROWS!=='2'
+      ||rows.ERROR!==undefined
+      ||!(rows.D1_RESULT==='READBACK_VERIFIED'
+        &&rows.RESULT==='PASS_EARNINGS_C_SERVICE_D1_READBACK'
+        &&rows.D1_READBACK==='VERIFIED'
+        ||rows.D1_RESULT==='ALREADY_STORED'
+        &&rows.RESULT==='PASS_EARNINGS_C_SERVICE_ALREADY_STORED'
+        &&rows.D1_READBACK==='PREVIOUS_IDENTICAL'))
+      throw Error('PUBLICATION_WPSFD42_APPLY_EVIDENCE_INVALID');
+  }
   const sourceVersion=operation==='bea-unit-profit-once'?rows.SOURCE_SHA256:rows.SOURCE_VERSION;
   const sourceStoredAt=Number(rows.SOURCE_STORED_AT);
   if(!SHA256.test(sourceVersion??'')||!Number.isSafeInteger(sourceStoredAt)||sourceStoredAt<=0)
     throw Error('PUBLICATION_RESULT_CHECKPOINT_INVALID');
   return Object.freeze({status:'PASS',d1Result:rows.D1_RESULT,sourceVersion,sourceStoredAt,
     ...(operation==='census-qfr-margin-once'?{
-      key:rows.SNAPSHOT_KEY,rawZipSha256:rows.RAW_ZIP_SHA256}:{})});
+      key:rows.SNAPSHOT_KEY,rawZipSha256:rows.RAW_ZIP_SHA256}
+      :operation==='bls-wpsfd42-service-once'?{key:rows.SNAPSHOT_KEY}:{})});
 }
 
 export function millisecondsToNextUtcSecond(now){
@@ -335,10 +403,13 @@ async function execute(){
     const logDirectory=resultDirectoryFor(request.requestId);
     const bea=request.operation==='bea-unit-profit-once';
     const mfg=request.operation==='bea-manufacturing-profit-once';
+    const service=request.operation==='bls-wpsfd42-service-once';
+    const qfr=request.operation==='census-qfr-margin-once';
     // The fixed BEA manufacturing publisher returns bounded JSON stdout;
     // the existing BEA Unit/QFR publishers retain their TXT evidence files.
     const outputDir=logDirectory;
     const prefix=bea?'EARNINGS_BEA_UNIT_PROFIT_R1_RESULT_':
+      service?'EARNINGS_BLS_SERVICE_R1_D1_RESULT_':
       'EARNINGS_CENSUS_QFR_R4_D1_RESULT_';
     const preflightLogBefore=mfg?null:new Set(fs.readdirSync(outputDir)
       .filter(file=>file.startsWith(prefix)&&file.endsWith('.txt')));
@@ -360,7 +431,8 @@ async function execute(){
       readNewResult(outputDir,prefix,preflightLogBefore);
     const mfgPin=mfg?parseBeaMfgResult(preflightEvidence,{phase:'PREFLIGHT',
       expectedSha:invocation.sourceSha256}):null;
-    const qfrPin=bea||mfg?null:validateQfrStoredPreflight(preflightEvidence,invocation.snapshotKey);
+    const qfrPin=qfr?validateQfrStoredPreflight(preflightEvidence,invocation.snapshotKey):null;
+    const servicePin=service?validateWpsfd42ServicePreflight(preflightEvidence,invocation.snapshotKey):null;
     if(bea)validateBeaStoredPreflight(preflightEvidence,invocation.sourceSha256);
     // Both pinned publishers use second-resolution, exclusive result filenames.
     // Keep apply in a later UTC second to avoid colliding with dry-run evidence.
@@ -377,19 +449,28 @@ async function execute(){
       ZGMINI_EARNINGS_BEA_MFG_SOURCE_VERSION:mfgPin.sourceVersion,
       ZGMINI_EARNINGS_BEA_MFG_SOURCE_STORED_AT:String(mfgPin.sourceStoredAt),
       ZGMINI_EARNINGS_BEA_MFG_OBSERVED_THROUGH:mfgPin.period}:
-      bea?childEnv:{...childEnv,
+      bea?childEnv:qfr?{...childEnv,
       ZGMINI_EARNINGS_QFR_SOURCE_VERSION:qfrPin.sourceVersion,
       ZGMINI_EARNINGS_QFR_RAW_ZIP_SHA256:qfrPin.rawZipSha256,
-      ZGMINI_EARNINGS_QFR_SOURCE_STORED_AT:String(qfrPin.sourceStoredAt)};
+      ZGMINI_EARNINGS_QFR_SOURCE_STORED_AT:String(qfrPin.sourceStoredAt)}
+      :{...childEnv,
+      ZGMINI_EARNINGS_SERVICE_SOURCE_VERSION:servicePin.sourceVersion,
+      ZGMINI_EARNINGS_SERVICE_SOURCE_STORED_AT:String(servicePin.sourceStoredAt)};
     const applied=await runFixedChild(script,mfg?
       ['--source-sha',invocation.sourceSha256,...invocation.flags]:
       [...invocation.flags],applyEnv,APPLY_TIMEOUT_MS);
     if(applied.exitCode!==0||applied.timedOut||applied.truncated){
-      if(!bea&&!mfg&&applied.exitCode===1&&!applied.timedOut&&!applied.truncated){
+      if(qfr&&applied.exitCode===1&&!applied.timedOut&&!applied.truncated){
         validateQfrPinnedNoWrite(readNewResult(outputDir,prefix,before),
           qfrPin,invocation.snapshotKey);
         noWriteVerified=true;
         throw Error('PUBLICATION_QFR_SOURCE_DRIFT_NO_WRITE');
+      }
+      if(service&&applied.exitCode===1&&!applied.timedOut&&!applied.truncated){
+        validateWpsfd42PinnedNoWrite(readNewResult(outputDir,prefix,before),
+          servicePin,invocation.snapshotKey);
+        noWriteVerified=true;
+        throw Error('PUBLICATION_WPSFD42_SOURCE_DRIFT_NO_WRITE');
       }
       throw Error('PUBLICATION_APPLY_RESULT_UNKNOWN');
     }
@@ -399,7 +480,8 @@ async function execute(){
       request.operation,invocation.snapshotKey);
     if((bea||mfg)&&evidence.sourceVersion!==invocation.sourceSha256)
       throw Error('PUBLICATION_BEA_APPLY_SOURCE_MISMATCH');
-    if(!bea&&!mfg)validateQfrApplySource(qfrPin,evidence);
+    if(qfr)validateQfrApplySource(qfrPin,evidence);
+    if(service)validateWpsfd42ServiceApplySource(servicePin,evidence);
     // QFR must forward the actual parsed key, not manufacture the expected key.
     validatePublicationReadback(validated,{
       ...evidence,...(bea?{key:invocation.snapshotKey}:{})});
