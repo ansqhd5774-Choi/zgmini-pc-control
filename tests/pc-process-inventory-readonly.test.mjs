@@ -6,7 +6,7 @@ import path from 'node:path';
 import {inspectTask, TASK} from '../tools/marketparquet-task-source-readonly.mjs';
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
 import assert from 'node:assert/strict';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,project2960MaintenanceStatus,compare2960ProtectedBaseline,compact2960ProcessResult,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,project2960MaintenanceStatus,compare2960ProtectedBaseline,classify2960ProtectionDifference,compact2960ProcessResult,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
@@ -1295,4 +1295,27 @@ test('fixed #2960 protection probe compares exact baseline and fails closed',()=
  assert.equal(compare2960ProtectedBaseline(before,{files:{}}),null);
  assert.equal(compare2960ProtectedBaseline([],identical),null);
  assert.equal(typeof compare2960ProtectedBaseline(before,identical),'boolean');
+});
+
+test('fixed #2960 drift scope is descriptive only and never approves recovery',()=>{
+ const before={files:{'config.json':'a'.repeat(64),
+  'quota-runner.cmd':'b'.repeat(64),'run-local.cmd':'c'.repeat(64)},
+  tasks:{'ZGMINI-PC-Local-Core':'d'.repeat(64),
+   'ZGMINI-PC-Local-Korea':'e'.repeat(64)}};
+ const same=structuredClone(before);
+ assert.equal(classify2960ProtectionDifference(before,same),'UNCHANGED');
+ const writer=structuredClone(before);
+ writer.files['config.json']='f'.repeat(64);
+ assert.equal(classify2960ProtectionDifference(before,writer),'WRITER_CONFIG_ONLY');
+ const task=structuredClone(writer);
+ task.tasks['ZGMINI-PC-Local-Core']='0'.repeat(64);
+ assert.equal(classify2960ProtectionDifference(before,task),'OTHER_PROTECTED_DRIFT');
+ const secondFile=structuredClone(writer);
+ secondFile.files['quota-runner.cmd']='1'.repeat(64);
+ assert.equal(classify2960ProtectionDifference(before,secondFile),'OTHER_PROTECTED_DRIFT');
+ const invalid=structuredClone(writer);
+ invalid.files['config.json']='not-a-hash';
+ assert.equal(classify2960ProtectionDifference(before,invalid),'OTHER_PROTECTED_DRIFT');
+ assert.equal(classify2960ProtectionDifference(null,writer),'UNVERIFIED');
+ assert.equal(classify2960ProtectionDifference(before,{files:{}}),'UNVERIFIED');
 });
