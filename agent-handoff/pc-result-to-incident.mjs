@@ -158,13 +158,19 @@ export function preparePcSharedResourceWait({originIssue,report,resultPath,resul
   // *after* the Controller has started its worker. Their legacy immutable
   // result pair has no phase/mutationStarted fields. Never assert that the
   // worker did not start; require the operation-specific pre-operation proof.
+  // Employment candidate's second memory guard runs before its child.
+  // A guard rejection has no executed source SHA; only an explicit null,
+  // alongside the immutable no-execution/protection proof below, is valid.
+  const candidateMemoryGuard=report.operation==='employment-r6-candidate-stage-readonly'&&
+    report.actualExecutionSha===null;
   const workerWait=noOperationalEffects&&report.code==='RESOURCE_WAIT_MEMORY'&&
-    ['employment-r6-wal-memory-preflight',
-      'theme-nine-r32-raw-coverage-readonly'].includes(report.operation)&&
+    (['employment-r6-wal-memory-preflight',
+      'theme-nine-r32-raw-coverage-readonly'].includes(report.operation)||
+      candidateMemoryGuard)&&
     report.phase===undefined&&report.mutationStarted===undefined&&
     report.lastPass==='ALLOWLISTED_WORKER_STARTED'&&
     report.firstFail==='ALLOWLISTED_OPERATION'&&report.exitCode===0&&
-    report.actualExecutionSha===report.controlSourceSha&&
+    (report.actualExecutionSha===report.controlSourceSha||candidateMemoryGuard)&&
     report.protectedStateUnchanged===true&&
     typeof report.protectedBeforeSha256==='string'&&
     /^[a-f0-9]{64}$/.test(report.protectedBeforeSha256)&&
@@ -172,7 +178,10 @@ export function preparePcSharedResourceWait({originIssue,report,resultPath,resul
     report.result?.status==='BLOCKED'&&report.result?.code===report.code&&
     report.result?.candidateExecuted===false&&
     report.result?.providerCalls===0&&report.result?.d1Writes===0&&
-    report.result?.operationalWrites===0&&report.result?.sqliteOpened===false;
+    (report.result?.operationalWrites===0||
+      (candidateMemoryGuard&&report.result&&
+       !Object.hasOwn(report.result,'operationalWrites')))&&
+    report.result?.sqliteOpened===false;
 
   const validLease=report.code!=='LEASE_BUSY'||['REQUEST_LEASE','SEAT_LEASE',
     'RESOURCE_LEASE'].includes(report.failureOperation);
