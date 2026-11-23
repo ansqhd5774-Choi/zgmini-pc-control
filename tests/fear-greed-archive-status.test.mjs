@@ -414,3 +414,35 @@ test('existing global publication ledger is sanitized and never equated to archi
  assert.equal(r.archiveTrace.sidecar.evidence,'NOT_FOUND');
  assert.doesNotMatch(JSON.stringify(r),/SECRET_TOKEN_EXAMPLE/);
 });
+
+
+test('read-only Sidecar diagnosis accepts only explicitly pinned source generations, never unknown bytes',()=>{
+ const f=fixture(),dir=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(dir);
+ const js="const approvedSourceSha=config.source;\nthrow Error('SOURCE_GATE_BLOCKED');\n";
+ const vbs='WScript.Echo "archive-run.mjs"\n';
+ fs.writeFileSync(path.join(dir,'archive-run.mjs'),js);
+ fs.writeFileSync(path.join(dir,'run-original-then-archive.vbs'),vbs);
+ const past=new Date(Date.now()-30000);
+ for(const name of ['archive-run.mjs','run-original-then-archive.vbs'])fs.utimesSync(path.join(dir,name),past,past);
+ fs.writeFileSync(path.join(dir,'last-run.json'),JSON.stringify({status:'BLOCKED',reason:'SOURCE_GATE_BLOCKED',secret:'DO_NOT_LEAK'}));
+ const before=digest(fs.readFileSync(f.dbFile));
+ const expectedVbs=digest(vbs);
+ const good=inspectSidecarSourceGate(f.dataRoot,{expectedHashes:{
+  'archive-run.mjs':[digest('previous-approved-generation'),digest(js)],
+  'run-original-then-archive.vbs':expectedVbs,
+ }});
+ assert.deepEqual(good.scriptStatus.map(x=>x.status),['MATCH','MATCH']);
+ assert.equal(good.matchingErrorSite,'UNIQUE');
+ assert.equal(good.matchedScript,'archive-run.mjs');
+ assert.deepEqual(good.matchedGateCategories,['SOURCE_APPROVAL_REFERENCE']);
+ assert.equal(good.operationalWrites,0);
+ assert.doesNotMatch(JSON.stringify(good),/DO_NOT_LEAK|SOURCE_GATE_BLOCKED|config\.source/);
+ const unknown=inspectSidecarSourceGate(f.dataRoot,{expectedHashes:{
+  'archive-run.mjs':[digest('previous-approved-generation')],
+  'run-original-then-archive.vbs':expectedVbs,
+ }});
+ assert.deepEqual(unknown.scriptStatus.map(x=>x.status),['CHANGED','MATCH']);
+ assert.equal(unknown.matchingErrorSite,'NOT_CHECKED');
+ assert.deepEqual(unknown.matchedGateCategories,[]);
+ assert.equal(digest(fs.readFileSync(f.dbFile)),before);
+});
