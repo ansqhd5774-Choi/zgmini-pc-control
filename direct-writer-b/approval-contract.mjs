@@ -4,6 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
+import {BEA_B_SCHEMA,BEA_B_MODE,isApprovedBeaNativeSource}
+  from './bea-native-source-once.mjs';
 
 // Schema tokens are fixed here so the configured-runtime B route does not
 // require unrelated PIN/BUNDLE implementation modules at process startup.
@@ -117,9 +119,11 @@ export function authorizeApprovedRaw({event,env,raw,worktree,actualHead}){
   const isPin=manifest?.schema===PIN_CAS_SCHEMA;
   const isBundle=manifest?.schema===BUNDLE_SCHEMA;
   const isConfigured=manifest?.schema===CONFIGURED_B_SCHEMA;
+  const isBea=manifest?.schema===BEA_B_SCHEMA;
   need((isPin&&manifest.scope===PIN_CAS_SCOPE&&manifest.status==='APPROVED_B')||
     (isBundle&&manifest.scope===BUNDLE_SCOPE&&manifest.status==='APPROVED')||
-    (isConfigured&&isApprovedConfiguredRuntime(manifest)),
+    (isConfigured&&isApprovedConfiguredRuntime(manifest))||
+    (isBea&&isApprovedBeaNativeSource(manifest)),
     'DIRECT_B_EFFECT_SCOPE_STOP');
   need(SHA40.test(manifest.sourceSha??'')&&
     typeof manifest.profileId==='string'&&manifest.profileId.length>0,
@@ -127,7 +131,7 @@ export function authorizeApprovedRaw({event,env,raw,worktree,actualHead}){
   return Object.freeze({request,manifest,raw,issueNumber:event.issue.number,
     controlSha:env.GITHUB_SHA,approvalPath:approvalPathFor(request),
     mode:isPin?'PIN_REGISTRY_CAS':isConfigured?CONFIGURED_B_EFFECT:
-      'VERSIONED_BUNDLE_ACTIVATE'});
+      isBea?BEA_B_MODE:'VERSIONED_BUNDLE_ACTIVATE'});
 }
 
 export function loadApprovedRaw({event,env,controlRoot,

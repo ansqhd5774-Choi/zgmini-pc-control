@@ -80,6 +80,8 @@ export function sanitizeDirectBReport(raw,request,env,exitEvidence=null){
     compatibilityEvidenceSha256:null,
     compatibilityDirections:0,
     compatibilitySharedLockVerified:false,
+    beaSourceVersion:null,beaHttpSha256:null,
+    beaStoredAt:null,beaObservedThrough:null,
     runId:RUN.test(env?.GITHUB_RUN_ID??'')?env.GITHUB_RUN_ID:null,
     ...provenance,retry:'NO_AUTO_RETRY_READ_ONLY_RECONCILE'};
   if(provenance.firstFailStep&&(!raw||!VALID.has(raw.status)||
@@ -113,13 +115,26 @@ export function sanitizeDirectBReport(raw,request,env,exitEvidence=null){
       raw.manifestSha256!==base.manifestSha256||
       !SHA40.test(raw.controlSha??'')||!SHA40.test(raw.sourceSha??'')||
       !['PIN_REGISTRY_CAS','VERSIONED_BUNDLE_ACTIVATE',
-        'CONFIGURED_THEMES_REPEAT_UPGRADE'].includes(raw.mode)||
-      (raw.mode!=='CONFIGURED_THEMES_REPEAT_UPGRADE'&&
+        'CONFIGURED_THEMES_REPEAT_UPGRADE',
+        'BEA_NIPA_PRIVATE_ARCHIVE_ONCE'].includes(raw.mode)||
+      (!['CONFIGURED_THEMES_REPEAT_UPGRADE',
+        'BEA_NIPA_PRIVATE_ARCHIVE_ONCE'].includes(raw.mode)&&
         raw.reportStatus!=='JSON_TXT_2_OF_2')||
-      (raw.mode==='CONFIGURED_THEMES_REPEAT_UPGRADE'&&
-        raw.reportStatus!=='INCOMPLETE'))return base;
+      (['CONFIGURED_THEMES_REPEAT_UPGRADE',
+        'BEA_NIPA_PRIVATE_ARCHIVE_ONCE'].includes(raw.mode)&&
+        raw.reportStatus!=='INCOMPLETE')||
+      (raw.mode==='BEA_NIPA_PRIVATE_ARCHIVE_ONCE'&&
+        (!SHA64.test(raw.sourceVersion??'')||
+         !SHA64.test(raw.sourceHttpSha256??'')||
+         !Number.isSafeInteger(raw.sourceStoredAt)||raw.sourceStoredAt<=0||
+         !/^\d{4}Q[1-4]$/.test(raw.observedThrough??''))))return base;
     return {...base,...compatibility,status:raw.status,code:raw.code,mode:raw.mode,
       sourceSha:raw.sourceSha,controlSha:raw.controlSha,operationSucceeded:true,
+      ...(raw.mode==='BEA_NIPA_PRIVATE_ARCHIVE_ONCE'?{
+        beaSourceVersion:raw.sourceVersion,
+        beaHttpSha256:raw.sourceHttpSha256,
+        beaStoredAt:raw.sourceStoredAt,
+        beaObservedThrough:raw.observedThrough}:{}),
       runtimeEffectProof:'LOCAL_EXECUTOR_PASS_REPORT_PENDING',
       operationalEffectAttempted:'LOCAL_EXECUTOR_PASS'};
   }
@@ -136,6 +151,10 @@ export function directBTextReport(r){return [
   `MODE=${r.mode??'NONE'}`,`MANIFEST_SHA256=${r.manifestSha256}`,
   `CONTROL_SHA=${r.controlSha??'UNKNOWN'}`,
   `SOURCE_SHA=${r.sourceSha??'UNKNOWN'}`,
+  `BEA_STORED_SHA256=${r.beaSourceVersion??'UNKNOWN'}`,
+  `BEA_HTTP_SHA256=${r.beaHttpSha256??'UNKNOWN'}`,
+  `BEA_SOURCE_STORED_AT=${r.beaStoredAt??'UNKNOWN'}`,
+  `BEA_OBSERVED_THROUGH=${r.beaObservedThrough??'UNKNOWN'}`,
   `OPERATION_SUCCEEDED=${r.operationSucceeded}`,
   `RUNTIME_EFFECT_PROOF=${r.runtimeEffectProof}`,
   `COMPATIBILITY_EVIDENCE_SHA256=${r.compatibilityEvidenceSha256??'UNKNOWN'}`,

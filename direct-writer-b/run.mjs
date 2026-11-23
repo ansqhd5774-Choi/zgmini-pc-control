@@ -5,6 +5,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
+import {BEA_B_MODE,runBeaNativeSourceOnce}
+  from './bea-native-source-once.mjs';
 import {dispatchConfiguredRuntimeB}
   from '../writer-b/approved-versioned-bundle/configured-runtime-b-dispatcher.mjs';
 
@@ -25,7 +27,8 @@ const need=(ok,code)=>{if(!ok)fail(code);};
 
 export async function applyApprovedOnce(auth,{makeApprovedNativeAdapter=null,
   pinRunner=null,bundleRunner=null,
-  configuredRunner=dispatchConfiguredRuntimeB}={}){
+  configuredRunner=dispatchConfiguredRuntimeB,
+  beaRunner=runBeaNativeSourceOnce,beaCandidateRoot=null}={}){
   // The installed configured-theme runtime has its own reviewed, recoverable
   // preflight -> one-shot -> repeat-upgrade engine. Do not wrap it in the
   // incompatible generic bundle CAS transaction.
@@ -50,7 +53,7 @@ export async function applyApprovedOnce(auth,{makeApprovedNativeAdapter=null,
         compatibilityDirections:2,
         compatibilitySharedLockVerified:true}:{};
     return {status:verified?'DIRECT_B_EFFECT_PASS_NOT_PUBLISHED':
-      outcome?.status==='STATE_UNKNOWN'?'DIRECT_B_EFFECT_UNKNOWN':
+      ['STATE_UNKNOWN','PASS'].includes(outcome?.status)?'DIRECT_B_EFFECT_UNKNOWN':
       'DIRECT_B_EFFECT_BLOCKED',
       code:verified?'DIRECT_B_LOCAL_EFFECT_PASS':
         configuredReason??(outcome?.status==='STATE_UNKNOWN'?
@@ -59,6 +62,26 @@ export async function applyApprovedOnce(auth,{makeApprovedNativeAdapter=null,
       controlSha:auth.controlSha,sourceSha:auth.manifest.sourceSha,
       mode:auth.mode,reportStatus:'INCOMPLETE',operationSucceeded:verified,
       ...compatibilityProof};
+  }
+  if(auth.mode===BEA_B_MODE){
+    const outcome=await beaRunner(auth,{candidateRoot:beaCandidateRoot});
+    const ok=outcome?.status==='PASS'&&outcome.providerRequests===1&&
+      /^[a-f0-9]{64}$/.test(outcome.sourceVersion??'')&&
+      /^[a-f0-9]{64}$/.test(outcome.sourceHttpSha256??'')&&
+      Number.isSafeInteger(outcome.sourceStoredAt)&&
+      /^\d{4}Q[1-4]$/.test(outcome.observedThrough??'');
+    return {status:ok?'DIRECT_B_EFFECT_PASS_NOT_PUBLISHED':
+      outcome?.status==='STATE_UNKNOWN'?'DIRECT_B_EFFECT_UNKNOWN':
+      'DIRECT_B_EFFECT_BLOCKED',
+      code:ok?'DIRECT_B_LOCAL_EFFECT_PASS':
+        outcome?.code??'DIRECT_B_BEA_ARCHIVE_READBACK_STOP',
+      requestId:auth.request.requestId,manifestSha256:sha(auth.raw),
+      controlSha:auth.controlSha,sourceSha:auth.manifest.sourceSha,
+      mode:BEA_B_MODE,reportStatus:'INCOMPLETE',operationSucceeded:ok,
+      ...(ok?{sourceVersion:outcome.sourceVersion,
+        sourceHttpSha256:outcome.sourceHttpSha256,
+        sourceStoredAt:outcome.sourceStoredAt,
+        observedThrough:outcome.observedThrough}:{} )};
   }
   // No default OS adapter: using an uninstalled B source must not grant effects.
   need(typeof makeApprovedNativeAdapter==='function',
@@ -114,6 +137,12 @@ async function main(){
   // The sole native factory is code in the fixed reviewed checkout. Issue body
   // cannot select modules, paths, commands, targets or bridge capabilities.
   const fixedBridge=new URL('./native-adapter.mjs',import.meta.url);
+  if(auth.mode===BEA_B_MODE){
+    const candidateRoot=path.join(env.GITHUB_WORKSPACE??'',
+      'configured-feature-source');
+    verifyPinnedSourceCheckout(auth,{sourceRoot:candidateRoot});
+    return applyApprovedOnce(auth,{beaCandidateRoot:candidateRoot});
+  }
   if(auth.mode===CONFIGURED_B_EFFECT){
     verifyPinnedSourceCheckout(auth,{sourceRoot:path.join(
       env.GITHUB_WORKSPACE??'','configured-feature-source')});

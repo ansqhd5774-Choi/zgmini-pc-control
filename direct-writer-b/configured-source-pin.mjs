@@ -6,6 +6,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {loadApprovedRaw} from './approval-contract.mjs';
+import {BEA_B_MODE,isApprovedBeaNativeSource}
+  from './bea-native-source-once.mjs';
 
 const fail=code=>{throw Object.assign(Error(code),{code});};
 const need=(ok,code)=>{if(!ok)fail(code);};
@@ -13,6 +15,11 @@ const need=(ok,code)=>{if(!ok)fail(code);};
 export function resolveConfiguredSourcePin({event,env,controlRoot,
   loadAuth=loadApprovedRaw}={}){
   const auth=loadAuth({event,env,controlRoot});
+  if(auth.mode===BEA_B_MODE){
+    need(isApprovedBeaNativeSource(auth.manifest),
+      'DIRECT_B_BEA_SOURCE_PIN_STOP');
+    return auth.manifest.sourceSha;
+  }
   if(auth.mode!=='CONFIGURED_THEMES_REPEAT_UPGRADE')return '';
   need(auth.manifest.sourceRepository==='ansqhd5774-Choi/zgmini'&&
     /^[a-f0-9]{40}$/.test(auth.manifest.sourceSha??'')&&
