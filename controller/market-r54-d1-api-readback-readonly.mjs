@@ -147,14 +147,20 @@ export async function inspectR54PublicReadback(dataRoot,{
  try{
   if(fetchFixed)apiResponse=await fetchFixed();
   else{
-   const ctrl=new AbortController();
    const response=await fetch(URL,{method:'GET',redirect:'error',
     headers:{accept:'application/json','cache-control':'no-cache'},
     signal:AbortSignal.timeout(12000)});
    apiResponse.httpStatus=response.status;
-   if(response.ok&&Number(response.headers.get('content-length')??'0')<=MAX){
-    const bodyText=await response.text();
-    if(Buffer.byteLength(bodyText,'utf8')<=MAX)apiResponse.body=JSON.parse(bodyText);
+   const headerSize=Number(response.headers.get('content-length')??'0');
+   if(response.ok&&headerSize<=MAX&&response.body){
+    const reader=response.body.getReader(),chunks=[];let size=0;
+    try{
+     while(size<=MAX){
+      const {done,value}=await reader.read();if(done)break;
+      size+=value.byteLength;if(size>MAX)break;chunks.push(value);
+     }
+     if(size<=MAX)apiResponse.body=JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    }finally{await reader.cancel().catch(()=>{});}
    }
   }
  }catch{apiResponse={httpStatus:null,body:null};}
