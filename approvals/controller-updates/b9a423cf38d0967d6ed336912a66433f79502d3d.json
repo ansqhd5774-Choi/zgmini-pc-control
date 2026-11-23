@@ -1,0 +1,39 @@
+{
+  "schema": "ZGMINI_PC_UPDATE_V1",
+  "installedSha": "ce843af5948881db399e4810d81590e4f825b76d",
+  "targetSha": "b9a423cf38d0967d6ed336912a66433f79502d3d",
+  "allowFiles": [
+    {
+      "path": "controller/earnings-bea-nipa-capture-readonly.mjs",
+      "sha256": "80a68c5fb0595eb19a83d47ecd7452626545eb3bec32aa046c69a50e0cb59959"
+    }
+  ],
+  "purpose": "pc-controller-maintenance",
+  "controllerOnlyInstall": true,
+  "approval": {
+    "grade": "B",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2955",
+    "scope": "PC_CONTROL_CONTROLLER_UPDATE"
+  },
+  "checks": {
+    "targetSha": "b9a423cf38d0967d6ed336912a66433f79502d3d",
+    "status": "PASS",
+    "manifestSha256": "72a2181a39e79bfbde9390cb8ea487d452cd16fa868e17305bab9696fb161b91"
+  },
+  "backup": {
+    "strategy": "VERSIONED_SNAPSHOT",
+    "rollback": {
+      "kind": "RESTORE_INSTALLED_SHA",
+      "sha": "ce843af5948881db399e4810d81590e4f825b76d"
+    }
+  },
+  "postOperation": "core-status",
+  "postSourceBranch": "main",
+  "postSourceSha": "2b69dcbc7ade75815e0c152fd0e2112ddaa5b333",
+  "selectiveSource": {
+    "schema": "ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1",
+    "branch": "codex/w05-bea-stored-compute-a-selective-20261123",
+    "mainSha": "513f20323ee141c180264edea8cc00f046c30546",
+    "customPaths": []
+  }
+}
