@@ -151,6 +151,8 @@ on:
       - 'tests/controller-heavy-only-install.test.mjs'
       - 'tools/maintenance-apply.mjs'
       - 'tools/controller-rollback-recovery.mjs'
+      - 'tools/w05-2821-operator-readonly-receipt.mjs'
+      - 'tests/w05-2821-operator-readonly-receipt.test.mjs'
       - 'tests/rollback-stalled-claim.test.mjs'
       - 'tests/interrupted-rollback.test.mjs'
       - 'tests/rollback-first-evidence.test.mjs'
@@ -228,6 +230,8 @@ jobs:
         run: node tools/controller-ci-scope.mjs
       - name: Check CI scope selection regressions
         run: node --test tests/controller-ci-scope.test.mjs
+      - name: Verify W05 independent operator receipt without operational access
+        run: node --test --test-concurrency=1 tests/w05-2821-operator-readonly-receipt.test.mjs
       - name: Verify pc-job late-label intake remains opt-in and deduplicated
         run: node --test --test-concurrency=1 tests/pc-job-late-label-intake.test.mjs tests/preimage-manifest-contract.test.mjs
       - name: Verify bounded PC Git-origin inventory and no false unique source attribution
