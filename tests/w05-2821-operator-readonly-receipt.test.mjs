@@ -1,11 +1,12 @@
 import test from 'node:test';
+import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
-import {ISSUE,REQUEST_ID,REPO,newReport,postAndVerify,collectReport}
+import {ISSUE,REQUEST_ID,REPO,newReport,postAndVerify,collectReport,inspectProbeProvenance}
  from '../tools/w05-2821-operator-readonly-receipt.mjs';
 const issueUrl='https://api.github.com/repos/'+REPO+'/issues/'+ISSUE;
 const good=()=>({...newReport({now:new Date('2026-11-23T05:30:00Z'),
  id:'11111111-2222-4333-8444-555555555555'}),
- nodeOperator:'PASS',nodeOperatorExit:'0',approval:'PASS',
+ nodeOperator:'PASS',nodeOperatorExit:'0',probeCheckout:'PASS',operatorVbs:'PASS',approval:'PASS',
  toolHashes:'5/5',originalCas:'5/5',recoveryClaim:'ABSENT',
  claimOwner:'NONE',originalOwnerAlive:'NO',readStatus:'READ_ONLY_COLLECTED'});
 
@@ -81,5 +82,53 @@ test('noninteractive/Runner environment cannot attest operator',()=>{
   const r=collectReport();
   assert.equal(r.nodeOperator,'UNVERIFIED');
   assert.equal(r.readStatus,'INDEPENDENT_WINDOWS_OPERATOR_REQUIRED');
+ }
+});
+
+
+const hash=v=>createHash('sha256').update(v).digest('hex');
+function sourceFixture({branch='main',tamperedProbe=false,tamperedVbs=false,
+ forgedManifest=false}={}){
+ const probe=Buffer.from('approved-inspection-script');
+ const vbs=Buffer.from('approved-operator-vbs');
+ const drift=Buffer.from('changed');
+ const sourceSha='a'.repeat(40);
+ const installedVbs=tamperedVbs?drift:vbs;
+ const manifest=JSON.stringify({schema:'ZGMINI_PC_MAINTENANCE_INSTALL_V1',
+  sourceSha,files:{'tools/maintenance-ancestry.vbs':
+   hash(forgedManifest?installedVbs:vbs)}});
+ const cfg={
+  entry:'C:/probe.mjs',
+  installation:'C:/maintenance',
+  readFile:file=>{
+   if(file==='C:/probe.mjs')return tamperedProbe?drift:probe;
+   if(file.endsWith('MAINTENANCE_INSTALL.json'))return Buffer.from(manifest);
+   if(file.endsWith('maintenance-ancestry.vbs'))return installedVbs;
+   throw Error('UNEXPECTED_PATH');
+  },
+  git:args=>{
+   if(args[0]==='branch')return{status:0,stdout:branch+'\n'};
+   if(args[0]==='show'&&args[1]==='HEAD:tools/w05-2821-operator-readonly-receipt.mjs')
+    return{status:0,stdout:probe};
+   if(args[0]==='show'&&args[1]===sourceSha+':tools/maintenance-ancestry.vbs')
+    return{status:0,stdout:vbs};
+   throw Error('UNEXPECTED_GIT');
+  }
+ };
+ return cfg;
+}
+test('operator source provenance verifies exact main checkout plus installed WMI origin',()=>{
+ assert.deepEqual(inspectProbeProvenance(sourceFixture()),
+  {probeCheckout:'PASS',operatorVbs:'PASS'});
+});
+test('operator proof fails closed on checkout branch or script byte drift',()=>{
+ assert.equal(inspectProbeProvenance(sourceFixture({branch:'codex/unsafe'})).probeCheckout,'FAIL');
+ assert.deepEqual(inspectProbeProvenance(sourceFixture({tamperedProbe:true})),
+  {probeCheckout:'FAIL',operatorVbs:'FAIL'});
+});
+test('installed WMI drift and self-consistent forged manifest cannot attest',()=>{
+ for(const opts of [{tamperedVbs:true},{tamperedVbs:true,forgedManifest:true}]){
+  assert.deepEqual(inspectProbeProvenance(sourceFixture(opts)),
+   {probeCheckout:'PASS',operatorVbs:'FAIL'});
  }
 });
