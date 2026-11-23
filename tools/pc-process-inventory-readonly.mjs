@@ -873,6 +873,48 @@ export function inspect1841LeaseCorrelation({
 const W05_2821_ID='pc-update-c09a58ae-4d2d-4f70-ae66-aa64d976ee51';
 const W05_2821_OLD='2f3ebcf3518a5e9b694bafbb7e6331840a6a4a25';
 const W05_2821_TARGET='08f0b656faa9ad5c46a813a0cdda4b43107eefbd';
+// Fixed local Windows checkout preflight for the already-approved #2821 rollback.
+// Observes exact source bytes only; this is NOT independent operator identity,
+// not six-Runner verification, and never starts recovery or changes a lease.
+const W05_2821_SOURCE='fda563c93f4680709788ba782ad1918abf74ff2d';
+const W05_2821_ROLLBACK_FILES=[
+ ['tools/controller-rollback-recovery.mjs','414064c4853d674b3aea078158342ad854722fb03864fa8fd214a2f974dcf677'],
+ ['tools/update.mjs','8505e7e98bd95297944e57262fbfe510ffecccd9ec3d90e46c37265d7e09a8cc'],
+ ['tools/maintenance-apply.mjs','39d35b0c2bb3516c7f15f0ad3a79bb90654557991d85c92b721773c87372f400'],
+ ['tools/maintenance-contract.mjs','cdaf63cef96d872cccb2a2fc33cab37eba7d1a91301b7f382c338374e2bf335e'],
+ ['tools/maintenance-lock.mjs','d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd']
+];
+export function inspectW052821CheckoutReadonly({
+ checkoutRoot='E:/ZGmini/projects/zgmini-pc-control',
+ fileSystem=fs,expected=W05_2821_ROLLBACK_FILES
+}={}){
+ const exact=(rel,max)=>{
+  const p=path.join(checkoutRoot,rel),st=fileSystem.lstatSync(p);
+  if(!st.isFile()||st.isSymbolicLink()||st.size<1||st.size>max)
+   throw Error('UNSAFE_FILE');
+  const bytes=fileSystem.readFileSync(p);
+  if(!Buffer.isBuffer(bytes)||bytes.length!==st.size)throw Error('FILE_CHANGED');
+  return bytes;
+ };
+ try{
+  const approval=JSON.parse(exact(
+   'approvals/maintenance-recoveries/'+W05_2821_ID+'.rollback.json',8192).toString('utf8'));
+  if(approval.schema!=='ZGMINI_PC_ROLLBACK_APPROVAL_V1'||
+     approval.approved!==true||approval.requestId!==W05_2821_ID||
+     approval.sourceSha!==W05_2821_SOURCE||
+     !Array.isArray(approval.files)||approval.files.length!==5||
+     expected.length!==5||
+     !expected.every(([rel,digest])=>approval.files.filter(f=>
+      f.path===rel&&f.sha256===digest).length===1))
+   return 'W05_CHECKOUT_APPROVAL_DRIFT';
+  for(const [rel,digest] of expected){
+   if(createHash('sha256').update(exact(rel,2097152)).digest('hex')!==digest)
+    return 'W05_CHECKOUT_SOURCE_DRIFT';
+  }
+  return 'W05_CHECKOUT_BYTES_VERIFIED';
+ }catch{return 'W05_CHECKOUT_UNAVAILABLE';}
+}
+
 export function inspectW052821RecoveryCasReadonly({
  maintenanceRoot='E:/ZGmini/automation/pc-maintenance',
  controlRoot='E:/ZGmini/automation/pc-control',
@@ -952,6 +994,7 @@ export function inspectW052821RecoveryCasReadonly({
    ownerMarkerSame,ownerAlive:typeof pidAlive==='boolean'?pidAlive:null,
    hostSame:first.currentHost.equals(first.snapshotHost),
    backupFilesVerified,protectionSame,digests,
+   checkoutCode:inspectW052821CheckoutReadonly(),
    // A matching owner nonce is not independent proof of install-request lineage.
    leaseBoundToRequest:null,recoveryEligible:false,
    operationalWrites:0,providerCalls:0,d1Writes:0};
