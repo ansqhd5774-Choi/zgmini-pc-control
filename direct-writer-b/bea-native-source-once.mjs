@@ -88,6 +88,38 @@ export function verifyBeaReadback(capture,readback){
     'DIRECT_B_BEA_INDEPENDENT_READBACK_STOP');
   return true;
 }
+// Return a fixed, non-sensitive code only. Never expose URL/UserID, stack,
+ // response bytes, error.message from a network client, or file paths.
+const BEA_SAFE_FAILURES=new Map([
+  ['BEA_UNIT_NIPA_COLLECT_HTTP_UNAVAILABLE','DIRECT_B_BEA_HTTP_UNAVAILABLE'],
+  ['BEA_UNIT_NIPA_COLLECT_PROVIDER_UNAVAILABLE','DIRECT_B_BEA_PROVIDER_UNAVAILABLE'],
+  ['BEA_UNIT_NIPA_COLLECT_RESPONSE_TOO_LARGE','DIRECT_B_BEA_RESPONSE_TOO_LARGE'],
+  ['BEA_UNIT_NIPA_COLLECT_SOURCE_TIME_INVALID','DIRECT_B_BEA_SOURCE_TIME_INVALID'],
+  ['BEA_UNIT_NIPA_COLLECT_CREDENTIAL_UNAVAILABLE','DIRECT_B_BEA_CREDENTIAL_UNAVAILABLE'],
+  ['BEA_UNIT_NIPA_ARCHIVE_SOURCE_MISMATCH','DIRECT_B_BEA_ARCHIVE_SOURCE_MISMATCH'],
+  ['BEA_UNIT_NIPA_ARCHIVE_METADATA_MISMATCH','DIRECT_B_BEA_ARCHIVE_METADATA_MISMATCH'],
+  ['BEA_UNIT_NIPA_ARCHIVE_MISSING','DIRECT_B_BEA_ARCHIVE_MISSING'],
+  ['BEA_UNIT_NIPA_ARCHIVE_PATH_UNSAFE','DIRECT_B_BEA_ARCHIVE_PATH_UNSAFE'],
+  ['BEA_UNIT_NIPA_ARCHIVE_READBACK_MISMATCH','DIRECT_B_BEA_ARCHIVE_READBACK_MISMATCH'],
+  ['DIRECT_B_BEA_ARCHIVE_READBACK_STOP','DIRECT_B_BEA_ARCHIVE_READBACK_STOP'],
+  ['DIRECT_B_BEA_INDEPENDENT_READBACK_STOP','DIRECT_B_BEA_INDEPENDENT_READBACK_STOP'],
+]);
+export function classifyBeaNativeFailure(error){
+  // These names originate only in reviewed, pinned source-owner modules.
+  // Do not project arbitrary error strings into an Actions result or journal.
+  return BEA_SAFE_FAILURES.get(error?.code) ??
+    BEA_SAFE_FAILURES.get(error?.message) ??
+    'DIRECT_B_BEA_SOURCE_OR_STORE_UNKNOWN';
+}
+function appendBeaJournalPhase(file,phase,code=null){
+  const record={phase,...(code?{code}:{})};
+  const fd=fs.openSync(file,'a');
+  try{
+    fs.writeSync(fd,JSON.stringify(record)+'\\n');
+    fs.fsyncSync(fd);
+  }finally{fs.closeSync(fd);}
+}
+
 // Installed source is used only as a CAS preimage; the effect implementation is
 // the immutable, reviewed Actions candidate checkout pinned by manifest.sourceSha.
 export async function runBeaNativeSourceOnce(auth,{candidateRoot,
@@ -147,6 +179,9 @@ export async function runBeaNativeSourceOnce(auth,{candidateRoot,
       attemptedAt:new Date().toISOString()
     })+'\n',{flag:'wx'});
     attempted=true;
+    // Distinguish "entered collector" from validation or readback failures
+    // without claiming the external GET actually completed.
+    appendBeaJournalPhase(claim.journalFile,'BEA_NATIVE_COLLECTOR_ENTERED');
     const value=await perform({pcBase:PC_ROOT,providers});
     const capture=verifyBeaCapture(value);
     verifyBeaReadback(capture,await readArchive({pcBase:PC_ROOT,
@@ -166,10 +201,14 @@ export async function runBeaNativeSourceOnce(auth,{candidateRoot,
       ...capture};
   }catch(error){
     if(attempted){
-      // Original claim + immutable marker survive ambiguous completion.
-      // Never replay the external GET under the same requestId.
-      return {status:'STATE_UNKNOWN',
-        code:'DIRECT_B_BEA_ATTEMPT_RECONCILE_REQUIRED'};
+      // Preserve only fixed error categories; even a journal write failure
+      // may follow an external GET, so NEVER replay this requestId.
+      const code=classifyBeaNativeFailure(error);
+      try{appendBeaJournalPhase(
+        path.join(journalRoot,requestId,'journal.jsonl'),
+        'BEA_NATIVE_ATTEMPT_FAILED',code);
+      }catch{}
+      return {status:'STATE_UNKNOWN',code};
     }
     throw Object.assign(Error('DIRECT_B_BEA_PREFLIGHT_STOP'),
       {code:'DIRECT_B_BEA_PREFLIGHT_STOP'});
