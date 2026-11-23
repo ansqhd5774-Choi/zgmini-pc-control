@@ -1,0 +1,23 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "ce201e63-71c7-4634-9601-ddd6722961cb",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "37f9048705793da5e49c4ff271f90dff444ec44b",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "8c1a7738fe71770d666f09b40fb1c435262a75fa",
+  "candidateSourceSha": "1ee0231fde631662555f0efcd646575b48ee98aa",
+  "manifestSha256": "11ff3c904dbc78da68d91e9c2bffcb14308f79e7d0754b4c4c6afd1a3b2974a5",
+  "baseTreeOid": "83e7362703bfc7ff46477a05f6f73d6c31e081d3",
+  "preparedTreeOid": "39c8f2da61b09bbfdb9c7f27cbbadf2d7890a2b9",
+  "provenanceSha256": "3db2e6f3a8c2431715f58b4dd4a77e42f1a2a1e3017ad9d8ee7f9f67267c1086",
+  "runId": "45207752906",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/market.mjs",
+    "lib/score-history/d05-independent-input-selector-witness-r1.mjs",
+    "lib/score-history/composite-archive-lineage-link-r1.mjs",
+    "lib/score-history/d05-lineage-event-contract-r1.mjs"
+  ]
+}
