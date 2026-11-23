@@ -91,9 +91,9 @@ test('passing TAP test titles do not turn an unrelated CI failure into HTTP 503 
     '2026-11-23T03:27:26.3057527Z ok 24 - fresh latest HTTP 503 stays failed despite burst-derived cadence',
     '2026-11-23T03:27:55.0336906Z ##[error]Process completed with exit code 1.'
   ];
-  assert.deepEqual(classifyLogs(lines.join('\\n')),[]);
+  assert.deepEqual(classifyLogs(lines.join('\n')),[]);
   assert.deepEqual(classifyLogs([...lines,
-    '2026-11-23T03:27:52.8015570Z not ok 175 - actual regression failure'].join('\\n')),
+    '2026-11-23T03:27:52.8015570Z not ok 175 - actual regression failure'].join('\n')),
     ['ASSERTION_HINT']);
   assert.deepEqual(classifyLogs('2026-11-23T03:27:27.000Z ##[error]HTTP 503 from provider'),
     ['UPSTREAM_5XX_HINT']);
