@@ -1,0 +1,15 @@
+{
+  "schema": "ZGMINI_PC_PUBLICATION_RESULT_V1",
+  "requestId": "pc-publication-9a0be743-689d-4a8e-8c6f-308b22d41b2a",
+  "operation": "bea-unit-nipa-json-once",
+  "issueNumber": 3023,
+  "snapshotKey": "detail:earnings-bea-unit-profit:v1",
+  "status": "BLOCKED",
+  "code": "PUBLICATION_OPERATIONAL_SOURCE_MISMATCH",
+  "startedAt": "2026-11-23T15:08:44.467Z",
+  "finishedAt": "2026-11-23T15:08:45.614Z",
+  "providerCalls": null,
+  "d1Writes": 0,
+  "sourceVersion": null,
+  "sourceStoredAt": null
+}
