@@ -32,8 +32,8 @@ const code=s=>/^[A-Z][A-Z0-9_]{0,79}$/.test(String(s??''))?String(s):'UNKNOWN';
 // maintenance receiver's own approved file. Never publish raw source/identity.
 export function inspectProbeProvenance({
  readFile=fs.readFileSync,
- git=(args,opts)=>g(args,opts),
- checkout=repo,installation=maint,entry=fileURLToPath(import.meta.url)
+ git=(args,opts)=>exec('git',['-C',repo,...args],opts),
+ installation=maint,entry=fileURLToPath(import.meta.url)
 }={}){
  const evidence={probeCheckout:'FAIL',operatorVbs:'FAIL'};
  try{
