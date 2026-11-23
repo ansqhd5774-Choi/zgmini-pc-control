@@ -1,3 +1,9 @@
+## 이슈·PR 해결 담당자 전용 현행 작업 정본 — 2026-11-23
+
+**`zgmini-pc-control / codex/issues-lifecycle-manager-20261118`** 담당자는 [`docs/ISSUE_LIFECYCLE_MANAGEMENT_STANDARD_20261118.md`](docs/ISSUE_LIFECYCLE_MANAGEMENT_STANDARD_20261118.md)를 따른다. 사용자 지정 R2는 종전의 '검토·인계만 수행', '운영 PC 변경 권한 없음', '격리 PC에서만 작업', '기능 원담당에게 운영 적용을 반드시 인계'라는 **이슈담당자 역할 제한을 대체**한다.
+
+이슈담당자는 최신 생성 Open Issue·Open PR을 각각 확인해 실제 문제를 **인수**하면 원인 분석, 최소 소스 수정, 관련 시험, 승인된 병합·운영 설치/복구·저장/게시 검증, 결과 기록, 종결을 직접 수행한다. 프로젝트 전체 총괄 직책이 되는 것은 아니며 **인수하지 않은 타 담당의 기능·브랜치를 임의 수정하지 않는다**. 실제 도구 권한·개별 운영 승인·B/C 안전 검사, 기존 PC와 격리 PC의 물리적 구분, 공유 자원 lease/CAS·백업·결과 검증은 유지한다. 과거 권한 제한을 기술한 문구는 해당 시점의 이력이며 이 담당자의 현행 업무 제한으로 사용하지 않는다.
+
 ## 저장소·담당 소속 — 2026-11-23 사용자 지정
 
 프로세스 총괄은 **`zgmini` / `codex/controller-ops-lessons-20261105`**, 이슈 담당자는 **`zgmini-pc-control` / `codex/issues-lifecycle-manager-20261118`**, 자동화 담당자는 **`zgmini-pc-control` / `codex/pc-automation-process-improvement-20261119`**에 소속된다. [역할 정본](https://github.com/ansqhd5774-Choi/zgmini/blob/main/docs/REPOSITORY_ROLES.md)을 따른다. 아래 과거 소속·호칭과 충돌하면 이 결정을 우선한다. 업무 소속과 실제 코드 변경 저장소는 구분하며 기존 승인·운영 보호·기능 담당자의 독립 작업은 유지한다. 새 승인 Gate를 추가하지 않는다.
