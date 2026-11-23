@@ -123,24 +123,57 @@ export const RUN_STATUS_PARTITIONS=Object.freeze([
   'failure','timed_out','cancelled','action_required',
   'queued','waiting','in_progress','pending'
 ]);
-async function recentRuns(now){
+// Overflow is resolved by at most eight day-scoped partitions, not by
+// increasing the regular scan of every status or removing coverage limits.
+// The first (partial) UTC day is retained; reports exclude pre-cutoff items.
+export async function recentRuns(now,requestRuns=request){
   const cutoff=now-WIDE_POLICY.lookbackDays*86400000;
-  const after=new Date(cutoff).toISOString().slice(0,10);
+  const firstDay=new Date(cutoff).toISOString().slice(0,10);
+  const lastDay=new Date(now).toISOString().slice(0,10);
+  const dateDays=[];
+  for(let d=Date.parse(firstDay+'T00:00:00Z');
+      d<=Date.parse(lastDay+'T00:00:00Z');d+=86400000){
+    dateDays.push(new Date(d).toISOString().slice(0,10));
+  }
+  if(dateDays.length>9)stop('RUN_WINDOW_OVERFLOW');
+  async function pageFor(status,created,page){
+    const x=await requestRuns('actions/runs?status='+encodeURIComponent(status)+
+      '&created='+encodeURIComponent(created)+'&per_page=100&page='+page);
+    if(!Array.isArray(x?.workflow_runs)||x.workflow_runs.length>100)
+      stop('RUN_PAGINATION_'+status);
+    return x.workflow_runs;
+  }
+  function endsWindow(rows){
+    if(rows.length<100)return true;
+    const oldest=Date.parse(rows.at(-1)?.created_at||'');
+    return Number.isFinite(oldest)&&oldest<cutoff;
+  }
   const batches=await Promise.all(RUN_STATUS_PARTITIONS.map(async status=>{
     const items=[];let complete=false;
     for(let page=1;page<=2;page++){
-      const x=await request('actions/runs?status='+encodeURIComponent(status)+
-        '&created='+encodeURIComponent('>='+after)+'&per_page=100&page='+page);
-      if(!Array.isArray(x?.workflow_runs))stop('RUN_PAGINATION_'+status);
-      items.push(...x.workflow_runs);
-      if(x.workflow_runs.length<100){complete=true;break;}
-      const oldest=Date.parse(x.workflow_runs.at(-1)?.created_at||'');
-      if(Number.isFinite(oldest)&&oldest<cutoff){complete=true;break;}
+      const rows=await pageFor(status,'>='+firstDay,page);
+      items.push(...rows);
+      if(endsWindow(rows)){complete=true;break;}
+    }
+    if(!complete){
+      // A busy seven-day status exceeds 200 runs. Partition by calendar day
+      // using bounded one/two-page reads; never infer completeness from cap.
+      const daily=[];complete=true;
+      for(const day of dateDays){
+        let dayComplete=false;
+        for(let page=1;page<=2;page++){
+          const rows=await pageFor(status,day,page);
+          daily.push(...rows);
+          if(endsWindow(rows)){dayComplete=true;break;}
+        }
+        if(!dayComplete)complete=false;
+      }
+      items.splice(0,items.length,...daily);
     }
     return {status,items,complete};
   }));
-  // A run may transition while parallel GitHub queries are in flight.
-  // Keep the latest available state, but do not declare the inventory complete.
+  // A run can change status between separate API queries; never claim full
+  // completeness when the same run appears in multiple status partitions.
   const map=new Map();let complete=batches.every(x=>x.complete);
   const rank={completed:4,in_progress:3,waiting:2,queued:1,pending:0};
   for(const batch of batches){
@@ -153,11 +186,12 @@ async function recentRuns(now){
       }else map.set(run.id,run);
     }
   }
-  const items=[...map.values()].sort((a,b)=>
+  const all=[...map.values()].sort((a,b)=>
     Date.parse(b.created_at)-Date.parse(a.created_at)||b.id-a.id);
-  return {items,complete,coverage:batches.map(x=>({
-    status:x.status,count:x.items.length,complete:x.complete
-  }))};
+  if(all.length>WIDE_POLICY.maxRuns)complete=false;
+  return {items:all.slice(0,WIDE_POLICY.maxRuns),complete,
+    coverage:batches.map(x=>({status:x.status,count:x.items.length,
+      complete:x.complete}))};
 }
 async function readWorkflows(){
   const values=[];
