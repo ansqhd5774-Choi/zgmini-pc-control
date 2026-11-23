@@ -55,7 +55,7 @@ test('fixed admission disallows original ID reuse, changed effect, target or act
  }))));
 });
 
-function setup(t,{wrongApproval=false,throwAfterExec=false,approvalMutation=null}={}){
+function setup(t,{wrongApproval=false,throwAfterExec=false,approvalMutation=null,encodedMutation=null}={}){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-installed-recovery-'));
  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  const leaseRoot=path.join(root,'leases');fs.mkdirSync(leaseRoot);
@@ -82,7 +82,7 @@ function setup(t,{wrongApproval=false,throwAfterExec=false,approvalMutation=null
     const resource=args[1].split('?')[0];
     if(resource.endsWith('/'+INSTALLED_RECOVERY_MANIFEST_PATH))
      return {stdout:JSON.stringify({type:'file',encoding:'base64',
-      content:(wrongApproval?Buffer.from('{"approved":false}'):manifest).toString('base64')})};
+      content:(encodedMutation??(x=>x))((wrongApproval?Buffer.from('{"approved":false}'):manifest).toString('base64'))})};
     assert.match(resource,/\/contents\/results\/maintenance-/);
     if(args.includes('--method')){
      stats.uploads++;
@@ -174,4 +174,20 @@ test('incomplete but correctly hashed approval is rejected before the one-shot c
    assert.equal(f.agent.loadLedger(f.request.requestId),null);
   });
  }
+});
+
+test('GitHub API base64 corruption is blocked even when permissive decoding would match approved bytes',async t=>{
+ const f=setup(t,{encodedMutation:encoded=>encoded.slice(0,8)+'?'+encoded.slice(8)});
+ const result=await f.agent.pollOnce();
+ assert.equal(result[0].status,'BLOCKED',JSON.stringify(result));
+ assert.equal(result[0].code,'INSTALLED_RECOVERY_APPROVAL_INVALID');
+ assert.equal(f.stats.recoveries,0);
+ assert.equal(f.agent.loadLedger(f.request.requestId),null);
+});
+
+test('GitHub API line-wrapped base64 remains valid under strict decoding',async t=>{
+ const f=setup(t,{encodedMutation:encoded=>encoded.match(/.{1,65}/g).join('\n')});
+ const result=await f.agent.pollOnce();
+ assert.equal(result[0].status,'SUCCEEDED',JSON.stringify(result));
+ assert.equal(f.stats.recoveries,1);
 });
