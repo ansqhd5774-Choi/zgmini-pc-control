@@ -504,6 +504,37 @@ test('1841 already-restored exact snapshot resumes intake without another restor
  const before=f.rows.findIndex(x=>x.code==='RECOVERY_INTAKE_RESUME_STARTED');
  assert.ok(before>=0);assert.equal(f.rows[before].mutationStarted,true);
 });
+test('W05 BACKED_UP independent recovery accepts previously verified online original while seats are busy',async()=>{
+ const observed=[];
+ const f=restoredRecovery({verifyPrevious:async opts=>{observed.push(opts);return opts.requireIdle===false;}});
+ f.original.firstFail='BACKED_UP';
+ const out=await f.run();
+ assert.equal(out.status,'ROLLED_BACK');
+ assert.equal(out.originalPhase,'BACKED_UP');
+ assert.equal(out.existingVersionPreserved,true);
+ assert.equal(out.actualInstalledSha,previous);
+ assert.equal(out.originalRequestRetried,false);
+ assert.ok(!f.calls.includes('restore'));
+ assert.ok(!f.calls.includes('reconnectPrevious'));
+ assert.ok(f.calls.includes('resumeIntake'));
+ assert.ok(f.calls.includes('reconcileBacklog'));
+ assert.deepEqual(observed,[
+  {installedSha:previous,requireRunning:true,requireIdle:false},
+  {installedSha:previous,requireRunning:true,requireIdle:false}]);
+});
+test('W05 independent recovery refuses unproven original without a destructive switch',async()=>{
+ const f=restoredRecovery({
+  verifyRestoredPrevious:async()=>false,
+  preflightRecoveryRestore:async()=>{throw Object.assign(Error(),{code:'RECOVERY_PROTECTION_PREFLIGHT_CHANGED'});}
+ });
+ f.original.firstFail='BACKED_UP';
+ const out=await f.run();
+ assert.equal(out.status,'RECOVERY_REQUIRED');
+ assert.equal(out.code,'RECOVERY_PROTECTION_PREFLIGHT_CHANGED');
+ assert.ok(!f.calls.includes('restore'));
+ assert.ok(!f.calls.includes('reconnectPrevious'));
+ assert.ok(!f.calls.includes('resumeIntake'));
+});
 test('restored intake ambiguity retains mutation flag and never repeats restore or enable',async()=>{
  let n=0;const f=restoredRecovery({resumeIntake:async()=>{n++;throw Object.assign(Error(),{code:'WORKFLOW_ENABLE_NOT_CONFIRMED'});}});
  const r=await f.run();assert.equal(n,1);assert.equal(r.status,'RECOVERY_REQUIRED');
