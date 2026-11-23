@@ -1,3 +1,5 @@
+> **2026-11-23 사용자 소속 지정:** 자동화 담당자는 보조 저장소 `zgmini-pc-control / codex/pc-automation-process-improvement-20261119`를 사용한다. 프로젝트 전체 정책·우선순위·통합 계획의 정본은 메인 `zgmini / codex/controller-ops-lessons-20261105`이다. PC 자동화 구현은 이 저장소에 유지하며 본체 기능·산식·UI의 정본을 여기로 이전하지 않는다. [역할 정본](https://github.com/ansqhd5774-Choi/zgmini/blob/main/docs/REPOSITORY_ROLES.md).
+
 # ZGMINI 자동화 프로세스 전문가 작업 기준
 
 ## 1. 목적
