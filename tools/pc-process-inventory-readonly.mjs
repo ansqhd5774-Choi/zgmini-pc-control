@@ -897,22 +897,33 @@ export function inspectW052821CheckoutReadonly({
   return bytes;
  };
  try{
-  const approval=JSON.parse(exact(
+  // A junction is valid: follow only the fixed root, not untrusted inputs.
+  if(!fileSystem.statSync(checkoutRoot).isDirectory())
+   return 'W05_PROJECT_ROOT_UNAVAILABLE';
+ }catch{return 'W05_PROJECT_ROOT_UNAVAILABLE';}
+ let approval;
+ try{
+  approval=JSON.parse(exact(
    'approvals/maintenance-recoveries/'+W05_2821_ID+'.rollback.json',8192).toString('utf8'));
-  if(approval.schema!=='ZGMINI_PC_ROLLBACK_APPROVAL_V1'||
-     approval.approved!==true||approval.requestId!==W05_2821_ID||
-     approval.sourceSha!==W05_2821_SOURCE||
-     !Array.isArray(approval.files)||approval.files.length!==5||
-     expected.length!==5||
-     !expected.every(([rel,digest])=>approval.files.filter(f=>
-      f.path===rel&&f.sha256===digest).length===1))
-   return 'W05_CHECKOUT_APPROVAL_DRIFT';
-  for(const [rel,digest] of expected){
-   if(createHash('sha256').update(exact(rel,2097152)).digest('hex')!==digest)
-    return 'W05_CHECKOUT_SOURCE_DRIFT';
-  }
-  return 'W05_CHECKOUT_BYTES_VERIFIED';
- }catch{return 'W05_CHECKOUT_UNAVAILABLE';}
+ }catch(e){return e?.code==='ENOENT'?
+  'W05_APPROVAL_MISSING':'W05_APPROVAL_UNREADABLE';}
+ if(approval.schema!=='ZGMINI_PC_ROLLBACK_APPROVAL_V1'||
+    approval.approved!==true||approval.requestId!==W05_2821_ID||
+    approval.sourceSha!==W05_2821_SOURCE||
+    !Array.isArray(approval.files)||approval.files.length!==5||
+    expected.length!==5||
+    !expected.every(([rel,digest])=>approval.files.filter(f=>
+     f.path===rel&&f.sha256===digest).length===1))
+  return 'W05_CHECKOUT_APPROVAL_DRIFT';
+ for(const [rel,digest] of expected){
+  let bytes;
+  try{bytes=exact(rel,2097152);}
+  catch(e){return e?.code==='ENOENT'?
+   'W05_SOURCE_MISSING':'W05_SOURCE_UNREADABLE';}
+  if(createHash('sha256').update(bytes).digest('hex')!==digest)
+   return 'W05_CHECKOUT_SOURCE_DRIFT';
+ }
+ return 'W05_CHECKOUT_BYTES_VERIFIED';
 }
 
 export function inspectW052821RecoveryCasReadonly({
