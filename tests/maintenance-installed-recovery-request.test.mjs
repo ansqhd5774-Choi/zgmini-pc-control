@@ -4,13 +4,12 @@ import {createHash} from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {createMaintenanceAgent} from '../tools/maintenance-agent.mjs';
 import {
- INSTALLED_RECOVERY_OPERATION,INSTALLED_RECOVERY_ISSUE_TITLE,
+ createMaintenanceAgent,INSTALLED_RECOVERY_OPERATION,INSTALLED_RECOVERY_ISSUE_TITLE,
  INSTALLED_RECOVERY_ORIGINAL_ID,INSTALLED_RECOVERY_SOURCE_SHA,
  INSTALLED_RECOVERY_CONTROLLER_SHA,INSTALLED_RECOVERY_MANIFEST_PATH,
  prepareInstalledRecoveryRequest,validateInstalledRecoveryIssueEnvelope,
-} from '../tools/maintenance-contract.mjs';
+} from '../tools/maintenance-agent.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control',ACTOR='ansqhd5774-Choi';
 const digest=b=>createHash('sha256').update(b).digest('hex');
