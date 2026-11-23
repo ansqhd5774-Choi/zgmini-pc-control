@@ -1658,7 +1658,10 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
     'RECOVERY_PREVIOUS_HOST_DRIFT');
    const current=readOwner();
    need(current.status.sourceSha===installedSha,'RECOVERY_PREVIOUS_SUPERVISOR_DRIFT');
-   need(available(apiRunners()),'RECOVERY_PREVIOUS_RUNNERS_NOT_IDLE');
+   // The original Supervisor can be healthy while an A task is running.
+   // Require every dedicated Runner online, not a globally idle roster.
+   need(dedicatedPcRunnerRows(apiRunners(),{requireOnline:true})!==null,
+    'RECOVERY_PREVIOUS_RUNNERS_NOT_ONLINE');
    for(const child of current.status.children){
     need(child.alive===true,'RECOVERY_PREVIOUS_CHILD_NOT_ALIVE');
     try{process.kill(child.pid,0);}catch{need(false,'RECOVERY_PREVIOUS_CHILD_NOT_ALIVE');}
