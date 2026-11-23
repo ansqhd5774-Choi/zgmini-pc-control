@@ -7,7 +7,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 
-const LIMIT_PER_DIR=64;
+const LIMIT_PER_DIR=256;
 const MAX_CANDIDATES=130;
 const MAX_FILE_BYTES=2_000_000;
 const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -78,22 +78,29 @@ export function inspectPcSourceOrigin({dataRoot,fsOps=fs,pathOps=path,git=defaul
   let entries;
   try{entries=fsOps.readdirSync(safe,{withFileTypes:true})}
   catch{continue;}
-  if(entries.length>LIMIT_PER_DIR){output.inventoryTruncated=true;continue;}
-  for(const entry of entries){
-   if(!entry.isDirectory()||entry.isSymbolicLink?.())continue;
+  // Bound eligible directories deterministically; unrelated files or an
+  // oversized parent must not erase every discoverable checkout candidate.
+  const children=entries.filter(entry=>entry.isDirectory()&&!entry.isSymbolicLink?.())
+   .sort((a,b)=>a.name.localeCompare(b.name,'en'));
+  if(children.length>LIMIT_PER_DIR)output.inventoryTruncated=true;
+  for(const entry of children.slice(0,LIMIT_PER_DIR)){
    const child=safeReal(pathOps.join(safe,entry.name));
    if(child&&stat(child)?.isDirectory())dirs.push(child);
   }
  }
- const distinct=[...new Set(dirs.map(s=>s.toLowerCase()))];
- if(distinct.length>MAX_CANDIDATES)output.inventoryTruncated=true;
- // A truncated inventory MUST NOT claim a unique candidate.
- const unique=[...new Map(dirs.map(dir=>[dir.toLowerCase(),dir])).values()].slice(0,MAX_CANDIDATES);
+ // Scan only the bounded parent inventory; unrelated directories must not
+ // consume the 130 eligible-Git-checkout budget.
+ const unique=[...new Map(dirs.map(dir=>[dir.toLowerCase(),dir])).values()];
  for(const dir of unique){
   const mark=pathOps.join(dir,'.git');
   const sourceFile=pathOps.join(dir,'scripts','pc-writer','local-cycle.mjs');
   const safeMark=safeReal(mark),markStat=safeMark&&stat(safeMark);
   if(!safeMark||!markStat||!stat(sourceFile)?.isFile()||!safeReal(sourceFile))continue;
+  // Stop only when the eligible Git candidate budget is exhausted.
+  // A truncated inventory must never certify a unique approved checkout.
+  if(output.candidates.length>=MAX_CANDIDATES){
+   output.inventoryTruncated=true;break;
+  }
   // A worktree .git pointer must not cause git to read a repository outside E:\ZGmini.
   if(markStat.isFile()){
    if(markStat.size>2048)continue;
