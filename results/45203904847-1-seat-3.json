@@ -1,0 +1,128 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-45203904847-1-seat-3",
+  "requestId": "pc-d3a6919d-de64-4456-9cec-a1fa292b2f60",
+  "startedAt": "2026-11-23T15:19:42.504Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "b9a423cf38d0967d6ed336912a66433f79502d3d",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "5c7f1673b4b2ea49f401891a674289c2cc493b8f",
+  "sourceBranch": "main",
+  "operation": "core-status",
+  "seat": 3,
+  "status": "PASS",
+  "code": "CORE_READONLY_DIAGNOSIS",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-controller-ops-core-post-writer-20261124",
+  "effectClass": "FIXED_READONLY_NO_PROVIDER_NO_DB",
+  "pcOperationalApprovedSha": "8c1a7738fe71770d666f09b40fb1c435262a75fa",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "CORE_READONLY_DIAGNOSIS",
+    "core": {
+      "lockPresent": false,
+      "checkpoints": {
+        "local-cycle-last-run.json": {
+          "exists": true,
+          "modifiedAt": "2026-11-23T15:17:07.246Z",
+          "bytes": 3292,
+          "status": "COMPLETE"
+        },
+        "local-collection-last-run.json": {
+          "exists": true,
+          "modifiedAt": "2026-11-23T15:09:25.386Z",
+          "bytes": 4186,
+          "status": "COMPLETE",
+          "employmentR6": {
+            "status": "PARTIAL",
+            "code": null,
+            "providerRequests": 2,
+            "groups": [
+              {
+                "groupName": "DOL_UI_WEEKLY_CLAIMS",
+                "status": "PARTIAL",
+                "failureCode": "DOL_RELEASE_OBSERVATION_STALE",
+                "providerRequests": 2
+              }
+            ],
+            "plannedGroups": [
+              {
+                "groupName": "DOL_UI_WEEKLY_CLAIMS",
+                "status": "DUE",
+                "due": true
+              },
+              {
+                "groupName": "BLS_EMPLOYMENT_SITUATION",
+                "status": "RELEASE_ALREADY_STORED",
+                "due": false
+              },
+              {
+                "groupName": "BLS_JOLTS",
+                "status": "RELEASE_ALREADY_STORED",
+                "due": false
+              },
+              {
+                "groupName": "BLS_ECI",
+                "status": "RELEASE_ALREADY_STORED",
+                "due": false
+              },
+              {
+                "groupName": "BLS_STATE_MSA",
+                "status": "RELEASE_ALREADY_STORED",
+                "due": false
+              },
+              {
+                "groupName": "BLS_BED",
+                "status": "RELEASE_ALREADY_STORED",
+                "due": false
+              }
+            ]
+          }
+        },
+        "local-writer-last-run.json": {
+          "exists": true,
+          "modifiedAt": "2026-11-23T15:14:01.772Z",
+          "bytes": 6787,
+          "status": "VERIFIED",
+          "employmentR6": {
+            "status": "UNCHANGED",
+            "failureCode": null,
+            "asOfDate": "2026-11-23",
+            "sourceStoredAt": 1795307425460,
+            "sourceFeatures": 29,
+            "chartReadyFeatures": 22,
+            "recentlyObservedFeatures": 22,
+            "localResultHash": "bd05ec8514dd4d4f7a70c1df73b173b4e597f10da73d8ca3da0b859408bf16b8",
+            "localResultStored": false,
+            "localResultReadback": "VERIFIED",
+            "methodologyVersion": "EMP-R6-FORMULA-R2-CPS-2025-10",
+            "formulaHash": "sha256:04486846cd6063452d1c764116d3a31209f074d23a8764bf5b6ec8467095210e"
+          }
+        }
+      },
+      "taskXmlHashes": {
+        "ZGMINI-PC-Local-Core": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+        "ZGMINI-PC-Local-Korea": "1797e5def9fc92551132ca69f60bb5320bb346c687988be3e4ff3eb76ef5fdc1",
+        "ZGMINI-PC-Iran-Progress-R13": "APPROVED_RETIRED_ABSENT"
+      },
+      "approvedSourceSha": "8c1a7738fe71770d666f09b40fb1c435262a75fa"
+    },
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "sqliteOpened": false
+  },
+  "protectedBeforeSha256": "f63a80a727d07e46fca6eb3095a11d848ee149b6d3ad73698e2fff0cf0f77221",
+  "protectedAfterSha256": "f63a80a727d07e46fca6eb3095a11d848ee149b6d3ad73698e2fff0cf0f77221",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "b9a423cf38d0967d6ed336912a66433f79502d3d",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-23T15:19:50.543Z",
+  "durationMs": 8039
+}
