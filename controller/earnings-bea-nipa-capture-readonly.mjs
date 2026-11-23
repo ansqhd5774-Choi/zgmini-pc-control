@@ -36,6 +36,60 @@ function parse(bytes){
   try{return JSON.parse(bytes.toString('utf8'));}
   catch{fail('BEA_NIPA_READONLY_INVALID_JSON');}
 }
+// Verified, purely local arithmetic for the exact BEA T11500/A463RD/Line7
+// Level series. Match source-owner quarter and numeric contracts; do not expose
+// the five private observation values in a public Actions receipt.
+const QUARTER=/^(20\\d{2})Q([1-4])$/;
+const NUMBER=/^-?(?:\\d+|[1-9]\\d{0,2}(?:,\\d{3})+)(?:\\.\\d+)?$/;
+export function computeBeaNipaStoredAttestation(data,{sourceVersion,sourceStoredAt,observedThrough}={}){
+  const rows=data?.BEAAPI?.Results?.Data;
+  if(!Array.isArray(rows)||rows.length<5||rows.length>40||
+    !SHA.test(sourceVersion??'')||
+    !Number.isSafeInteger(sourceStoredAt)||sourceStoredAt<=0)
+    fail('BEA_NIPA_CALC_SOURCE_INVALID');
+  const points=rows.map(row=>{
+    if(row?.TableName!=='T11500'||row.SeriesCode!=='A463RD'||
+       String(row.LineNumber)!=='7')fail('BEA_NIPA_CALC_IDENTITY_INVALID');
+    if(String(row.UNIT_MULT??'').trim()!=='0'||
+       !['usd','dollars','level'].includes(String(row.CL_UNIT??'').trim().toLowerCase()))
+      fail('BEA_NIPA_CALC_UNIT_UNVERIFIED');
+    const q=QUARTER.exec(String(row.TimePeriod??''));
+    if(!q)fail('BEA_NIPA_CALC_QUARTER_INVALID');
+    const raw=String(row.DataValue??'');
+    if(!NUMBER.test(raw))fail('BEA_NIPA_CALC_VALUE_INVALID');
+    const value=Number(raw.replaceAll(',',''));
+    if(!Number.isFinite(value))fail('BEA_NIPA_CALC_VALUE_INVALID');
+    return {ordinal:Number(q[1])*4+Number(q[2])-1,
+      quarter:row.TimePeriod,value};
+  }).sort((a,b)=>a.ordinal-b.ordinal);
+  for(let i=1;i<points.length;i++)
+    if(points[i].ordinal===points[i-1].ordinal)
+      fail('BEA_NIPA_CALC_DUPLICATE_QUARTER');
+  const recent=points.slice(-5);
+  if(recent.some((v,i)=>i>0&&v.ordinal!==recent[i-1].ordinal+1))
+    fail('BEA_NIPA_CALC_NONCONTIGUOUS_QUARTERS');
+  const last=recent.at(-1),previous=recent.at(-2);
+  const end=new Date(Date.UTC(Number(last.quarter.slice(0,4)),
+    Number(last.quarter.at(-1))*3,0)).toISOString().slice(0,10);
+  if(end!==observedThrough||
+     Date.parse(end+'T23:59:59Z')>sourceStoredAt)
+    fail('BEA_NIPA_CALC_SOURCE_PERIOD_MISMATCH');
+  const change=last.value-previous.value;
+  if(!Number.isFinite(change))fail('BEA_NIPA_CALC_VALUE_INVALID');
+  const canonical=JSON.stringify({
+    schema:'BEA_NIPA_STORED_CALC_ATTESTATION_R1',
+    sourceVersion,sourceStoredAt,periodEnd:end,unit:'USD_PER_REAL_GVA_UNIT',
+    history:recent.map(({quarter,value})=>({quarter,value})),
+    currentValue:last.value,previousValue:previous.value,change
+  });
+  return {status:'STORED_SOURCE_CALCULATED',sourceVersion,
+    sourceStoredAt,observationPeriodEnd:end,unit:'USD_PER_REAL_GVA_UNIT',
+    historyPoints:recent.length,latestQuarter:last.quarter,
+    previousQuarter:previous.quarter,
+    calculationSha256:digest(Buffer.from(canonical,'utf8')),
+    providerCalls:0,operationalWrites:0,rawExposed:false};
+}
+
 function inspectStore(fsApi,base){
   let folder=directory(fsApi,base,'raw');
   if(!folder)return [];
@@ -78,9 +132,12 @@ function inspectStore(fsApi,base){
         row.SeriesCode!=='A463RD'||String(row.LineNumber)!=='7'||
         Object.keys(row).some(k=>!FIELDS.includes(k))))
       fail('BEA_NIPA_READONLY_SOURCE_SCOPE_INVALID');
+    const calculation=computeBeaNipaStoredAttestation(data,{
+      sourceVersion:sha,sourceStoredAt:meta.sourceStoredAt,
+      observedThrough:meta.observedThrough});
     sources.push({sourceVersion:sha,sourceHttpSha256:meta.sourceHttpSha256,
       sourceStoredAt:meta.sourceStoredAt,observedThrough:meta.observedThrough,
-      rowCount:bea.Results.Data.length});
+      rowCount:bea.Results.Data.length,calculation});
   }
   return sources;
 }
@@ -149,7 +206,9 @@ export function inspectBeaNipaCaptureReadonly(dataRoot,{filesystem=fs}={}){
       markedAttempts:attempts.filter(x=>x.markerPresent).length,
       completedJournalAttempts:completions.length,
       storedSourceCount:sources.length,verifiedSourceCount:sources.length,
-      latest,attemptStatus:attempts.map(x=>({
+      latest:latest?({...latest,calculation:undefined}):null,
+      calculation:latest?.calculation??null,
+      attemptStatus:attempts.map(x=>({
         requestId:x.requestId,markerPresent:x.markerPresent,
         checkpointVerified:x.completion!==null
       }))
