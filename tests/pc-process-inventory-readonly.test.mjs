@@ -6,7 +6,7 @@ import path from 'node:path';
 import {inspectTask, TASK} from '../tools/marketparquet-task-source-readonly.mjs';
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
 import assert from 'node:assert/strict';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,project2960MaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,project2960MaintenanceStatus,compact2960ProcessResult,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
@@ -66,6 +66,27 @@ test('#2960 exact status strips secrets and never authorizes recovery',()=>{
  assert.equal(project2960MaintenanceStatus({...r,recoveryEvidence:{
   ...r.recoveryEvidence,requestId:'wrong'}}).status,'STATE_UNKNOWN');
  assert.equal(project2960MaintenanceStatus(null).status,'STATE_UNKNOWN');
+});
+
+
+test('#2960 compact receipt respects 32 KiB atomic result limit',()=>{
+ const base={schema:'ZGMINI_PC_PROCESS_INVENTORY_RESULT_V1',role:'operating',
+  requestId:'21f1eecd-4f3b-443e-89cd-f6362871f9ea',issueNumber:2977,
+  runId:'45184776880',attempt:'1',host:'PC',runnerName:'zgmini-pc-03',
+  operationalWrites:0,providerCalls:0,d1Writes:0,automaticRetries:0};
+ const id='pc-update-e8767e20-6bad-4418-97c6-561cf79a8213';
+ const s=project2960MaintenanceStatus({actualControllerSha:'a'.repeat(40),
+  workflowState:'active',historicalRequest:{requestId:id,status:'RECOVERY_REQUIRED'},
+  recoveryEvidence:{requestId:id,leaseHeld:true,recoveryRequired:true,
+   backlog:{file:'PRESENT',windows:1,openWindows:0,replayCount:0}}});
+ const out=compact2960ProcessResult(base,s);
+ assert.equal(out.status,'PASS');
+ assert.equal(out.w052960MaintenanceStatus.status,'READ_ONLY_OBSERVED');
+ assert.equal(out.snapshot,undefined);
+ assert.equal(out.maintenance,undefined);
+ assert.ok(Buffer.byteLength(serializeProcessResult(out))<32768);
+ assert.ok(Buffer.byteLength(toText(out))<32768);
+ assert.equal(compact2960ProcessResult(base,project2960MaintenanceStatus(null)).status,'PARTIAL');
 });
 
 test('sanitize output keeps only bounded whitelisted Windows process metadata',()=>{
