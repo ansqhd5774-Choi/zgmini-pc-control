@@ -188,9 +188,11 @@ export async function recentRuns(now,requestRuns=request){
             }
             if(!completeHour){hoursComplete=false;break;}
           }
-          if(hoursComplete){
-            // Discard duplicate day-level first 200 only once the hourly
-            // partitions are proven complete, never on a partial read.
+          // Ensure the finer-grained GitHub query returned every known
+          // day-level run. An unsupported range must never look complete.
+          const known=daily.slice(-200);
+          const found=new Set(hourly.map(x=>x.id));
+          if(hoursComplete&&known.every(x=>found.has(x.id))){
             daily.splice(daily.length-200,200,...hourly);
           }else complete=false;
         }
