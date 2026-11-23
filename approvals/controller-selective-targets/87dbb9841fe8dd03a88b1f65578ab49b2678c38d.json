@@ -1,0 +1,27 @@
+{
+  "schema": "ZGMINI_CONTROLLER_SELECTIVE_PIN_V1",
+  "installedSha": "d996f2c666955c6659c233d8840d13181571f02a",
+  "targetSha": "87dbb9841fe8dd03a88b1f65578ab49b2678c38d",
+  "sourceMainSha": "df7a94c4b5568d259dc13817251da5e423250ab2",
+  "targetBranch": "codex/issues-w05-2794-selective-d996-20261123",
+  "customPaths": [
+    "config/operations.json",
+    "controller/operations.mjs",
+    "controller/w05-wpsfd42-service-readonly.mjs"
+  ],
+  "allowFiles": [
+    {
+      "path": "config/operations.json",
+      "sha256": "5b42ef2bcb1cd765cdced2341d2a1e5350a283e6a87dfe29e0ee43a6194c9eb0"
+    },
+    {
+      "path": "controller/operations.mjs",
+      "sha256": "44a3f2ac25df3043007a3387c392a63985df523e8d4602f9ac35253160404d8e"
+    },
+    {
+      "path": "controller/w05-wpsfd42-service-readonly.mjs",
+      "sha256": "4ab021ee53181a240a54963d98417e1e3acba04b937b7c9d160971893bf1872f"
+    }
+  ],
+  "approvalRef": "PENDING_B_REVIEW"
+}
