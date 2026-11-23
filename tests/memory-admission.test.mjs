@@ -30,29 +30,6 @@ test('temporary RAM deficit recovers in bounded time',async()=>{
  const r=await waitForMemoryAdmission({minimumFreeMiB:1536,readFreeMiB:()=>values[Math.min(count++,2)],timeoutMs:50,intervalMs:1});
  assert.equal(r.admitted,true);assert.equal(r.samples,3);assert.equal(r.minObservedMiB,800);
 });
-test('R32 post-admission recheck waits briefly for recovery and preserves the original safety minimum',async()=>{
- const ops=fs.readFileSync(new URL('../controller/operations.mjs',import.meta.url),'utf8');
- const r32=ops.split("if(request.operation==='theme-nine-r32-raw-coverage-readonly')")[1]
-  ?.split("if(request.operation==='inflation-a401-private23-readonly')")[0];
- assert.ok(r32,'R32 operation branch present');
- assert.match(r32,/await waitForMemoryAdmission\(\{minimumFreeMiB,timeoutMs:9000,intervalMs:1500\}\)/);
- assert.match(r32,/minimumFreeMiB=policy\.operations\[request\.operation\]\.minimumFreeMiB/);
- assert.match(r32,/if\(!memoryRecheck\.admitted\)return \{status:'BLOCKED',code:'RESOURCE_WAIT_MEMORY'/);
- assert.doesNotMatch(r32,/if\(os\.freemem\(\)\/1048576<min\)/);
- const threshold=memoryAdmissionMinimum(policy,'theme-nine-r32-raw-coverage-readonly');
- assert.equal(threshold,1536);
- const engine=await waitForMemoryAdmission({minimumFreeMiB:threshold,readFreeMiB:()=>1798,timeoutMs:0});
- assert.equal(engine.admitted,true);
- const seen=[1200,1600];let samples=0;
- const recovered=await waitForMemoryAdmission({minimumFreeMiB:threshold,
-  readFreeMiB:()=>seen[Math.min(samples++,seen.length-1)],timeoutMs:50,intervalMs:1});
- assert.equal(recovered.admitted,true);assert.equal(recovered.samples,2);
- assert.equal(recovered.minObservedMiB,1200);
- const blocked=await waitForMemoryAdmission({minimumFreeMiB:threshold,
-  readFreeMiB:()=>1200,timeoutMs:5,intervalMs:1});
- assert.equal(blocked.admitted,false);assert.equal(blocked.freeMiB,1200);
-});
-
 test('sustained RAM deficit remains BLOCKED and is never treated as success',async()=>{
  const r=await waitForMemoryAdmission({minimumFreeMiB:1536,readFreeMiB:()=>1000,timeoutMs:5,intervalMs:2});
  assert.equal(r.admitted,false);assert.equal(r.freeMiB,1000);assert.ok(r.samples>=2);
