@@ -1,5 +1,15 @@
 # 승인된 PC Controller 자동 갱신 — 독립 유지보수기
 
+## 2026-11-23 정상 실행 보존과 준비 실패 격리
+
+공통 변경은 후보 준비 → 기존 작업 drain → 짧은 전환 → 운영 검증 순서로 수행한다. 후보 준비와 의존성 검증을 위해 먼저 공용 intake를 중지하지 않는다. 기존 승인 모듈·소스 번들을 재사용하며 변경하지 않은 기능을 설치 범위에 끼워 넣지 않는다.
+
+`STAGING_ONLY_ISOLATED_VERIFIED`는 실패한 후보 namespace와 정상 실행 상태가 각각 입증된 stage 전용 결과다. 기존 Controller·보호 파일·Supervisor owner·Workflow를 검증하며 실제 준비물은 삭제하지 않는다. 이 범위의 실패는 `BLOCKED`로 보고해 정상 실행과 공통 lane을 유지한다. 임의 콜백·과거 SHA·프로세스 PID만으로 적용하지 않는다. 증명이 없으면 기존 복구 보호를 유지한다. 중단·전환 후 실패에는 이 예외를 적용하지 않는다.
+
+운영자 인증 실패는 `RECOVERY_OPERATOR_ATTESTATION_UNVERIFIED`, 검증 timeout은 `RECOVERY_OPERATOR_PROOF_TIMEOUT`, 실행기 부재는 `RECOVERY_OPERATOR_PROOF_TOOL_UNAVAILABLE`로 구분한다. 원문 명령줄·SID·자격증명을 출력하지 않는다. `INDEPENDENT_OPERATOR`와 정상 종료를 함께 만족해야 기존 인증이 통과하며 정책 완화가 아니다.
+
+Controller 설치·재개·복구의 실제 효과는 설치된 도구 바이트와 원장·Workflow·전용 Runner·보호 readback으로 판정한다. main 병합은 운영 반영이 아니며 기존 RECOVERY_REQUIRED lease를 이 문서로 해제하지 않는다.
+
 ## 2026-11-23 요청 생성·단회 제출 공통 경로
 
 기존 승인 manifest와 실제 설치 SHA가 확인되면 `tools/maintenance-request.mjs`를 사용한다.

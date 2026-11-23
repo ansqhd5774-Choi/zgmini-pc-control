@@ -164,6 +164,14 @@ export async function applyApprovedUpdate(request, port) {
       try {prevalidationUntouched=await port.verifyPrevalidationUntouched({
         installedSha:request.installedSha})===true;} catch {}
     }
+    let stagingIsolated=false;
+    // Preparation failure must not poison the shared install lane when the
+    // trusted port proves both the original runtime and the candidate namespace.
+    // A generic untouched assertion is deliberately insufficient for staging.
+    if(failureOperation==='stage'&&!intakeAttempted&&!paused&&!backup&&!supervisorStopped&&!switched&&
+      typeof port.verifyStagingFailureIsolated==='function'){
+      try{stagingIsolated=await port.verifyStagingFailureIsolated({installedSha:request.installedSha})===true;}catch{}
+    }
     let oldStillRunning=false;
     // A positive scoped no-effect proof is already sufficient here. Avoid
     // a second broad Runner-idle probe that can fail solely because another
@@ -185,7 +193,7 @@ export async function applyApprovedUpdate(request, port) {
       // An intact preflight failure can leave it enabled only if verified.
       // A partially written staging tree is not a verified no-effect
       // prevalidation, even if the previous Supervisor is still alive.
-      let safe=failureOperation!=='stage'&&(oldStillRunning||prevalidationUntouched);
+      let safe=stagingIsolated||(failureOperation!=='stage'&&(oldStillRunning||prevalidationUntouched));
       // pauseIntake() can disable the workflow and then lose its API ACK,
       // leaving paused=false in this coordinator. Never infer active intake
       // merely from an unchanged controller or from our local Boolean.
@@ -194,7 +202,7 @@ export async function applyApprovedUpdate(request, port) {
       let workflowState=observed?.workflowState;
       // A claimed untouched prevalidation must also match the independently
       // observed installed SHA, not only a callback's Boolean result.
-      if(prevalidationUntouched&&observed?.actualControllerSha!==request.installedSha)safe=false;
+      if((prevalidationUntouched||stagingIsolated)&&observed?.actualControllerSha!==request.installedSha)safe=false;
       if(safe && paused && workflowState==='disabled_manually') {
         if(port.didPauseIntake && !port.didPauseIntake())safe=false;
         else try {await port.resumeIntake();paused=false;
@@ -215,8 +223,10 @@ export async function applyApprovedUpdate(request, port) {
           requireRunning:true,requireIdle:false})===true;}catch{safe=false;}
       }
       const status=safe?'BLOCKED':'RECOVERY_REQUIRED';
-      const substate=safe&&prevalidationUntouched?'PREVALIDATION_UNTOUCHED_VERIFIED':undefined;
+      const substate=safe&&stagingIsolated?'STAGING_ONLY_ISOLATED_VERIFIED':
+       safe&&prevalidationUntouched?'PREVALIDATION_UNTOUCHED_VERIFIED':undefined;
       await record(status,{status,code:reason,firstFail,substate,actualInstalledSha:safe?request.installedSha:null,intakePaused:paused,
+        ...(safe&&stagingIsolated?{candidateArtifactsPreserved:true,operatingStateUnchanged:true}:{}),
         workflowEnabled:workflowState==='active'?true:workflowState==='disabled_manually'?false:null,
         observed,...details(status)});
       return {...ledger};
