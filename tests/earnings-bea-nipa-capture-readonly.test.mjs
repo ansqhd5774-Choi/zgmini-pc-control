@@ -43,7 +43,7 @@ const writeSource=home=>{
     seriesCode:'A463RD',lineNumber:'7',frequency:'Q',
     sourceVersion:version,sourceStoredAt:stored,
     sourceRetrievedAt:new Date(stored).toISOString(),
-    observedThrough:'2026Q2',sourceByteLength:bytes.length,
+    observedThrough:'2026-06-30',sourceByteLength:bytes.length,
     file:version+'.json'
   })+'\n');
   return {version,httpSha,stored,folder};
@@ -66,7 +66,7 @@ test('sanitized immutable archive and bounded journal readback agree',t=>{
   fs.appendFileSync(path.join(journal,'journal.jsonl'),JSON.stringify({
     phase:'BEA_NATIVE_ARCHIVE_READBACK_VERIFIED',
     sourceVersion:src.version,sourceHttpSha256:src.httpSha,
-    sourceStoredAt:src.stored,observedThrough:'2026Q2'
+    sourceStoredAt:src.stored,observedThrough:'2026-06-30'
   })+'\n');
   const out=inspectBeaNipaCaptureReadonly(data);
   assert.equal(out.status,'PASS');

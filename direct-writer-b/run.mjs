@@ -69,7 +69,7 @@ export async function applyApprovedOnce(auth,{makeApprovedNativeAdapter=null,
       /^[a-f0-9]{64}$/.test(outcome.sourceVersion??'')&&
       /^[a-f0-9]{64}$/.test(outcome.sourceHttpSha256??'')&&
       Number.isSafeInteger(outcome.sourceStoredAt)&&
-      /^\d{4}Q[1-4]$/.test(outcome.observedThrough??'');
+      /^20\d{2}-(?:03-31|06-30|09-30|12-31)$/.test(outcome.observedThrough??'');
     return {status:ok?'DIRECT_B_EFFECT_PASS_NOT_PUBLISHED':
       outcome?.status==='STATE_UNKNOWN'?'DIRECT_B_EFFECT_UNKNOWN':
       'DIRECT_B_EFFECT_BLOCKED',
