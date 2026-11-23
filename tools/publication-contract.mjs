@@ -30,6 +30,29 @@ const OPS=Object.freeze({
       'worker/earnings-bea-unit-profit-r1.mjs',
     ]),
   }),
+  // Native BEA NIPA JSON uses the SAME existing single-key publication lane,
+  // but needs an independently reviewed B approval and distinct source provenance.
+  'bea-unit-nipa-json-once':Object.freeze({
+    script:'scripts/pc-writer/EARNINGS_BEA_UNIT_PROFIT_R1_ONCE.mjs',
+    flags:Object.freeze(['--apply','--confirm-bea-nipa-d1-write',
+      '--source-transport=BEA_API_JSON']),
+    snapshotKey:'detail:earnings-bea-unit-profit:v1',
+    approvalScope:'BEA_UNIT_NIPA_JSON_SINGLE_KEY_D1_ONCE',
+    provider:'BEA_API_JSON',
+    sourceFiles:Object.freeze([
+      'scripts/pc-writer/EARNINGS_BEA_UNIT_PROFIT_R1_ONCE.mjs',
+      'scripts/pc-writer/EARNINGS_BEA_UNIT_NIPA_PUBLIC_PROJECTION_R1.mjs',
+      'scripts/pc-writer/EARNINGS_BEA_UNIT_NIPA_ARCHIVE_R1.mjs',
+      'scripts/pc-writer/EARNINGS_BEA_UNIT_NIPA_EQUIVALENCE_R1.mjs',
+      'scripts/pc-writer/EARNINGS_BEA_UNIT_STORED_RAW_R1.mjs',
+      'scripts/pc-writer/EARNINGS_R4_C_D1_DUAL_SOURCE_GATES.mjs',
+      'scripts/pc-writer/d1.mjs',
+      'scripts/pc-writer/d1-transient.mjs',
+      'scripts/pc-writer/d1-diagnostics.mjs',
+      'lib/market-score/earnings-bea-unit-profit-source-r1.mjs',
+      'worker/earnings-bea-unit-profit-r1.mjs',
+    ]),
+  }),
   'bea-manufacturing-profit-once':Object.freeze({
     script:'scripts/pc-writer/EARNINGS_BEA_MFG_PROFIT_R6_D1_ONE_SHOT.mjs',
     flags:Object.freeze(['--apply','--confirm-bea-manufacturing-d1-write']),
@@ -118,7 +141,7 @@ export function validatePublicationApproval(request,bytes){
   if(sha256(bytes)!==request.approvalManifestSha256)throw Error('PUBLICATION_MANIFEST_HASH_MISMATCH');
   let approval;
   try{approval=JSON.parse(bytes.toString());}catch{throw Error('PUBLICATION_MANIFEST_JSON_INVALID');}
-  const bea=['bea-unit-profit-once','bea-manufacturing-profit-once'].includes(request.operation);
+  const bea=['bea-unit-profit-once','bea-unit-nipa-json-once','bea-manufacturing-profit-once'].includes(request.operation);
   exact(approval,['schema','requestId','operation','sourceRepository','publisherSha',
     'operationalSha','snapshotKey','publisherFiles','approval','execution',
     ...(bea?['sourceSha256']:[])],
