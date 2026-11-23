@@ -8,6 +8,7 @@ import {inspectEmploymentR6D1Readback} from './employment-r6-d1-readback-readonl
 import {inspectR54PublicReadback} from './market-r54-d1-api-readback-readonly.mjs';
 import {inspectInflationCensusM3ArchivedHeaders} from './inflation-census-m3-archived-headers-readonly.mjs';
 import {inspectInflation7D1Readback} from './inflation7-d1-readback-readonly.mjs';
+import {inspectInflation19D1Readback} from './inflation19-d1-readback-readonly.mjs';
 import {inspectCoreRuntimeSource} from './core-runtime-source-readonly.mjs';
 import {observeInflationCoreLock} from './inflation-core-lock-observation-readonly.mjs';
 import {inspectInflationEvent129Once} from './inflation-event129-evidence-readonly.mjs';
@@ -206,6 +207,7 @@ export async function runOperation(request,context){
  if(request.operation==='market-r54-d1-api-readback-readonly')return inspectR54PublicReadback(dataRoot);
  if(request.operation==='inflation-census-m3-archive-headers-readonly')return inspectInflationCensusM3ArchivedHeaders(dataRoot);
  if(request.operation==='inflation7-d1-readback-readonly')return inspectInflation7D1Readback(dataRoot);
+ if(request.operation==='inflation19-d1-readback-readonly')return inspectInflation19D1Readback(dataRoot);
  if(request.operation==='r17-268-postcancel-readonly'){
   if(request.requestId!==ONE_SHOT_DIAGNOSTIC_ID)return {status:'BLOCKED',code:'R17_268_ONE_SHOT_REQUEST_ID_STOP',providerCalls:0,d1Writes:0,operationalWrites:0};
   let coreTaskXml=null,sourceTrace=null,protectedStateSha256=null;
