@@ -52,12 +52,35 @@ test('W01 D1 local metadata drift is distinct from a data-value difference',()=>
  const {payload,row}=fixture();
  const meta=structuredClone(payload);meta.sourceVersion='INFL19_PRESENTATION_'+'b'.repeat(64);
  const m=verifyInflation19D1Row(row,{now:NOW,localPayload:meta});
- assert.equal(m.status,'PARTIAL');assert.equal(m.code,'INFL19_D1_LOCAL_METADATA_DIFF');
+ assert.equal(m.status,'PARTIAL');assert.equal(m.code,'INFL19_D1_METADATA_ONLY_DIFF');
+ assert.equal(m.valueDateHistoryMatches,true);assert.equal(m.metadataMatches,false);
  const changed=structuredClone(payload);changed.indicators[17].value+=1;
  const d=verifyInflation19D1Row(row,{now:NOW,localPayload:changed});
  assert.equal(d.status,'PARTIAL');
  assert.equal(d.code,'INFL19_D1_LOCAL_VALUE_DIFF');
  assert.deepEqual([d.firstMismatchId,d.firstMismatchField],['26','value']);
+});
+test('W01 compares changed value and date before version drift rather than masking mismatch',()=>{
+ const {payload,row}=fixture();
+ const both=structuredClone(payload);
+ both.sourceVersion='INFL19_PRESENTATION_'+'b'.repeat(64);
+ both.indicators[18].observationDate='2026-08-01';
+ const v=verifyInflation19D1Row(row,{now:NOW,localPayload:both});
+ assert.equal(v.code,'INFL19_D1_LOCAL_VALUE_DIFF');
+ assert.deepEqual([v.firstMismatchId,v.firstMismatchField],['31','observationDate']);
+});
+test('W01 compares historical points and distinguishes row-level metadata drift',()=>{
+ const {payload,row}=fixture();
+ const history=structuredClone(payload);
+ history.indicators[0].history[0].value+=1;
+ const v=verifyInflation19D1Row(row,{now:NOW,localPayload:history});
+ assert.equal(v.code,'INFL19_D1_LOCAL_VALUE_DIFF');
+ assert.equal(v.firstMismatchField,'history');
+ const rowMeta=structuredClone(payload);
+ rowMeta.indicators[0].sourceStoredAt='2026-11-19T10:00:00.000Z';
+ const m=verifyInflation19D1Row(row,{now:NOW,localPayload:rowMeta});
+ assert.equal(m.code,'INFL19_D1_METADATA_ONLY_DIFF');
+ assert.equal(m.valueDateHistoryMatches,true);
 });
 test('W01 common operation registers A/light and invokes read-only module only',()=>{
  const ops=JSON.parse(readFileSync(new URL('../config/operations.json',import.meta.url),'utf8')).operations;
