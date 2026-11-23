@@ -1,3 +1,5 @@
+> **2026-11-23 사용자 소속 지정:** 이슈 담당자는 보조 저장소 `zgmini-pc-control / codex/issues-lifecycle-manager-20261118` 소속이다. 프로젝트 전체 프로세스 총괄은 메인 `zgmini / codex/controller-ops-lessons-20261105`이다. 아래 ‘공통 대기열 PC 프로세스 총괄’은 격리 PC의 이슈·인계 실행 기반 관리만 뜻하며 프로젝트 전체 총괄을 뜻하지 않는다. [역할 정본](https://github.com/ansqhd5774-Choi/zgmini/blob/main/docs/REPOSITORY_ROLES.md). 기존 승인과 실제 지정된 업무 범위는 유지한다.
+
 # ZGMINI GitHub Issues 수명주기 관리 기준 R1
 
 - 제정: 2026-11-18 KST
