@@ -289,6 +289,41 @@ test('lost stop acknowledgement confirms the old supervisor before treating the 
  assert.equal(f.installed,previous);
  assert.ok(!f.events.includes('switch'));
 });
+test('W05: Runner becomes busy after BACKED_UP; intact original Supervisor resumes intake without rollback',async()=>{
+ const checks=[];
+ const f=fixture({
+  stopOwnSupervisor:async()=>{throw Object.assign(Error('new job became busy'),{code:'RUNNERS_NOT_IDLE'});},
+  verifyPrevious:async options=>{checks.push(options);return options.requireIdle===false;},
+ });
+ const out=await applyApprovedUpdate(request,f.port);
+ assert.equal(out.status,'BLOCKED');
+ assert.equal(out.code,'RUNNERS_NOT_IDLE');
+ assert.equal(out.firstFail,'BACKED_UP');
+ assert.equal(out.actualInstalledSha,previous);
+ assert.equal(out.workflowEnabled,true);
+ assert.equal(f.paused,false);
+ assert.deepEqual(checks,[{installedSha:previous,requireRunning:true,requireIdle:false}]);
+ assert.equal(f.events.includes('stop'),false);
+ assert.equal(f.events.includes('restore'),false);
+ assert.equal(f.events.includes('switch'),false);
+ assert.ok(f.events.includes('resume'));
+ assert.ok(f.events.includes('replay-missed-issues'));
+});
+test('W05: no verified original pre-switch tree retains fail-closed recovery instead of declaring safe',async()=>{
+ const f=fixture({
+  stopOwnSupervisor:async()=>{throw Object.assign(Error('not idle'),{code:'RUNNERS_NOT_IDLE'});},
+  verifyPrevious:async()=>false,
+  restore:async()=>{throw Object.assign(Error('original runtime unverified'),{code:'ROLLBACK_SUPERVISOR_SOURCE_UNKNOWN'});},
+ });
+ const out=await applyApprovedUpdate(request,f.port);
+ assert.equal(out.status,'RECOVERY_REQUIRED');
+ assert.equal(out.originalFailureCode,'RUNNERS_NOT_IDLE');
+ assert.equal(out.rollbackFailureCode,'ROLLBACK_SUPERVISOR_SOURCE_UNKNOWN');
+ assert.equal(out.actualInstalledSha,null);
+ assert.equal(f.events.includes('switch'),false);
+ assert.equal(f.paused,true);
+});
+
 test('an unverified Core protection digest cannot be a successful postcheck',async()=>{
  const f=fixture({postcheck:async()=>({status:'PASS',actualExecutionSha:target,
    protectedStateUnchanged:false,runnerSetVerified:true,postSourceVerified:true})});
