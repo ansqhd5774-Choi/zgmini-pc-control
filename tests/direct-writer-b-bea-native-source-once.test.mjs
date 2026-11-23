@@ -1,4 +1,7 @@
 import test from 'node:test';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import assert from 'node:assert/strict';
 import {BEA_B_SCHEMA,BEA_B_SCOPE,BEA_B_MODE,
   isApprovedBeaNativeSource,verifyBeaInstalledBinding,verifyBeaCapture,
@@ -7,6 +10,8 @@ import {BEA_B_SCHEMA,BEA_B_SCOPE,BEA_B_MODE,
 import {applyApprovedOnce} from '../direct-writer-b/run.mjs';
 import {resolveConfiguredSourcePin} from '../direct-writer-b/configured-source-pin.mjs';
 import {sanitizeDirectBReport} from '../direct-writer-b/report.mjs';
+import {acquireInstallLock,createInstallJournal,releaseInstallClaim}
+  from '../r17-writer-b/r17-b-claim.mjs';
 
 const sha40='a'.repeat(40),sha64='b'.repeat(64),httpSha='c'.repeat(64);
 const approval=()=>({
@@ -93,4 +98,22 @@ test('shared B dispatcher and report preserve proof without D1 or raw data',asyn
     beaCandidateRoot:'/test/pin',beaRunner:async()=>({
       status:'STATE_UNKNOWN',code:'DIRECT_B_BEA_ATTEMPT_RECONCILE_REQUIRED'})});
   assert.equal(unknown.status,'DIRECT_B_EFFECT_UNKNOWN');
+});
+
+test('existing shared Writer lease rejects concurrent and replayed capture claims',t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'zg-bea-b-claim-'));
+  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const journalRoot=path.join(root,'bea-claims');
+  const sharedLock=path.join(root,'writer-source-install.lock');
+  const requestId='bea-approved-test';
+  const lock=acquireInstallLock({journalRoot,requestId,sharedLock});
+  try{
+    const claim=createInstallJournal({journalRoot,requestId,sharedLock,fd:lock.fd});
+    assert.equal(fs.existsSync(claim.journalFile),true);
+    assert.throws(()=>acquireInstallLock({journalRoot,
+      requestId:'another-request',sharedLock}),/SHARED_INSTALL_BUSY/);
+  }finally{releaseInstallClaim({fd:lock.fd,sharedLock,requestId,retain:false});}
+  assert.throws(()=>acquireInstallLock({journalRoot,requestId,sharedLock}),
+    /REQUEST_ALREADY_CLAIMED/);
+  assert.equal(fs.existsSync(sharedLock),false);
 });
