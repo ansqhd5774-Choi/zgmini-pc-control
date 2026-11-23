@@ -662,6 +662,37 @@ export function createMaintenanceAgent({
   }
   // Separate fixed recovery lane. This deliberately does not reuse the
   // original #2960 controller-update request or its durable request ledger.
+  // Check the *structure* of the exact already approved installed recovery
+  // before an immutable one-shot claim is created. The pinned independent
+  // operator still rechecks the live bytes, provenance and source digests.
+  function completeInstalledRecoveryApproval(approval){
+    const digestPattern=/^[a-f0-9]{64}$/;
+    const filePaths=['tools/maintenance-recovery.mjs','tools/update.mjs',
+      'tools/maintenance-contract.mjs','controller/fixed-readonly-bytes.mjs'];
+    const casKeys=['ledgerSha256','ownerSha256','markerSha256','backlogSha256',
+      'snapshotSha256','protectionSha256','writerSha256'];
+    const files=approval?.files,cas=approval?.casDigests;
+    const proof=approval?.proof;
+    return approval?.schema==='ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V1'&&
+      approval.approved===true&&approval.operation==='RECONCILE_INSTALLED'&&
+      approval.requestId===INSTALLED_RECOVERY_ORIGINAL_ID&&
+      approval.issueNumber===2960&&
+      approval.sourceSha===INSTALLED_RECOVERY_SOURCE_SHA&&
+      approval.targetControllerSha===INSTALLED_RECOVERY_CONTROLLER_SHA&&
+      digestPattern.test(approval.approvedCurrentWriterConfigSha256??'')&&
+      Array.isArray(files)&&files.length===filePaths.length&&
+      filePaths.every(name=>files.filter(x=>x?.path===name&&
+        digestPattern.test(x?.sha256??'')).length===1)&&
+      cas!==null&&typeof cas==='object'&&!Array.isArray(cas)&&
+      Object.keys(cas).length===casKeys.length&&
+      casKeys.every(key=>digestPattern.test(cas[key]??''))&&
+      cas.writerSha256===approval.approvedCurrentWriterConfigSha256&&
+      proof?.issueNumber===2982&&
+      proof?.runId===45186420113&&proof?.jobId===137733094098&&
+      proof?.runnerName==='zgmini-pc-04'&&
+      proof?.resultPath==='results/45186420113-1-seat-4.json'&&
+      digestPattern.test(proof?.resultSha256??'');
+  }
   async function processInstalledRecoveryIssue(issue){
     if(!issueIsTrusted(issue,{allowedActors,title:INSTALLED_RECOVERY_ISSUE_TITLE,label}))
       return {status:'IGNORED',issueNumber:issue?.number};
@@ -702,12 +733,7 @@ export function createMaintenanceAgent({
          sha256(raw)!==request.approvalManifestSha256)
         throw coded('INSTALLED_RECOVERY_APPROVAL_HASH_MISMATCH');
       approval=JSON.parse(raw.toString('utf8'));
-      if(approval.schema!=='ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V1'||
-         approval.approved!==true||approval.operation!=='RECONCILE_INSTALLED'||
-         approval.requestId!==INSTALLED_RECOVERY_ORIGINAL_ID||
-         approval.issueNumber!==2960||
-         approval.sourceSha!==INSTALLED_RECOVERY_SOURCE_SHA||
-         approval.targetControllerSha!==INSTALLED_RECOVERY_CONTROLLER_SHA)
+      if(!completeInstalledRecoveryApproval(approval))
         throw coded('INSTALLED_RECOVERY_APPROVAL_SCOPE_INVALID');
     }catch(error){
       return {status:'BLOCKED',code:safeCode(error?.code??error?.message),
