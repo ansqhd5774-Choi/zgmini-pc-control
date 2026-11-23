@@ -100,17 +100,30 @@ export async function inspectInflation19D1Readback(dataRoot,{
  const stageRead=readFixedReadonlyBytes(
   path.join(home,'inflation-causal-r1','public-19-summary-projection-r1.json'),{
    fileSystem,verifiedRoot:dataRoot,minBytes:2,maxBytes:65536});
- if(!stageRead.ok)return report('STATE_UNKNOWN','INFL19_STAGED_SUMMARY_UNAVAILABLE');
- let stage;
- try{stage=JSON.parse(stageRead.bytes.toString('utf8'));}
- catch{return report('STATE_UNKNOWN','INFL19_STAGED_SUMMARY_INVALID');}
- if(stage?.payload?.schemaVersion!=='inflation-causal-public-19-r1-v1'||
-   stage.sourceVersion!==stage.payload.sourceVersion||
-   stage.sourceStoredAt!==stage.payload.sourceStoredAt)
-  return report('STATE_UNKNOWN','INFL19_STAGED_CONTRACT_INVALID');
+ // A metadata-only Writer run can preserve D1 without creating a fresh local
+ // staging file. Missing is not a corrupt local file; all other read errors
+ // remain fail-closed. Never claim local/D1 equivalence without the stage.
+ if(!stageRead.ok&&stageRead.reason!=='MISSING')
+  return report('STATE_UNKNOWN','INFL19_STAGED_SUMMARY_UNAVAILABLE');
+ let stage=null;
+ if(stageRead.ok){
+  try{stage=JSON.parse(stageRead.bytes.toString('utf8'));}
+  catch{return report('STATE_UNKNOWN','INFL19_STAGED_SUMMARY_INVALID');}
+  if(stage?.payload?.schemaVersion!=='inflation-causal-public-19-r1-v1'||
+    stage.sourceVersion!==stage.payload.sourceVersion||
+    stage.sourceStoredAt!==stage.payload.sourceStoredAt)
+   return report('STATE_UNKNOWN','INFL19_STAGED_CONTRACT_INVALID');
+ }
+ const verifyRow=row=>{
+  const checked=verifyInflation19D1Row(row,{
+   now,localPayload:stage?.payload??null});
+  if(stage===null&&checked.status==='PASS')
+   return {...checked,status:'PARTIAL',code:'INFL19_D1_VERIFIED_STAGE_MISSING',
+    d1ReadbackVerified:true,localMatches:false};
+  return checked;
+ };
  if(queryFixed){
-  try{return verifyInflation19D1Row(await queryFixed(SQL,[INFL19_D1_KEY]),
-   {now,localPayload:stage.payload});}
+  try{return verifyRow(await queryFixed(SQL,[INFL19_D1_KEY]));}
   catch{return report('STATE_UNKNOWN','INFL19_D1_QUERY_FAILED');}
  }
  let phase='CHECKOUT_RESOLVE';
@@ -143,6 +156,6 @@ export async function inspectInflation19D1Readback(dataRoot,{
   phase='D1_SELECT';
   const row=(await client(config,()=>credential(real))
    .query(config.core,SQL,[INFL19_D1_KEY])).results?.[0]??null;
-  return verifyInflation19D1Row(row,{now,localPayload:stage.payload});
+  return verifyRow(row);
  }catch{return report('STATE_UNKNOWN','INFL19_D1_'+phase+'_FAILED');}
 }
