@@ -15,7 +15,7 @@
   "approval": {
     "grade": "B",
     "scope": "HOST_APPROVED_SOURCES_SINGLE_CAS_ONLY",
-    "ref": "PENDING_PR_NUMBER"
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2811"
   },
   "backup": {
     "strategy": "VERSIONED_SNAPSHOT",
