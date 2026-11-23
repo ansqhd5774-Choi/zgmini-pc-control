@@ -235,6 +235,9 @@ jobs:
           echo CI_TESTED_INTEGRATION_SHA=%GITHUB_SHA%
           node --test tests/controller-ci-scope.test.mjs
       - name: Verify W05 independent operator receipt without operational access
+        # Historical PR integration trees can predate this W05 fixture.
+        # Test it whenever it is present; do not fail unrelated older heads.
+        if: hashFiles('tests/w05-2821-operator-readonly-receipt.test.mjs') != ''
         run: node --test --test-concurrency=1 tests/w05-2821-operator-readonly-receipt.test.mjs
       - name: Verify pc-job late-label intake remains opt-in and deduplicated
         run: node --test --test-concurrency=1 tests/pc-job-late-label-intake.test.mjs tests/preimage-manifest-contract.test.mjs
