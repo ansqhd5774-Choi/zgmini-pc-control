@@ -97,7 +97,19 @@ export function classifyLogs(text){
   // TAP successful-test titles are not failure evidence. In particular, a
   // passing fixture named "HTTP 503" must not become an upstream outage hint.
   // Preserve `not ok` and actual error lines for the normal failure signals.
-  const log=text.slice(0,131072).split(/\r?\n/).filter(line=>
+  // Keep the fixed 128 KiB classification budget, but reserve its last
+  // 112 KiB for the error/failed-test footer of long CI logs. Scanning only
+  // the beginning missed actual TAP 'not ok' failures after 200 KiB.
+  const budget=131072,headBudget=16384;
+  const sampled=text.length<=budget?text:(()=>{
+    const head=text.slice(0,headBudget),tail=text.slice(-(budget-headBudget));
+    // Avoid inventing a match from a fragment of a split CI log line.
+    const headEnd=head.lastIndexOf('\n');
+    const tailStart=tail.indexOf('\n');
+    return (headEnd<0?'':head.slice(0,headEnd+1))+'\n'+
+      (tailStart<0?'':tail.slice(tailStart+1));
+  })();
+  const log=sampled.split(/\r?\n/).filter(line=>
     !/^\s*(?:\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z\s+)?(?:# Subtest:|ok \d+ -)/.test(line)
   ).join('\n');
   return tests.filter(([,r])=>r.test(log)).map(([name])=>name).slice(0,3);

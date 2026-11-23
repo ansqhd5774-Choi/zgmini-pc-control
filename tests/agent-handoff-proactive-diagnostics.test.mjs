@@ -98,6 +98,22 @@ test('passing TAP test titles do not turn an unrelated CI failure into HTTP 503 
   assert.deepEqual(classifyLogs('2026-11-23T03:27:27.000Z ##[error]HTTP 503 from provider'),
     ['UPSTREAM_5XX_HINT']);
 });
+test('large CI log captures actual failed TAP tests in the tail within the 128 KiB budget',()=>{
+  // Reproduces the original 358 KiB Job 137206882613 layout: the first
+  // not-ok line only appears after the initial 128 KiB window.
+  const passed='2026-11-22T12:23:01Z # Subtest: healthy fixture HTTP 503 was rejected\n'+
+    '2026-11-22T12:23:02Z ok 9 - healthy fixture HTTP 503 was rejected\n';
+  const text=passed+'2026-11-22T12:23:10Z PASS fixture\n'.repeat(9000)+
+    '2026-11-22T12:24:42Z not ok 133 - actual regression failure\n'+
+    '2026-11-22T12:24:43Z harmless output\n'.repeat(1800);
+  assert.ok(text.indexOf('not ok 133')>131072);
+  assert.ok(text.length-text.indexOf('not ok 133')<114688);
+  assert.deepEqual(classifyLogs(text),['ASSERTION_HINT']);
+  assert.deepEqual(classifyLogs(passed+'normal line\n'.repeat(19000)),[]);
+  const trueUpstream='2026-11-22T12:24:43Z ##[error]HTTP 503 from provider\n';
+  assert.deepEqual(classifyLogs('previous successful CI log\n'.repeat(9500)+trueUpstream),
+    ['UPSTREAM_5XX_HINT']);
+});
 test('changed run SHA and status refuse write',()=>{
   assert.throws(()=>assertSameRun(run(1),run(1,recent,{head_sha:'b'.repeat(40)})),/SOURCE_RUN_DRIFT/);
   assert.throws(()=>assertSameRun(run(1),run(1,recent,{conclusion:'success'})),/SOURCE_RUN_DRIFT/);
