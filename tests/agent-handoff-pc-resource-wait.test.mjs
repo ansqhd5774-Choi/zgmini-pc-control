@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {preparePcSharedResourceWait}
   from '../agent-handoff/pc-result-to-incident.mjs';
 import {processCompletedPcJob} from '../agent-handoff/pc-failure-producer.mjs';
@@ -34,6 +35,37 @@ const bot='github-actions[bot]';
 const receipt=()=>({user:{login:bot},
   body:`<!-- zgmini-pc-result:${runId}:1:4 -->\nreadback verified`,
   issue_url:`https://api.github.com/repos/${repo}/issues/1009`});
+
+test('archived #2307 published JSON/TXT classify as the same verified memory wait',()=>{
+  // These are the actual published, immutable result pair of original PC Job
+  // 44493517681, not an invented BLOCKED fixture or a simulated PC execution.
+  const base=new URL('../results/',import.meta.url);
+  const report=JSON.parse(readFileSync(new URL('44493517681-1-seat-2.json',base),'utf8'));
+  const resultTxt=readFileSync(new URL('44493517681-1-seat-2.txt',base),'utf8');
+  const originIssue={...issue(),number:2307,body:JSON.stringify({
+    schema:'ZGMINI_PC_JOB_V1',
+    requestId:'pc-82e8d098-90c8-4524-8514-c5f5343444d3',
+    chatId:'chat-proc-w04-recert-20261119',
+    operation:'employment-r6-candidate-stage-readonly',
+    sourceRepository:'ansqhd5774-Choi/zgmini',
+    sourceBranch:'fix/w04-pit0405-raw-attestation-breakdown-20261117',
+    sourceSha:'0193056bdb47bcf6c911f17623b6c302c8199c4c'
+  })};
+  const resultPath='results/44493517681-1-seat-2.json';
+  const prepared=preparePcSharedResourceWait({originIssue,report,resultPath,resultTxt});
+  assert.equal(prepared.state,'WAITING_SHARED_RESOURCE');
+  assert.equal(prepared.wait.waitId,'resource-wait-25d1ea46e9015156f1a51993');
+  assert.equal(prepared.wait.safePoint,'REQUEST_CONSUMED_WORKER_PREOP_UNTOUCHED');
+  assert.equal(prepared.wait.evidence.runId,44493517681);
+  assert.equal(prepared.wait.automaticPcRetries,0);
+  assert.equal(report.result.candidateExecuted,false);
+  assert.equal(report.actualExecutionSha,null);
+  assert.equal(report.protectedBeforeSha256,report.protectedAfterSha256);
+  assert.equal(report.operationalWrites,0);
+  const corrupted=resultTxt.replace('actualExecutionSha=null','actualExecutionSha=forged');
+  assert.equal(preparePcSharedResourceWait({originIssue,report,resultPath,
+    resultTxt:corrupted}).state,'WAIT_PROOF_UNVERIFIED');
+});
 
 test('PC resource wait reuses generic ledger contract with pc- requestId',()=>{
   const r=blocked();
