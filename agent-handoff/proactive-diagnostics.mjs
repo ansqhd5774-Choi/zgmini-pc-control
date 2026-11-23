@@ -104,12 +104,12 @@ export function classifyLogs(text){
   const sampled=text.length<=budget?text:(()=>{
     const head=text.slice(0,headBudget),tail=text.slice(-(budget-headBudget));
     // Avoid inventing a match from a fragment of a split CI log line.
-    const headEnd=head.lastIndexOf('\\n');
-    const tailStart=tail.indexOf('\\n');
-    return (headEnd<0?'':head.slice(0,headEnd+1))+'\\n'+
+    const headEnd=head.lastIndexOf('\n');
+    const tailStart=tail.indexOf('\n');
+    return (headEnd<0?'':head.slice(0,headEnd+1))+'\n'+
       (tailStart<0?'':tail.slice(tailStart+1));
   })();
-  const log=sampled.split(/\\r?\\n/).filter(line=>
+  const log=sampled.split(/\r?\n/).filter(line=>
     !/^\s*(?:\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z\s+)?(?:# Subtest:|ok \d+ -)/.test(line)
   ).join('\n');
   return tests.filter(([,r])=>r.test(log)).map(([name])=>name).slice(0,3);
