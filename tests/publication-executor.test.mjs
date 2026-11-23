@@ -335,3 +335,55 @@ test('WPSFD42 B source drift can stop only with proved no D1 query or write',()=
  assert.match(executor,/PUBLICATION_WPSFD42_SOURCE_DRIFT_NO_WRITE/);
  assert.match(executor,/noWriteVerified=true/);
 });
+
+test('native BEA JSON B preflight binds immutable source and dedicated transport',()=>{
+ const key='detail:earnings-bea-unit-profit:v1',sha='e'.repeat(64);
+ const raw=[
+  'MODE=READ_ONLY_PREFLIGHT','SOURCE_TRANSPORT=BEA_API_JSON',
+  'SOURCE_SERIES=A463RD','SNAPSHOT_KEY='+key,
+  'SOURCE_SHA256='+sha,'SOURCE_ORIGIN=PC_IMMUTABLE_ARCHIVE',
+  'SOURCE_HTTP_REQUESTS=0','STORED_RAW_READBACK=VERIFIED',
+  'D1_WRITES=0','RAW_LOCAL_WRITES=0','RESULT=PASS_BEA_UNIT_PREFLIGHT_ONLY'
+ ].join('\n');
+ assert.equal(validateBeaStoredPreflight(raw,sha,{native:true,expectedKey:key}),true);
+ for(const [oldValue,newValue] of [
+  ['SOURCE_TRANSPORT=BEA_API_JSON','SOURCE_TRANSPORT=FRED_CSV'],
+  ['SOURCE_SERIES=A463RD','SOURCE_SERIES=A463RD3Q052SBEA'],
+  ['SNAPSHOT_KEY='+key,'SNAPSHOT_KEY=detail:other']
+ ])assert.throws(()=>validateBeaStoredPreflight(raw.replace(oldValue,newValue),sha,
+  {native:true,expectedKey:key}),/PUBLICATION_BEA_NATIVE_PREFLIGHT_MISMATCH/);
+ assert.throws(()=>validateBeaStoredPreflight(raw,'f'.repeat(64),
+  {native:true,expectedKey:key}),/PUBLICATION_BEA_PREFLIGHT_SOURCE_MISMATCH/);
+});
+
+test('native BEA JSON B apply accepts only exact source and D1 result evidence',()=>{
+ const key='detail:earnings-bea-unit-profit:v1',sha='e'.repeat(64);
+ const lines=[
+  'MODE=EXPLICIT_APPLY','SOURCE_TRANSPORT=BEA_API_JSON',
+  'SOURCE_SERIES=A463RD','SNAPSHOT_KEY='+key,
+  'SOURCE_GATES=PASS','SOURCE_HTTP_REQUESTS=0','PC_SQLITE_WRITES=0',
+  'SOURCE_ORIGIN=PC_IMMUTABLE_ARCHIVE','STORED_RAW_READBACK=VERIFIED',
+  'SOURCE_SHA256='+sha,'SOURCE_STORED_AT=1793112733108',
+  'D1_RESULT=READBACK_VERIFIED','D1_READBACK=VERIFIED',
+  'RESULT=PASS_BEA_UNIT_READBACK_VERIFIED'
+ ];
+ const fixture=changes=>lines.map(line=>{
+  const key=line.split('=')[0];
+  return Object.hasOwn(changes,key)?key+'='+changes[key]:line;
+ }).join('\n');
+ const e=parsePublisherLog(fixture({}),'bea-unit-nipa-json-once',key);
+ assert.deepEqual(e,{status:'PASS',d1Result:'READBACK_VERIFIED',
+  sourceVersion:sha,sourceStoredAt:1793112733108});
+ for(const [name,value] of [
+  ['MODE','READ_ONLY_PREFLIGHT'],['SOURCE_TRANSPORT','FRED_CSV'],
+  ['SOURCE_SERIES','A463RD3Q052SBEA'],['SNAPSHOT_KEY','detail:wrong'],
+  ['SOURCE_GATES','FAIL'],['SOURCE_HTTP_REQUESTS','1'],
+  ['PC_SQLITE_WRITES','1'],['D1_READBACK','PREVIOUS_IDENTICAL']
+ ])assert.throws(()=>parsePublisherLog(fixture({[name]:value}),
+  'bea-unit-nipa-json-once',key),/PUBLICATION_(BEA_NATIVE_APPLY_EVIDENCE_INVALID|BEA_NOT_STORED_SOURCE)/);
+ assert.deepEqual(publicationCheckpointReport('bea-unit-nipa-json-once',
+  {...e,d1Result:'ALREADY_STORED'}),{
+   sourceStoredAt:null,attemptedSourceStoredAt:1793112733108,
+   sourceStoredAtEvidence:'ATTEMPTED_ONLY'
+  });
+});
