@@ -1,0 +1,17 @@
+{
+  "schema": "ZGMINI_CONTROLLER_SELECTIVE_PIN_V1",
+  "installedSha": "523fb6ec8138311977c24eb5a352c3175fbf2354",
+  "targetSha": "d996f2c666955c6659c233d8840d13181571f02a",
+  "sourceMainSha": "edb103721b642c59d260daed052529ea3d93c5bd",
+  "targetBranch": "codex/w04-r54-event-inventory-selective-20261123",
+  "customPaths": [
+    "controller/source-inventory-runtime-readonly.mjs"
+  ],
+  "allowFiles": [
+    {
+      "path": "controller/source-inventory-runtime-readonly.mjs",
+      "sha256": "549eea141fa83f8e591fdd724ae17137a6f2d140c7ca6fac41d297613560cf2e"
+    }
+  ],
+  "approvalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2787"
+}
