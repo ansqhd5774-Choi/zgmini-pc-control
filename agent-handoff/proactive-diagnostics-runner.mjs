@@ -219,9 +219,10 @@ export async function scanLatest(io,nowMs){
     shards=await loadShardEvidence(io,month);
     if(recordedInEntries(shards,run)){existing++;continue;}
     let target=await ensureShard(io,month,shards);
-    // If creating a shard changed the index, re-check all authenticated
-    // shards (including the new one) before posting any run receipt.
-    shards=await loadShardEvidence(io,month);
+    // The immediately preceding pre-write readback already authenticated
+    // a reused shard. Only a new shard requires another full index read.
+    if(!shards.some(x=>x.issue.number===target.number))
+      shards=await loadShardEvidence(io,month);
     if(recordedInEntries(shards,run)){existing++;continue;}
     const actual=shards.find(x=>x.issue.number===target.number);
     if(!actual||actual.issue.state!=='open'||actual.comments.length>=

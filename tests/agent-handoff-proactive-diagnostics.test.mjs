@@ -134,6 +134,36 @@ test('authenticated month snapshot deduplicates many previously recorded runs wi
   assert.equal(io.posted.length,0);
 });
 
+test('existing authenticated shard needs no redundant full index reload before POST',async()=>{
+  const io=ioFor([run(211)]);
+  const issue=await io.createShard('2026-11',1,
+    'ZGMINI Proactive Diagnostics 2026-11 #1',
+    '<!-- ZGMINI_PROACTIVE_DIAGNOSTIC_LEDGER_R2 month:2026-11 shard:1 -->');
+  const find=io.findShards,read=io.readShardComments;
+  let searches=0,reads=0;
+  io.findShards=async m=>{searches++;return find(m);};
+  io.readShardComments=async n=>{reads++;return read(n);};
+  const result=await scanLatest(io,now);
+  assert.equal(result.newReports,1);
+  assert.equal(result.observed[0].shardIssue,issue.number);
+  // Initial check, fresh pre-write check, and post-write readback only.
+  assert.equal(searches,3);
+  assert.equal(reads,3);
+  assert.equal(io.posted.length,1);
+});
+
+test('new shard still requires full index recheck before write',async()=>{
+  const io=ioFor([run(212)]);
+  const find=io.findShards;
+  let searches=0;
+  io.findShards=async m=>{searches++;return find(m);};
+  const result=await scanLatest(io,now);
+  assert.equal(result.newReports,1);
+  // Includes the additional verification needed after shard creation.
+  assert.equal(searches,4);
+  assert.equal(io.posted.length,1);
+});
+
 test('cached absent marker is refreshed before write and cannot duplicate another recorded run',async()=>{
   const runs=[run(301),run(302)];
   const io=ioFor(runs);
