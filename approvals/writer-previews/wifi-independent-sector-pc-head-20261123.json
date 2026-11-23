@@ -1,0 +1,19 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "baseHead": "af5374593a0d27ebaa5280f78187b075ffcabb23",
+  "filePath": "scripts/pc-writer/sector-provisional-cycle.mjs",
+  "beforeSha256": "85019213bf81706da9c5276ca665b54b6288cab5f66e0e47875c7705af9c4946",
+  "insertions": [
+    {
+      "anchor": "import {createQuotaFetch} from './quota-fetch.mjs';",
+      "position": "after",
+      "text": "import {observeIndependentProviderFetch} from './provider-endpoint-fingerprint.mjs';\n"
+    },
+    {
+      "anchor": "   const sharedFetch=createQuotaFetch({base,originalFetch:fetchImpl,mode:'enforce'}).fetch;",
+      "position": "before",
+      "text": "  // Passive endpoint receipt, after existing quota admission; no schedule or raw changes.\n  fetchImpl=observeIndependentProviderFetch(base,'SECTOR_PROVISIONAL',fetchImpl);\n"
+    }
+  ]
+}
