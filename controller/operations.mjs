@@ -5,6 +5,7 @@ import {inspectPcSource} from './pc-source-readonly.mjs';
 import {inspectWriterInstallPreimage} from './writer-install-preimage-readonly.mjs';
 import {inspectWriterPublicationEvidence} from './writer-publication-evidence-readonly.mjs';
 import {inspectEmploymentR6D1Readback} from './employment-r6-d1-readback-readonly.mjs';
+import {inspectR54PublicReadback} from './market-r54-d1-api-readback-readonly.mjs';
 import {inspectInflation7D1Readback} from './inflation7-d1-readback-readonly.mjs';
 import {inspectCoreRuntimeSource} from './core-runtime-source-readonly.mjs';
 import {observeInflationCoreLock} from './inflation-core-lock-observation-readonly.mjs';
@@ -207,6 +208,7 @@ export async function runOperation(request,context){
  if(request.operation==='writer-install-preimage-readonly')return inspectWriterInstallPreimage(dataRoot,{coreTaskXml:queryTask('ZGMINI-PC-Local-Core'),approvedPreimageScope:context.approvedPreimageScope});
  if(request.operation==='writer-publication-evidence-readonly')return inspectWriterPublicationEvidence(dataRoot);
  if(request.operation==='employment-r6-d1-readback-readonly')return inspectEmploymentR6D1Readback(dataRoot);
+ if(request.operation==='market-r54-d1-api-readback-readonly')return inspectR54PublicReadback(dataRoot);
  if(request.operation==='inflation7-d1-readback-readonly')return inspectInflation7D1Readback(dataRoot);
  if(request.operation==='r17-268-postcancel-readonly'){
   if(request.requestId!==ONE_SHOT_DIAGNOSTIC_ID)return {status:'BLOCKED',code:'R17_268_ONE_SHOT_REQUEST_ID_STOP',providerCalls:0,d1Writes:0,operationalWrites:0};
