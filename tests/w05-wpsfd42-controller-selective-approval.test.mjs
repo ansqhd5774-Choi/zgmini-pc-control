@@ -4,8 +4,8 @@ import fs from 'node:fs';
 import {createHash} from 'node:crypto';
 import {manifestFingerprint,validateControllerSelectivePin} from '../tools/maintenance-contract.mjs';
 
-const installed='d996f2c666955c6659c233d8840d13181571f02a';
-const target='87dbb9841fe8dd03a88b1f65578ab49b2678c38d';
+const installed='2f3ebcf3518a5e9b694bafbb7e6331840a6a4a25';
+const target='08f0b656faa9ad5c46a813a0cdda4b43107eefbd';
 const manifest=JSON.parse(fs.readFileSync(new URL(
  '../approvals/controller-updates/'+target+'.json',import.meta.url),'utf8'));
 const pin=JSON.parse(fs.readFileSync(new URL(
@@ -13,8 +13,8 @@ const pin=JSON.parse(fs.readFileSync(new URL(
 const paths=['config/operations.json','controller/operations.mjs',
  'controller/w05-wpsfd42-service-readonly.mjs'];
 const checks={
- 'config/operations.json':'5b42ef2bcb1cd765cdced2341d2a1e5350a283e6a87dfe29e0ee43a6194c9eb0',
- 'controller/operations.mjs':'44a3f2ac25df3043007a3387c392a63985df523e8d4602f9ac35253160404d8e',
+ 'config/operations.json':'2f0b61c56334720c079b63f5c3d96f3d9fd0fca333fc7bb84a6d4a3fc2a81cc0',
+ 'controller/operations.mjs':'6fbb76a91c8682607a890e7dcdb7cff91087cc73804cb0d49b918250e2d98b09',
  'controller/w05-wpsfd42-service-readonly.mjs':'4ab021ee53181a240a54963d98417e1e3acba04b937b7c9d160971893bf1872f',
 };
 
@@ -34,7 +34,7 @@ test('W05 fixed threefile Controller selective review is internally exact',()=>{
  assert.equal(manifest.selectiveSource.mainSha,
   'df7a94c4b5568d259dc13817251da5e423250ab2');
  assert.equal(manifest.selectiveSource.branch,
-  'codex/issues-w05-2794-selective-d996-20261123');
+  'codex/w05-2f3-single-parent-20261123');
  assert.deepEqual(manifest.selectiveSource.customPaths,paths);
  assert.equal(manifest.approval.ref,
   'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2803');
