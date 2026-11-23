@@ -117,7 +117,9 @@ test('large CI log captures actual failed TAP tests in the tail within the 128 K
 test('actual GitHub log stream retains late failure and discards private middle',async()=>{
  const pass='2026-11-23T07:00:00Z # Subtest: HTTP 503 success fixture\n'+
   '2026-11-23T07:00:01Z ok 1 - HTTP 503 success fixture\n';
- const middle='secret=UNPUBLISHED_PRIVATE_MIDDLE\n'.repeat(9000);
+ const middle='2026-11-23T07:00:02Z clean CI output\n'.repeat(1200)+
+  'secret=UNPUBLISHED_PRIVATE_MIDDLE\n'+
+  '2026-11-23T07:00:03Z clean CI output\n'.repeat(7800);
  const failure='2026-11-23T07:01:00Z not ok 133 - real failing Windows test\n';
  const body=pass+middle+failure+'2026-11-23T07:02:00Z clean footer\n'.repeat(2200);
  assert.ok(body.length>300000&&body.indexOf('not ok 133')>131072);
