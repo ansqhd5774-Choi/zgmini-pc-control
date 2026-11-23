@@ -45,6 +45,7 @@ import {inspectEmploymentR6WalMemoryPreflight} from './employment-r6-wal-memory-
 import {inspectEmploymentR6CollectionEvidence,R6_READONLY_STAGES} from './employment-r6-collection-evidence-readonly.mjs';
 import {inspectEmploymentR6RawRunLight} from './employment-r6-raw-run-attestation-readonly.mjs';
 import {inspectBeaMfgArchiveReadonly} from './earnings-bea-mfg-archive-readonly.mjs';
+import {inspectW05ServiceSavedPreview} from './w05-service-saved-preview-readonly.mjs';
 const activeTasks=['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea'];
 const retiredIranTask='ZGMINI-PC-Iran-Progress-R13';
 const taskNotFound=text=>/cannot find the file|cannot find the specified|does not exist|지정.*(?:파일|작업|경로).*찾을 수 없|찾을 수 없.*(?:파일|작업|경로)/i.test(text);
@@ -247,6 +248,7 @@ export async function runOperation(request,context){
  });
  if(request.operation==='employment-r6-raw-run-attestation-readonly')return inspectEmploymentR6RawRunLight(dataRoot);
  if(request.operation==='earnings-bea-mfg-archive-readonly')return inspectBeaMfgArchiveReadonly(dataRoot);
+ if(request.operation==='w05-service-saved-preview-readonly')return inspectW05ServiceSavedPreview(dataRoot);
  if(request.operation==='employment-r6-candidate-stage-readonly'){
   const minimum=policy.operations[request.operation].minimumFreeMiB??policy.minimumFreeMiBForHeavy;
   if(os.freemem()/1048576<minimum)return {status:'BLOCKED',code:'RESOURCE_WAIT_MEMORY',
