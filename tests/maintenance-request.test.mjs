@@ -64,10 +64,12 @@ test('title/body/author/label/state/PR substitutions cannot pass readback',()=>{
   const f=setup();assert.throws(()=>verifyMaintenanceIssue(f.expected,{...f.actual,...patch}),new RegExp('READBACK_'+code));
  }
 });
-test('read-only historical verification permits closed Issue without relaxing new submission state',()=>{
+test('read-only reconciliation permits completed closed Issue without relaxing new submission state',async()=>{
  const f=setup();f.actual.state='closed';
  assert.throws(()=>verifyMaintenanceIssue(f.expected,f.actual),/STATE_MISMATCH/);
  assert.equal(verifyMaintenanceIssue(f.expected,f.actual,{allowClosed:true}).execution,'NOT_ASSERTED');
+ const receipt={schema:'ZGMINI_MAINTENANCE_SUBMISSION_V1',expected:f.expected,issueNumber:42};
+ assert.equal((await reconcileMaintenanceIssue(receipt,f.ports)).execution,'NOT_ASSERTED');assert.equal(f.posts,0);
 });
 test('unknown fields and invalid CLI combinations fail before external access',async()=>{
  await assert.rejects(()=>main(['verify','--issue-number','1','--manifest-file','x']),/USAGE/);

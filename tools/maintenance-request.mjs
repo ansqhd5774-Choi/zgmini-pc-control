@@ -65,7 +65,9 @@ export async function reconcileMaintenanceIssue(receipt,{findIssues,readIssue,sa
    next:'READ_ORIGINAL_CREATION_STATE_NO_NEW_POST'};
   issueNumber=matches[0].number;
  }
- const verified=verifyMaintenanceIssue(receipt.expected,await readIssue(issueNumber));
+ // Reconciliation may happen after the original request completed and closed.
+ // Closure is not a failed POST or permission to submit another request.
+ const verified=verifyMaintenanceIssue(receipt.expected,await readIssue(issueNumber),{allowClosed:true});
  await saveReceipt({...receipt,issueNumber,phase:'READBACK_VERIFIED'});return verified;
 }
 function github(endpoint,{body}={}){
