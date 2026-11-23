@@ -1,0 +1,32 @@
+{
+  "schema": "ZGMINI_PC_PUBLICATION_APPROVAL_V1",
+  "requestId": "pc-publication-c8627e3e-d090-466b-bfd0-7fb6795e2bcd",
+  "operation": "bls-wpsfd42-service-once",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "publisherSha": "0a298d64188f0dfd268723cab369ffb7e2ea1455",
+  "operationalSha": "af5374593a0d27ebaa5280f78187b075ffcabb23",
+  "snapshotKey": "detail:earnings-recession-indicators:bls-wpsfd42:v1",
+  "publisherFiles": {
+    "scripts/pc-writer/EARNINGS_BLS_SERVICE_R1_D1_ONCE.mjs": "08e920c51e3dec927ff019210d6ef11e53b4979c661c7bbb37170cd51be55a25",
+    "scripts/pc-writer/earnings-publication-result-directory.mjs": "8787bbf081022a5de0c0cebad00b2eda7e25e9fa458b9389bfd09d21825a4034",
+    "scripts/pc-writer/EARNINGS_R4_C_READ_MODEL_PREVIEW_READONLY.mjs": "0f04f4ab485ac49f224b93a398a85c0cbc9c139b22a47411e5fa151549362f72",
+    "scripts/pc-writer/EARNINGS_R3D_STORED_BLS_CALC_READONLY.mjs": "b441a52551a015ab9522280ee7c3f620fc8efd967c8dd0e6e04865bb72c97b31",
+    "scripts/pc-writer/EARNINGS_R4_C_D1_DUAL_SOURCE_GATES.mjs": "6106ff55993324b905186330163692f8918f3f49354f266cae430b50093a9377",
+    "scripts/pc-writer/d1.mjs": "267fb175386fa007bd74b255d922fba9ee6fe71ffe953f94970beb8ba9d9ff87",
+    "scripts/pc-writer/d1-transient.mjs": "f912c335675481f8646380feaebb6241ec0d877b78dbd6fa165e208fdc6d457e",
+    "scripts/pc-writer/d1-diagnostics.mjs": "2e9ea54661c51d86798800e532edb10c6796694d3049844ef8b283b7ad6dfe5f",
+    "worker/earnings-companion-c-r4.mjs": "01fa847441e590d0fa3a775cfd56ad9530a73fce7f20736ab5edf65ce86f42b4"
+  },
+  "approval": {
+    "grade": "B",
+    "scope": "WPSFD42_SERVICE_SINGLE_KEY_D1_ONCE",
+    "actor": "ansqhd5774-Choi",
+    "issueNumber": 2881
+  },
+  "execution": {
+    "mode": "ONCE",
+    "maxAutomaticRetries": 0,
+    "maxD1Keys": 1,
+    "provider": "STORED_SQLITE_ONLY"
+  }
+}
