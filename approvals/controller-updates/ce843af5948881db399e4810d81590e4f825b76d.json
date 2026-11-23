@@ -5,20 +5,20 @@
   "allowFiles": [
     {
       "path": "controller/earnings-bea-nipa-capture-readonly.mjs",
-      "sha256": "f5809ec9ee6e24b0acf9a6f1aef46cce46ff2c3636c231ca74a57651da9e0140"
+      "sha256": "51db41721278db0f7d0507f95bd875f3b82f704e7e78a5ee42303d04859aa5ea"
     }
   ],
   "purpose": "pc-controller-maintenance",
   "controllerOnlyInstall": true,
   "approval": {
     "grade": "B",
-    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2935",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2937",
     "scope": "PC_CONTROL_CONTROLLER_UPDATE"
   },
   "checks": {
     "targetSha": "ce843af5948881db399e4810d81590e4f825b76d",
     "status": "PASS",
-    "manifestSha256": "0362eb4c44c6da0a6c428ba70a6b1f3640c3c5a29661f5c718ea4370e77033f3"
+    "manifestSha256": "69147ef1720345f97a45b70abd00220311861778e0190a9426790f701d60cc10"
   },
   "backup": {
     "strategy": "VERSIONED_SNAPSHOT",
