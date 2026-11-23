@@ -1,0 +1,22 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "c495c284-bcb4-4cea-832e-2267ef2515b5",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "c62bd5aac3353d7e146d930dbb033b82d89010cd",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "af5374593a0d27ebaa5280f78187b075ffcabb23",
+  "candidateSourceSha": "748263a85d0ad8e056a2e30b79c9fe795f5d02d7",
+  "manifestSha256": "3d77e2ddcc08a6d78047c7b1a57ef43cc66bcacee9072fcdf8f4754a0f555e96",
+  "baseTreeOid": "f94e20d7488aad9ea0b2dbea59681cb6534196d3",
+  "preparedTreeOid": "77f9e7bb7de802fb0c1714e9840a67248e8e564d",
+  "provenanceSha256": "af4aadf38470f1b115a099306b38e5256a0f17e0ddda12691f43efc5c285fee6",
+  "runId": "45176281538",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "worker/candidate-market-operational-store.mjs",
+    "lib/score-history/market-input-observation-shadow-r1.mjs",
+    "lib/score-history/composite-archive-lineage-link-r1.mjs"
+  ]
+}
