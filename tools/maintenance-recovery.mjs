@@ -334,6 +334,10 @@ async function reconcileInstalledRecovery2960({id,source,g,before}){
  const verdict=classifyInstalledReconciliationProof(proof);
  need(verdict.status==='INSTALLED_RECONCILIATION_ELIGIBLE',verdict.code);
  const claim=path.join(root,'leases/controller-recovery');
+ const leaseDir=path.join(root,'leases/controller-install');
+ const leaseStat=fs.lstatSync(leaseDir);
+ need(leaseStat.isDirectory()&&!leaseStat.isSymbolicLink(),
+  'INSTALLED_RECOVERY_LEASE_DIRECTORY_UNSAFE');
  need(!fs.existsSync(claim),'INSTALLED_RECOVERY_OTHER_CLAIM_ACTIVE');
  fs.mkdirSync(claim);
  const nonce=randomUUID(),claimFile=path.join(claim,'owner.json');
@@ -342,6 +346,9 @@ async function reconcileInstalledRecovery2960({id,source,g,before}){
   {flag:'wx',mode:0o600});
  const recoveryDir=path.join(root,'recovery');
  fs.mkdirSync(recoveryDir,{recursive:true});
+ const recoveryStat=fs.lstatSync(recoveryDir);
+ need(recoveryStat.isDirectory()&&!recoveryStat.isSymbolicLink(),
+  'INSTALLED_RECOVERY_ARCHIVE_DIRECTORY_UNSAFE');
  const stem=id+'-installed-'+nonce,record=path.join(recoveryDir,stem+'.json');
  const archive=path.join(recoveryDir,stem+'.lease');
  const prepared={schema:'ZGMINI_PC_INSTALLED_RECOVERY_RESULT_V1',
@@ -376,7 +383,7 @@ async function reconcileInstalledRecovery2960({id,source,g,before}){
   // not a synthetic success. The original ledger is never changed.
   fs.writeFileSync(record,JSON.stringify(prepared,null,2)+'\n',
    {flag:'wx',mode:0o600});
-  fs.renameSync(path.join(root,'leases/controller-install'),archive);
+  fs.renameSync(leaseDir,archive);
   need(fs.readFileSync(path.join(archive,'owner.json')).equals(bytes.owner)&&
    fs.readFileSync(path.join(archive,'RECOVERY_REQUIRED.json')).equals(bytes.marker)&&
    !fs.existsSync(path.join(root,'leases/controller-install')),
