@@ -158,7 +158,7 @@ export async function processCompletedPcJob(event, {
   const result = {state: 'SCAN_COMPLETED', runId: run.runId, attempt: run.attempt,
     reportsObserved: 0, confirmedFailures: 0, newIssues: 0, reusedIssues: 0,
     routesRecorded: 0, routesReused: 0,
-    waitsRecorded:0,waitsReused:0,waitProofPending:0,failureProofPending:0,
+    waitsRecorded:0,waitsReused:0,waitsPostReconciled:0,waitProofPending:0,failureProofPending:0,
     missingReceipts: 0, seatReadPending: 0, seatReadProblems: [],
     seatProofUnverified:0, seatProofProblems:[],
     pcOperationalWrites: 0, automaticPcRetries: 0};
@@ -234,7 +234,9 @@ export async function processCompletedPcJob(event, {
         postComment:createResourceWaitComment,
         getComment:readResourceWaitComment});
       if(ledger.state==='WAIT_RECORDED')result.waitsRecorded++;
-      else result.waitsReused++;
+       else if(ledger.state==='WAIT_REUSED')result.waitsReused++;
+       else if(ledger.state==='WAIT_POST_RECONCILED')result.waitsPostReconciled++;
+       else stop('WAIT_LEDGER_RESULT_INVALID');
       continue;
     }
     // No Issue is created from BLOCKED, STATE_UNKNOWN or successful results.
@@ -315,7 +317,7 @@ export async function processCompletedPcJob(event, {
   else if (result.missingReceipts) result.state = 'PARTIAL_RECEIPT_PENDING';
   else if (result.failureProofPending) result.state = 'PARTIAL_FAILURE_EVIDENCE_PENDING';
   else if (result.waitProofPending) result.state = 'PARTIAL_WAIT_EVIDENCE_PENDING';
-  else if (result.waitsRecorded || result.waitsReused)
+  else if (result.waitsRecorded || result.waitsReused || result.waitsPostReconciled)
     result.state = 'WAITING_SHARED_RESOURCE_RECORDED';
   return Object.freeze(result);
 }

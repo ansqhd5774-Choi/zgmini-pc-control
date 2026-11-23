@@ -115,6 +115,36 @@ test('PC verified memory contention records one #68 wait, without repair or retr
   assert.equal(repairs,0);
 });
 
+test('ambiguous POST readback is reconciled, not reported as existing reuse',async()=>{
+  const r=blocked(),queue=[];let posts=0;
+  const io={
+    readReport:async p=>p===pathJson?r:null,
+    readReportText:async p=>p===pathJson.replace('.json','.txt')?textReport(r):null,
+    readComments:async()=>[receipt()],
+    readIssue:async n=>n===1009?issue():null,
+    listHandoffs:async()=>({repository:repo,complete:true,issues:[]}),
+    createHandoff:async()=>{throw Error('UNEXPECTED_REPAIR');},
+    listResourceWaitComments:async()=>queue,
+    createResourceWaitComment:async body=>{
+      posts++;
+      queue.push({id:12345,body,user:{login:bot},
+        issue_url:`https://api.github.com/repos/${repo}/issues/68`});
+      throw Error('POST_RESPONSE_LOST');
+    },
+    readResourceWaitComment:async id=>queue.find(x=>x.id===id),
+  };
+  const first=await processCompletedPcJob(ev(),io);
+  assert.equal(first.state,'WAITING_SHARED_RESOURCE_RECORDED');
+  assert.equal(first.waitsRecorded,0);
+  assert.equal(first.waitsReused,0);
+  assert.equal(first.waitsPostReconciled,1);
+  assert.equal(posts,1);
+  const second=await processCompletedPcJob(ev(),io);
+  assert.equal(second.waitsReused,1);
+  assert.equal(second.waitsPostReconciled,0);
+  assert.equal(posts,1);
+});
+
 test('PC text evidence absent remains pending, never posts a wait',async()=>{
   const r=blocked();let posts=0;
   const io={
