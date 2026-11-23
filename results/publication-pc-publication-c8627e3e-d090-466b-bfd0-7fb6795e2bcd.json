@@ -1,0 +1,18 @@
+{
+  "schema": "ZGMINI_PC_PUBLICATION_RESULT_V1",
+  "requestId": "pc-publication-c8627e3e-d090-466b-bfd0-7fb6795e2bcd",
+  "operation": "bls-wpsfd42-service-once",
+  "issueNumber": 2882,
+  "snapshotKey": "detail:earnings-recession-indicators:bls-wpsfd42:v1",
+  "status": "PASS",
+  "code": "PUBLICATION_SINGLE_KEY_READBACK_VERIFIED",
+  "startedAt": "2026-11-23T07:44:47.651Z",
+  "finishedAt": "2026-11-23T07:44:55.399Z",
+  "providerCalls": 0,
+  "d1Writes": 1,
+  "sourceVersion": "a28e8c4a8a1074fbb6fb4affa0156b99d094c5c8e5e6f02dbaac6ee2986fe3ed",
+  "sourceStoredAt": 1795351641253,
+  "d1Result": "READBACK_VERIFIED",
+  "attemptedSourceStoredAt": 1795351641253,
+  "sourceStoredAtEvidence": "D1_READBACK_VERIFIED"
+}
