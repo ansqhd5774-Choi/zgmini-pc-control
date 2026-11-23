@@ -134,6 +134,25 @@ test('actual GitHub log stream retains late failure and discards private middle'
  assert.ok(!excerpt.includes('UNPUBLISHED_PRIVATE_MIDDLE'));
  assert.deepEqual(classifyLogs(excerpt),['ASSERTION_HINT']);
 });
+test('real streamed 112-128 KiB logs retain first error and every byte exactly once',async()=>{
+ for(const length of [114688,114689,120000,131071,131072]){
+  const first='2026-11-23T08:00:00Z ##[error]HTTP 503 provider outage\n';
+  const last='\n2026-11-23T08:00:01Z log completed\n';
+  const middle='Z'.repeat(length-first.length-last.length);
+  const original=first+middle+last;
+  assert.equal(new TextEncoder().encode(original).length,length);
+  const raw=new TextEncoder().encode(original);
+  let i=0;
+  const reader={read:async()=>i>=raw.length?{done:true}:(()=>{
+   const end=Math.min(i+4093,raw.length);
+   const value=raw.subarray(i,end);i=end;
+   return {done:false,value};
+  })()};
+  const received=await readBoundedLogEvidence(reader);
+  assert.equal(received,original,'exact byte-preservation at length '+length);
+  assert.deepEqual(classifyLogs(received),['UPSTREAM_5XX_HINT']);
+ }
+});
 test('bounded log reader keeps small errors and fails closed on overlarge logs',async()=>{
  const bytes=new TextEncoder().encode('##[error]HTTP 503 from provider\n');
  const reader={read:async()=>reader.done?{done:true}:(reader.done=true,{done:false,value:bytes})};
