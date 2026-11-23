@@ -1,0 +1,35 @@
+{
+  "schema": "ZGMINI_PC_PUBLICATION_APPROVAL_V1",
+  "requestId": "pc-publication-b2e4ba50-2c95-4cd4-b0da-84269b88c73c",
+  "operation": "bea-unit-nipa-json-once",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "publisherSha": "b4042b42c99f6b73c24e6ff3b3fd03e78abd690f",
+  "operationalSha": "8c1a7738fe71770d666f09b40fb1c435262a75fa",
+  "snapshotKey": "detail:earnings-bea-unit-profit:v1",
+  "publisherFiles": {
+    "scripts/pc-writer/EARNINGS_BEA_UNIT_PROFIT_R1_ONCE.mjs": "9ed322447e8532fdcc0d96cebbde75f3476b008a448597b2719e27438ca0012e",
+    "scripts/pc-writer/EARNINGS_BEA_UNIT_NIPA_PUBLIC_PROJECTION_R1.mjs": "1a3e45c5c77b4673f8bdb23d01586bc0842e2673b53c4ee7349665354623032d",
+    "scripts/pc-writer/EARNINGS_BEA_UNIT_NIPA_ARCHIVE_R1.mjs": "58c3f81a2361ab3465a5b68b97bdc293ed94fafa19753b4de949d1bcfb4a7f88",
+    "scripts/pc-writer/EARNINGS_BEA_UNIT_NIPA_EQUIVALENCE_R1.mjs": "b3a745bcf773dae56dca19179cd8fbc931c7c05e2f13c15634f191c25c38e36c",
+    "scripts/pc-writer/EARNINGS_BEA_UNIT_STORED_RAW_R1.mjs": "ad303488ac6b3a70a2613534fd1110e7de40995bdbb3c89014b2804f75e41d3d",
+    "scripts/pc-writer/EARNINGS_R4_C_D1_DUAL_SOURCE_GATES.mjs": "6106ff55993324b905186330163692f8918f3f49354f266cae430b50093a9377",
+    "scripts/pc-writer/d1.mjs": "267fb175386fa007bd74b255d922fba9ee6fe71ffe953f94970beb8ba9d9ff87",
+    "scripts/pc-writer/d1-transient.mjs": "f912c335675481f8646380feaebb6241ec0d877b78dbd6fa165e208fdc6d457e",
+    "scripts/pc-writer/d1-diagnostics.mjs": "2e9ea54661c51d86798800e532edb10c6796694d3049844ef8b283b7ad6dfe5f",
+    "lib/market-score/earnings-bea-unit-profit-source-r1.mjs": "c76cfbc3b228ecea5de766f45789309cb452f77003bc63604afc6aae4ba1943b",
+    "worker/earnings-bea-unit-profit-r1.mjs": "d7ae3651a6b1c6bc8b905457eee50fcbae47645c54b61a7faae5d28ed084a35e"
+  },
+  "approval": {
+    "grade": "B",
+    "scope": "BEA_UNIT_NIPA_JSON_SINGLE_KEY_D1_ONCE",
+    "actor": "ansqhd5774-Choi",
+    "issueNumber": 3014
+  },
+  "execution": {
+    "mode": "ONCE",
+    "maxAutomaticRetries": 0,
+    "maxD1Keys": 1,
+    "provider": "BEA_API_JSON"
+  },
+  "sourceSha256": "ff5a5a3a88cfc2f8758d8cd1369818eff1f9875e6df70e81caef4baf119273c3"
+}
