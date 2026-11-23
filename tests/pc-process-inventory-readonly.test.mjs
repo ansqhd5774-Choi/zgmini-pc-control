@@ -116,8 +116,10 @@ test('D05 Writer checkpoint projection distinguishes unchanged and unproven with
  assert.equal(out.archiveAppendConditionMet,false);
  assert.equal(out.recoveryEligible,false);
  assert.doesNotMatch(JSON.stringify(out),/SECRET|credentials|providerInputs|message/);
- const yes=projectD05WriterCheckpoint({...raw,compositeObserved:{status:'LOCAL_STORED'},
+ const yes=projectD05WriterCheckpoint({...raw,market:{status:'VERIFIED'},
+  compositeObserved:{status:'LOCAL_STORED'},
   d05PrivateLineageStatus:'APPENDED_VERIFIED_LOCAL_ONLY'});
+ assert.equal(yes.marketStage,'VERIFIED');
  assert.equal(yes.archiveAppendConditionMet,true);
  assert.equal(yes.actualLineageAppendProven,true);
  const missing=projectD05WriterCheckpoint({...raw,d05PrivateLineageStatus:null});

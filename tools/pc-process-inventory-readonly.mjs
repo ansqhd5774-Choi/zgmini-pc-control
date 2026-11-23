@@ -449,7 +449,9 @@ export function projectD05WriterCheckpoint(raw){
   writerAt:at,writerMode:mode,writerStatus,writerSource,
   marketStage:market,compositeArchiveStage:archive,d05PrivateLineageStage:lineage,
   // Null means no stage was reported, not that a calculation failed.
-  archiveAppendConditionMet:market==='LOCAL_STORED'&&archive==='LOCAL_STORED',
+  // Market reporting may advance to VERIFIED after publication; archive is the only fixed stage gate here.
+  // This does not attest the exclusive Writer witness, output append, or full D05 input lineage.
+  archiveAppendConditionMet:archive==='LOCAL_STORED',
   actualLineageAppendProven:lineage==='APPENDED_VERIFIED_LOCAL_ONLY',
   localArchiveNewEventProven:archive==='LOCAL_STORED',
   fullD05InputLineageVerified:false,publicD1Verified:false,
