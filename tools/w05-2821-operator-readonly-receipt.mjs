@@ -27,6 +27,25 @@ const exec=(bin,args,opts={})=>spawnSync(bin,args,{windowsHide:true,encoding:'ut
 const g=args=>exec('git',['-C',repo,...args]);
 const code=s=>/^[A-Z][A-Z0-9_]{0,79}$/.test(String(s??''))?String(s):'UNKNOWN';
 
+// Independent source provenance and the current working tree are different facts.
+// Do not turn a normal later main commit into a forged approval failure.
+export function compareRollbackFileEvidence(expected,pinnedBytes,checkoutSha){
+ const approved=/^[a-f0-9]{64}$/.test(expected??'')&&
+  Buffer.isBuffer(pinnedBytes)&&hash(pinnedBytes)===expected;
+ return {approved,checkout:approved&&checkoutSha===expected};
+}
+export function classifyReadOnlyDelivery(report,receipt){
+ const remoteVerified=receipt?.status==='REMOTE_RECEIPT_VERIFIED';
+ return {
+  status:remoteVerified?'READ_ONLY_RECEIPT_VERIFIED':'READ_ONLY_RECEIPT_UNVERIFIED',
+  operatorAttested:report?.nodeOperator==='PASS'&&report?.probeCheckout==='PASS'&&
+   report?.operatorVbs==='PASS',
+  // The companion is not a rollback authorization tool. A full recovery
+  // eligibility decision must be made by the fixed independent rollback tool.
+  rollbackAuthorized:false
+ };
+}
+
 // OPERATOR text alone is insufficient: verify that the executable probe is
 // exactly the committed checkout and that the installed WMI proof is the
 // maintenance receiver's own approved file. Never publish raw source/identity.
@@ -67,7 +86,7 @@ export function newReport({now=new Date(),id=randomUUID()}={}){
  requestId:REQUEST_ID,incidentIssue:ISSUE,receiptId:id,observedAtUtc:now.toISOString(),
  nodeOperator:'UNVERIFIED',nodeOperatorExit:'UNKNOWN',probeCheckout:'UNKNOWN',
  operatorVbs:'UNKNOWN',approval:'UNKNOWN',
- toolHashes:'0/5',originalCas:'0/5',recoveryClaim:'UNKNOWN',claimOwner:'UNKNOWN',
+ pinnedToolHashes:'0/5',toolHashes:'0/5',originalCas:'0/5',recoveryClaim:'UNKNOWN',claimOwner:'UNKNOWN',
  originalOwnerAlive:'UNKNOWN',priorRecoveryRecord:'UNKNOWN',
  priorRecoveryCode:'UNKNOWN',priorRecoveryOperation:'UNKNOWN',
  readStatus:'NOT_STARTED',operationalWrites:0,rollbackInvocations:0};
@@ -102,14 +121,17 @@ export function collectReport({pid=process.pid,report=newReport()}={}){
    committed.status===0&&hash(committed.stdout)===hash(bytes)&&ancestor.status===0?'PASS':'FAIL';
   const entries=Array.isArray(a.files)?a.files:[];
   const exact=entries.length===5&&sourceFiles.every(p=>entries.filter(x=>x?.path===p).length===1);
-  let valid=0;
+  let pinnedValid=0,checkoutValid=0;
   if(exact)for(const file of sourceFiles){
    const expected=entries.find(x=>x.path===file).sha256;
    const origin=exec('git',['-C',repo,'show',SOURCE_SHA+':'+file],{encoding:'buffer'});
-   if(/^[a-f0-9]{64}$/.test(expected??'')&&origin.status===0&&
-    hash(origin.stdout)===expected&&hfile(path.join(repo,file))===expected)valid++;
+   const match=compareRollbackFileEvidence(expected,
+    origin.status===0?origin.stdout:null,hfile(path.join(repo,file)));
+   if(match.approved)pinnedValid++;
+   if(match.checkout)checkoutValid++;
   }
-  report.toolHashes=valid+'/5';
+  report.pinnedToolHashes=pinnedValid+'/5';
+  report.toolHashes=checkoutValid+'/5';
   if(a.toolSha256!==entries.find(x=>x?.path===sourceFiles[0])?.sha256)report.approval='FAIL';
 
   const install=path.join(maint,'leases/controller-install');
@@ -192,11 +214,11 @@ export function publishReceipt(report){
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const r=collectReport(),receipt=publishReceipt(r);
+ const delivery=classifyReadOnlyDelivery(r,receipt);
  console.log(JSON.stringify({requestId:REQUEST_ID,nodeOperator:r.nodeOperator,
   readStatus:r.readStatus,receiptStatus:receipt.status,receiptUrl:receipt.url??null,
-  rollbackInvocations:0}));
- if(receipt.status!=='REMOTE_RECEIPT_VERIFIED'||r.nodeOperator!=='PASS'||
-  r.probeCheckout!=='PASS'||r.operatorVbs!=='PASS'||
-  r.approval!=='PASS'||r.toolHashes!=='5/5'||r.originalCas!=='5/5'||
-  r.recoveryClaim!=='ABSENT'||r.originalOwnerAlive!=='NO')process.exitCode=2;
+  deliveryStatus:delivery.status,operatorAttested:delivery.operatorAttested,
+  pinnedToolHashes:r.pinnedToolHashes,localToolHashes:r.toolHashes,
+  rollbackAuthorized:false,rollbackInvocations:0}));
+ if(!delivery.status.endsWith('_VERIFIED'))process.exitCode=2;
 }
