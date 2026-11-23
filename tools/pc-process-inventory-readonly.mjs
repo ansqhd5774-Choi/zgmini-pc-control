@@ -79,9 +79,12 @@ export function authenticateProcess(event,env,role){
  const keys=Object.keys(raw||{}).sort().join(',');
  const basic=keys==='operation,requestId,role,schema';
  const withJobs=keys==='operation,requestId,role,runnerJobRefs,schema';
- if(!raw||(!basic&&!withJobs)||
+ const withW05=keys==='operation,probe,requestId,role,schema';
+ if(!raw||(!basic&&!withJobs&&!withW05)||
    raw.schema!==SCHEMA||raw.operation!==ROLE_OPERATION||raw.role!==role||
-   (withJobs&&role!=='operating'))fail('REQUEST_SCOPE_INVALID');
+   (withJobs&&role!=='operating')||
+   (withW05&&(role!=='operating'||raw.probe!=='w05-operator-topology-readonly')))
+  fail('REQUEST_SCOPE_INVALID');
  const runnerJobRefs=withJobs?validateRunnerJobRefs(raw.runnerJobRefs):null;
  const normalized=structuredClone(event);
  normalized.issue.title='pc-host-inventory-readonly';
@@ -89,7 +92,8 @@ export function authenticateProcess(event,env,role){
   operation:'host-inventory-readonly',requestId:raw.requestId,role});
  if(event.issue.title!==TITLE)fail('ISSUE_TITLE_INVALID');
  const verified=authenticate(normalized,env,role);
- return runnerJobRefs?{...verified,runnerJobRefs}:verified;
+ return {...verified,...(runnerJobRefs?{runnerJobRefs}:{}),
+  ...(withW05?{w05OperatorTopology:true}:{})};
 }
 export function sanitizeProbe(raw){
  if(!raw||raw.schema!=='ZGMINI_PC_PROCESS_PROBE_V1')fail('PROBE_SCHEMA_INVALID');
@@ -1301,6 +1305,108 @@ function readTargetEndpointStatus(){
  }catch{return endpointUnknown('ENDPOINT_LOG_UNAVAILABLE');}
 }
 
+
+// Fixed W05 #2821 independent-operator ancestry *observation* through the
+// existing operating-PC A runner. This never invokes OPERATOR authorization,
+// emulates a login, changes the installed .vbs, or makes a recovery eligible.
+// Only bounded process IDs and first failing check codes are exported.
+const W05_OPERATOR_TOPOLOGY_PS=[
+ "$ErrorActionPreference='Stop'",
+ "$all=@(Get-CimInstance -ClassName Win32_Process -ErrorAction Stop)",
+ "$by=@{};foreach($p in $all){$by[[int]$p.ProcessId]=$p}",
+ "$candidates=@($all | Where-Object {($_.Name -eq 'powershell.exe' -or $_.Name -eq 'pwsh.exe') -and [int]$_.SessionId -gt 0} | Sort-Object ProcessId)",
+ "$output=@()",
+ "foreach($start in ($candidates | Select-Object -First 6)){",
+ " $item=$start;$session=[int]$start.SessionId;$sidRef=$null;$childBorn=$null;$seen=@{};$reason='DEPTH_EXCEEDED'",
+ " for($n=0;$n -lt 32;$n++){",
+ "  $processId=[int]$item.ProcessId",
+ "  if($processId -le 0 -or $seen.ContainsKey($processId)){$reason='INVALID_OR_CYCLIC_PID';break}",
+ "  $seen[$processId]=$true",
+ "  if([int]$item.SessionId -ne $session){$reason='SESSION_MISMATCH';break}",
+ "  $exe=[string]$item.ExecutablePath",
+ "  if([string]::IsNullOrWhiteSpace($exe)){$reason='EXECUTABLE_PATH_UNAVAILABLE';break}",
+ "  $name=[System.IO.Path]::GetFileName($exe).ToLowerInvariant()",
+ "  if($name -eq 'runner.listener.exe' -or $name -eq 'runner.worker.exe'){$reason='RUNNER_ANCESTRY';break}",
+ "  if($null -eq $item.CreationDate){$reason='CREATION_TIME_UNAVAILABLE';break}",
+ "  $born=[datetime]$item.CreationDate",
+ "  if($null -ne $childBorn -and $born.ToUniversalTime() -gt $childBorn.ToUniversalTime()){$reason='PARENT_NEWER_THAN_CHILD';break}",
+ "  $sid=$null",
+ "  try{$owner=Invoke-CimMethod -InputObject $item -MethodName GetOwnerSid -ErrorAction Stop;if([int]$owner.ReturnValue -eq 0){$sid=[string]$owner.Sid}}catch{}",
+ "  if([string]::IsNullOrWhiteSpace($sid)){$reason='SID_UNAVAILABLE';break}",
+ "  if($null -eq $sidRef){$sidRef=$sid}elseif($sid -ne $sidRef){$reason='SID_MISMATCH';break}",
+ "  if($name -eq 'explorer.exe'){$reason='EXPLORER_CHAIN_CANDIDATE';break}",
+ "  $parentId=[int]$item.ParentProcessId",
+ "  if($parentId -le 0 -or -not $by.ContainsKey($parentId)){$reason='PARENT_UNAVAILABLE';break}",
+ "  $childBorn=$born;$item=$by[$parentId]",
+ " }",
+ " $output+=@{pid=[int]$start.ProcessId;reason=$reason}",
+ "}",
+ "@{schema='ZGMINI_W05_OPERATOR_TOPOLOGY_PROBE_V1';candidateTotal=[int]$candidates.Count;cases=@($output)} | ConvertTo-Json -Compress -Depth 4"
+].join('; ');
+const W05_OPERATOR_REASONS=new Set([
+ 'DEPTH_EXCEEDED','INVALID_OR_CYCLIC_PID','SESSION_MISMATCH',
+ 'EXECUTABLE_PATH_UNAVAILABLE','RUNNER_ANCESTRY',
+ 'CREATION_TIME_UNAVAILABLE','PARENT_NEWER_THAN_CHILD','SID_UNAVAILABLE',
+ 'SID_MISMATCH','EXPLORER_CHAIN_CANDIDATE','PARENT_UNAVAILABLE'
+]);
+export function sanitizeW05OperatorTopologyProbe(raw){
+ if(raw?.schema!=='ZGMINI_W05_OPERATOR_TOPOLOGY_PROBE_V1'||
+   !Number.isSafeInteger(raw.candidateTotal)||raw.candidateTotal<0||
+   raw.candidateTotal>50000||!Array.isArray(raw.cases)||
+   raw.cases.length>6||raw.cases.length>raw.candidateTotal||
+   (raw.candidateTotal<=6&&raw.cases.length!==raw.candidateTotal))
+  fail('W05_OPERATOR_PROBE_SCHEMA_INVALID');
+ const seen=new Set(),cases=raw.cases.map(row=>{
+  if(!row||Object.keys(row).sort().join(',')!=='pid,reason'||
+    !Number.isSafeInteger(row.pid)||row.pid<=0||
+    seen.has(row.pid)||!W05_OPERATOR_REASONS.has(row.reason))
+   fail('W05_OPERATOR_PROBE_RESULT_INVALID');
+  seen.add(row.pid);
+  return {pid:row.pid,firstBoundary:row.reason};
+ });
+ return {status:cases.length?'READ_ONLY_OBSERVED':'STATE_UNKNOWN',
+   code:cases.length?'W05_OPERATOR_CANDIDATE_TOPOLOGY_COLLECTED':'W05_OPERATOR_NO_SHELL_CANDIDATES',
+   candidateTotal:raw.candidateTotal,casesTruncated:raw.candidateTotal>6,
+   cases,independentOperatorAttested:false,recoveryEligible:false};
+}
+export function collectW05OperatorTopology(ctx,env=process.env,{
+ platform=os.platform,hostname=os.hostname,exists=fs.existsSync,spawn=spawnSync
+}={}){
+ const base={schema:'ZGMINI_W05_OPERATOR_TOPOLOGY_RESULT_V1',role:'operating',
+  requestId:ctx.requestId,issueNumber:ctx.issueNumber,runId:ctx.runId,
+  attempt:ctx.attempt,observedAtUtc:new Date().toISOString(),
+  host:hostname().toUpperCase(),runnerName:String(env.RUNNER_NAME||''),
+  independentOperatorAttested:false,recoveryEligible:false,
+  operationalWrites:0,providerCalls:0,d1Writes:0,automaticRetries:0,
+  commandLinesCaptured:false,ownerSidsCaptured:false};
+ const seat=validateSeat('operating',base.host,base.runnerName,env.COMPUTERNAME);
+ if(platform()!=='win32'||base.host!=='PC'||seat!=='MATCH')
+  return {...base,status:'BLOCKED',code:platform()!=='win32'?'W05_WINDOWS_REQUIRED':
+   seat==='MATCH'?'W05_OPERATING_PC_REQUIRED':seat};
+ const powershell=path.win32.join(env.SystemRoot||'C:\\Windows',
+   'System32\\WindowsPowerShell\\v1.0\\powershell.exe');
+ if(!exists(powershell))return {...base,status:'STATE_UNKNOWN',code:'W05_POWERSHELL_UNAVAILABLE'};
+ const encoded=Buffer.from(W05_OPERATOR_TOPOLOGY_PS,'utf16le').toString('base64');
+ const proc=spawn(powershell,['-NoLogo','-NoProfile','-NonInteractive','-EncodedCommand',encoded],
+  {encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:12288,shell:false,env:{...env}});
+ if(proc.error||proc.status!==0)
+  return {...base,status:'STATE_UNKNOWN',code:
+   proc.error?.code==='ETIMEDOUT'?'W05_OPERATOR_WMI_TIMEOUT':'W05_OPERATOR_WMI_UNAVAILABLE'};
+ try{
+  const rows=sanitizeW05OperatorTopologyProbe(JSON.parse(proc.stdout.replace(/^\uFEFF/,'').trim()));
+  return {...base,...rows};
+ }catch{return {...base,status:'STATE_UNKNOWN',code:'W05_OPERATOR_WMI_REPORT_INVALID'};}
+}
+export function w05OperatorTopologyText(r){
+ return ['schema='+r.schema,'requestId='+r.requestId,'runId='+r.runId,
+  'attempt='+r.attempt,'role='+r.role,'host='+r.host,'runner='+r.runnerName,
+  'status='+r.status,'code='+r.code,
+  'candidateTotal='+(r.candidateTotal??'UNKNOWN'),
+  ...(r.cases??[]).map(x=>'candidate.'+x.pid+'='+x.firstBoundary),
+  'independentOperatorAttested=false','recoveryEligible=false',
+  'operationalWrites=0','automaticRetries=0',''].join('\r\n');
+}
+
 export function collect(role,ctx,env=process.env){
  const host=os.hostname().toUpperCase();
  const runnerName=String(env.RUNNER_NAME||'');
@@ -1393,9 +1499,12 @@ async function main(){
  const env=process.env,role=process.argv[2];
  const event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
  const ctx=authenticateProcess(event,env,role);
- const result=collect(role,ctx,env);
- const stem='results/pc-process-inventory-'+ctx.runId+'-'+ctx.attempt+'-'+role;
- const outputs=[[stem+'.json',serializeProcessResult(result)],[stem+'.txt',toText(result)]];
+ const targeted=ctx.w05OperatorTopology===true;
+ const result=targeted?collectW05OperatorTopology(ctx,env):collect(role,ctx,env);
+ const stem=targeted?'results/w05-operator-topology-'+ctx.runId+'-'+ctx.attempt+'-'+role:
+  'results/pc-process-inventory-'+ctx.runId+'-'+ctx.attempt+'-'+role;
+ const outputs=[[stem+'.json',serializeProcessResult(result)],
+  [stem+'.txt',targeted?w05OperatorTopologyText(result):toText(result)]];
  const headers={authorization:'Bearer '+env.GITHUB_TOKEN,accept:'application/vnd.github+json',
   'X-GitHub-Api-Version':'2022-11-28','content-type':'application/json'};
  const uploaded=await uploadResultPairAtomic({outputs,headers,
@@ -1403,11 +1512,12 @@ async function main(){
  if(uploaded.delivery!=='RESULT_PAIR_READBACK_VERIFIED')fail(uploaded.delivery);
  const ack=await fetch('https://api.github.com/repos/'+REPO+'/issues/'+ctx.issueNumber+'/comments',
   {method:'POST',headers,body:JSON.stringify({body:
-   '<!-- zgmini-pc-process:'+ctx.runId+':'+role+' -->\n'+'Process inventory '+
+   '<!-- zgmini-pc-process:'+ctx.runId+':'+role+' -->\n'+(targeted?'W05 operator topology ':'Process inventory ')+
     role+': '+result.status+' / '+result.code+'; exact result pair '+stem+
     '.json and '+stem+'.txt verified; operationalWrites=0; retries=0.'})});
  if(!ack.ok)fail('COMMENT_NOT_VERIFIED');
- console.log('PROCESS_INVENTORY_VERIFIED role='+role+' status='+result.status+' code='+result.code);
+ console.log((targeted?'W05_OPERATOR_TOPOLOGY_VERIFIED':'PROCESS_INVENTORY_VERIFIED')+
+  ' role='+role+' status='+result.status+' code='+result.code);
  if(result.status!=='PASS')process.exitCode=2;
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))await main();
