@@ -243,6 +243,34 @@ test('ambiguous shard creation without readback is stopped and not retried',asyn
   assert.equal(io.posted.length,0);
 });
 
+test('shard creation 403 retains exact API phase after no-create readback',async()=>{
+  const io=ioFor([run(741)]);
+  let attempts=0;
+  io.createShard=async()=>{
+    attempts++;
+    throw Error('PROACTIVE_DIAG_RUNNER_GITHUB_HTTP_403_SHARD_CREATE');
+  };
+  await assert.rejects(()=>scanLatest(io,now),
+    /PROACTIVE_DIAG_RUNNER_GITHUB_HTTP_403_SHARD_CREATE/);
+  assert.equal(attempts,1);
+  assert.equal(io.shards.size,0);
+  assert.equal(io.posted.length,0);
+});
+
+test('comment 403 retains exact API phase with one POST and zero duplicates',async()=>{
+  const io=ioFor([run(742)]);
+  let attempts=0;
+  io.postComment=async()=>{
+    attempts++;
+    throw Error('PROACTIVE_DIAG_RUNNER_GITHUB_HTTP_403_COMMENT_WRITE');
+  };
+  await assert.rejects(()=>scanLatest(io,now),
+    /PROACTIVE_DIAG_RUNNER_GITHUB_HTTP_403_COMMENT_WRITE/);
+  assert.equal(attempts,1);
+  assert.equal(io.posted.length,0);
+  assert.equal([...io.shards.values()][0].comments.length,0);
+});
+
 test('invalid run cannot suppress a later valid run in newest-first scan',async()=>{
   const io=ioFor([run(800,'bad'),run(801)]);
   const result=await scanLatest(io,now);
