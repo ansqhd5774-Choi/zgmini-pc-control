@@ -27,10 +27,46 @@ const exec=(bin,args,opts={})=>spawnSync(bin,args,{windowsHide:true,encoding:'ut
 const g=args=>exec('git',['-C',repo,...args]);
 const code=s=>/^[A-Z][A-Z0-9_]{0,79}$/.test(String(s??''))?String(s):'UNKNOWN';
 
+// OPERATOR text alone is insufficient: verify that the executable probe is
+// exactly the committed checkout and that the installed WMI proof is the
+// maintenance receiver's own approved file. Never publish raw source/identity.
+export function inspectProbeProvenance({
+ readFile=fs.readFileSync,
+ git=(args,opts)=>exec('git',['-C',repo,...args],opts),
+ installation=maint,entry=fileURLToPath(import.meta.url)
+}={}){
+ const evidence={probeCheckout:'FAIL',operatorVbs:'FAIL'};
+ try{
+  const branch=git(['branch','--show-current']);
+  if(branch?.status!==0||String(branch.stdout).trim()!=='main')return evidence;
+  const src=git(['show','HEAD:tools/w05-2821-operator-readonly-receipt.mjs'],
+   {encoding:'buffer'});
+  if(src?.status!==0||!Buffer.isBuffer(src.stdout)||
+   !src.stdout.equals(Buffer.from(readFile(entry))))return evidence;
+  evidence.probeCheckout='PASS';
+  const a=JSON.parse(readFile(path.join(installation,'MAINTENANCE_INSTALL.json')));
+  const expected=a?.files?.['tools/maintenance-ancestry.vbs'];
+  if(a?.schema!=='ZGMINI_PC_MAINTENANCE_INSTALL_V1'||
+   !/^[a-f0-9]{64}$/.test(expected??''))return evidence;
+  const live=readFile(path.join(installation,'tools/maintenance-ancestry.vbs'));
+  if(hash(live)!==expected)return evidence;
+  // Checkout history is a second, independent source reference. A self-edited
+  // installation manifest with matching tampered VBS cannot authorize a PASS.
+  if(!/^[a-f0-9]{40}$/.test(a.sourceSha??''))return evidence;
+  const pinned=git(['show',a.sourceSha+':tools/maintenance-ancestry.vbs'],
+   {encoding:'buffer'});
+  if(pinned?.status!==0||!Buffer.isBuffer(pinned.stdout)||
+   hash(pinned.stdout)!==expected)return evidence;
+  evidence.operatorVbs='PASS';
+ }catch{/* Safe: source cannot be attested. */}
+ return evidence;
+}
+
 export function newReport({now=new Date(),id=randomUUID()}={}){
  return {schema:'ZGMINI_W05_2821_INDEPENDENT_OPERATOR_READONLY_V1',
  requestId:REQUEST_ID,incidentIssue:ISSUE,receiptId:id,observedAtUtc:now.toISOString(),
- nodeOperator:'UNVERIFIED',nodeOperatorExit:'UNKNOWN',approval:'UNKNOWN',
+ nodeOperator:'UNVERIFIED',nodeOperatorExit:'UNKNOWN',probeCheckout:'UNKNOWN',
+ operatorVbs:'UNKNOWN',approval:'UNKNOWN',
  toolHashes:'0/5',originalCas:'0/5',recoveryClaim:'UNKNOWN',claimOwner:'UNKNOWN',
  originalOwnerAlive:'UNKNOWN',priorRecoveryRecord:'UNKNOWN',
  priorRecoveryCode:'UNKNOWN',priorRecoveryOperation:'UNKNOWN',
@@ -41,6 +77,14 @@ const fields=Object.freeze(Object.keys(newReport({id:'11111111-2222-4333-8444-55
 export function collectReport({pid=process.pid,report=newReport()}={}){
  if(process.platform!=='win32'||process.env.GITHUB_ACTIONS||process.env.RUNNER_NAME){
   report.readStatus='INDEPENDENT_WINDOWS_OPERATOR_REQUIRED';return report;
+ }
+ const provenance=inspectProbeProvenance();
+ report.probeCheckout=provenance.probeCheckout;
+ report.operatorVbs=provenance.operatorVbs;
+ if(provenance.probeCheckout!=='PASS'||provenance.operatorVbs!=='PASS'){
+  report.nodeOperator='FAIL';
+  report.readStatus='OPERATOR_SOURCE_NOT_VERIFIED';
+  return report;
  }
  // Prove this very Node PID, never its parent PowerShell or a Runner.
  const ancestry=exec(cscript,['//NoLogo',path.join(maint,'tools/maintenance-ancestry.vbs'),
@@ -152,6 +196,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
   readStatus:r.readStatus,receiptStatus:receipt.status,receiptUrl:receipt.url??null,
   rollbackInvocations:0}));
  if(receipt.status!=='REMOTE_RECEIPT_VERIFIED'||r.nodeOperator!=='PASS'||
+  r.probeCheckout!=='PASS'||r.operatorVbs!=='PASS'||
   r.approval!=='PASS'||r.toolHashes!=='5/5'||r.originalCas!=='5/5'||
   r.recoveryClaim!=='ABSENT'||r.originalOwnerAlive!=='NO')process.exitCode=2;
 }
