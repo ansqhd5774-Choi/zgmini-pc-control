@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {readFileSync,mkdtempSync,mkdirSync,writeFileSync,rmSync,realpathSync} from 'node:fs';
+import os from 'node:os';import path from 'node:path';
 import {createHash} from 'node:crypto';
-import {verifyInflation19D1Row,INFL19_D1_KEY} from './inflation19-d1-readback-readonly.mjs';
+import {verifyInflation19D1Row,inspectInflation19D1Readback,INFL19_D1_KEY} from './inflation19-d1-readback-readonly.mjs';
 
 const IDS=['1','3','4','5','6','7','8','9','10','11','12','13','14','18','19','21','25','26','31'];
 const NOW=Date.parse('2026-11-23T14:00:00.000Z');
@@ -89,4 +90,38 @@ test('W01 common operation registers A/light and invokes read-only module only',
  const controller=readFileSync(new URL('./operations.mjs',import.meta.url),'utf8');
  assert.match(controller,/request\.operation==='inflation19-d1-readback-readonly'/);
  assert.match(controller,/inspectInflation19D1Readback\(dataRoot\)/);
+});
+
+test('W01 metadata-only Writer without a stage still returns D1-only evidence, never local PASS',async()=>{
+ const dir=mkdtempSync(path.join(os.tmpdir(),'infl19-d1-missing-stage-'));
+ try{
+  mkdirSync(path.join(dir,'pc-writer'),{recursive:true});
+  writeFileSync(path.join(dir,'pc-writer','config.json'),JSON.stringify({
+   source:'a'.repeat(40),account:'a'.repeat(32),core:'123e4567-e89b-12d3-a456-426614174000'}));
+  const {row}=fixture();let queries=0;
+  const out=await inspectInflation19D1Readback(realpathSync.native(dir),{now:NOW,queryFixed:async(sql,params)=>{
+   assert.match(sql,/SELECT body,stored_at FROM market_public_snapshots_v1/);
+   assert.deepEqual(params,[INFL19_D1_KEY]);queries++;return row;
+  }});
+  assert.equal(queries,1,JSON.stringify(out));
+  assert.equal(out.status,'PARTIAL');
+  assert.equal(out.code,'INFL19_D1_VERIFIED_STAGE_MISSING');
+  assert.equal(out.d1ReadbackVerified,true);assert.equal(out.localMatches,false);
+  assert.equal(out.d1BodySha256,createHash('sha256').update(row.body).digest('hex'));
+  assert.equal(out.indicators.length,19);
+  assert.deepEqual([out.providerCalls,out.operationalWrites,out.d1Writes,out.sqliteOpened],[0,0,0,false]);
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});
+test('W01 absent local stage never turns missing or malformed D1 into a success',async()=>{
+ const dir=mkdtempSync(path.join(os.tmpdir(),'infl19-d1-no-stage-'));
+ try{
+  mkdirSync(path.join(dir,'pc-writer'),{recursive:true});
+  writeFileSync(path.join(dir,'pc-writer','config.json'),JSON.stringify({
+   source:'a'.repeat(40),account:'a'.repeat(32),core:'123e4567-e89b-12d3-a456-426614174000'}));
+  const none=await inspectInflation19D1Readback(realpathSync.native(dir),{now:NOW,queryFixed:async()=>null});
+  assert.equal(none.status,'PARTIAL',JSON.stringify(none));assert.equal(none.code,'INFL19_D1_ROW_ABSENT');
+  const {row}=fixture();const bad={...row,body:'not-json'};
+  const invalid=await inspectInflation19D1Readback(realpathSync.native(dir),{now:NOW,queryFixed:async()=>bad});
+  assert.equal(invalid.status,'STATE_UNKNOWN');assert.equal(invalid.code,'INFL19_D1_JSON_INVALID');
+ }finally{rmSync(dir,{recursive:true,force:true});}
 });
