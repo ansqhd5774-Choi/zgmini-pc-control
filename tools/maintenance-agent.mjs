@@ -13,11 +13,7 @@ import {validateMaintenanceRequest,validateUpdateRequest,
   validateR54BIssueEnvelope,validateR54BManifestRequest,
   R54_B_ISSUE_TITLE,R54_B_OPERATION,R54_B_SOURCE_FILES,
   SOURCE_BUNDLE_OPERATION,SOURCE_BUNDLE_ISSUE_TITLE,
-  validateSourceBundleIssueEnvelope,validateSourceBundleBApproval,
-  INSTALLED_RECOVERY_OPERATION,INSTALLED_RECOVERY_ISSUE_TITLE,
-  INSTALLED_RECOVERY_ORIGINAL_ID,INSTALLED_RECOVERY_SOURCE_SHA,
-  INSTALLED_RECOVERY_CONTROLLER_SHA,INSTALLED_RECOVERY_MANIFEST_PATH,
-  validateInstalledRecoveryIssueEnvelope} from "./maintenance-contract.mjs";
+  validateSourceBundleIssueEnvelope,validateSourceBundleBApproval} from "./maintenance-contract.mjs";
 import {acquireMaintenanceLock} from "./maintenance-lock.mjs";
 
 const CONTROL_REPOSITORY="ansqhd5774-Choi/zgmini-pc-control";
@@ -25,6 +21,61 @@ const ISSUE_TITLE="pc-controller-update";
 const R6_HOST_ISSUE_TITLE="pc-r6-host-register";
 const ISSUE_LABEL="pc-maintenance";
 const ALLOWED_ACTORS=Object.freeze(["ansqhd5774-Choi"]);
+// Exact one-instance recovery admission belongs to the Receiver, not to the
+// four source files pinned by the historical approved recovery manifest.
+export const INSTALLED_RECOVERY_OPERATION='controller-installed-recovery';
+export const INSTALLED_RECOVERY_ISSUE_TITLE='pc-controller-installed-recovery';
+export const INSTALLED_RECOVERY_ORIGINAL_ID='pc-update-e8767e20-6bad-4418-97c6-561cf79a8213';
+export const INSTALLED_RECOVERY_SOURCE_SHA='e6c96e8d19bd9084b8021c7df31678f56ef1b388';
+export const INSTALLED_RECOVERY_CONTROLLER_SHA='b9a423cf38d0967d6ed336912a66433f79502d3d';
+export const INSTALLED_RECOVERY_MANIFEST_PATH=
+ 'approvals/maintenance-recoveries/'+INSTALLED_RECOVERY_ORIGINAL_ID+'.installed.json';
+const INSTALLED_RECOVERY_FIELDS=['schema','requestId','chatId','operation',
+ 'controlRepository','targetControllerSha','approvalManifestSha256'];
+const RECOVERY_ID=/^pc-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+export function validateInstalledRecoveryIssueEnvelope(request,{
+ controlRepository=CONTROL_REPOSITORY,actor=null,allowedActors=ALLOWED_ACTORS,
+}={}){
+ if(controlRepository!==CONTROL_REPOSITORY||request?.controlRepository!==CONTROL_REPOSITORY||
+    actor!==ALLOWED_ACTORS[0]||!Array.isArray(allowedActors)||
+    !allowedActors.includes(ALLOWED_ACTORS[0]))
+  throw coded('INSTALLED_RECOVERY_ACTOR_DENIED');
+ if(!request||typeof request!=='object'||Array.isArray(request)||
+    Object.keys(request).length!==INSTALLED_RECOVERY_FIELDS.length||
+    INSTALLED_RECOVERY_FIELDS.some(key=>!Object.hasOwn(request,key)))
+  throw coded('INSTALLED_RECOVERY_ISSUE_FIELDS_INVALID');
+ if(request.schema!=='ZGMINI_PC_MAINTENANCE_REQUEST_V1'||
+    request.operation!==INSTALLED_RECOVERY_OPERATION)
+  throw coded('INSTALLED_RECOVERY_OPERATION_DENIED');
+ if(typeof request.requestId!=='string'||!RECOVERY_ID.test(request.requestId)||
+    request.requestId===INSTALLED_RECOVERY_ORIGINAL_ID)
+  throw coded('INSTALLED_RECOVERY_REQUEST_ID_INVALID');
+ if(typeof request.chatId!=='string'||!/^chat-[a-z0-9-]{1,75}$/.test(request.chatId))
+  throw coded('INSTALLED_RECOVERY_CHAT_ID_INVALID');
+ if(request.targetControllerSha!==INSTALLED_RECOVERY_CONTROLLER_SHA)
+  throw coded('INSTALLED_RECOVERY_TARGET_DENIED');
+ if(typeof request.approvalManifestSha256!=='string'||
+    !/^[a-f0-9]{64}$/.test(request.approvalManifestSha256))
+  throw coded('INSTALLED_RECOVERY_MANIFEST_PIN_INVALID');
+ return Object.freeze({...request});
+}
+export function prepareInstalledRecoveryRequest(approvedRawBytes,{chatId}={}){
+ const raw=JSON.parse(Buffer.from(approvedRawBytes).toString('utf8'));
+ if(raw?.schema!=='ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V1'||
+    raw.approved!==true||raw.operation!=='RECONCILE_INSTALLED'||
+    raw.requestId!==INSTALLED_RECOVERY_ORIGINAL_ID||raw.issueNumber!==2960||
+    raw.sourceSha!==INSTALLED_RECOVERY_SOURCE_SHA||
+    raw.targetControllerSha!==INSTALLED_RECOVERY_CONTROLLER_SHA)
+  throw coded('INSTALLED_RECOVERY_APPROVAL_UNVERIFIED');
+ return validateInstalledRecoveryIssueEnvelope({
+  schema:'ZGMINI_PC_MAINTENANCE_REQUEST_V1',
+  requestId:'pc-'+crypto.randomUUID(),chatId:chatId??('chat-'+crypto.randomUUID()),
+  operation:INSTALLED_RECOVERY_OPERATION,controlRepository:CONTROL_REPOSITORY,
+  targetControllerSha:INSTALLED_RECOVERY_CONTROLLER_SHA,
+  approvalManifestSha256:crypto.createHash('sha256').update(approvedRawBytes).digest('hex'),
+ },{actor:ALLOWED_ACTORS[0]});
+}
+
 const SHA40=/^[a-f0-9]{40}$/;
 const REQUEST_ID=/^[a-z0-9][a-z0-9-]{7,79}$/;
 const MAX_BODY_BYTES=16_384;
