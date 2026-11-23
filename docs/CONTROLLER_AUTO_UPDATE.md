@@ -1,5 +1,23 @@
 # 승인된 PC Controller 자동 갱신 — 독립 유지보수기
 
+## 2026-11-23 요청 생성·단회 제출 공통 경로
+
+기존 승인 manifest와 실제 설치 SHA가 확인되면 `tools/maintenance-request.mjs`를 사용한다.
+Controller 설치기가 아니라 요청 작성·제출 도구이며 PC 설치·승인·lease 검사를 대체하지 않는다.
+제목·라벨·본문을 함께 만들고 기존 `prepareControllerUpdateRequest()`로 검증한다.
+
+- `prepare --manifest-file <원본JSON> --installed-sha <실제40자리SHA> [--chat-id <기존대화ID>]`: 기존 GitHub create_issue 도구의 인수 객체 출력. 네트워크·운영 변경 없음.
+- `submit --manifest-file <원본JSON> --installed-sha <실제40자리SHA> --receipt-file <사용자TEMP의고유JSON> [--chat-id <기존대화ID>]`: Owner 계정·비공개 저장소·main의 승인 원본 바이트를 확인한 뒤 한 번 제출한다. 영수증은 생성 전에 저장되며 같은 파일로 재제출할 수 없다.
+- 권장 입력은 `--manifest-file` 대신 `--target-sha <승인된40자리목표SHA>`다. main의 승인 JSON 원본을 공식 GitHub API에서 읽어 Windows checkout의 CRLF 차이를 피한다. 두 입력은 함께 쓰지 않는다. `prepare --target-sha`도 원격 읽기를 하지만 Issue를 만들지 않는다. 원본 해시를 임의 정규화하지 않는다.
+- `reconcile --receipt-file <같은JSON>`: 응답 유실·readback 실패 시 기존 요청만 조회한다. Issue 번호가 없으면 같은 requestId와 정확한 본문으로 찾는다. 없거나 여러 건이어도 새 POST를 하지 않는다. 임의 라벨 추가·운영 실행 강제 없음.
+- `verify --issue-number <기존번호>`: 기존 요청의 Owner·제목·라벨·본문 계약만 읽기 확인한다. 이전에 의도한 원문과의 동일성이나 실행·설치 성공을 선언하지 않는다.
+
+Code Mode에서는 `submit` 경로를 사용한다. GitHub 전용 도구 환경에서는 `prepareMaintenanceIssue()` 반환값 전체를 단일 `create_issue` 호출에 전달하고 생성한 원본을 `verifyMaintenanceIssue(expected, actual)`와 같은 기준으로 재조회한다. 수동 JSON·제목·라벨 조립을 기본 절차로 사용하지 않는다.
+
+`REQUEST_READBACK_VERIFIED`는 요청 저장 확인이다. 실제 접수는 유지보수기 영수증, 설치 완료는 원장·결과 JSON/TXT·사후검사로 판단한다. 접수 댓글 전송 실패를 설치를 막는 새 Gate로 만들지 않는다.
+
+모듈 누락 방지는 기존 설치기의 `validateControllerImportClosure()`와 `controllerImportScanRoots()`를 재사용한다. 정확한 대상 Git tree의 entry·operations와 변경 모듈의 전이 의존성을 intake 중지 전에 검사한다. 운영 진입점을 임의 import하는 새 smoke 절차를 넣지 않는다. 실제 TEMP 로딩 시험은 부작용 없는 fixture로 수행한다. 기존 롤백·결과 불명 재조회·중복 실행 방지 경로를 유지한다.
+
 ## 2026-11-05 이란 R13 의도적 운영 제외 — Controller 갱신 전 선행 인계
 
 사용자가 메모리 부담으로 이란 콘텐츠를 제거했다. 2026-11-04T18:54:31Z의

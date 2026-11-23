@@ -150,7 +150,7 @@ Offline이면 Issue를 반복하지 않고 기존 Supervisor/watchdog/guardian·
 사용자가 승인한 업무의 필수 공통 등록·격리 복원·최소 실행 정책·Controller/Writer 설치·유지보수기 인계는 정확한 효과 범위에서 재승인 없이 수행한다. 게시·배포·관리자/보안 변경은 그 업무 승인 범위를 따른다. 코드 병합이나 도구 접근 권한이 업무 승인을 대신하지 않는다.
 현재 설치 → 정확 목표·파일별 해시·raw manifest 해시·검사·백업/복구 조건을 확정한다. 누적 diff와 allowFiles가 다르면 승인되지 않은 변경을 끼워 넣지 말고 정규 최소 목표 commit/manifest 또는 승인된 순차 적용을 준비한다.
 설치된 실행기가 지원하는 정규 선별 적용(selectiveSource)도 재사용할 수 있다. 승인된 main 출처·고정 대상 branch/commit·실제 설치본과의 정확 diff·파일 해시·선택 적용 pin을 현재 계약으로 검증한다. 과거 ‘모든 목표는 main 조상이어야 한다’는 조건을 다른 계약에 그대로 전파하지 않으며, 미지원 설치기에 문서만으로 이 기능이 생겼다고 가정하지 않는다. 미승인 main 변경은 함께 설치하지 않는다.
-요청 작성에 지원되는 `prepareControllerUpdateRequest(rawManifestBytes, {installedSha, chatId})` 등 기존 생성기·검증기를 사용해 수작업 ID/바이트 해시 오류를 줄인다. 명세 작성은 새 업무 승인이 아니다.
+요청 작성에 지원되는 `prepareControllerUpdateRequest(rawManifestBytes, {installedSha, chatId})` 등 기존 생성기·검증기를 사용해 수작업 ID/바이트 해시 오류를 줄인다. Controller 요청은 이를 재사용하는 `tools/maintenance-request.mjs`로 제목·라벨·본문을 함께 만들고 단회 제출·원격 readback을 수행한다. 제출 전 사용자 TEMP의 고유 영수증을 저장하며 timeout/전달 불명은 같은 영수증 `reconcile`로 조회하고 새 POST를 하지 않는다. [제출 공통 경로](CONTROLLER_AUTO_UPDATE.md)를 따른다. 명세 작성·요청 저장은 새 업무 승인이나 실제 PC 접수·설치 성공이 아니다.
 Controller는 독립 pc-maintenance로 갱신한다. 일반 pc-job이 실행 중인 자기 Controller를 교체하지 않는다.
 기존 작업/업로드 종료 → 요청 보존 → 검산한 백업 → 승인 파일 적용 → 전용 Runner 재연결 → 보호 검사 → 기능별 사후 검사 → 결과 회수 순서로 진행한다. 접수/backlog도 중복 없이 회수한다.
 유지보수기 자체 첫 인계는 별도 계약을 따른다. 출처 증거를 소급 생성하거나 UNKNOWN을 PASS로 바꾸지 않는다. Startup 환경의 실제 GitHub 인증을 확인하며 비밀값은 공식 저장소 밖으로 내보내지 않는다.
