@@ -79,12 +79,12 @@ function argsOf(argv){
  if(!['prepare','submit','reconcile','verify'].includes(mode)||rest.length%2)fail('MAINTENANCE_REQUEST_USAGE');
  const options={};
  for(let i=0;i<rest.length;i+=2){
-  if(!['--manifest-file','--installed-sha','--chat-id','--receipt-file','--issue-number'].includes(rest[i])||
+  if(!['--manifest-file','--target-sha','--installed-sha','--chat-id','--receipt-file','--issue-number'].includes(rest[i])||
    Object.hasOwn(options,rest[i])||!rest[i+1]||rest[i+1].startsWith('--'))fail('MAINTENANCE_REQUEST_USAGE');
   options[rest[i]]=rest[i+1];
  }
  const allowed=mode==='verify'?['--issue-number']:mode==='reconcile'?['--receipt-file']:
-  ['--manifest-file','--installed-sha','--chat-id',...(mode==='submit'?['--receipt-file']:[])];
+  ['--manifest-file','--target-sha','--installed-sha','--chat-id',...(mode==='submit'?['--receipt-file']:[])];
  if(Object.keys(options).some(k=>!allowed.includes(k)))fail('MAINTENANCE_REQUEST_USAGE');
  return {mode,options};
 }
@@ -113,17 +113,24 @@ export async function main(argv=process.argv.slice(2)){
     return result.items;
    }});
  }
- if(!o['--manifest-file']||!o['--installed-sha'])fail('MAINTENANCE_REQUEST_USAGE');
- const bytes=fs.readFileSync(path.resolve(o['--manifest-file']));
+ if(!o['--installed-sha']||Boolean(o['--manifest-file'])===Boolean(o['--target-sha']))fail('MAINTENANCE_REQUEST_USAGE');
+ if(o['--target-sha']&&!/^[a-f0-9]{40}$/.test(o['--target-sha']))fail('MAINTENANCE_REQUEST_USAGE');
+ // Prefer immutable GitHub blob bytes to avoid Windows checkout CRLF drift.
+ const readRemote=sha=>{
+  const found=github(`repos/${CONTROL_REPOSITORY}/contents/approvals/controller-updates/${sha}.json?ref=main`);
+  if(found.encoding!=='base64'||typeof found.content!=='string')fail('MAINTENANCE_REMOTE_MANIFEST_BYTES_MISSING');
+  return Buffer.from(found.content,'base64');
+ };
+ const bytes=o['--target-sha']?readRemote(o['--target-sha']):fs.readFileSync(path.resolve(o['--manifest-file']));
  const expected=prepareMaintenanceIssue(bytes,{installedSha:o['--installed-sha'],chatId:o['--chat-id']});
+ if(o['--target-sha']&&JSON.parse(expected.body).targetControllerSha!==o['--target-sha'])fail('MAINTENANCE_TARGET_MANIFEST_MISMATCH');
  if(mode==='prepare')return expected;
  if(!receiptPath)fail('MAINTENANCE_RECEIPT_PATH_REQUIRED');
  if(fs.existsSync(receiptPath))fail('MAINTENANCE_RECEIPT_EXISTS_USE_RECONCILE');
  if(github('user').login!==CONTROL_ACTOR||github(`repos/${CONTROL_REPOSITORY}`).private!==true)
   fail('MAINTENANCE_SUBMIT_IDENTITY_DENIED');
  const request=JSON.parse(expected.body);
- const remote=github(`repos/${CONTROL_REPOSITORY}/contents/approvals/controller-updates/${request.targetControllerSha}.json?ref=main`);
- if(remote.encoding!=='base64'||!Buffer.from(remote.content??'','base64').equals(bytes))
+ if(!readRemote(request.targetControllerSha).equals(bytes))
   fail('MAINTENANCE_REMOTE_MANIFEST_BYTES_MISMATCH');
  return submitMaintenanceIssue(expected,{saveReceipt,readIssue,
   createIssue:e=>github(`repos/${CONTROL_REPOSITORY}/issues`,{body:{title:e.title,labels:e.labels,body:e.body}})});

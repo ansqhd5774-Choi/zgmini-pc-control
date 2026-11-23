@@ -73,6 +73,8 @@ test('unknown fields and invalid CLI combinations fail before external access',a
  await assert.rejects(()=>main(['verify','--issue-number','1','--manifest-file','x']),/USAGE/);
  await assert.rejects(()=>main(['verify','--issue-number','1;bad']),/USAGE/);
  await assert.rejects(()=>main(['reconcile']),/RECEIPT_PATH_REQUIRED/);
+ await assert.rejects(()=>main(['prepare','--manifest-file','x','--target-sha',NEXT,'--installed-sha',OLD]),/USAGE/);
+ await assert.rejects(()=>main(['prepare','--target-sha','../bad','--installed-sha',OLD]),/USAGE/);
 });
 test('existing target-tree check catches unchanged entry and transitive missing module without importing it',()=>{
  const files={'controller/entry.mjs':"import './dispatcher.mjs';",'controller/operations.mjs':'export {};','controller/dispatcher.mjs':"import './missing.mjs';"};

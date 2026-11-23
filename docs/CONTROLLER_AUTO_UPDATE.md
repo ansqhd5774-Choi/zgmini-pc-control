@@ -8,6 +8,7 @@ Controller 설치기가 아니라 요청 작성·제출 도구이며 PC 설치·
 
 - `prepare --manifest-file <원본JSON> --installed-sha <실제40자리SHA> [--chat-id <기존대화ID>]`: 기존 GitHub create_issue 도구의 인수 객체 출력. 네트워크·운영 변경 없음.
 - `submit --manifest-file <원본JSON> --installed-sha <실제40자리SHA> --receipt-file <사용자TEMP의고유JSON> [--chat-id <기존대화ID>]`: Owner 계정·비공개 저장소·main의 승인 원본 바이트를 확인한 뒤 한 번 제출한다. 영수증은 생성 전에 저장되며 같은 파일로 재제출할 수 없다.
+- 권장 입력은 `--manifest-file` 대신 `--target-sha <승인된40자리목표SHA>`다. main의 승인 JSON 원본을 공식 GitHub API에서 읽어 Windows checkout의 CRLF 차이를 피한다. 두 입력은 함께 쓰지 않는다. `prepare --target-sha`도 원격 읽기를 하지만 Issue를 만들지 않는다. 원본 해시를 임의 정규화하지 않는다.
 - `reconcile --receipt-file <같은JSON>`: 응답 유실·readback 실패 시 기존 요청만 조회한다. Issue 번호가 없으면 같은 requestId와 정확한 본문으로 찾는다. 없거나 여러 건이어도 새 POST를 하지 않는다. 임의 라벨 추가·운영 실행 강제 없음.
 - `verify --issue-number <기존번호>`: 기존 요청의 Owner·제목·라벨·본문 계약만 읽기 확인한다. 이전에 의도한 원문과의 동일성이나 실행·설치 성공을 선언하지 않는다.
 
