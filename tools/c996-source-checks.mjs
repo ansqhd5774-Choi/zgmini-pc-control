@@ -123,7 +123,8 @@ export function ungroupedChangedTests(paths,exists=fs.existsSync){
  if(!Array.isArray(paths))return [];
  const registered=new Set(Object.values(GROUPS).flat());
  return [...new Set(paths)].filter(p=>
-   typeof p==='string'&&/^tests\\/[A-Za-z0-9][A-Za-z0-9._-]*\\.test\\.mjs$/.test(p)&&
+   typeof p==='string'&&p.startsWith('tests/')&&
+   /^[A-Za-z0-9][A-Za-z0-9._-]*[.]test[.]mjs$/.test(p.slice(6))&&
    !registered.has(p)&&exists(p));
 }
 export async function changedFiles(env=process.env,fetcher=fetch){
