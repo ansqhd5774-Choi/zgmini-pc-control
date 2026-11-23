@@ -1,0 +1,18 @@
+{
+  "schema": "ZGMINI_PC_PUBLICATION_RESULT_V1",
+  "requestId": "pc-publication-b2e4ba50-2c95-4cd4-b0da-84269b88c73c",
+  "operation": "bea-unit-nipa-json-once",
+  "issueNumber": 3029,
+  "snapshotKey": "detail:earnings-bea-unit-profit:v1",
+  "status": "PASS",
+  "code": "PUBLICATION_SINGLE_KEY_READBACK_VERIFIED",
+  "startedAt": "2026-11-23T15:20:15.945Z",
+  "finishedAt": "2026-11-23T15:20:20.972Z",
+  "providerCalls": 0,
+  "d1Writes": 1,
+  "sourceVersion": "ff5a5a3a88cfc2f8758d8cd1369818eff1f9875e6df70e81caef4baf119273c3",
+  "sourceStoredAt": 1795435085956,
+  "d1Result": "READBACK_VERIFIED",
+  "attemptedSourceStoredAt": 1795435085956,
+  "sourceStoredAtEvidence": "D1_READBACK_VERIFIED"
+}
