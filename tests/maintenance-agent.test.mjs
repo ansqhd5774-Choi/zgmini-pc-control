@@ -6,6 +6,7 @@ import path from "node:path";
 import {test} from "node:test";
 
 import {createMaintenanceAgent,failedUpdaterResult,normalizedResult} from "../tools/maintenance-agent.mjs";
+import {prepareMaintenanceIssue} from '../tools/maintenance-request.mjs';
 
 test('pre-install child rejection retains exact safe code and current installed SHA',()=>{
  const r=failedUpdaterResult({requestId:'fixture',targetControllerSha:'b'.repeat(40)},
@@ -148,7 +149,7 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
     }
     if(args[1]==="apply"){
       stats.applies++;
-      assert.equal(args[args.indexOf("--request-id")+1],REQUEST_ID);
+      assert.equal(args[args.indexOf("--request-id")+1],request.requestId);
       const packageFile=args[args.indexOf("--manifest-file")+1];
       assert.ok(packageFile.startsWith(path.join(root,"approved")+path.sep));
       const packaged=JSON.parse(fs.readFileSync(packageFile,"utf8"));
@@ -166,6 +167,17 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
     leaseAttempts:1,leaseWaitMs:0,execFileImpl:fakeExec,verifyInstalledSource});
   return {root,leaseRoot,agent,stats,remote,calls,issue,request,manifest,rawManifest,fakeExec};
 }
+
+test('common generated envelope is accepted by the real receiver and applies once',async t=>{
+ const f=fixture(t);
+ const envelope=prepareMaintenanceIssue(f.rawManifest,{installedSha:INSTALLED});
+ Object.assign(f.request,JSON.parse(envelope.body));
+ Object.assign(f.issue,{title:envelope.title,body:envelope.body,labels:envelope.labels.map(name=>({name}))});
+ const result=await f.agent.pollOnce();
+ assert.equal(result[0].status,'SUCCEEDED');assert.equal(f.stats.applies,1);
+ assert.equal(f.agent.loadLedger(f.request.requestId).requestId,f.request.requestId);
+ await f.agent.pollOnce();assert.equal(f.stats.applies,1);
+});
 
 test('accepted receipt failure is non-blocking and never creates another apply or receipt on poll',async t=>{
  const f=fixture(t,{progressError:Object.assign(Error('network timeout'),{code:'ETIMEDOUT'})});
