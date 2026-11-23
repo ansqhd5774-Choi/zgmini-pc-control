@@ -4,6 +4,7 @@ import {createHash} from 'node:crypto';
 import {previewWriterInsertions,PREVIEW_SCHEMA,validatePreviewSpec} from './insert-preview-readonly.mjs';
 import {applyApprovedInsertions} from './insert-only-patch.mjs';
 import fs from 'node:fs';
+import {validateWriterBManifest} from './contract.mjs';
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const before=Buffer.from("const alpha=1;\nconst omega=2;\n");
 const spec={schema:PREVIEW_SCHEMA,
@@ -112,4 +113,37 @@ test('insertions preserve all original lines; only retired Alpaca calls are iner
   {fetch:()=>{throw Error('unexpected provider call');}},Date);
  assert.equal(collectorCalls.length,0);
  assert.deepEqual(result,{status:'RETIRED_LEGACY_ALPACA',providerRequests:0});
+});
+
+// Reuse the actual PC SHA preview receipts; never infer AFTER from upstream files.
+test('Core092 exact B overlay pins two runtime guards and no unrelated features',()=>{
+ const approval=JSON.parse(fs.readFileSync(new URL(
+  '../approvals/writer-updates/paid-sector-alpaca-retirement-insert-threefile-20261123.json',
+  import.meta.url),'utf8'));
+ assert.equal(validateWriterBManifest(approval),approval);
+ assert.equal(approval.baseHead,'c62bd5aac3353d7e146d930dbb033b82d89010cd');
+ assert.equal(approval.candidateSourceSha,'5c7f1673b4b2ea49f401891a674289c2cc493b8f');
+ assert.deepEqual(approval.files.map(x=>x.path),[
+  'scripts/pc-writer/local-cycle.mjs','scripts/pc-writer/collect-local.mjs',
+  'scripts/pc-writer/expanded-collection-health.mjs']);
+ for(const spec of [entry,collector]){
+  const installed=approval.files.find(x=>x.path===spec.filePath);
+  assert.ok(installed);
+  assert.equal(installed.beforeSha256,spec.beforeSha256);
+  assert.deepEqual(installed.insertions,spec.insertions);
+  assert.equal(installed.change,'M');
+ }
+ assert.equal(approval.files[0].afterSha256,
+  '41912f24c2bdc13a9de52d2ee2b504fe90b733656a0d66827c617a5e2c6c0f4a');
+ assert.equal(approval.files[1].afterSha256,
+  '1648a62e26157868e9d4ed43ab9d36436068e08973ba56d495b7c1751e02c62e');
+ assert.equal(approval.files[2].afterSha256,
+  '2f0fe206a7b338f96a1795627358afc17c17adf88fa5a2d7cddfcd323ad9a5bc');
+ assert.equal(approval.coreMaintenance,'PAUSE_NEW_STARTS_DRAIN_360S_V1');
+ assert.equal(approval.runtimeDependencies.taskXmlSha256,
+  'dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028');
+ for(const key of ['allowProviderCalls','allowDbChanges','allowD1Writes',
+  'allowTaskDefinitionChanges','allowOtherSourceChanges'])assert.equal(approval[key],false);
+ assert.throws(()=>validateWriterBManifest({...approval,allowOtherSourceChanges:true}),
+  {code:'WRITER_B_SIDE_EFFECT_SCOPE_STOP'});
 });
