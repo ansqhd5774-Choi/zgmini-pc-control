@@ -1,3 +1,5 @@
+> **2026-11-23 사용자 소속 지정:** 자동화 담당자는 보조 저장소 `zgmini-pc-control / codex/pc-automation-process-improvement-20261119`를 사용한다. 프로젝트 전체 정책·우선순위·통합 계획의 정본은 메인 `zgmini / codex/controller-ops-lessons-20261105`이다. PC 자동화 구현은 이 저장소에 유지하며 본체 기능·산식·UI의 정본을 여기로 이전하지 않는다. [역할 정본](https://github.com/ansqhd5774-Choi/zgmini/blob/main/docs/REPOSITORY_ROLES.md).
+
 # ZGMINI 자동화 프로세스 전문가 작업 기준
 
 **2026-11-23 변경 실패 격리:** [공통 정본](PC_AUTOMATION_STANDARD.md)의 공통 변경 장애 격리를 따른다. 후보 준비는 정상 실행·intake를 유지한 상태에서 수행하고, 입증된 후보 namespace 실패만 해당 요청에 한정한다. 기존 실행이 입증되지 않으면 안전 중단을 유지한다. 기능 추가는 기존 승인 모듈·등록 경로를 우선 재사용하며 고장 난 Controller에 복구 실행을 다시 의존시키지 않는다. 소스 병합과 운영 handoff·복구·기능 완료를 구분한다. 검증되지 않은 롤백·새 전역 Gate·무관한 기능 변경을 만들지 않는다.

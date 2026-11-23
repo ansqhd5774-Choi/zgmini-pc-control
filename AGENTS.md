@@ -1,3 +1,7 @@
+## 저장소·담당 소속 — 2026-11-23 사용자 지정
+
+프로세스 총괄은 **`zgmini` / `codex/controller-ops-lessons-20261105`**, 이슈 담당자는 **`zgmini-pc-control` / `codex/issues-lifecycle-manager-20261118`**, 자동화 담당자는 **`zgmini-pc-control` / `codex/pc-automation-process-improvement-20261119`**에 소속된다. [역할 정본](https://github.com/ansqhd5774-Choi/zgmini/blob/main/docs/REPOSITORY_ROLES.md)을 따른다. 아래 과거 소속·호칭과 충돌하면 이 결정을 우선한다. 업무 소속과 실제 코드 변경 저장소는 구분하며 기존 승인·운영 보호·기능 담당자의 독립 작업은 유지한다. 새 승인 Gate를 추가하지 않는다.
+
 # ZGMINI PC 자동 실행 공통 기준
 
 **자동화 프로세스 전문가 작업 기준(2026-11-22):** [AUTOMATION_PROCESS_EXPERT_WORK_STANDARD.md](docs/AUTOMATION_PROCESS_EXPERT_WORK_STANDARD.md)를 공통 실행 기준의 보완 지침으로 적용한다. 기존 승인·안전 보호를 유지하면서 실제 실패 조건 → 최소 수정 → 범위에 맞는 결과 검증을 우선한다. 조회 가시성·idle·실패를 구분하고 092의 이미 완료된 운영 증거를 재사용한다. 새 승인 Gate·무관한 기능 변경·반복 진단을 만들지 않는다.
