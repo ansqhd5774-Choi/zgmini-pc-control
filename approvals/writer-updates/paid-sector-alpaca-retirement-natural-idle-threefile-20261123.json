@@ -1,0 +1,75 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "5c7f1673b4b2ea49f401891a674289c2cc493b8f",
+  "baseHead": "c62bd5aac3353d7e146d930dbb033b82d89010cd",
+  "baseConfigSourceSha": "c62bd5aac3353d7e146d930dbb033b82d89010cd",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/local-cycle.mjs",
+      "change": "M",
+      "beforeSha256": "0cb4a9834c466d778415a12a4f8bdb62e66596dbd39ea2dd1b7550e982a0708d",
+      "afterSha256": "41912f24c2bdc13a9de52d2ee2b504fe90b733656a0d66827c617a5e2c6c0f4a",
+      "candidateSha256": "76c5ea1f629af6431c8cd6a7a9f444053ab2c6f212753c030171555fb831b6c2",
+      "insertions": [
+        {
+          "anchor": "  spawnSync(process.execPath,[path.join(here,'sector-provisional-cycle.mjs'),'--write-local'],{windowsHide:true,stdio:['ignore','pipe','pipe'],timeout:5*60000});",
+          "position": "before",
+          "text": "  if (false) // Retired Alpaca provisional fetch; preserve paid stored Sector calculation.\n"
+        }
+      ]
+    },
+    {
+      "path": "scripts/pc-writer/collect-local.mjs",
+      "change": "M",
+      "beforeSha256": "dd2ec67a4a26860215c4e94e4df9b0f4d4fdeb4532e0775600a810f6a966c706",
+      "afterSha256": "1648a62e26157868e9d4ed43ab9d36436068e08973ba56d495b7c1751e02c62e",
+      "candidateSha256": "1b865d2d9e1026981fcd914b293126a5b2c93246a11e970a709a076a98d69865",
+      "insertions": [
+        {
+          "anchor": "  let result,releaseCalendar={status:'SKIPPED_KOREA_LANE',providerRequests:0},sectorFearGreedEtf={status:'SKIPPED_KOREA_LANE',providerRequests:0};",
+          "position": "after",
+          "text": "  if(lane==='core')sectorFearGreedEtf={status:'RETIRED_LEGACY_ALPACA',providerRequests:0};\n"
+        },
+        {
+          "anchor": "    sectorFearGreedEtf=await collectSectorFearGreedR3EtfIncremental(base,{fetchImpl:globalThis.fetch,fetchAlreadyQuotaProtected:true,now:Date.now()});",
+          "position": "before",
+          "text": "    if (false) // Retired Alpaca ETF fetch; preserve existing paid stored inputs.\n"
+        }
+      ]
+    },
+    {
+      "path": "scripts/pc-writer/expanded-collection-health.mjs",
+      "change": "M",
+      "beforeSha256": "3d937ea6e157511217d965f2a6939fbb58fcdee5e90809097acf9e626e8f5c41",
+      "afterSha256": "2f0fe206a7b338f96a1795627358afc17c17adf88fa5a2d7cddfcd323ad9a5bc"
+    }
+  ],
+  "protectedFiles": [],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": [
+      {
+        "id": "existing-core-launcher",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+        "dependsOn": [
+          "scripts/pc-writer/local-cycle.mjs"
+        ]
+      }
+    ]
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
