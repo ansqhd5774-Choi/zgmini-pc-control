@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {inspectBeaNipaCaptureReadonly} from '../controller/earnings-bea-nipa-capture-readonly.mjs';
+import {appendBeaJournalPhase} from '../direct-writer-b/bea-native-source-once.mjs';
 const sha=x=>createHash('sha256').update(x).digest('hex');
 const REQUEST='0ac25f3d-e307-41d4-8fcc-62c933f5b9d3';
 const M='dc85fe197c60a11cb62d0e5fc636a3e45152d3528d925ee1ed74f9a73dc83090';
@@ -95,4 +96,41 @@ test('unsafe archive redirection is not followed',t=>{
   const out=inspectBeaNipaCaptureReadonly(data);
   assert.equal(out.status,'STATE_UNKNOWN');
   assert.equal(out.code,'BEA_NIPA_READONLY_UNSAFE_DIRECTORY');
+});
+
+test('real B phase writer preserves independent A archive and checkpoint readback',t=>{
+  const {data,home}=prep(t);
+  const journal=writeAttempt(home);
+  const src=writeSource(home);
+  const file=path.join(journal,'journal.jsonl');
+  appendBeaJournalPhase(file,'BEA_NATIVE_COLLECTOR_ENTERED');
+  fs.appendFileSync(file,JSON.stringify({
+    phase:'BEA_NATIVE_ARCHIVE_READBACK_VERIFIED',
+    sourceVersion:src.version,sourceHttpSha256:src.httpSha,
+    sourceStoredAt:src.stored,observedThrough:'2026-06-30'
+  })+'\n');
+  const out=inspectBeaNipaCaptureReadonly(data);
+  assert.equal(out.status,'PASS');
+  assert.equal(out.code,'BEA_NIPA_PRIVATE_ARCHIVE_READBACK_VERIFIED');
+  assert.equal(out.completedJournalAttempts,1);
+  assert.equal(out.verifiedSourceCount,1);
+  assert.equal(out.latest.sourceVersion,src.version);
+});
+
+test('real B failure phases remain readable without inventing provider success',t=>{
+  const {data,home}=prep(t);
+  const journal=writeAttempt(home);
+  const file=path.join(journal,'journal.jsonl');
+  appendBeaJournalPhase(file,'BEA_NATIVE_COLLECTOR_ENTERED');
+  appendBeaJournalPhase(file,'BEA_NATIVE_ATTEMPT_FAILED',
+    'DIRECT_B_BEA_HTTP_UNAVAILABLE');
+  const out=inspectBeaNipaCaptureReadonly(data);
+  assert.equal(out.status,'PASS');
+  assert.equal(out.code,'BEA_NIPA_PRIVATE_ARCHIVE_NOT_STORED');
+  assert.equal(out.completedJournalAttempts,0);
+  assert.equal(out.storedSourceCount,0);
+  assert.equal(out.providerCalls,0);
+  const rows=fs.readFileSync(file,'utf8').trim().split(/\r?\n/).map(JSON.parse);
+  assert.equal(rows.length,3);
+  assert.equal(rows[2].code,'DIRECT_B_BEA_HTTP_UNAVAILABLE');
 });

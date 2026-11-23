@@ -122,11 +122,11 @@ export function classifyBeaNativeFailure(error){
     BEA_SAFE_FAILURES.get(error?.message) ??
     'DIRECT_B_BEA_SOURCE_OR_STORE_UNKNOWN';
 }
-function appendBeaJournalPhase(file,phase,code=null){
+export function appendBeaJournalPhase(file,phase,code=null){
   const record={phase,...(code?{code}:{})};
   const fd=fs.openSync(file,'a');
   try{
-    fs.writeSync(fd,JSON.stringify(record)+'\\n');
+    fs.writeSync(fd,JSON.stringify(record)+'\n');
     fs.fsyncSync(fd);
   }finally{fs.closeSync(fd);}
 }
