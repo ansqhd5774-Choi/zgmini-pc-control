@@ -168,7 +168,11 @@ export async function applyApprovedUpdate(request, port) {
     // A positive scoped no-effect proof is already sufficient here. Avoid
     // a second broad Runner-idle probe that can fail solely because another
     // approved A task started while this request was being classified.
-    if(!switched&&!prevalidationUntouched){try{oldStillRunning=await port.verifyPrevious({installedSha:request.installedSha,requireRunning:true});}catch{}}
+    // A seat can become busy after the last drain check but before the Supervisor is stopped.
+    // At this pre-switch boundary require a verified, online original runtime,
+    // not globally idle seats: an unrelated approved job must not force a
+    // destructive rollback attempt against a Supervisor still on installedSha.
+    if(!switched&&!prevalidationUntouched){try{oldStillRunning=await port.verifyPrevious({installedSha:request.installedSha,requireRunning:true,requireIdle:false});}catch{}}
     if(!switched && (!supervisorStopped || oldStillRunning)) {
       // Intake is deliberately not enabled when drain/state is uncertain.
       // An intact preflight failure can leave it enabled only if verified.
