@@ -385,7 +385,7 @@ const D05_STAGE_STATUSES=new Set(['LOCAL_STORED','UNCHANGED','PREVIOUS_RELEASE_P
 const D05_WRITER_MODES=new Set(['PUBLISH','DRY_RUN']);
 const D05_WRITER_CODES=new Set(['VERIFIED','VERIFIED_WITH_GAPS','FAILED','DRY_RUN_PASS','DRY_RUN_PARTIAL']);
 const safeD05Value=v=>typeof v==='string'&&D05_STAGE_STATUSES.has(v)?v:null;
-const safeD05Iso=v=>typeof v==='string'&&/^20\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d:\\d\\d(?:\\.\\d{1,3})?Z$/.test(v)&&
+const safeD05Iso=v=>typeof v==='string'&&/^20\d\d-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/.test(v)&&
  Number.isFinite(Date.parse(v))?new Date(v).toISOString():null;
 /** Fixed 1-file read only. Never include raw Writer report, inputs, paths or secrets. */
 export function projectD05WriterCheckpoint(raw){
