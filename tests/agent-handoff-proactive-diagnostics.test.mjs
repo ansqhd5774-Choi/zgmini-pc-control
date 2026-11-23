@@ -6,7 +6,7 @@ import {
   assertSameRun,buildDiagnosis
 } from '../agent-handoff/proactive-diagnostics.mjs';
 import {
-  scanLatest,validateScoutEvent,lookbackQuery,readLegacyProactiveArchive,githubRequestPhase,REPO,OWNER
+  scanLatest,validateScoutEvent,lookbackQuery,readLegacyProactiveArchive,githubRequestPhase,github403Signal,REPO,OWNER
 } from '../agent-handoff/proactive-diagnostics-runner.mjs';
 const now=Date.parse('2026-11-16T13:00:00Z');
 const recent='2026-11-16T12:00:00Z',old='2026-08-16T12:00:00Z';
@@ -317,6 +317,29 @@ test('invalid run cannot suppress a later valid run in newest-first scan',async(
   assert.equal(result.unverified,1);
   assert.equal(result.newReports,1);
   assert.equal(result.observed[0].runId,801);
+});
+
+test('403 response classifies only bounded rate-limit signal, not speculative permission cause',()=>{
+  assert.equal(github403Signal(new Headers({'x-ratelimit-remaining':'0'})),'RATE_LIMIT_SIGNAL');
+  assert.equal(github403Signal(new Headers({'retry-after':'30'})),'RATE_LIMIT_SIGNAL');
+  assert.equal(github403Signal(new Headers({'x-ratelimit-remaining':'40'})),'CAUSE_UNVERIFIED');
+  assert.equal(github403Signal(new Headers()),'CAUSE_UNVERIFIED');
+  assert.equal(github403Signal(null),'CAUSE_UNVERIFIED');
+  const source=readFileSync(new URL('../agent-handoff/proactive-diagnostics-runner.mjs',import.meta.url),'utf8');
+  assert.match(source,/res.status===403\?'_'\+github403Signal\(res.headers\)/);
+  assert.doesNotMatch(source,/console\.log\(res\.headers\)|res\.headers\.entries\(\)/);
+});
+
+test('403 rate-limit classification preserves fail-closed write and no repeat POST',async()=>{
+  const io=ioFor([run(743)]);
+  let calls=0;
+  io.postComment=async()=>{
+    calls++;
+    throw Error('PROACTIVE_DIAG_RUNNER_GITHUB_HTTP_403_COMMENT_WRITE_RATE_LIMIT_SIGNAL');
+  };
+  await assert.rejects(()=>scanLatest(io,now),/GITHUB_HTTP_403_COMMENT_WRITE_RATE_LIMIT_SIGNAL/);
+  assert.equal(calls,1);
+  assert.equal(io.posted.length,0);
 });
 
 test('403 diagnostics identify only a fixed API phase without exposing query or job identity',()=>{
