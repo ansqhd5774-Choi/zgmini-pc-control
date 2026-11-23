@@ -5,7 +5,7 @@ import {
   WIDE_POLICY,evaluateWideSnapshot,reportDecision,renderWideReport,snapshotMarker,
   CONTROL_REPO,OWNER
 } from '../agent-handoff/wide-scout.mjs';
-import {validateWideEvent,scoutWide,RUN_STATUS_PARTITIONS} from '../agent-handoff/wide-scout-runner.mjs';
+import {validateWideEvent,scoutWide,RUN_STATUS_PARTITIONS,recentRuns} from '../agent-handoff/wide-scout-runner.mjs';
 const now=Date.parse('2026-11-16T15:00:00Z');
 const recent='2026-11-16T14:00:00Z';
 const older='2026-08-16T12:00:00Z';
@@ -157,6 +157,52 @@ test('event identity and owner provenance are strict',()=>{
     {...env,GITHUB_EVENT_NAME:'push',GITHUB_ACTOR:OWNER}),/WIDE_SCOUT_RUNNER_EVENT/);
 });
 
+test('seven-day overflow uses bounded UTC daily queries to recover all recent failures and cancellations',async()=>{
+ const time=Date.parse('2026-11-16T15:00:00Z');
+ const data=[];
+ for(const [kind,idOffset] of [['failure',0],['cancelled',1000]]){
+  for(let day=10;day<=16;day++)for(let i=0;i<30;i++)data.push({
+   id:idOffset+day*100+i,created_at:'2026-11-'+String(day)+'T12:00:00Z',
+   run_started_at:'2026-11-'+String(day)+'T12:00:00Z',
+   status:'completed',conclusion:kind
+  });
+ }
+ let calls=0;
+ const fetchRun=async resource=>{
+  calls++;
+  const q=new URL(resource,'https://api.github.com/').searchParams;
+  const kind=q.get('status'),created=q.get('created'),page=Number(q.get('page'));
+  const sorted=data.filter(x=>x.conclusion===kind&&
+    (created.startsWith('>=')?x.created_at.slice(0,10)>=created.slice(2):
+      x.created_at.slice(0,10)===created)).sort((a,b)=>b.id-a.id);
+  return {workflow_runs:sorted.slice((page-1)*100,page*100)};
+ };
+ const result=await recentRuns(time,fetchRun);
+ assert.equal(result.complete,true);
+ assert.equal(result.items.length,420);
+ assert.deepEqual(result.coverage.filter(x=>['failure','cancelled'].includes(x.status))
+   .map(x=>[x.count,x.complete]),[[210,true],[210,true]]);
+ assert.ok(calls<=44,'bounded page calls without an unlimited retry');
+});
+test('overfull single-day inventory remains incomplete rather than falsely verified',async()=>{
+ const time=Date.parse('2026-11-16T15:00:00Z');
+ const rows=Array.from({length:230},(_,i)=>({
+  id:i+1,status:'completed',conclusion:'failure',
+  created_at:'2026-11-16T12:00:00Z'
+ })).reverse();
+ const fetchRun=async resource=>{
+  const q=new URL(resource,'https://api.github.com/').searchParams;
+  const page=Number(q.get('page'));
+  return {workflow_runs:q.get('status')==='failure'&&
+   (q.get('created').startsWith('>=')||q.get('created')==='2026-11-16')?
+   rows.slice((page-1)*100,page*100):[]};
+ };
+ const result=await recentRuns(time,fetchRun);
+ assert.equal(result.complete,false);
+ assert.deepEqual(result.coverage.find(x=>x.status==='failure'),{
+  status:'failure',count:200,complete:false
+ });
+});
 test('status-partition coverage prevents a newest-300-only blind spot',()=>{
   assert.deepEqual(RUN_STATUS_PARTITIONS,[
     'failure','timed_out','cancelled','action_required',
