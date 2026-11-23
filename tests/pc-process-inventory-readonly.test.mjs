@@ -6,7 +6,7 @@ import path from 'node:path';
 import {inspectTask, TASK} from '../tools/marketparquet-task-source-readonly.mjs';
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
 import assert from 'node:assert/strict';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,project2960MaintenanceStatus,compact2960ProcessResult,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,project2960MaintenanceStatus,compact2960ProcessResult,projectD05WriterCheckpoint,compactD05WriterResult,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
@@ -87,6 +87,52 @@ test('#2960 compact receipt respects 32 KiB atomic result limit',()=>{
  assert.ok(Buffer.byteLength(serializeProcessResult(out))<32768);
  assert.ok(Buffer.byteLength(toText(out))<32768);
  assert.equal(compact2960ProcessResult(base,project2960MaintenanceStatus(null)).status,'PARTIAL');
+});
+
+
+test('D05 fixed Writer probe uses exact operating-only request contract',()=>{
+ const e=event(),p=JSON.parse(e.issue.body);
+ const q={...e,issue:{...e.issue,body:JSON.stringify({...p,probe:'d05-writer-checkpoint-readonly'})}};
+ assert.equal(authenticateProcess(q,env,'operating').d05WriterCheckpoint,true);
+ assert.throws(()=>authenticateProcess(q,env,'handoff'));
+ for(const probe of ['d05-writer-status','d05-writer-checkpoint-readonly -c',
+  'd05-writer-checkpoint-readonly\\\\cmd']){
+  assert.throws(()=>authenticateProcess({...e,issue:{...e.issue,
+   body:JSON.stringify({...p,probe})}},env,'operating'));
+ }
+ assert.throws(()=>authenticateProcess({...e,issue:{...e.issue,
+  body:JSON.stringify({...p,probe:'d05-writer-checkpoint-readonly',
+   file:'E:/SECRET'})}},env,'operating'));
+});
+test('D05 Writer checkpoint projection distinguishes unchanged and unproven without leaking data',()=>{
+ const raw={at:'2026-11-23T13:40:15.000Z',mode:'PUBLISH',
+  status:'VERIFIED',source:'a'.repeat(40),
+  market:{status:'LOCAL_STORED'},compositeObserved:{status:'UNCHANGED'},
+  d05PrivateLineageStatus:'UNPROVEN',
+  credentials:'SECRET',failure:{message:'SECRET'},providerInputs:['SECRET']};
+ const out=projectD05WriterCheckpoint(raw);
+ assert.equal(out.status,'READ_ONLY_OBSERVED');
+ assert.equal(out.compositeArchiveStage,'UNCHANGED');
+ assert.equal(out.actualLineageAppendProven,false);
+ assert.equal(out.archiveAppendConditionMet,false);
+ assert.equal(out.recoveryEligible,false);
+ assert.doesNotMatch(JSON.stringify(out),/SECRET|credentials|providerInputs|message/);
+ const yes=projectD05WriterCheckpoint({...raw,compositeObserved:{status:'LOCAL_STORED'},
+  d05PrivateLineageStatus:'APPENDED_VERIFIED_LOCAL_ONLY'});
+ assert.equal(yes.archiveAppendConditionMet,true);
+ assert.equal(yes.actualLineageAppendProven,true);
+ const missing=projectD05WriterCheckpoint({...raw,d05PrivateLineageStatus:null});
+ assert.equal(missing.d05PrivateLineageStage,null);
+ assert.equal(projectD05WriterCheckpoint(null).status,'STATE_UNKNOWN');
+ assert.equal(projectD05WriterCheckpoint({...raw,status:'SECRET'}).status,'STATE_UNKNOWN');
+ const base={schema:'ZGMINI_PC_PROCESS_INVENTORY_RESULT_V1',role:'operating',
+  requestId:'218d558d-418a-4967-a015-7c2e43261bfd',issueNumber:2985,
+  runId:'45187447318',attempt:'1',host:'PC',runnerName:'zgmini-pc-03',operationalWrites:0,
+  providerCalls:0,d1Writes:0,automaticRetries:0};
+ const compact=compactD05WriterResult(base,out);
+ assert.equal(compact.status,'PASS');
+ assert.ok(Buffer.byteLength(serializeProcessResult(compact))<32768);
+ assert.ok(Buffer.byteLength(toText(compact))<32768);
 });
 
 test('sanitize output keeps only bounded whitelisted Windows process metadata',()=>{
