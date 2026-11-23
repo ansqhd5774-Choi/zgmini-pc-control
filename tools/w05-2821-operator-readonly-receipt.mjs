@@ -220,5 +220,5 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
   deliveryStatus:delivery.status,operatorAttested:delivery.operatorAttested,
   pinnedToolHashes:r.pinnedToolHashes,localToolHashes:r.toolHashes,
   rollbackAuthorized:false,rollbackInvocations:0}));
- if(!delivery.status.endsWith('_VERIFIED'))process.exitCode=2;
+ if(delivery.status!=='READ_ONLY_RECEIPT_VERIFIED')process.exitCode=2;
 }
