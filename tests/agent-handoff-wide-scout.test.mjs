@@ -184,6 +184,55 @@ test('seven-day overflow uses bounded UTC daily queries to recover all recent fa
    .map(x=>[x.count,x.complete]),[[210,true],[210,true]]);
  assert.ok(calls<=44,'bounded page calls without an unlimited retry');
 });
+test('saturated cancellation day recovers 288 runs via bounded hourly queries',async()=>{
+ const time=Date.parse('2026-11-16T15:00:00Z');
+ const runs=Array.from({length:288},(_,i)=>{
+   const hour=String(i%24).padStart(2,'0');
+   const minute=String(Math.floor(i/24)).padStart(2,'0');
+   return {id:1000+i,status:'completed',conclusion:'cancelled',
+     created_at:'2026-11-16T'+hour+':'+minute+':00Z'};
+ });
+ let count=0;
+ const requestRuns=async resource=>{
+   count++;
+   const q=new URL(resource,'https://api.github.com/').searchParams;
+   const status=q.get('status'),created=q.get('created');
+   const page=Number(q.get('page'));
+   let matches=runs.filter(x=>x.conclusion===status);
+   if(created.includes('..')){
+     const [start,end]=created.split('..');
+     matches=matches.filter(x=>x.created_at>=start&&x.created_at<=end);
+   }else if(created.startsWith('>=')){
+     matches=matches.filter(x=>x.created_at.slice(0,10)>=created.slice(2));
+   }else matches=matches.filter(x=>x.created_at.slice(0,10)===created);
+   matches.sort((a,b)=>b.created_at.localeCompare(a.created_at)||b.id-a.id);
+   return {workflow_runs:matches.slice((page-1)*100,page*100)};
+ };
+ const result=await recentRuns(time,requestRuns);
+ assert.equal(result.complete,true);
+ assert.equal(result.items.length,288);
+ assert.equal(result.coverage.find(x=>x.status==='cancelled').count,288);
+ assert.equal(new Set(result.items.map(x=>x.id)).size,288);
+ assert.ok(count<=50,'hourly extension stays bounded and skips ordinary statuses');
+});
+test('unsupported hourly filter cannot fake complete day coverage',async()=>{
+ const time=Date.parse('2026-11-16T15:00:00Z');
+ const all=Array.from({length:230},(_,i)=>({
+  id:2000+i,created_at:'2026-11-16T12:00:00Z',
+  status:'completed',conclusion:'cancelled'})).reverse();
+ const requestRuns=async resource=>{
+  const q=new URL(resource,'https://api.github.com/').searchParams;
+  const page=Number(q.get('page'));
+  if(q.get('status')!=='cancelled'||q.get('created').includes('..')||
+    !(q.get('created')==='2026-11-16'||q.get('created').startsWith('>=')))
+   return {workflow_runs:[]};
+  return {workflow_runs:all.slice((page-1)*100,page*100)};
+ };
+ const result=await recentRuns(time,requestRuns);
+ assert.equal(result.complete,false);
+ assert.equal(result.coverage.find(x=>x.status==='cancelled').complete,false);
+ assert.equal(result.coverage.find(x=>x.status==='cancelled').count,200);
+});
 test('overfull single-day inventory remains incomplete rather than falsely verified',async()=>{
  const time=Date.parse('2026-11-16T15:00:00Z');
  const rows=Array.from({length:230},(_,i)=>({
