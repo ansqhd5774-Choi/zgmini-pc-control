@@ -341,3 +341,16 @@ test('D05 sector R3 A exact three-file selective pin is fail-closed and rollback
  assert.throws(()=>validateUpdateRequest(request,raw,{actor:'ansqhd5774-Choi',installedSha:target}),
   /UPDATE_INSTALLED_SOURCE_DRIFT/);
 });
+
+test('D05 sector R3 D1/API fixed reader reuses existing local evidence and bounded public GET',()=>{
+ const source=fs.readFileSync(path.join(import.meta.dirname,'..','controller',
+  'sector-r3-d1-api-readback-readonly.mjs'),'utf8');
+ assert.match(source,/const FEED='sector-fear-greed-r3'/);
+ assert.match(source,/snapshot_key='current' LIMIT 1/);
+ assert.match(source,/const URL='https:\/\/zgmini\.kr\/api\/sector-fear-greed'/);
+ assert.match(source,/sectorR3StoredDisplayDigest/);
+ assert.match(source,/D1_CLIENT_SOURCE_DRIFT/);
+ assert.match(source,/phase==='CONFIRMED'/);
+ assert.match(source,/oneYearPitVerified:false/);
+ assert.doesNotMatch(source,/DELETE FROM|INSERT INTO|UPDATE public_feed_snapshots_v1/);
+});
