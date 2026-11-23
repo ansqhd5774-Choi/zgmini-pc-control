@@ -223,7 +223,8 @@ test('unsupported hourly filter cannot fake complete day coverage',async()=>{
  const requestRuns=async resource=>{
   const q=new URL(resource,'https://api.github.com/').searchParams;
   const page=Number(q.get('page'));
-  if(q.get('status')!=='cancelled'||q.get('created').includes('..'))
+  if(q.get('status')!=='cancelled'||q.get('created').includes('..')||
+    !(q.get('created')==='2026-11-16'||q.get('created').startsWith('>=')))
    return {workflow_runs:[]};
   return {workflow_runs:all.slice((page-1)*100,page*100)};
  };
