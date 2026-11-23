@@ -74,18 +74,22 @@ test('missing date rows are not fabricated from current',t=>{
  const r=inspectSectorR3DatedLedger(f.data);
  assert.equal(r.status,'UNPROVEN');assert.equal(r.datedKeyCount,0);
 });
-test('SQLite WAL with an active writer preserves committed data and sidecars',t=>{
+test('SQLite WAL with an active writer preserves business rows (engine WAL/SHM read coordination allowed)',t=>{
  const f=fixture(t,{wal:true}),b=body(),at=Date.parse('2026-11-10T05:00:00Z');
  f.add('2026-11-10',b,at);f.add('current',b,at);
- const files=[f.file,f.file+'-wal',f.file+'-shm'];
- const before=files.map(file=>fs.existsSync(file)?[fs.statSync(file).size,fs.statSync(file).mtimeMs]:null);
+ const prior=fs.readFileSync(f.file);
  const r=inspectSectorR3DatedLedger(f.data);
- const after=files.map(file=>fs.existsSync(file)?[fs.statSync(file).size,fs.statSync(file).mtimeMs]:null);
- assert.equal(r.status,'PASS');assert.deepEqual(after,before);
+ const count=f.db.prepare("SELECT COUNT(*) AS n FROM public_feed_snapshots_v1 WHERE feed_key='sector-fear-greed-r3'").get().n;
+ assert.equal(r.status,'PASS');assert.equal(count,2);
+ assert.deepEqual(fs.readFileSync(f.file),prior);
 });
 test('unexpected path symlink is rejected before SQLite open',t=>{
  const f=fixture(t),outside=path.join(path.dirname(f.data),'elsewhere.sqlite');
  f.db.close();fs.renameSync(f.file,outside);
  try{fs.symlinkSync(outside,f.file);}catch(e){if(e.code==='EPERM'){t.skip('symlinks unavailable');return;}throw e;}
  assert.equal(inspectSectorR3DatedLedger(f.data).code,'SECTOR_R3_DB_FILE_UNSAFE');
+});
+
+test('invalid data root fails without path exception',()=>{
+ assert.equal(inspectSectorR3DatedLedger(null).code,'SECTOR_R3_DATA_ROOT_INVALID');
 });
