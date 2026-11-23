@@ -98,3 +98,14 @@ test('unsafe and missing current metadata fail closed',t=>{
  assert.equal(invalid.core.r54StoredEvent.reason,'CURRENT_BODY_UNREADABLE');
  assert.doesNotMatch(JSON.stringify(invalid),/SECRET_BAD_JSON/);
 });
+
+test('malformed optional snapshot table never blocks unrelated fixed inventories',t=>{
+ const f=fixture(t);
+ f.core.exec('DROP TABLE market_public_snapshots_v1; CREATE TABLE market_public_snapshots_v1 (unrelated TEXT)');
+ const result=inspectSourceInventory(f.data);
+ assert.equal(result.status,'PASS');
+ assert.deepEqual(result.core.r54StoredEvent,{
+  status:'UNVERIFIED',reason:'SNAPSHOT_QUERY_FAILED',eventVerified:false,
+ });
+ assert.equal(result.operationalWrites,0);assert.equal(result.d1Writes,0);
+});
