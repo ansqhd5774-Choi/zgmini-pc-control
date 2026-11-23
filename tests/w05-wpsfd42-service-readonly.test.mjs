@@ -36,12 +36,14 @@ function bundle(t,{script='// approved fixture',dependency='// linked fixture'}=
   fs.mkdirSync(path.dirname(output),{recursive:true});
   fs.writeFileSync(output,contents);
  }
- const manifest={sourceSha,sourceBranch:branch,entrypoint:W05_ENTRY,files};
+ const manifest={schema:'ZGMINI_PC_SOURCE_BUNDLE_MANIFEST_V1',
+  sourceRepository:'ansqhd5774-Choi/zgmini',
+  sourceSha,sourceBranch:branch,entrypoint:W05_ENTRY,files};
  const bytes=Buffer.from(JSON.stringify(manifest));
  fs.writeFileSync(path.join(root,'manifest.json'),bytes);
  const request={operation:'w05-wpsfd42-service-readonly',sourceRepository:'ansqhd5774-Choi/zgmini',
   sourceBranch:branch,sourceSha};
- const host={approvedSources:{[sourceSha]:{root,branch,manifestSha256:sha(bytes)}}};
+ const host={approvedSources:{[sourceSha]:{root,branch,entrypoint:W05_ENTRY,manifestSha256:sha(bytes)}}};
  return {root,request,host};
 }
 
@@ -50,6 +52,9 @@ test('only the exact B-approved two-module bundle is eligible',t=>{
  const verified=verifyW05ServiceBundle(f);
  assert.deepEqual(verified.sources.map(item=>item.file),[W05_ENTRY,W05_DEP]);
  assert.equal(verified.sourceSha,sourceSha);
+ assert.throws(()=>verifyW05ServiceBundle({
+  request:f.request,host:{approvedSources:{[sourceSha]:{...f.host.approvedSources[sourceSha],entrypoint:'wrong.mjs'}}},
+ }),/W05_APPROVED_ENTRYPOINT_MISMATCH/);
  assert.equal(verifyW05ServiceBundle({request:f.request,host:{approvedSources:{}}}),null);
  assert.throws(()=>verifyW05ServiceBundle({
   request:{...f.request,sourceBranch:'other'},host:f.host,
