@@ -209,14 +209,28 @@ function r54StoredEventSummary(db,tables){
  const event=domain.lastCalculationEvent;
  const eventStamp=safeIso(event?.calculatedAt)?event.calculatedAt:null;
  const eventPresent=event?.kind==='R54_STORED_CALCULATION_EVENT_R1';
+ const factorIds=['employment-41','employment-42','employment-43','employment-44'];
+ const factorSources=['BLS / UNRATE','BLS / PAYEMS',
+  'DOL ETA 539 / stored state claims','DOL ETA 539 / stored state claims breadth'];
+ const factorWeights=[0.3,0.3,0.2,0.2];
+ const factors=domain.indicators, dates=event?.factorObservationDates;
+ const factorVerified=Array.isArray(factors)&&factors.length===4&&
+  Array.isArray(dates)&&dates.length===4&&
+  factors.every((factor,i)=>factor?.id===factorIds[i]&&
+   factor.status==='READY'&&factor.source===factorSources[i]&&
+   typeof factor.score==='number'&&Number.isFinite(factor.score)&&
+   factor.score>=0&&factor.score<=100&&safeDay(factor.observationDate)&&
+   factor.observationDate<=body.asOfDate&&dates[i]?.id===factorIds[i]&&
+   dates[i]?.date===factor.observationDate)&&
+  score!==null&&Math.abs(factors.reduce((sum,factor,i)=>
+   sum+factor.score*factorWeights[i],0)-score)<=1e-6;
  const exact=body.status==='SUCCESS'&&body.updatedAt===eventStamp&&
   eventStamp?.slice(0,10)===body.asOfDate&&
   resultBase.methodologyVersion!==null&&
   event?.methodologyVersion===resultBase.methodologyVersion&&
   domain?.asOfDate===body.asOfDate&&domain?.status==='READY'&&
   score!==null&&
-  Array.isArray(domain.indicators)&&domain.indicators.length===4&&
-  Array.isArray(event.factorObservationDates)&&event.factorObservationDates.length===4&&
+  factorVerified&&
   lastDate===body.asOfDate&&last?.pointKind==='R54_STORED_CALCULATION_EVENT_R1'&&
   last?.calculatedAt===eventStamp&&
   last?.value===score&&datedMatch;
