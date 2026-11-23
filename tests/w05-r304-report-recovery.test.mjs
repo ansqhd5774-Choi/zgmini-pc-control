@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {writeAndVerify} from '../w05-r304-service-b/report.mjs';
 import fs from 'node:fs';
 import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
 import {validateSourceBundleBApproval} from '../tools/source-bundle-register.mjs';
 
 const url='https://api.github.com/repos/ansqhd5774-Choi/zgmini-pc-control/contents/results/w05-fixture.json';
@@ -46,10 +47,15 @@ test('W05 service two-file source B manifest candidate validates and detects dri
  const approvalBytes=fs.readFileSync(new URL(
   '../approvals/source-bundles/w05-service-r4-twofile-source-b-20261123.json',import.meta.url));
  const approval=JSON.parse(approvalBytes.toString('utf8'));
- const sourceBytes=fs.readFileSync(new URL(
-  '../approvals/source-bundles/manifests/42a1c46c0c973fb859f4050a77d781a026acc6c7.json',import.meta.url));
+ const sourcePath='approvals/source-bundles/manifests/42a1c46c0c973fb859f4050a77d781a026acc6c7.json';
+ const sourceBytes=fs.readFileSync(new URL('../'+sourcePath,import.meta.url));
+ // On Windows checkout autocrlf may convert LF to CRLF; the B approver
+ // pins the immutable Git blob bytes, not a checkout working-tree copy.
+ const sourceGitBytes=execFileSync('git',['show','HEAD:'+sourcePath],{maxBuffer:8192});
  const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
- assert.equal(digest(sourceBytes),approval.sourceManifestSha256);
+ assert.equal(digest(sourceGitBytes),approval.sourceManifestSha256);
+ assert.equal(sourceBytes.toString('utf8').replace(/\r\n/g,'\n'),
+  sourceGitBytes.toString('utf8'));
  const source=JSON.parse(sourceBytes.toString('utf8'));
  assert.deepEqual(Object.keys(source.files).sort(),[
   'scripts/pc-writer/EARNINGS_R3D_STORED_BLS_CALC_READONLY.mjs',
