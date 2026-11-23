@@ -178,7 +178,10 @@ export function preparePcSharedResourceWait({originIssue,report,resultPath,resul
     report.result?.status==='BLOCKED'&&report.result?.code===report.code&&
     report.result?.candidateExecuted===false&&
     report.result?.providerCalls===0&&report.result?.d1Writes===0&&
-    report.result?.operationalWrites===0&&report.result?.sqliteOpened===false;
+    (report.result?.operationalWrites===0||
+      (candidateMemoryGuard&&report.result&&
+       !Object.hasOwn(report.result,'operationalWrites')))&&
+    report.result?.sqliteOpened===false;
 
   const validLease=report.code!=='LEASE_BUSY'||['REQUEST_LEASE','SEAT_LEASE',
     'RESOURCE_LEASE'].includes(report.failureOperation);
