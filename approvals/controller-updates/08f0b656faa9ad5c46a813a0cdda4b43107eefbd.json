@@ -1,0 +1,50 @@
+{
+  "schema": "ZGMINI_PC_UPDATE_V1",
+  "installedSha": "2f3ebcf3518a5e9b694bafbb7e6331840a6a4a25",
+  "targetSha": "08f0b656faa9ad5c46a813a0cdda4b43107eefbd",
+  "allowFiles": [
+    {
+      "path": "config/operations.json",
+      "sha256": "2f0b61c56334720c079b63f5c3d96f3d9fd0fca333fc7bb84a6d4a3fc2a81cc0"
+    },
+    {
+      "path": "controller/operations.mjs",
+      "sha256": "6fbb76a91c8682607a890e7dcdb7cff91087cc73804cb0d49b918250e2d98b09"
+    },
+    {
+      "path": "controller/w05-wpsfd42-service-readonly.mjs",
+      "sha256": "4ab021ee53181a240a54963d98417e1e3acba04b937b7c9d160971893bf1872f"
+    }
+  ],
+  "purpose": "pc-controller-maintenance",
+  "controllerOnlyInstall": true,
+  "approval": {
+    "grade": "B",
+    "ref": "PENDING_PR_CREATION",
+    "scope": "PC_CONTROL_CONTROLLER_UPDATE"
+  },
+  "checks": {
+    "targetSha": "08f0b656faa9ad5c46a813a0cdda4b43107eefbd",
+    "status": "PASS",
+    "manifestSha256": "6fe070566a8f71151feb8a47a1acd3b108877e3cd5ed0282fe465b649c94cf18"
+  },
+  "backup": {
+    "strategy": "VERSIONED_SNAPSHOT",
+    "rollback": {
+      "kind": "RESTORE_INSTALLED_SHA",
+      "sha": "2f3ebcf3518a5e9b694bafbb7e6331840a6a4a25"
+    }
+  },
+  "postOperation": "core-status",
+  "postSourceBranch": "main",
+  "postSourceSha": "8a6dc683348ca549c110fabedd44c04d22183050",
+  "selectiveSource": {
+    "schema": "ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1",
+    "branch": "codex/w05-2f3-single-parent-20261123",
+    "mainSha": "53c75239ade4830b6a5cf76b57c85946f7e0bbc2",
+    "customPaths": [
+      "config/operations.json",
+      "controller/operations.mjs"
+    ]
+  }
+}
