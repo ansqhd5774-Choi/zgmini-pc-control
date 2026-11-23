@@ -1,0 +1,26 @@
+{
+  "schema": "ZGMINI_CONTROLLER_SELECTIVE_PIN_V1",
+  "installedSha": "d996f2c666955c6659c233d8840d13181571f02a",
+  "targetSha": "1aefab5683fcdbdf4b2535af6667d8fcad524452",
+  "sourceMainSha": "f9b4c9df37f5892123d51365d55862cdf575327f",
+  "targetBranch": "codex/w05-d996-single-parent-20261123",
+  "customPaths": [
+    "config/operations.json",
+    "controller/operations.mjs"
+  ],
+  "allowFiles": [
+    {
+      "path": "config/operations.json",
+      "sha256": "5b42ef2bcb1cd765cdced2341d2a1e5350a283e6a87dfe29e0ee43a6194c9eb0"
+    },
+    {
+      "path": "controller/operations.mjs",
+      "sha256": "44a3f2ac25df3043007a3387c392a63985df523e8d4602f9ac35253160404d8e"
+    },
+    {
+      "path": "controller/w05-wpsfd42-service-readonly.mjs",
+      "sha256": "4ab021ee53181a240a54963d98417e1e3acba04b937b7c9d160971893bf1872f"
+    }
+  ],
+  "approvalRef": "PENDING_REVIEW_PR_NUMBER"
+}
