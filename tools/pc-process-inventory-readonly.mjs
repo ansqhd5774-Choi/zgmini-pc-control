@@ -362,6 +362,13 @@ export function project2960MaintenanceStatus(raw){
   leaseBoundToOriginalRequest:null,recoveryEligible:false,
   protectedStateUnchanged:null,operationalWrites:0,providerCalls:0,d1Writes:0};
 }
+/** Exact #2960 receipt only: skip 32-KiB general inventory payload. */
+export function compact2960ProcessResult(base,status){
+ return {...base,observedAtUtc:new Date().toISOString(),
+  status:status?.status==='READ_ONLY_OBSERVED'?'PASS':'PARTIAL',
+  code:status?.code??'W05_2960_EVIDENCE_INCOMPLETE',
+  w052960MaintenanceStatus:status??project2960MaintenanceStatus(null)};
+}
 function inspect2960MaintenanceStatusReadonly(){
  try{return project2960MaintenanceStatus(collectAutomationStatus(['--request-id',TARGET2960]));}
  catch{return project2960MaintenanceStatus(null);}
@@ -1468,6 +1475,8 @@ export function collect(role,ctx,env=process.env){
  if(identity!=='MATCH'||(role==='operating'&&host!=='PC')){
   return {...base,status:'BLOCKED',code:identity==='MATCH'?'HOST_NOT_CANONICAL':identity};
  }
+ if(ctx.w052960MaintenanceStatus===true)
+  return compact2960ProcessResult(base,inspect2960MaintenanceStatusReadonly());
  const withMaintenance=role==='operating'?{...base,
   maintenance:collectMaintenanceStatusReadonly(),
   ...(ctx.w052960MaintenanceStatus?{
