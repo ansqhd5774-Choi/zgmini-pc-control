@@ -6,7 +6,7 @@ import path from 'node:path';
 import {inspectTask, TASK} from '../tools/marketparquet-task-source-readonly.mjs';
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
 import assert from 'node:assert/strict';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
@@ -1002,4 +1002,57 @@ test('C2505 Writer B source-only CAS proves exact original byte digest, not a ch
   'C2505_WRITER_SOURCE_FIELD_AMBIGUOUS');
  assert.equal(project2505WriterSourceOnlyDelta(now,'not-a-sha').code,
   'C2505_WRITER_SOURCE_BYTES_UNVERIFIED');
+});
+
+test('W05 #2821 fixed read-only CAS observes stable original bytes without claiming recovery',()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'w05-2821-cas-'));
+ const maintenanceRoot=path.join(root,'maintenance'),controlRoot=path.join(root,'control');
+ const id='pc-update-c09a58ae-4d2d-4f70-ae66-aa64d976ee51';
+ const old='2f3ebcf3518a5e9b694bafbb7e6331840a6a4a25';
+ const target='08f0b656faa9ad5c46a813a0cdda4b43107eefbd';
+ const backup=path.join(controlRoot,'backups','controller-update-'+id);
+ const write=(p,b)=>{fs.mkdirSync(path.dirname(p),{recursive:true});fs.writeFileSync(p,b);};
+ const entry=Buffer.from('export const safe=true;\n');
+ const host={controllerSourceSha:old,
+  controllerFiles:{'controller/entry.mjs':createHash('sha256').update(entry).digest('hex')}};
+ const protectedBefore={files:{'config.json':'0'.repeat(64)},tasks:{}};
+ const owner={pid:1234,nonce:'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'};
+ const marker={requestOwnerPid:owner.pid,nonce:owner.nonce};
+ const ledger={requestId:id,issueNumber:2821,installedShaBefore:old,targetSha:target,
+  status:'RECOVERY_REQUIRED',phase:'RECOVERY_REQUIRED',firstFail:'BACKED_UP'};
+ write(path.join(maintenanceRoot,'ledger',id+'.json'),JSON.stringify(ledger));
+ write(path.join(maintenanceRoot,'leases/controller-install/owner.json'),JSON.stringify(owner));
+ write(path.join(maintenanceRoot,'leases/controller-install/RECOVERY_REQUIRED.json'),JSON.stringify(marker));
+ write(path.join(controlRoot,'host.json'),JSON.stringify(host));
+ write(path.join(backup,'snapshot/host.json'),JSON.stringify(host));
+ write(path.join(backup,'snapshot/controller/entry.mjs'),entry);
+ write(path.join(backup,'PROTECTED_BEFORE.json'),JSON.stringify(protectedBefore));
+ const args={maintenanceRoot,controlRoot,lock:()=>({held:true,recoveryRequired:true}),
+  isAlive:()=>false,protectedProbe:()=>protectedBefore};
+ try{
+  const observed=inspectW052821RecoveryCasReadonly(args);
+  assert.equal(observed.status,'READ_ONLY_OBSERVED');
+  assert.equal(observed.code,'W05_2821_FIXED_RECOVERY_CAS');
+  assert.equal(observed.phase,'RECOVERY_REQUIRED');
+  assert.equal(observed.firstFail,'BACKED_UP');
+  assert.equal(observed.ownerMarkerSame,true);
+  assert.equal(observed.ownerAlive,false);
+  assert.equal(observed.hostSame,true);
+  assert.equal(observed.backupFilesVerified,true);
+  assert.equal(observed.protectionSame,true);
+  for(const key of ['ledgerSha256','ownerSha256','markerSha256',
+   'snapshotHostSha256','protectionSha256'])
+   assert.match(observed.digests[key],/^[a-f0-9]{64}$/);
+  assert.equal(observed.recoveryEligible,false);
+  assert.equal(observed.operationalWrites,0);
+  assert.equal(JSON.stringify(observed).includes(owner.nonce),false);
+  write(path.join(maintenanceRoot,'ledger',id+'.json'),JSON.stringify({...ledger,issueNumber:999}));
+  assert.equal(inspectW052821RecoveryCasReadonly(args).code,
+   'W05_2821_ORIGINAL_LEDGER_IDENTITY_DRIFT');
+  write(path.join(maintenanceRoot,'ledger',id+'.json'),JSON.stringify(ledger));
+  write(path.join(backup,'snapshot/controller/entry.mjs'),'altered');
+  assert.equal(inspectW052821RecoveryCasReadonly(args).backupFilesVerified,false);
+  assert.equal(inspectW052821RecoveryCasReadonly({...args,
+   lock:()=>({held:false,recoveryRequired:false})}).status,'STATE_UNKNOWN');
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
 });

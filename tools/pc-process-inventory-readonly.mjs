@@ -867,6 +867,97 @@ export function inspect1841LeaseCorrelation({
     path.join(MAINTENANCE_ROOT,'backlog',C1841_ID+'.json'),stat)});
  }catch{return as1841(c996Unknown('C996_ORIGINAL_FILES_UNAVAILABLE'));}
 }
+// Fixed W05 #2821 BACKED_UP incident: capture only exact recovery CAS
+// digests and bounded booleans using the already-approved operating-PC A read.
+// This is not approval, not an install, and never releases the install lease.
+const W05_2821_ID='pc-update-c09a58ae-4d2d-4f70-ae66-aa64d976ee51';
+const W05_2821_OLD='2f3ebcf3518a5e9b694bafbb7e6331840a6a4a25';
+const W05_2821_TARGET='08f0b656faa9ad5c46a813a0cdda4b43107eefbd';
+export function inspectW052821RecoveryCasReadonly({
+ maintenanceRoot='E:/ZGmini/automation/pc-maintenance',
+ controlRoot='E:/ZGmini/automation/pc-control',
+ read=fs.readFileSync,stat=fs.lstatSync,protectedProbe=protectedSnapshot,
+ lock=null,isAlive=pid=>{try{process.kill(pid,0);return true;}catch(e){
+  return e?.code==='ESRCH'?false:null;}}
+}={}){
+ const unknown=code=>({status:'STATE_UNKNOWN',code,recoveryEligible:false,
+  operationalWrites:0,providerCalls:0,d1Writes:0});
+ const readExact=(file,cap=131072)=>{
+  const st=stat(file);
+  if(!st.isFile()||st.isSymbolicLink()||st.size<1||st.size>cap)
+   throw Error('W05_READONLY_FILE_UNSAFE');
+  const bytes=read(file);
+  if(!Buffer.isBuffer(bytes)||bytes.length!==st.size)
+   throw Error('W05_READONLY_BYTES_CHANGED');
+  return bytes;
+ };
+ try{
+  const lockStatus=()=>typeof lock==='function'?lock():
+   maintenanceLockStatus(maintenanceRoot,'controller-install');
+  const before=lockStatus();
+  if(before?.held!==true||before?.recoveryRequired!==true)
+   return unknown('W05_2821_RECOVERY_LEASE_NOT_HELD');
+  const backup=path.join(controlRoot,'backups','controller-update-'+W05_2821_ID);
+  const fixed={
+   ledger:path.join(maintenanceRoot,'ledger',W05_2821_ID+'.json'),
+   owner:path.join(maintenanceRoot,'leases/controller-install/owner.json'),
+   marker:path.join(maintenanceRoot,'leases/controller-install/RECOVERY_REQUIRED.json'),
+   currentHost:path.join(controlRoot,'host.json'),
+   snapshotHost:path.join(backup,'snapshot/host.json'),
+   protection:path.join(backup,'PROTECTED_BEFORE.json')
+  };
+  const capture=()=>Object.fromEntries(Object.entries(fixed).map(
+   ([k,p])=>[k,readExact(p)]));
+  const first=capture(),second=capture(),after=lockStatus();
+  if(Object.keys(first).some(k=>!first[k].equals(second[k]))||
+    after?.held!==true||after?.recoveryRequired!==true)
+   return unknown('W05_2821_RECOVERY_EVIDENCE_CHANGED');
+  const ledger=JSON.parse(first.ledger.toString('utf8'));
+  if(ledger.requestId!==W05_2821_ID||ledger.issueNumber!==2821||
+     ledger.installedShaBefore!==W05_2821_OLD||
+     ledger.targetSha!==W05_2821_TARGET)
+   return unknown('W05_2821_ORIGINAL_LEDGER_IDENTITY_DRIFT');
+  const owner=JSON.parse(first.owner.toString('utf8'));
+  const marker=JSON.parse(first.marker.toString('utf8'));
+  const host=JSON.parse(first.snapshotHost.toString('utf8'));
+  const baseline=JSON.parse(first.protection.toString('utf8'));
+  const files=host.controllerFiles;
+  if(host.controllerSourceSha!==W05_2821_OLD||
+     !files||typeof files!=='object'||Array.isArray(files)||
+     Object.keys(files).length<1||Object.keys(files).length>160)
+   return unknown('W05_2821_SNAPSHOT_MANIFEST_INVALID');
+  let backupFilesVerified=true;
+  for(const [rel,hash] of Object.entries(files)){
+   if(!/^(?:controller\/[a-z0-9-]+\.mjs|config\/operations\.json)$/.test(rel)||
+      !/^[a-f0-9]{64}$/.test(hash)||
+      createHash('sha256').update(
+       readExact(path.join(backup,'snapshot',rel),2097152)).digest('hex')!==hash){
+    backupFilesVerified=false;break;
+   }
+  }
+  let protectionSame=null;
+  try{protectionSame=JSON.stringify(protectedProbe())===JSON.stringify(baseline);}
+  catch{/* Protection readback is unknown, never treated as equal. */}
+  const ownerMarkerSame=Number.isSafeInteger(owner.pid)&&owner.pid>0&&
+   /^[a-f0-9-]{36}$/i.test(owner.nonce??'')&&
+   marker.requestOwnerPid===owner.pid&&marker.nonce===owner.nonce;
+  const pidAlive=ownerMarkerSame?isAlive(owner.pid):null;
+  const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
+  const digests={ledgerSha256:hash(first.ledger),ownerSha256:hash(first.owner),
+   markerSha256:hash(first.marker),snapshotHostSha256:hash(first.snapshotHost),
+   protectionSha256:hash(first.protection)};
+  return {status:'READ_ONLY_OBSERVED',code:'W05_2821_FIXED_RECOVERY_CAS',
+   phase:['BACKED_UP','RECOVERY_REQUIRED'].includes(ledger.phase)?ledger.phase:null,
+   firstFail:ledger.firstFail==='BACKED_UP'?'BACKED_UP':null,
+   ownerMarkerSame,ownerAlive:typeof pidAlive==='boolean'?pidAlive:null,
+   hostSame:first.currentHost.equals(first.snapshotHost),
+   backupFilesVerified,protectionSame,digests,
+   // A matching owner nonce is not independent proof of install-request lineage.
+   leaseBoundToRequest:null,recoveryEligible:false,
+   operationalWrites:0,providerCalls:0,d1Writes:0};
+ }catch{return unknown('W05_2821_RECOVERY_FILES_UNAVAILABLE');}
+}
+
 // Fixed read-only HTTP request log projection. The source module is the
 // already-tested Controller A adapter, loaded from the exact Git checkout.
 // No caller input, secrets, URLs, query paths, or raw log lines are returned.
@@ -1140,6 +1231,7 @@ export function collect(role,ctx,env=process.env){
   c996LeaseCorrelation:inspect996LeaseCorrelation(),
   c1501LeaseCorrelation:inspect1501LeaseCorrelation(),
    c1841RecoveryCheckpoint:inspect1841LeaseCorrelation(),
+  w052821RecoveryCas:inspectW052821RecoveryCasReadonly(),
   observedHttpHostRoster:readObservedProviderHosts(),
   marketParquetTaskSource:inspectMarketParquetTask(),
   w03PaidPrivate:inspectW03PaidPrivateReadonly(),
