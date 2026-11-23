@@ -182,3 +182,35 @@ test('BEA manufacturing requires a separately pinned CSV SHA, bounded source fil
  r.request.operation='census-qfr-margin-once';
  assert.throws(()=>admitted(r),/PUBLICATION_MANIFEST_(FIELDS_INVALID|SCOPE_MISMATCH)/);
 });
+
+
+test('WPSFD42 service B requires exact one-key scope, immutable source import graph and separate approval',()=>{
+  const f=fixture('bls-wpsfd42-service-once'),v=admitted(f);
+  assert.equal(v.invocation.script,'scripts/pc-writer/EARNINGS_BLS_SERVICE_R1_D1_ONCE.mjs');
+  assert.deepEqual(v.invocation.flags,['--apply','--confirm-earnings-c-service-d1-write']);
+  assert.equal(v.invocation.snapshotKey,'detail:earnings-recession-indicators:bls-wpsfd42:v1');
+  assert.equal(v.approval.approval.scope,'WPSFD42_SERVICE_SINGLE_KEY_D1_ONCE');
+  assert.equal(v.approval.execution.provider,'STORED_SQLITE_ONLY');
+  assert.equal(v.invocation.sourceSha256,null);
+  assert.notEqual(v.invocation.snapshotKey,operationSpec('census-qfr-margin-once').snapshotKey);
+  assert.notEqual(v.invocation.snapshotKey,'detail:earnings-recession-indicators:v1');
+  for(const path of ['scripts/pc-writer/EARNINGS_BLS_SERVICE_R1_D1_ONCE.mjs',
+    'scripts/pc-writer/EARNINGS_R4_C_READ_MODEL_PREVIEW_READONLY.mjs',
+    'scripts/pc-writer/EARNINGS_R3D_STORED_BLS_CALC_READONLY.mjs',
+    'worker/earnings-companion-c-r4.mjs'])
+    assert.ok(operationSpec('bls-wpsfd42-service-once').sourceFiles.includes(path));
+  const key=fixture('bls-wpsfd42-service-once');
+  key.approval.snapshotKey='detail:earnings-recession-indicators:v1';
+  repin(key);
+  assert.throws(()=>admitted(key),/PUBLICATION_MANIFEST_SCOPE_MISMATCH/);
+  const file=fixture('bls-wpsfd42-service-once');
+  delete file.approval.publisherFiles['worker/earnings-companion-c-r4.mjs'];
+  repin(file);
+  assert.throws(()=>admitted(file),/PUBLICATION_SOURCE_FILES_INVALID/);
+  const effects=fixture('bls-wpsfd42-service-once');
+  effects.approval.execution.maxD1Keys=2;repin(effects);
+  assert.throws(()=>admitted(effects),/PUBLICATION_EXECUTION_SCOPE_INVALID/);
+  const grade=fixture('bls-wpsfd42-service-once');
+  grade.approval.approval.scope='CENSUS_QFR_MARGIN_SINGLE_KEY_D1_ONCE';repin(grade);
+  assert.throws(()=>admitted(grade),/PUBLICATION_B_APPROVAL_MISSING/);
+});
