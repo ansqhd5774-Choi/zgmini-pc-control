@@ -16,7 +16,7 @@ const approval=()=>({
   installedSourceSha:sha40,
   dataRoot:String.raw`E:\ZGmini\data\pc-writer`,
   sourceRoot:String.raw`E:\ZGmini\projects\zgmini-earnings-history-pc-release`,
-  runCount:1,effects:{providerCalls:1,privateArchiveWrites:true,
+  runCount:1,effects:{providerCalls:1,privateArchiveWrites:true,attemptMarkerWrite:true,
     sqliteWrites:false,d1Writes:false,taskDefinitionChanges:false,
     newTasks:false,otherOperationalFiles:false}
 });
