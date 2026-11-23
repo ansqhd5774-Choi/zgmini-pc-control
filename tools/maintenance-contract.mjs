@@ -419,6 +419,52 @@ export function validateMaintenanceRequest(request,{
   return Object.freeze({...request});
 }
 
+// Exact #2960 installed-state reconciliation: a distinct request may be
+// admitted only by the existing independent maintenance receiver. No generic
+// commands, issue-selected recovery IDs or source SHA are accepted.
+export const INSTALLED_RECOVERY_OPERATION='controller-installed-recovery';
+export const INSTALLED_RECOVERY_ISSUE_TITLE='pc-controller-installed-recovery';
+export const INSTALLED_RECOVERY_ORIGINAL_ID='pc-update-e8767e20-6bad-4418-97c6-561cf79a8213';
+export const INSTALLED_RECOVERY_SOURCE_SHA='e6c96e8d19bd9084b8021c7df31678f56ef1b388';
+export const INSTALLED_RECOVERY_CONTROLLER_SHA='b9a423cf38d0967d6ed336912a66433f79502d3d';
+export const INSTALLED_RECOVERY_MANIFEST_PATH=
+ 'approvals/maintenance-recoveries/'+INSTALLED_RECOVERY_ORIGINAL_ID+'.installed.json';
+export function validateInstalledRecoveryIssueEnvelope(request,{
+ controlRepository=CONTROL_REPOSITORY,actor=null,allowedActors=[CONTROL_ACTOR],
+}={}){
+ if(controlRepository!==CONTROL_REPOSITORY||request?.controlRepository!==CONTROL_REPOSITORY||
+   actor!==CONTROL_ACTOR||!Array.isArray(allowedActors)||!allowedActors.includes(CONTROL_ACTOR))
+  throw Error('INSTALLED_RECOVERY_ACTOR_DENIED');
+ requireKeys(request,ISSUE_KEYS,'INSTALLED_RECOVERY_ISSUE_FIELDS_INVALID');
+ if(request.schema!==MAINTENANCE_ISSUE_SCHEMA||
+   request.operation!==INSTALLED_RECOVERY_OPERATION)
+  throw Error('INSTALLED_RECOVERY_OPERATION_DENIED');
+ requireString(request.requestId,REQUEST_ID,'INSTALLED_RECOVERY_REQUEST_ID_INVALID');
+ if(request.requestId===INSTALLED_RECOVERY_ORIGINAL_ID)
+  throw Error('INSTALLED_RECOVERY_ORIGINAL_REPLAY_DENIED');
+ requireString(request.chatId,CHAT_ID,'INSTALLED_RECOVERY_CHAT_ID_INVALID');
+ if(request.targetControllerSha!==INSTALLED_RECOVERY_CONTROLLER_SHA)
+  throw Error('INSTALLED_RECOVERY_TARGET_DENIED');
+ requireDigest(request.approvalManifestSha256,'INSTALLED_RECOVERY_MANIFEST_PIN_INVALID');
+ return Object.freeze({...request});
+}
+export function prepareInstalledRecoveryRequest(approvedRawBytes,{chatId}={}){
+ const raw=JSON.parse(Buffer.from(approvedRawBytes).toString('utf8'));
+ if(raw?.schema!=='ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V1'||
+   raw.approved!==true||raw.operation!=='RECONCILE_INSTALLED'||
+   raw.requestId!==INSTALLED_RECOVERY_ORIGINAL_ID||raw.issueNumber!==2960||
+   raw.sourceSha!==INSTALLED_RECOVERY_SOURCE_SHA||
+   raw.targetControllerSha!==INSTALLED_RECOVERY_CONTROLLER_SHA)
+   throw Error('INSTALLED_RECOVERY_APPROVAL_UNVERIFIED');
+ return validateInstalledRecoveryIssueEnvelope({
+  schema:MAINTENANCE_ISSUE_SCHEMA,requestId:'pc-'+randomUUID(),
+  chatId:chatId??('chat-'+randomUUID()),operation:INSTALLED_RECOVERY_OPERATION,
+  controlRepository:CONTROL_REPOSITORY,
+  targetControllerSha:INSTALLED_RECOVERY_CONTROLLER_SHA,
+  approvalManifestSha256:sha256(approvedRawBytes),
+ },{actor:CONTROL_ACTOR});
+}
+
 // Client-side construction, not new authority. Existing manifest/actor/source
 // validation still decides admission. Callers no longer handcraft UUID fields.
 export function prepareControllerUpdateRequest(manifestBytes,{installedSha,chatId}={}){
