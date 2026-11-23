@@ -164,7 +164,7 @@ test('stored native BEA Level/0 six rows calculate from latest five without exte
   assert.equal(one.providerCalls,0);
   assert.equal(one.operationalWrites,0);
   assert.equal(one.rawExposed,false);
-  const reversed=computeBeaNipaStoredAttestation({BEAAPI:{Results:{Data:rows.toReversed()}}},basis);
+  const reversed=computeBeaNipaStoredAttestation({BEAAPI:{Results:{Data:rows.slice().reverse()}}},basis);
   assert.equal(reversed.calculationSha256,one.calculationSha256);
   for(const mutate of [
     rows=>{rows[0].UNIT_MULT='3';},
