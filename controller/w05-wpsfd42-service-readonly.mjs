@@ -31,6 +31,7 @@ export function verifyW05ServiceBundle({request,host}){
  if(!approved)return null; // absence is an approval-stage block, not a PC failure
  need(typeof approved.branch==='string'&&approved.branch===request.sourceBranch,
   'W05_APPROVED_BRANCH_MISMATCH');
+ need(approved.entrypoint===W05_ENTRY,'W05_APPROVED_ENTRYPOINT_MISMATCH');
  need(typeof approved.root==='string'&&path.isAbsolute(approved.root),
   'W05_APPROVED_ROOT_INVALID');
  need(SHA64.test(approved.manifestSha256??''),'W05_APPROVED_MANIFEST_SHA_INVALID');
@@ -41,7 +42,9 @@ export function verifyW05ServiceBundle({request,host}){
  let manifest;
  try{manifest=JSON.parse(bytes.toString('utf8'));}
  catch{need(false,'W05_APPROVED_MANIFEST_INVALID');}
- need(manifest?.sourceSha===request.sourceSha &&
+ need(manifest?.schema==='ZGMINI_PC_SOURCE_BUNDLE_MANIFEST_V1' &&
+  manifest.sourceRepository==='ansqhd5774-Choi/zgmini' &&
+  manifest.sourceSha===request.sourceSha &&
   manifest.sourceBranch===request.sourceBranch &&
   manifest.entrypoint===W05_ENTRY,'W05_APPROVED_MANIFEST_IDENTITY');
  const files=manifest.files;
