@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync,writeFileSync,mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {GROUPS,selectGroups,changedFiles} from '../tools/c996-source-checks.mjs';
+import {GROUPS,selectGroups,changedFiles,ungroupedChangedTests} from '../tools/c996-source-checks.mjs';
 const all=Object.keys(GROUPS);
 test('018 retired owner-inaccessible workflow and archived collector stay foundation-only',()=>{
  assert.deepEqual(selectGroups(['.github/workflows/pc-c996-r5-readonly.yml']),['foundation']);
@@ -69,6 +69,17 @@ test('011 workflow and selection contract changes always run all original suites
  assert.ok(tests.includes('tests/r47-existing-task-once.test.mjs'));
  assert.ok(tests.includes('tests/marketparquet-task-retire.test.mjs'));
 });
+test('unmapped changed test executes instead of CI success with zero regressions',()=>{
+ const changed=['tests/new-source-coverage.test.mjs','docs/other.md'];
+ assert.deepEqual(selectGroups(changed),[]);
+ assert.deepEqual(ungroupedChangedTests(changed,()=>true),['tests/new-source-coverage.test.mjs']);
+ assert.deepEqual(ungroupedChangedTests(changed,()=>false),[]);
+ assert.deepEqual(ungroupedChangedTests(['tests/agent-handoff-proactive-diagnostics.test.mjs'],()=>true),[]);
+ assert.deepEqual(ungroupedChangedTests(['tests/new-source-coverage.test.mjs','tests/new-source-coverage.test.mjs'],()=>true),['tests/new-source-coverage.test.mjs']);
+ assert.deepEqual(ungroupedChangedTests(['tests/../secrets.test.mjs','tests/missing.js','site/new.test.mjs'],()=>true),[]);
+ assert.deepEqual(ungroupedChangedTests(null,()=>true),[]);
+});
+
 test('011 incomplete PR file retrieval retains full regression coverage',async()=>{
  const env={GITHUB_EVENT_PATH:'not-real-path',GITHUB_REPOSITORY:'ansqhd5774-Choi/zgmini-pc-control',GITHUB_TOKEN:'unit-test'};
  assert.equal(await changedFiles(env),null);
