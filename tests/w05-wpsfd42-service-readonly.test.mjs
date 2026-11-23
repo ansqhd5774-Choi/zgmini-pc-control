@@ -5,7 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {verifyW05ServiceBundle,interpretW05ServicePreview,runW05ServiceStoredReadonly,
- W05_ENTRY,W05_DEP} from '../controller/w05-wpsfd42-service-readonly.mjs';
+ W05_ENTRY,W05_DEP,W05_CHILD_TIMEOUT_MS} from '../controller/w05-wpsfd42-service-readonly.mjs';
+import {validateControllerConfigTransition} from '../tools/maintenance-contract.mjs';
 
 const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 const sourceSha='a'.repeat(40);
@@ -122,4 +123,16 @@ test('unapproved source is blocked before touching the source or operational DB'
  });
  assert.deepEqual({status:result.status,code:result.code,candidateExecuted:result.candidateExecuted},
   {status:'BLOCKED',code:'W05_B_APPROVED_SOURCE_NOT_STAGED',candidateExecuted:false});
+});
+
+
+test('W05 A/light policy is accepted by the existing B controller admission',()=>{
+ const current=JSON.parse(fs.readFileSync(new URL('../config/operations.json',import.meta.url),'utf8'));
+ const prior=structuredClone(current);
+ delete prior.operations['w05-wpsfd42-service-readonly'];
+ assert.deepEqual(current.operations['w05-wpsfd42-service-readonly'],
+  {grade:'A',timeoutSeconds:90,resource:'light'});
+ assert.doesNotThrow(()=>validateControllerConfigTransition(prior,current));
+ assert.equal(W05_CHILD_TIMEOUT_MS,55000);
+ assert.ok(W05_CHILD_TIMEOUT_MS<current.operations['w05-wpsfd42-service-readonly'].timeoutSeconds*1000-20000);
 });

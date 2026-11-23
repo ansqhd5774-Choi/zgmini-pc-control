@@ -97,7 +97,9 @@ export function interpretW05ServicePreview(payload,txt){
   rows,providerCalls:0,sqliteOpened:true,operationalWrites:0,d1Writes:0};
 }
 
-async function spawnBounded(entry,env,timeoutMs=85000,spawnImpl=spawn){
+// Parent A/light worker has a 90-second limit; reserve time for engine postchecks.
+export const W05_CHILD_TIMEOUT_MS=55000;
+async function spawnBounded(entry,env,timeoutMs=W05_CHILD_TIMEOUT_MS,spawnImpl=spawn){
  return await new Promise(resolve=>{
   const child=spawnImpl(process.execPath,['--max-old-space-size=160',entry,'--service-only'],
    {cwd:path.dirname(entry),env,windowsHide:true,stdio:['ignore','pipe','pipe']});
@@ -136,7 +138,7 @@ export async function runW05ServiceStoredReadonly({request,host,dataRoot,workspa
   PATH:path.dirname(process.execPath),TEMP:tmp,TMP:tmp,
   ZGMINI_PC_HOME:dbRoot};
  const entry=path.join(outputDir,path.basename(W05_ENTRY));
- const child=await spawnBounded(entry,env,85000,spawnImpl);
+ const child=await spawnBounded(entry,env,W05_CHILD_TIMEOUT_MS,spawnImpl);
  need(!child.timedOut,'W05_SERVICE_CALC_TIMEOUT');
  need(!child.overflow,'W05_SERVICE_CALC_OUTPUT_OVERFLOW');
  const names=fs.readdirSync(outputDir);
