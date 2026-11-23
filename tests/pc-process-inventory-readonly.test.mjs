@@ -6,7 +6,7 @@ import path from 'node:path';
 import {inspectTask, TASK} from '../tools/marketparquet-task-source-readonly.mjs';
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
 import assert from 'node:assert/strict';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,project2960MaintenanceStatus,compact2960ProcessResult,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,project2960MaintenanceStatus,compare2960ProtectedBaseline,compact2960ProcessResult,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
@@ -1281,4 +1281,18 @@ test('W05 operator topology collector uses fixed read-only WMI on operating PC',
   spawn:()=>({status:2,stderr:'PRIVATE_SECRET'})});
  assert.equal(failed.code,'W05_OPERATOR_WMI_UNAVAILABLE');
  assert.doesNotMatch(JSON.stringify(failed),/PRIVATE_SECRET/);
+});
+
+test('fixed #2960 protection probe compares exact baseline and fails closed',()=>{
+ const before={files:{'config.json':'a'.repeat(64),'core.json':'b'.repeat(64)},
+  tasks:{'ZGMINI-PC-Local-Core':{enabled:true}}};
+ const identical=structuredClone(before);
+ const changed=structuredClone(before);
+ changed.files['config.json']='c'.repeat(64);
+ assert.equal(compare2960ProtectedBaseline(before,identical),true);
+ assert.equal(compare2960ProtectedBaseline(before,changed),false);
+ assert.equal(compare2960ProtectedBaseline(null,identical),null);
+ assert.equal(compare2960ProtectedBaseline(before,{files:{}}),null);
+ assert.equal(compare2960ProtectedBaseline([],identical),null);
+ assert.equal(typeof compare2960ProtectedBaseline(before,identical),'boolean');
 });

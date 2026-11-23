@@ -362,6 +362,28 @@ export function project2960MaintenanceStatus(raw){
   leaseBoundToOriginalRequest:null,recoveryEligible:false,
   protectedStateUnchanged:null,operationalWrites:0,providerCalls:0,d1Writes:0};
 }
+// Compare only the exact #2960 approved protected snapshot, never dump its
+// file hashes, local paths, secrets or current operating configuration.
+// Null means the baseline/current observation cannot be compared, not drift.
+export function compare2960ProtectedBaseline(original,current){
+ const record=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
+ if(!record(original)||!record(current)||!record(original.files)||
+  !record(original.tasks)||!record(current.files)||!record(current.tasks))
+  return null;
+ return JSON.stringify(original)===JSON.stringify(current);
+}
+function inspect2960ProtectedBaselineReadonly(){
+ const original=path.join('E:/ZGmini/automation/pc-control','backups',
+  'controller-update-'+TARGET2960,'PROTECTED_BEFORE.json');
+ try{
+  const stat=fs.lstatSync(original);
+  if(!stat.isFile()||stat.isSymbolicLink()||stat.size<=0||stat.size>65536)
+   return null;
+  const baseline=JSON.parse(fs.readFileSync(original,'utf8'));
+  return compare2960ProtectedBaseline(baseline,protectedSnapshot());
+ }catch{return null;}
+}
+
 /** Exact #2960 receipt only: skip 32-KiB general inventory payload. */
 export function compact2960ProcessResult(base,status){
  return {...base,observedAtUtc:new Date().toISOString(),
@@ -370,8 +392,12 @@ export function compact2960ProcessResult(base,status){
   w052960MaintenanceStatus:status??project2960MaintenanceStatus(null)};
 }
 function inspect2960MaintenanceStatusReadonly(){
- try{return project2960MaintenanceStatus(collectAutomationStatus(['--request-id',TARGET2960]));}
- catch{return project2960MaintenanceStatus(null);}
+ try{
+  const existing=project2960MaintenanceStatus(
+   collectAutomationStatus(['--request-id',TARGET2960]));
+  return {...existing,protectedStateUnchanged:existing.status==='READ_ONLY_OBSERVED'?
+   inspect2960ProtectedBaselineReadonly():null};
+ }catch{return project2960MaintenanceStatus(null);}
 }
 
 function collectMaintenanceStatusReadonly(){
