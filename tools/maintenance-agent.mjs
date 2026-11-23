@@ -728,7 +728,12 @@ export function createMaintenanceAgent({
         'INSTALLED_RECOVERY_APPROVAL_READ_FAILED');
       if(response?.type!=='file'||response.encoding!=='base64'||
         typeof response.content!=='string')throw coded('INSTALLED_RECOVERY_APPROVAL_INVALID');
-      const raw=Buffer.from(response.content.replace(/\\s/g,''),'base64');
+      if(response.content.length>MAX_MANIFEST_BYTES*2)
+        throw coded('INSTALLED_RECOVERY_APPROVAL_INVALID');
+      const encoded=response.content.replace(/\s/g,'');
+      if(!/^[A-Za-z0-9+/]*={0,2}$/.test(encoded))
+        throw coded('INSTALLED_RECOVERY_APPROVAL_INVALID');
+      const raw=Buffer.from(encoded,'base64');
       if(!raw.length||raw.length>MAX_MANIFEST_BYTES||
          sha256(raw)!==request.approvalManifestSha256)
         throw coded('INSTALLED_RECOVERY_APPROVAL_HASH_MISMATCH');
