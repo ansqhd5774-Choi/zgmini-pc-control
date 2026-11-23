@@ -41,3 +41,10 @@ test('scoped regression families and mixed changes',()=>{
   assert.deepEqual(selectGroups(['tools/r181-protected-b-entry.mjs',
     'tests/w01-inflation7-writer-ledger-existing-a.test.mjs']),['w03','w01']);
 });
+
+test('optional W05 receipt fixture executes on installed-base trees that contain it',()=>{
+ const workflow=fs.readFileSync(new URL('../.github/workflows/controller-maintenance-source-tests.yml',import.meta.url),'utf8');
+ assert.match(workflow,/name: Verify W05 independent operator receipt without operational access\s+#[^\n]*\n\s*#[^\n]*\n\s*if: hashFiles\('tests\/w05-2821-operator-readonly-receipt\.test\.mjs'\) != ''\s+run: node --test --test-concurrency=1 tests\/w05-2821-operator-readonly-receipt\.test\.mjs/);
+ // Only fixture existence is optional. No operative protection assertion is removed.
+ assert.match(workflow,/name: Run scoped maintenance and Controller runtime safety regressions/);
+});
