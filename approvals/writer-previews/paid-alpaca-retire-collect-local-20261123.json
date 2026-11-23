@@ -1,0 +1,19 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "baseHead": "c62bd5aac3353d7e146d930dbb033b82d89010cd",
+  "filePath": "scripts/pc-writer/collect-local.mjs",
+  "beforeSha256": "dd2ec67a4a26860215c4e94e4df9b0f4d4fdeb4532e0775600a810f6a966c706",
+  "insertions": [
+    {
+      "anchor": "  let result,releaseCalendar={status:'SKIPPED_KOREA_LANE',providerRequests:0},sectorFearGreedEtf={status:'SKIPPED_KOREA_LANE',providerRequests:0};",
+      "position": "after",
+      "text": "  if(lane==='core')sectorFearGreedEtf={status:'RETIRED_LEGACY_ALPACA',providerRequests:0};\n"
+    },
+    {
+      "anchor": "    sectorFearGreedEtf=await collectSectorFearGreedR3EtfIncremental(base,{fetchImpl:globalThis.fetch,fetchAlreadyQuotaProtected:true,now:Date.now()});",
+      "position": "before",
+      "text": "    if (false) // Retired Alpaca ETF fetch; preserve existing paid stored inputs.\n"
+    }
+  ]
+}
