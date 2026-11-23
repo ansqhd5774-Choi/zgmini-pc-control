@@ -1,0 +1,19 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "baseHead": "af5374593a0d27ebaa5280f78187b075ffcabb23",
+  "filePath": "scripts/pc-writer/alpaca-incremental.mjs",
+  "beforeSha256": "49d2f7de1081257b298b8fecba285dd83b6a3dd486733602dba849712637e7ee",
+  "insertions": [
+    {
+      "anchor": "import {observeIndependentProviderFetch} from './provider-endpoint-fingerprint.mjs';",
+      "position": "after",
+      "text": "// Read-only observer import presence probe; never install this candidate.\n"
+    },
+    {
+      "anchor": "  const sharedFetch=observeIndependentProviderFetch(base,'ALPACA_INCREMENTAL',createQuotaFetch({base,originalFetch:fetchImpl,mode:'enforce'}).fetch);",
+      "position": "before",
+      "text": "// Read-only observer wrapper presence probe; never install this candidate.\n"
+    }
+  ]
+}
