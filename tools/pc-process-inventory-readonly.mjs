@@ -80,10 +80,13 @@ export function authenticateProcess(event,env,role){
  const basic=keys==='operation,requestId,role,schema';
  const withJobs=keys==='operation,requestId,role,runnerJobRefs,schema';
  const withW05=keys==='operation,probe,requestId,role,schema';
- if(!raw||(!basic&&!withJobs&&!withW05)||
+ const withRecovery=keys==='operation,probe,requestId,role,schema,targetRequestId';
+ if(!raw||(!basic&&!withJobs&&!withW05&&!withRecovery)||
    raw.schema!==SCHEMA||raw.operation!==ROLE_OPERATION||raw.role!==role||
    (withJobs&&role!=='operating')||
-   (withW05&&(role!=='operating'||raw.probe!=='w05-operator-topology-readonly')))
+   (withW05&&(role!=='operating'||raw.probe!=='w05-operator-topology-readonly'))||
+   (withRecovery&&(role!=='operating'||raw.probe!=='maintenance-recovery-status-readonly'||
+    !/^pc-update-[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(raw.targetRequestId))))
   fail('REQUEST_SCOPE_INVALID');
  const runnerJobRefs=withJobs?validateRunnerJobRefs(raw.runnerJobRefs):null;
  const normalized=structuredClone(event);
@@ -93,7 +96,8 @@ export function authenticateProcess(event,env,role){
  if(event.issue.title!==TITLE)fail('ISSUE_TITLE_INVALID');
  const verified=authenticate(normalized,env,role);
  return {...verified,...(runnerJobRefs?{runnerJobRefs}:{}),
-  ...(withW05?{w05OperatorTopology:true}:{})};
+  ...(withW05?{w05OperatorTopology:true}:{}),
+  ...(withRecovery?{maintenanceRecoveryRequestId:raw.targetRequestId}:{})};
 }
 export function sanitizeProbe(raw){
  if(!raw||raw.schema!=='ZGMINI_PC_PROCESS_PROBE_V1')fail('PROBE_SCHEMA_INVALID');
@@ -323,6 +327,81 @@ export function sanitizeMaintenanceStatus(raw){
 function collectMaintenanceStatusReadonly(){
  try{return sanitizeMaintenanceStatus(collectAutomationStatus([]));}
  catch{return sanitizeMaintenanceStatus(null);}
+}
+
+const MAINTAINER_ROOT='E:/ZGmini/automation/pc-maintenance';
+// Only sanitized fields of the existing readMaintenanceRecoveryStatus API leave PC.
+// This is observation, never a recovery approval or an independent maintainer.
+export function projectMaintenanceRecoveryStatusReadonly(targetRequestId,raw,owner=null){
+ const ledger=raw?.ledger?.requestId===targetRequestId?raw.ledger:null;
+ const lease=raw?.artifacts?.lease;
+ const lock=raw?.installLock;
+ const token=v=>typeof v==='string'&&/^[A-Z][A-Z0-9_]{0,79}$/.test(v)?v:null;
+ const ownerBound=ledger&&lock?.held===true&&lease?.ownerMarkerMatch===true&&
+  Number.isSafeInteger(ledger.leaseOwnerPid)&&ledger.leaseOwnerPid>0&&
+  typeof ledger.leaseOwnerNonce==='string'&&
+  owner?.pid===ledger.leaseOwnerPid&&owner?.nonce===ledger.leaseOwnerNonce;
+ const b=raw?.artifacts?.backlog;
+ return {schema:'ZGMINI_MAINTENANCE_RECOVERY_STATUS_READONLY_V1',
+  targetRequestId,status:ledger&&raw?.artifacts?.status==='OBSERVED'?
+   'READ_ONLY_OBSERVED':'STATE_UNKNOWN',
+  code:ledger?'EXISTING_MAINTENANCE_LEDGER_OBSERVED':'REQUEST_LEDGER_NOT_VERIFIED',
+  ledgerStatus:token(ledger?.status),ledgerPhase:token(ledger?.phase),
+  firstFail:token(ledger?.firstFail),lastPass:token(ledger?.lastPass),
+  failureOperation:typeof ledger?.failureOperation==='string'&&
+   /^[a-zA-Z][a-zA-Z0-9_]{0,79}$/.test(ledger.failureOperation)?
+   ledger.failureOperation:null,
+  targetControllerSha:asSha(ledger?.targetSha),
+  actualControllerSha:asSha(raw?.actualControllerSha),
+  postIssueNumber:Number.isSafeInteger(ledger?.postIssueNumber)&&
+   ledger.postIssueNumber>0?ledger.postIssueNumber:null,
+  installLockHeld:asBool(lock?.held),
+  installLockRecoveryRequired:asBool(lock?.recoveryRequired),
+  leaseOwnerMatchesRequest:ledger&&lock?.held===true?ownerBound===true:null,
+  ownerMarkerMatch:asBool(lease?.ownerMarkerMatch),
+  backlog:b?{file:b.file,windows:b.windows,
+   openWindows:b.openWindows,replayCount:b.replayCount}:null,
+  artifactStatus:raw?.artifacts?.status==='OBSERVED'?'OBSERVED':'UNVERIFIED',
+  installedReadbackCode:token(raw?.installedReadbackCode),
+  ledgerReadbackCode:token(raw?.ledgerReadbackCode),
+  lockReadbackCode:token(raw?.lockReadbackCode),
+  artifactReadbackCode:token(raw?.artifactReadbackCode),
+  recoveryEligible:false,installSuccessProven:false,
+  operationalWrites:0,providerCalls:0,d1Writes:0,automaticRetries:0};
+}
+export function collectMaintenanceRecoveryStatusReadonly(ctx,env=process.env,{
+ read=()=>readMaintenanceRecoveryStatus(ctx.maintenanceRecoveryRequestId),
+ readOwner=()=>{
+  const file=path.join(MAINTAINER_ROOT,'leases/controller-install/owner.json');
+  const st=fs.lstatSync(file);
+  if(!st.isFile()||st.isSymbolicLink()||st.size>4096)throw Error('OWNER_UNVERIFIED');
+  return JSON.parse(fs.readFileSync(file,'utf8'));
+ }
+}={}){
+ const host=os.hostname().toUpperCase(),runnerName=String(env.RUNNER_NAME||'');
+ const base={role:'operating',requestId:ctx.requestId,issueNumber:ctx.issueNumber,
+  runId:ctx.runId,attempt:ctx.attempt,observedAtUtc:new Date().toISOString(),
+  host,runnerName};
+ if(os.platform()!=='win32'||host!=='PC'||
+  validateSeat('operating',host,runnerName,env.COMPUTERNAME)!=='MATCH')
+  return {...base,status:'BLOCKED',code:'OPERATING_PC_REQUIRED',
+   operationalWrites:0,automaticRetries:0};
+ let raw=null,owner=null;
+ try{raw=read();}catch{}
+ try{owner=readOwner();}catch{}
+ return {...base,...projectMaintenanceRecoveryStatusReadonly(
+   ctx.maintenanceRecoveryRequestId,raw,owner),
+  workflowState:collectMaintenanceStatusReadonly().workflowState};
+}
+export function maintenanceRecoveryText(r){
+ return ['schema='+r.schema,'requestId='+r.requestId,
+  'targetRequestId='+r.targetRequestId,'runId='+r.runId,
+  'status='+r.status,'code='+r.code,
+  'ledgerStatus='+(r.ledgerStatus??'UNKNOWN'),
+  'firstFail='+(r.firstFail??'UNKNOWN'),
+  'leaseOwnerMatchesRequest='+(r.leaseOwnerMatchesRequest??'UNKNOWN'),
+  'workflowState='+(r.workflowState??'UNVERIFIED'),
+  'operationalWrites=0','automaticRetries=0',''].join('\r\n');
 }
 
 
@@ -1500,11 +1579,15 @@ async function main(){
  const event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
  const ctx=authenticateProcess(event,env,role);
  const targeted=ctx.w05OperatorTopology===true;
- const result=targeted?collectW05OperatorTopology(ctx,env):collect(role,ctx,env);
+ const recovery=typeof ctx.maintenanceRecoveryRequestId==='string';
+ const result=targeted?collectW05OperatorTopology(ctx,env):
+  recovery?collectMaintenanceRecoveryStatusReadonly(ctx,env):collect(role,ctx,env);
  const stem=targeted?'results/w05-operator-topology-'+ctx.runId+'-'+ctx.attempt+'-'+role:
+  recovery?'results/maintenance-recovery-status-'+ctx.runId+'-'+ctx.attempt+'-'+role:
   'results/pc-process-inventory-'+ctx.runId+'-'+ctx.attempt+'-'+role;
  const outputs=[[stem+'.json',serializeProcessResult(result)],
-  [stem+'.txt',targeted?w05OperatorTopologyText(result):toText(result)]];
+  [stem+'.txt',targeted?w05OperatorTopologyText(result):
+   recovery?maintenanceRecoveryText(result):toText(result)]];
  const headers={authorization:'Bearer '+env.GITHUB_TOKEN,accept:'application/vnd.github+json',
   'X-GitHub-Api-Version':'2022-11-28','content-type':'application/json'};
  const uploaded=await uploadResultPairAtomic({outputs,headers,
@@ -1512,12 +1595,12 @@ async function main(){
  if(uploaded.delivery!=='RESULT_PAIR_READBACK_VERIFIED')fail(uploaded.delivery);
  const ack=await fetch('https://api.github.com/repos/'+REPO+'/issues/'+ctx.issueNumber+'/comments',
   {method:'POST',headers,body:JSON.stringify({body:
-   '<!-- zgmini-pc-process:'+ctx.runId+':'+role+' -->\n'+(targeted?'W05 operator topology ':'Process inventory ')+
+   '<!-- zgmini-pc-process:'+ctx.runId+':'+role+' -->\n'+(targeted?'W05 operator topology ':recovery?'Maintenance recovery status ':'Process inventory ')+
     role+': '+result.status+' / '+result.code+'; exact result pair '+stem+
     '.json and '+stem+'.txt verified; operationalWrites=0; retries=0.'})});
  if(!ack.ok)fail('COMMENT_NOT_VERIFIED');
- console.log((targeted?'W05_OPERATOR_TOPOLOGY_VERIFIED':'PROCESS_INVENTORY_VERIFIED')+
+ console.log((targeted?'W05_OPERATOR_TOPOLOGY_VERIFIED':recovery?'MAINTENANCE_RECOVERY_STATUS_VERIFIED':'PROCESS_INVENTORY_VERIFIED')+
   ' role='+role+' status='+result.status+' code='+result.code);
- if(result.status!=='PASS')process.exitCode=2;
+ if(result.status!=='PASS'&&result.status!=='READ_ONLY_OBSERVED')process.exitCode=2;
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))await main();
