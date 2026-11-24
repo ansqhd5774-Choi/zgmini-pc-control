@@ -364,11 +364,15 @@ async function reconcileInstalledRecoveryFixed({id,source,g,before}){
  let postWriterVerified=false;
  if(postWriterRequested){
   const readPinned=rel=>{
-   const bytes=inspectStep('W04_POSTWRITER_EVIDENCE_MISSING',
-    ()=>fs.readFileSync(path.join(repo,rel)));
-   need(digest(bytes)===digest(g(['show','HEAD:'+rel],
-    'W04_POSTWRITER_EVIDENCE_NOT_COMMITTED')),
-    'W04_POSTWRITER_EVIDENCE_DRIFT');
+   // Evidence is a historical Git object, not an executable local file.
+   // Windows checkout may CRLF-convert writer-updates/results JSON while
+   // the pinned SHA256 authorizes the exact committed LF bytes.
+   const bytes=g(['show','HEAD:'+rel],'W04_POSTWRITER_EVIDENCE_NOT_COMMITTED');
+   if(rel===W04_3409_ORIGINAL_APPROVAL){
+    const local=inspectStep('W04_POSTWRITER_ORIGINAL_APPROVAL_MISSING',
+     ()=>fs.readFileSync(path.join(repo,rel)));
+    need(digest(local)===digest(bytes),'W04_POSTWRITER_ORIGINAL_APPROVAL_DRIFT');
+   }
    return bytes;
   };
   postWriterVerified=validateW043409PostWriterBridge({
