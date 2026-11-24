@@ -81,6 +81,24 @@ test('superseded fixed gas-electric dual-source Issue intake is retired',()=>{
    'pc-inflation-gas-refresh-approved-once.yml'])
   assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
 });
+// Frozen 2026-11-04 ER1 November cached-cohort readers were consumed by
+// #373 (15/20), #397 (blocked), and #402 (20/20 recovered). This retirement
+// is not proof of a complete November actuals or public ER1 projection.
+test('terminal November saved15 read-only event intakes are retired with original evidence preserved',()=>{
+ for(const [workflow,entry,contract,testFile] of [
+  ['pc-er1-nov30-saved15-readonly.yml','er1-nov30-saved15-readonly-entry.mjs',
+    'ER1_NOV30_SAVED15_READONLY_A_CONTRACT.json','tests/er1-nov30-saved15-readonly-entry.test.mjs'],
+  ['pc-er1-nov30-saved15-recovery-readonly.yml','er1-nov30-saved15-recovery-readonly-entry.mjs',
+    'ER1_NOV30_SAVED15_RECOVERY_READONLY_A_CONTRACT.json',
+    'tests/er1-nov30-saved15-recovery-readonly-entry.test.mjs']
+ ]){
+  assert.equal(existsSync(path.join(root,'.github/workflows',workflow)),false,workflow);
+  for(const file of [entry,contract,testFile])assert.equal(existsSync(path.join(root,file)),true,file);
+ }
+ for(const name of ['pc-job.yml','pc-approved-runtime-a-once.yml','pc-approved-runtime-b-once.yml',
+  'pc-writer-b-source-once.yml','pc-er1-nov30-capture.yml','pc-er1-nov30-full.yml'])
+  assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
+});
 test('common A/B and unfinished inflation and R54 readers are preserved',()=>{
  for(const name of kept)assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
 });
