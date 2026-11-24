@@ -1,0 +1,39 @@
+{
+  "schema": "ZGMINI_R6_DOL_MANUAL_B_APPROVAL_V2",
+  "status": "APPROVED_B",
+  "scope": "EMPLOYMENT_R6_DOL_MANUAL_SQLITE_ONCE",
+  "mode": "ONE_YEAR",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "installedSourceSha": "aa4da58cf84f231142f7797b88fa747822ff1cd7",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "pcHome": "E:\\ZGmini\\data\\pc-writer",
+  "groupName": "DOL_UI_WEEKLY_CLAIMS",
+  "maxDolCalls": 2,
+  "fileHashes": {
+    "lib/market-score/employment-r6-provider.mjs": "b94cd97208bc5ea19be4068a170e3c45b051639c5ee3d1ec2156c1ed18c587d6",
+    "lib/market-score/employment-r6-collector.mjs": "580fefcbf6b592208fd6a9f98aaf56b89dcd3bb665ad0f8a215fececc5d386df",
+    "lib/market-score/employment-r6-scheduler.mjs": "7f33c6f3920317cdfd362bb04b570f7af8a5c3322e5924edb4c0cfaf31c16a88",
+    "lib/market-score/employment-r6-dol-advance-pdf-candidate.mjs": "5d3527fc4e6b63aecbd3ef92d4fd95cebeeabb7596ce0ca7957e0d15235ec9ad",
+    "lib/market-score/employment-r6-dol-advance-store-candidate.mjs": "009cba88a7519e0ef1fa1e70812e0e69b58beb8abe92b75567ee27cca58137af",
+    "lib/market-score/employment-r6-dol-pdf-raw-envelope.mjs": "46efc126157714af3123866c8790fadf3d588734cd03c499270537d0fefd3b31",
+    "lib/market-score/employment-r6-dol-eta538-provider.mjs": "a0be157d46312fa12d63dcc70d7fd6f3accddd4b3f06a387bc3840ce69f0f5a2",
+    "lib/market-score/employment-r6-dol-advance-row-readback.mjs": "215c24516469ff29834418dfbaf01c1f2e3381c72dc109b00c86cd35518e8394",
+    "lib/market-score/employment-r6-dol-release-text.mjs": "b849c77c1afebb0dfb7dc9ec673c7d4390e2469a06f77b7e70451a955a52871b"
+  },
+  "effects": {
+    "dolProviderCalls": true,
+    "sqliteWrites": true,
+    "rawSnapshotReadback": true,
+    "blsProviderCalls": false,
+    "d1Writes": false,
+    "taskWrites": false,
+    "sourceWrites": false,
+    "eta538PdfGet": true
+  },
+  "pdfArchive": {
+    "releaseDate": "2026-11-19",
+    "releaseAt": "2026-11-19T13:30:00.000Z",
+    "expectedInitialWeekEnd": "2026-11-14",
+    "originalPdfSha256": "a11a33cbd30081e869f2cad4cc4a6ccb6b19feeb20731d233ef83d29d15995ec"
+  }
+}
