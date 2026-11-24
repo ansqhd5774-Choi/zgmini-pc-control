@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {authorizeDolManual,performDolManual,runDolManualOnce,DOL_MANUAL_SCHEMA,DOL_MANUAL_PDF_SCHEMA,createApprovedDolManualCollectorOptions,verifyDolEta539StateReadback} from './dol-manual-v1.mjs';
+import {DatabaseSync} from 'node:sqlite';
+import {authorizeDolManual,performDolManual,runDolManualOnce,DOL_MANUAL_SCHEMA,DOL_MANUAL_PDF_SCHEMA,createApprovedDolManualCollectorOptions,verifyDolEta539StateReadback,DOL_ETA539_STATE_LATEST_WEEK_SQL} from './dol-manual-v1.mjs';
 import {readFileSync} from 'node:fs';
 import {sanitizeR6BResult} from './report.mjs';
 
@@ -308,16 +309,73 @@ test('W04 Controller B event dispatcher accepts only the existing manual workflo
  assert.ok(source.includes('verifyInstalledR6DolManualOverlay'));
 });
 
-test('W04 PDF V2 success only follows all 51 ETA539 state current rows',()=>{
+test('W04 PDF V2 succeeds with exactly 51 distinct areas on latest stored ETA539 week',()=>{
+  const success={pdfMode:true,collectorStatus:'SUCCESS',latestWeek:'2026-11-14'};
   for(const stateRows of [0,1,49,50,52,NaN,null,undefined,51.5]){
     assert.throws(()=>verifyDolEta539StateReadback({
-      pdfMode:true,collectorStatus:'SUCCESS',stateRows,
-    }),e=>e?.code==='R6_DOL_ETA539_STATE_READBACK_INVALID',
-    'missing or non-exact State row count must fail before PDF V2 success');
+      ...success,stateRows,stateGeographies:51,
+    }),e=>e?.code==='R6_DOL_ETA539_STATE_READBACK_INVALID');
   }
+  for(const geo of [0,50,52,NaN,null,undefined]){
+    assert.throws(()=>verifyDolEta539StateReadback({
+      ...success,stateRows:51,stateGeographies:geo,
+    }),e=>e?.code==='R6_DOL_ETA539_STATE_READBACK_INVALID');
+  }
+  assert.throws(()=>verifyDolEta539StateReadback({
+    pdfMode:true,collectorStatus:'SUCCESS',stateRows:51,stateGeographies:51,
+    latestWeek:null,
+  }),e=>e?.code==='R6_DOL_ETA539_STATE_READBACK_INVALID');
   assert.equal(verifyDolEta539StateReadback({
-    pdfMode:true,collectorStatus:'SUCCESS',stateRows:51,
+    ...success,stateRows:51,stateGeographies:51,
   }),true);
+});
+
+test('W04 ETA539 readback selects only newest complete 51-area week from 112-week current history',()=>{
+  const db=new DatabaseSync(':memory:');
+  try{
+    db.exec(`CREATE TABLE market_score_employment_r4_shadow_current_v1 (
+      provider TEXT,geography_type TEXT,logical_series_id TEXT,
+      geography_code TEXT,observation_date TEXT,retrieved_at TEXT
+    )`);
+    const insert=db.prepare(`INSERT INTO market_score_employment_r4_shadow_current_v1
+      (provider,geography_type,logical_series_id,geography_code,observation_date,retrieved_at)
+      VALUES('DOL_ETA','STATE','STATE_INITIAL_CLAIMS',?,?,?)`);
+    const start='2026-11-25T00:00:00.000Z';
+    db.exec('BEGIN');
+    for(let week=0;week<112;week++){
+      const date=new Date(Date.UTC(2024,0,6+week*7)).toISOString().slice(0,10);
+      for(let geo=0;geo<51;geo++)insert.run('S'+String(geo).padStart(2,'0'),date,start);
+    }
+    db.exec('COMMIT');
+    assert.equal(db.prepare(`SELECT COUNT(*) AS n FROM
+      market_score_employment_r4_shadow_current_v1`).get().n,112*51);
+    const row=db.prepare(DOL_ETA539_STATE_LATEST_WEEK_SQL).get(start);
+    assert.deepEqual({n:row.n,geographies:row.geographies},
+      {n:51,geographies:51});
+    assert.equal(verifyDolEta539StateReadback({
+      pdfMode:true,collectorStatus:'SUCCESS',
+      stateRows:row.n,stateGeographies:row.geographies,latestWeek:row.latest_week,
+    }),true);
+    db.prepare(`DELETE FROM market_score_employment_r4_shadow_current_v1
+      WHERE observation_date=? AND geography_code='S50'`).run(row.latest_week);
+    const missing=db.prepare(DOL_ETA539_STATE_LATEST_WEEK_SQL).get(start);
+    assert.equal(missing.n,50);
+    assert.throws(()=>verifyDolEta539StateReadback({
+      pdfMode:true,collectorStatus:'SUCCESS',
+      stateRows:missing.n,stateGeographies:missing.geographies,latestWeek:missing.latest_week,
+    }),e=>e?.code==='R6_DOL_ETA539_STATE_READBACK_INVALID');
+    db.prepare(`INSERT INTO market_score_employment_r4_shadow_current_v1
+      (provider,geography_type,logical_series_id,geography_code,observation_date,retrieved_at)
+      VALUES('DOL_ETA','STATE','STATE_INITIAL_CLAIMS','S00',?,?)`)
+      .run(row.latest_week,start);
+    const duplicate=db.prepare(DOL_ETA539_STATE_LATEST_WEEK_SQL).get(start);
+    assert.equal(duplicate.n,51);
+    assert.equal(duplicate.geographies,50);
+    assert.throws(()=>verifyDolEta539StateReadback({
+      pdfMode:true,collectorStatus:'SUCCESS',
+      stateRows:duplicate.n,stateGeographies:duplicate.geographies,latestWeek:duplicate.latest_week,
+    }),e=>e?.code==='R6_DOL_ETA539_STATE_READBACK_INVALID');
+  }finally{db.close();}
 });
 
 test('W04 V1 and incomplete V2 preserve existing partial reporting',()=>{

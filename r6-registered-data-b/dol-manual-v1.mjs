@@ -144,11 +144,26 @@ export function createApprovedDolManualCollectorOptions({auth,db,fetchImpl,provi
  };
 }
 
+export const DOL_ETA539_STATE_LATEST_WEEK_SQL=`
+   WITH recent AS (
+    SELECT geography_code, observation_date
+    FROM market_score_employment_r4_shadow_current_v1
+    WHERE provider='DOL_ETA' AND geography_type='STATE'
+     AND logical_series_id='STATE_INITIAL_CLAIMS' AND retrieved_at>=?
+   )
+   SELECT COUNT(*) AS n, COUNT(DISTINCT geography_code) AS geographies,
+    MAX(observation_date) AS latest_week
+   FROM recent
+   WHERE observation_date=(SELECT MAX(observation_date) FROM recent)`;
+
 // Enforce the exact current SQLite result for the PDF+ETA539 V2 success path.
 // Legacy XML V1 and explicitly partial runs retain their existing semantics.
-export function verifyDolEta539StateReadback({pdfMode=false,collectorStatus,stateRows}={}){
+export function verifyDolEta539StateReadback({pdfMode=false,collectorStatus,
+ stateRows,stateGeographies,latestWeek}={}){
  if(pdfMode&&collectorStatus==='SUCCESS')
-  need(Number.isSafeInteger(stateRows)&&stateRows===51,
+  need(Number.isSafeInteger(stateRows)&&stateRows===51&&
+   Number.isSafeInteger(stateGeographies)&&stateGeographies===51&&
+   typeof latestWeek==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(latestWeek),
    'R6_DOL_ETA539_STATE_READBACK_INVALID');
  return true;
 }
@@ -206,11 +221,11 @@ export async function runInstalledDolManual({auth,pcHome=R6_B_HOME,
        AND s.request_key ${pdfMode?"=?":"LIKE 'DOL_NATIONAL:%'"}
        ${pdfMode?"AND s.snapshot_id=json_extract(c.provenance_json,'$.rawSnapshotId')":""}
     )`).bind(start,...(pdfMode?['DOL_ETA538_PDF:'+auth.approval.pdfArchive.releaseDate]:[])).first();
-  const state=await db.prepare(`
-   SELECT COUNT(*) AS n FROM market_score_employment_r4_shadow_current_v1
-   WHERE provider='DOL_ETA' AND geography_type='STATE'
-    AND logical_series_id='STATE_INITIAL_CLAIMS' AND retrieved_at>=?`
-  ).bind(start).first();
+  // ETA539 ONE_YEAR stores up to 112 complete weeks x 51 geographies.
+  // A valid history has many more than 51 CURRENT rows: attest the newest
+  // stored week instead of comparing all weeks against a 51-row ceiling.
+  const state=await db.prepare(DOL_ETA539_STATE_LATEST_WEEK_SQL)
+   .bind(start).first();
   const nationalSeries=Number(core?.n??0);
   const nationalRows=Number(core?.rows??0);
   const stateRows=Number(state?.n??0);
@@ -218,7 +233,9 @@ export async function runInstalledDolManual({auth,pcHome=R6_B_HOME,
    Number.isSafeInteger(nationalRows)&&nationalRows>=0&&
    Number.isSafeInteger(stateRows)&&stateRows>=0&&stateRows<=35000,
    'R6_DOL_READBACK_INVALID');
-  verifyDolEta539StateReadback({pdfMode,collectorStatus:output.status,stateRows});
+  verifyDolEta539StateReadback({pdfMode,collectorStatus:output.status,
+   stateRows,stateGeographies:Number(state?.geographies??0),
+   latestWeek:state?.latest_week??null});
   if(pdfMode&&output.status==='SUCCESS'){
    // Full PDF bytes and four National observations must read back as linked.
    const found=await db.prepare(`
