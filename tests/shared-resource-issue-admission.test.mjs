@@ -236,3 +236,34 @@ test('dedicated W04 R6 manual B request is not falsely rejected by shared intake
  assert.equal(invalid.state,'REJECTED_AT_ADMISSION');
  assert.equal(invalid.code,'EXACT_ISSUE_TITLE_REQUIRED');
 });
+
+
+test('CNN exact Sidecar B workflow owns its shared-label issue without false rejection',async()=>{
+ const wf=readFileSync(new URL('../.github/workflows/cnn-sidecar-b-once.yml',
+  import.meta.url),'utf8');
+ const title='cnn-sidecar-onefile-b-install';
+ assert.ok(wf.includes("github.event.issue.title == '"+title+"'"));
+ assert.ok(wf.includes("contains(github.event.issue.labels.*.name, 'pc-writer-b-install')"));
+ const cnn={...issue(title),body:JSON.stringify({
+  schema:'ZGMINI_CNN_SIDECAR_ONEFILE_B_REQUEST_V1',
+  requestId:'9ca75abe-81ab-49e8-a1c1-70bc12e54b52',
+  approvalManifestPath:'approvals/sidecar-b/cnn1521-onefile-20261124.json',
+  approvalManifestSha256:'b'.repeat(64),
+  controlHead:'236e63ab16aec72b09a5333748c445d1226554f4'
+ })};
+ assert.deepEqual(inspectSharedIssueAdmission(cnn),
+  {state:'UNMANAGED',code:'DEDICATED_EXACT_WORKFLOW_ROUTE'});
+ let posted=0;
+ const result=await reportRejectedAdmission({...event(title),issue:cnn},{
+  listComments:async()=>[],postComment:async()=>{posted++;},
+  getComment:async()=>null
+ });
+ assert.equal(result.state,'UNMANAGED');
+ assert.equal(posted,0);
+ const incorrect=inspectSharedIssueAdmission({...cnn,title:'not-cnn-approved'});
+ assert.equal(incorrect.state,'REJECTED_AT_ADMISSION');
+ assert.equal(incorrect.code,'EXACT_ISSUE_TITLE_REQUIRED');
+ const missingLabel=inspectSharedIssueAdmission({...cnn,labels:[]});
+ assert.equal(missingLabel.state,'UNMANAGED');
+ assert.equal(inspectSharedIssueAdmission(base()).state,'ADMITTED_TO_WORKFLOW');
+});
