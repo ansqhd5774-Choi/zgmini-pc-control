@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 
 export const REPO='ansqhd5774-Choi/zgmini-pc-control';
-export const WORKFLOWS=Object.freeze(["C996 R5 Readonly Source Checks","ZGMINI PC Secret Scan","ZGMINI Controller Maintenance Source Tests","W05 QFR Publication - Focused Source CI","Issue Lifecycle Eligibility (offline)"]);
+export const WORKFLOWS=Object.freeze(["C996 R5 Readonly Source Checks","ZGMINI PC Secret Scan","ZGMINI Controller Maintenance Source Tests","W05 QFR Publication - Focused Source CI","Issue Lifecycle Eligibility (offline)","ZGMINI Automation Status Readonly Source Tests","ZGMINI CNN Sidecar B Source Contract CI","ZGMINI D05 Readonly Source Tests","ZGMINI 092 Writer B Source and Lineage Tests","SEC Core four-file Writer B approval source tests","ZGMINI W04 DOL Manual Source Tests","SEC Core Structural Insert Contract (source-only)","ZGMINI Agent Handoff PR Evidence CI"]);
 const fail=code=>{throw Error('CI_INCIDENT_'+code);};
 const goodId=value=>Number.isSafeInteger(value)&&value>0;
 const clean=value=>String(value??'').replace(/[^A-Za-z0-9 ._():/\-]/g,' ').trim().slice(0,110);
