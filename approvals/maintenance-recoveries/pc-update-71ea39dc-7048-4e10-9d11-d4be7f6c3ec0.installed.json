@@ -4,13 +4,13 @@
   "operation": "RECONCILE_INSTALLED",
   "requestId": "pc-update-71ea39dc-7048-4e10-9d11-d4be7f6c3ec0",
   "issueNumber": 3409,
-  "sourceSha": "d09b3011f55f8760ff90034f6a68fed64195373d",
+  "sourceSha": "8ba45da5104d569eea5c86fbd783e2983b84cf56",
   "targetControllerSha": "6b3c9c0ce77354d81babe4c9ea7785663c6c2cb4",
   "approvedCurrentWriterConfigSha256": "00e1b32c9983a8630ca5fd9ed99eafcf6c7eaeac39dbcdb7b68111906d778c64",
   "files": [
     {
       "path": "tools/maintenance-recovery.mjs",
-      "sha256": "65a9017f23be5feafa742a544a8c5936269f9d87ff7c4a7f13749daae5dbf1aa"
+      "sha256": "39df7ce402773e4745c8a0db9f4dc38615379975693476af46b09d9d8fb3e7d7"
     },
     {
       "path": "tools/update.mjs",
