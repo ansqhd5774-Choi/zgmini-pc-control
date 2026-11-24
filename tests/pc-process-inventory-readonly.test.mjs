@@ -7,7 +7,7 @@ import {inspectTask, TASK} from '../tools/marketparquet-task-source-readonly.mjs
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
 import assert from 'node:assert/strict';
 import {classifyInstalledReconciliationProof,main as maintenanceRecoveryMain} from '../tools/maintenance-recovery.mjs';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,project2960MaintenanceStatus,compare2960ProtectedBaseline,classify2960ProtectionDifference,assess2960OriginalLeaseLineage,compact2960ProcessResult,projectD05WriterCheckpoint,compactD05WriterResult,inspectD05PrivateFinalReceiptReadonly,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,project2960MaintenanceStatus,project3409MaintenanceStatus,compact3409ProcessResult,compare2960ProtectedBaseline,classify2960ProtectionDifference,assess2960OriginalLeaseLineage,compact2960ProcessResult,projectD05WriterCheckpoint,compactD05WriterResult,inspectD05PrivateFinalReceiptReadonly,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 import {inspect3160RecoveryCasReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 import {inspect3160RollbackPreflightReadonly} from '../tools/pc-process-inventory-readonly.mjs';
@@ -36,6 +36,46 @@ test('exact read-only schema, owner, roles and run provenance',()=>{
  assert.throws(()=>authenticateProcess(event(),{...env,GITHUB_ACTOR:'other'},'operating'));
 });
 
+test('#3409 fixed maintenance scope accepts operating only and rejects paths',()=>{
+ const e=event(),p=JSON.parse(e.issue.body);
+ const scoped={...e,issue:{...e.issue,body:JSON.stringify({...p,
+  probe:'w04-3409-maintenance-status-readonly'})}};
+ assert.equal(authenticateProcess(scoped,env,'operating').w043409MaintenanceStatus,true);
+ assert.throws(()=>authenticateProcess(scoped,env,'handoff'));
+ for(const probe of ['w04-3409-maintenance-status-readonly;cmd','w04-3410-maintenance-status-readonly']){
+  assert.throws(()=>authenticateProcess({...e,issue:{...e.issue,
+   body:JSON.stringify({...p,probe})}},env,'operating'));
+ }
+ assert.throws(()=>authenticateProcess({...e,issue:{...e.issue,
+  body:JSON.stringify({...p,probe:'w04-3409-maintenance-status-readonly',
+   path:'E:/private'})}},env,'operating'));
+});
+test('#3409 original maintenance ledger projection strips secrets and fails closed',()=>{
+ const requestId='pc-update-71ea39dc-7048-4e10-9d11-d4be7f6c3ec0';
+ const fixture={actualControllerSha:'6'.repeat(40),workflowState:'active',
+  historicalRequest:{requestId,status:'RECOVERY_REQUIRED',code:'POSTCHECK_OUTCOME_UNKNOWN',
+   phase:'RECOVERY_REQUIRED',firstFail:'POSTCHECK_PENDING',postIssueNumber:3410,
+   secret:'SECRET_LEDGER'},
+  recoveryEvidence:{requestId,leaseHeld:true,recoveryRequired:true,
+   installLease:{directory:'PRESENT',ownerFile:'PRESENT',recoveryMarker:'PRESENT',
+    ownerMarkerMatch:true,ownerPid:12345,nonce:'SECRET_OWNER'},
+   backlog:{file:'PRESENT',windows:1,openWindows:0,replayCount:0,secret:'SECRET_BACKLOG'}}};
+ const result=project3409MaintenanceStatus(fixture);
+ assert.equal(result.status,'READ_ONLY_OBSERVED');
+ assert.equal(result.historicalRequest.postIssueNumber,3410);
+ assert.equal(result.recoveryEvidence.recoveryRequired,true);
+ assert.equal(result.recoveryEligible,false);
+ assert.equal(result.protectedStateUnchanged,null);
+ assert.doesNotMatch(JSON.stringify(result),/SECRET|nonce|ownerPid|token/i);
+ const compact=compact3409ProcessResult({requestId:'fixed'},result);
+ assert.equal(compact.status,'PASS');
+ assert.ok(Buffer.byteLength(JSON.stringify(compact))<32768);
+ assert.equal(project3409MaintenanceStatus({...fixture,recoveryEvidence:{
+  ...fixture.recoveryEvidence,requestId:'another-request'}}).status,'STATE_UNKNOWN');
+ assert.equal(project3409MaintenanceStatus(null).status,'STATE_UNKNOWN');
+ assert.equal(compact3409ProcessResult({requestId:'fixed'},
+  project3409MaintenanceStatus(null)).status,'PARTIAL');
+});
 test('#2960 exact recovery probe rejects arbitrary parameters and handoff host',()=>{
  const e=event(),p=JSON.parse(e.issue.body);
  const q={...e,issue:{...e.issue,body:JSON.stringify({...p,

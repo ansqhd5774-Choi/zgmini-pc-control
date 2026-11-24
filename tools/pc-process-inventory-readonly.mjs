@@ -27,6 +27,8 @@ export const ROLE_OPERATION='process-inventory-readonly';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const TARGET2960='pc-update-e8767e20-6bad-4418-97c6-561cf79a8213';
 const PROBE2960='w05-2960-maintenance-status-readonly';
+const TARGET3409='pc-update-71ea39dc-7048-4e10-9d11-d4be7f6c3ec0';
+const PROBE3409='w04-3409-maintenance-status-readonly';
 const D05_WRITER_PROBE='d05-writer-checkpoint-readonly';
 const D05_PRIVATE_RECEIPT_PROBE='d05-private-final-events-readonly';
 const D05_THEME_PROBE='d05-theme-final-outputs-readonly';
@@ -98,6 +100,7 @@ export function authenticateProcess(event,env,role){
  const withW05=keys==='operation,probe,requestId,role,schema';
   const isOperator=withW05&&raw.probe==='w05-operator-topology-readonly';
   const is2960=withW05&&raw.probe===PROBE2960;
+   const is3409=withW05&&raw.probe===PROBE3409;
   const isD05Writer=withW05&&raw.probe===D05_WRITER_PROBE;
   const isD05PrivateReceipt=withW05&&raw.probe===D05_PRIVATE_RECEIPT_PROBE;
   const isD05Theme=withW05&&raw.probe===D05_THEME_PROBE;
@@ -111,7 +114,7 @@ export function authenticateProcess(event,env,role){
  if(!raw||(!basic&&!withJobs&&!withW05)||
    raw.schema!==SCHEMA||raw.operation!==ROLE_OPERATION||raw.role!==role||
    (withJobs&&role!=='operating')||
-   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!isD05Writer&&!isD05PrivateReceipt&&!isD05Theme&&!isD05Registration&&!is3160&&!isCnnStaticGuard&&!isCnnGitPredicates&&!isCnnBPins&&!isCnnBResources&&!isCnnBCore))))
+   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!is3409&&!isD05Writer&&!isD05PrivateReceipt&&!isD05Theme&&!isD05Registration&&!is3160&&!isCnnStaticGuard&&!isCnnGitPredicates&&!isCnnBPins&&!isCnnBResources&&!isCnnBCore))))
   fail('REQUEST_SCOPE_INVALID');
  const runnerJobRefs=withJobs?validateRunnerJobRefs(raw.runnerJobRefs):null;
  const normalized=structuredClone(event);
@@ -123,6 +126,7 @@ export function authenticateProcess(event,env,role){
  return {...verified,...(runnerJobRefs?{runnerJobRefs}:{}),
   ...(isOperator?{w05OperatorTopology:true}:{}),
    ...(is2960?{w052960MaintenanceStatus:true}:{}),
+    ...(is3409?{w043409MaintenanceStatus:true}:{}),
    ...(isD05Writer?{d05WriterCheckpoint:true}:{}),
    ...(isD05PrivateReceipt?{d05PrivateFinalReceipt:true}:{}),
    ...(isD05Theme?{d05ThemeFinalOutputs:true}:{}),
@@ -361,17 +365,17 @@ export function sanitizeMaintenanceStatus(raw){
 }
 
 /** Fixed #2960 request only. Never release leases, infer ownership or expose raw journal. */
-export function project2960MaintenanceStatus(raw){
+function projectFixedMaintenanceStatus(raw,{requestId,schema,codePrefix}){
  const tok=v=>typeof v==='string'&&/^[A-Z0-9_]{1,96}$/.test(v)?v:null;
  const file=v=>['PRESENT','ABSENT','UNKNOWN','UNSAFE','UNVERIFIED'].includes(v)?v:'UNKNOWN';
  const num=v=>Number.isSafeInteger(v)&&v>=0&&v<=100000?v:null;
  const flag=v=>typeof v==='boolean'?v:null;
- const h=raw?.historicalRequest?.requestId===TARGET2960?raw.historicalRequest:null;
- const e=raw?.recoveryEvidence?.requestId===TARGET2960?raw.recoveryEvidence:null;
+ const h=raw?.historicalRequest?.requestId===requestId?raw.historicalRequest:null;
+ const e=raw?.recoveryEvidence?.requestId===requestId?raw.recoveryEvidence:null;
  const b=e?.backlog,l=e?.installLease,good=Boolean(h&&e);
- return {schema:'ZGMINI_W05_2960_MAINTENANCE_READONLY_V1',requestId:TARGET2960,
+ return {schema,requestId,
   status:good?'READ_ONLY_OBSERVED':'STATE_UNKNOWN',
-  code:good?'W05_2960_STATUS_OBSERVED':'W05_2960_EVIDENCE_INCOMPLETE',
+  code:good?codePrefix+'_STATUS_OBSERVED':codePrefix+'_EVIDENCE_INCOMPLETE',
   actualControllerSha:asSha(raw?.actualControllerSha),
   workflowState:['active','disabled_manually','disabled_inactivity'].includes(raw?.workflowState)?
    raw.workflowState:'UNVERIFIED',
@@ -395,6 +399,14 @@ export function project2960MaintenanceStatus(raw){
     recoveryMarker:file(l.recoveryMarker),ownerMarkerMatch:flag(l.ownerMarkerMatch)}:null}:null,
   leaseBoundToOriginalRequest:null,recoveryEligible:false,
   protectedStateUnchanged:null,operationalWrites:0,providerCalls:0,d1Writes:0};
+}
+export function project2960MaintenanceStatus(raw){
+ return projectFixedMaintenanceStatus(raw,{requestId:TARGET2960,
+  schema:'ZGMINI_W05_2960_MAINTENANCE_READONLY_V1',codePrefix:'W05_2960'});
+}
+export function project3409MaintenanceStatus(raw){
+ return projectFixedMaintenanceStatus(raw,{requestId:TARGET3409,
+  schema:'ZGMINI_W04_3409_MAINTENANCE_READONLY_V1',codePrefix:'W04_3409'});
 }
 // Compare only the exact #2960 approved protected snapshot, never dump its
 // file hashes, local paths, secrets or current operating configuration.
@@ -529,6 +541,19 @@ function inspect2960MaintenanceStatusReadonly(){
    recoveryCas:existing.status==='READ_ONLY_OBSERVED'?
     inspect2960RecoveryCasReadonly():null};
  }catch{return project2960MaintenanceStatus(null);}
+}
+
+/** Fixed #3409 receipt only: no dynamic path, request or recovery mutation. */
+export function compact3409ProcessResult(base,status){
+ return {...base,observedAtUtc:new Date().toISOString(),
+  status:status?.status==='READ_ONLY_OBSERVED'?'PASS':'PARTIAL',
+  code:status?.code??'W04_3409_EVIDENCE_INCOMPLETE',
+  w043409MaintenanceStatus:status??project3409MaintenanceStatus(null)};
+}
+function inspect3409MaintenanceStatusReadonly(){
+ try{return project3409MaintenanceStatus(
+  collectAutomationStatus(['--request-id',TARGET3409]));}
+ catch{return project3409MaintenanceStatus(null);}
 }
 
 const D05_STAGE_STATUSES=new Set(['LOCAL_STORED','UNCHANGED','PREVIOUS_RELEASE_PRESERVED',
@@ -2067,6 +2092,8 @@ export function collect(role,ctx,env=process.env){
  }
  if(ctx.w052960MaintenanceStatus===true)
   return compact2960ProcessResult(base,inspect2960MaintenanceStatusReadonly());
+ if(ctx.w043409MaintenanceStatus===true)
+  return compact3409ProcessResult(base,inspect3409MaintenanceStatusReadonly());
  if(ctx.d05WriterCheckpoint===true)
   return compactD05WriterResult(base,inspectD05WriterCheckpointReadonly());
  if(ctx.d05PrivateFinalReceipt===true){
@@ -2135,6 +2162,11 @@ export function toText(r){
   'memoryGroupCoverage='+(r.snapshot?.memoryGroupCoverage??'UNAVAILABLE'),
   'otherSubgroupCoverage='+(r.snapshot?.otherSubgroupCoverage??'UNAVAILABLE'),
   'maintenanceStatus='+(r.maintenance?.status??'NOT_APPLICABLE'),
+  ...(r.w043409MaintenanceStatus?[
+   'w043409Status='+r.w043409MaintenanceStatus.status,
+   'w043409HistoricalPhase='+(r.w043409MaintenanceStatus.historicalRequest?.phase??'UNKNOWN'),
+   'w043409LeaseHeld='+(r.w043409MaintenanceStatus.recoveryEvidence?.leaseHeld??'UNKNOWN'),
+   'w043409RecoveryRequired='+(r.w043409MaintenanceStatus.recoveryEvidence?.recoveryRequired??'UNKNOWN')]:[]),
   'c2505Recovery='+(r.c2505RecoveryCheckpoint?.status??'NOT_APPLICABLE'),
   'c2505RecoveryCode='+(r.c2505RecoveryCheckpoint?.code??'NOT_APPLICABLE'),
   'c2505ByteProof='+(r.c2505ByteProof?.status??'NOT_APPLICABLE'),
