@@ -175,7 +175,7 @@ test('line19 reports strictly allowlisted semantic classes without raw operands'
  assert.equal(r.connective,'AND_ONLY');
  assert.equal(r.atomSemantics.length,2);
  assert.equal(r.atomSemantics[0].family,'FILESYSTEM_METADATA');
- assert.equal(r.atomSemantics[0].input,'FIXED_FILESYSTEM');
+ assert.equal(r.atomSemantics[0].input,'FILESYSTEM_PATH_UNVERIFIED');
  assert.equal(r.atomSemantics[1].family,'GIT_PROCESS');
  assert.equal(r.atomSemantics[1].input,'GIT_STATUS');
  assert.equal(r.currentStaticCondition,'UNKNOWN');
