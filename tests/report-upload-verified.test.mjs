@@ -112,7 +112,7 @@ test('noncanonical pad bits cannot certify the same decoded bytes',async()=>{
  const api=async(route,method='GET')=>{
   calls.push(method);return {status:200,data:{type:'file',encoding:'base64',content:'AR=='}};
  };
- await assert.rejects(uploadVerifiedReportPair({...params,json:'\\u0001',api}),
+ await assert.rejects(uploadVerifiedReportPair({...params,json:'\x01',api}),
   {code:'REPORT_REMOTE_INVALID'});
  assert.deepEqual(calls,['GET']);
 });
