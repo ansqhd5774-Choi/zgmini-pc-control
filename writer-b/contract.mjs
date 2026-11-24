@@ -48,6 +48,16 @@ const fail=code=>{throw Object.assign(new Error(code),{code});};
 const need=(condition,code)=>{if(!condition)fail(code);};
 export const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
 
+// Explicit B approval opt-in only. The 360-second contract stays unchanged;
+// a longer Core pause requires a NEW hash-bound approved manifest.
+const RESERVED_CORE_DRAIN_WINDOWS_MS=Object.freeze({
+ PAUSE_NEW_STARTS_DRAIN_360S_V1:360000,
+ PAUSE_NEW_STARTS_DRAIN_2400S_V1:2400000,
+});
+export const approvedCoreDrainWindowMs=mode=>
+ Object.hasOwn(RESERVED_CORE_DRAIN_WINDOWS_MS,mode)?
+  RESERVED_CORE_DRAIN_WINDOWS_MS[mode]:null;
+
 export function isScopedWriterPath(file){
  if(typeof file!=='string'||file.length>180||!RELATIVE.test(file)||
     file.includes('\\')||file.includes('//'))return false;
@@ -58,7 +68,7 @@ export function validateWriterBManifest(manifest){
  const maintenance=Object.hasOwn(manifest??{},'coreMaintenance');
  need(exact(manifest,maintenance?[...APPROVAL_KEYS,'coreMaintenance']:APPROVAL_KEYS),
   'WRITER_B_MANIFEST_FIELDS_STOP');
- if(maintenance)need(manifest.coreMaintenance==='PAUSE_NEW_STARTS_DRAIN_360S_V1'&&
+ if(maintenance)need(approvedCoreDrainWindowMs(manifest.coreMaintenance)!==null&&
   SHA64.test(manifest.runtimeDependencies?.taskXmlSha256??''),
   'WRITER_B_MAINTENANCE_APPROVAL_STOP');
  need(manifest.schema===APPROVAL_SCHEMA&&manifest.status==='APPROVED_B'&&

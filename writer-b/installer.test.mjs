@@ -120,7 +120,8 @@ function mockIO({failAt=null,rollbackFail=false,dirtyTarget=false,
  return {io,state};
 }
 
-const maintenanceAuth=()=>auth({coreMaintenance:'PAUSE_NEW_STARTS_DRAIN_360S_V1'});
+const maintenanceAuth=(mode='PAUSE_NEW_STARTS_DRAIN_360S_V1')=>
+ auth({coreMaintenance:mode});
 test('approved maintenance stages before inhibition and drains active Core without natural-idle lottery',async()=>{
  const {io,state}=mockIO({failAt:'window'});
  let active=true;
@@ -139,6 +140,33 @@ test('approved maintenance stages before inhibition and drains active Core witho
  assert.equal(state.coreEnabled,true);assert.equal(state.retained,false);
 });
 
+test('new hash-bound 2400s maintenance mode retains safe ordering',async()=>{
+ const {io,state}=mockIO({failAt:'window'});
+ io.waitForCoreDrain=async()=>{
+  assert.equal(state.coreEnabled,false);
+  assert.equal(state.head,manifest().baseHead);
+  state.steps.push('long-drain-finished');
+ };
+ const out=await performWriterBInstall(
+  maintenanceAuth('PAUSE_NEW_STARTS_DRAIN_2400S_V1'),io);
+ assert.equal(out.status,'WRITER_B_INSTALLED_VERIFIED');
+ assert.equal(state.steps.includes('long-drain-finished'),true);
+ assert.equal(state.steps.some(x=>x.startsWith('window')),false);
+ assert.equal(state.head!==manifest().baseHead,true);
+ assert.equal(state.coreEnabled,true);
+ assert.equal(state.retained,false);
+});
+test('2400s reserved maintenance timeout restores original without switch',async()=>{
+ const {io,state}=mockIO({failAt:'drain'});
+ const out=await performWriterBInstall(
+  maintenanceAuth('PAUSE_NEW_STARTS_DRAIN_2400S_V1'),io);
+ assert.equal(out.status,'WRITER_B_INSTALL_STOP_RESTORED');
+ assert.equal(out.recovery,'ORIGINAL_VERIFIED');
+ assert.equal(state.coreEnabled,true);
+ assert.equal(state.head,manifest().baseHead);
+ assert.equal(state.steps.includes('switch'),false);
+ assert.equal(state.retained,false);
+});
 test('maintenance preparation failure leaves scheduling untouched',async()=>{
  const {io,state}=mockIO({failAt:'prepare'});
  const out=await performWriterBInstall(maintenanceAuth(),io);

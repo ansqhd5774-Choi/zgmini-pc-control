@@ -24,7 +24,9 @@ jobs:
       cancel-in-progress: false
       queue: max
     runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
-    timeout-minutes: 12
+    # Extended pause/drain is accepted only with a separately hash-approved B
+    # manifest. Existing 360-second and natural-idle policies remain bounded.
+    timeout-minutes: 50
     defaults:
       run:
         shell: cmd

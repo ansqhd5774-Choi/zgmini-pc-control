@@ -1,7 +1,8 @@
 // Reusable Writer B transaction coordinator. Source-only and I/O-free.
 // An independently authorized Windows B adapter must implement these exact
 // bounded methods; this module is NOT a pc-job handler or remote shell.
-import {assertAuthenticatedWriterBIssue,validateWriterBManifest} from './contract.mjs';
+import {assertAuthenticatedWriterBIssue,validateWriterBManifest,
+ approvedCoreDrainWindowMs} from './contract.mjs';
 import {safeWriterBImportDiagnostic,
  safeWriterBImportDiagnosticBatch} from './import-availability.mjs';
 
@@ -156,7 +157,7 @@ export async function performWriterBInstall(auth,io){
  // authorizeWriterBIssue after fetching the immutable approved manifest.
  assertAuthenticatedWriterBIssue(auth);
  const manifest=validateWriterBManifest(auth.manifest);
- const reservedWindow=manifest.coreMaintenance==='PAUSE_NEW_STARTS_DRAIN_360S_V1';
+ const reservedWindow=approvedCoreDrainWindowMs(manifest.coreMaintenance)!==null;
  need(object(io)&&REQUIRED_IO.every(name=>typeof io[name]==='function'),
    'WRITER_B_ADAPTER_CONTRACT_STOP');
  let acquired=false,claimed=false,taskMayHaveChanged=false;

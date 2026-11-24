@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {sha256,authorizeWriterBIssue,validateWriterBManifest,
   isScopedWriterPath,REQUEST_SCHEMA,APPROVAL_SCHEMA,OPERATION,SCOPE,
-  CONTROL_REPO,SOURCE_REPO,ISSUE_TITLE,ISSUE_LABEL} from './contract.mjs';
+  CONTROL_REPO,SOURCE_REPO,ISSUE_TITLE,ISSUE_LABEL,
+  approvedCoreDrainWindowMs} from './contract.mjs';
 
 const H=value=>sha256(Buffer.from(value));
 const A='a'.repeat(40),B='b'.repeat(40);
@@ -59,7 +60,13 @@ test('3-file Inflation19 manifest validates without hard-coded filename values',
 test('reserved maintenance is exact opt-in bound to approved original Task XML',()=>{
  const m={...manifest(),coreMaintenance:'PAUSE_NEW_STARTS_DRAIN_360S_V1'};
  assert.equal(validateWriterBManifest(m),m);
- for(const coreMaintenance of [true,'DISABLE','PAUSE_NEW_STARTS_DRAIN_999S_V1',null])
+ assert.equal(approvedCoreDrainWindowMs(m.coreMaintenance),360000);
+ const long={...m,coreMaintenance:'PAUSE_NEW_STARTS_DRAIN_2400S_V1'};
+ assert.equal(validateWriterBManifest(long),long);
+ assert.equal(approvedCoreDrainWindowMs(long.coreMaintenance),2400000);
+ assert.equal(approvedCoreDrainWindowMs(undefined),null);
+ for(const coreMaintenance of [true,'DISABLE','PAUSE_NEW_STARTS_DRAIN_999S_V1',
+  'PAUSE_NEW_STARTS_DRAIN_2401S_V1',null])
   assert.throws(()=>validateWriterBManifest({...m,coreMaintenance}),
    {code:'WRITER_B_MAINTENANCE_APPROVAL_STOP'});
  assert.throws(()=>validateWriterBManifest({...m,runtimeDependencies:{

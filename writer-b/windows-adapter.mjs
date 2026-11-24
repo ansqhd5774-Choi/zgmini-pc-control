@@ -9,7 +9,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {setTimeout as delay} from 'node:timers/promises';
-import {sha256} from './contract.mjs';
+import {sha256,approvedCoreDrainWindowMs} from './contract.mjs';
 import {materializeApprovedWriterFile} from './insert-only-patch.mjs';
 import {verifyWriterBImportAvailability} from './import-availability.mjs';
 import {approvalPathFromIssue,verifyReadOnlyPreflight} from './preflight.mjs';
@@ -329,11 +329,11 @@ export function makeWindowsBAdapter(auth,{candidateRoot,controlRoot}){
     definitionMatches:()=>fixedTaskXml(task).normalized===originalXml.normalized,
     probe:taskProbe,cycleLockExists:()=>fs.existsSync(CORE_CYCLE_LOCK),journal,
     disable:()=>exec('schtasks',['/Change','/TN',task,'/Disable']),
-   },{reserved:m.coreMaintenance==='PAUSE_NEW_STARTS_DRAIN_360S_V1'});
+   },{reserved:approvedCoreDrainWindowMs(m.coreMaintenance)!==null});
   },
   async waitForCoreDrain(){
    let consecutive=0;const until=Date.now()+
-    (m.coreMaintenance==='PAUSE_NEW_STARTS_DRAIN_360S_V1'?360000:90000);
+    (approvedCoreDrainWindowMs(m.coreMaintenance)??90000);
    while(Date.now()<until){
     consecutive=taskQuiet(taskProbe())?consecutive+1:0;
     if(consecutive>=2){journal('CORE_DRAINED');return;}
@@ -428,12 +428,13 @@ export function makeWindowsBAdapter(auth,{candidateRoot,controlRoot}){
    need(fixedTaskXml(task).normalized===originalXml.normalized,
     'WRITER_B_CORE_PREPAUSE_TASK_XML_DRIFT_STOP');
    if(!taskProbe().enabled)return; // Already paused by this exact owned transaction.
-   if(m.coreMaintenance!=='PAUSE_NEW_STARTS_DRAIN_360S_V1')await io.waitForCoreIdleWindow();
+   if(approvedCoreDrainWindowMs(m.coreMaintenance)===null)
+    await io.waitForCoreIdleWindow();
    inhibitCoreStarts({assertBase:assertOwned,
     definitionMatches:()=>fixedTaskXml(task).normalized===originalXml.normalized,
     probe:taskProbe,cycleLockExists:()=>fs.existsSync(CORE_CYCLE_LOCK),journal,
     disable:()=>exec('schtasks',['/Change','/TN',task,'/Disable']),
-   },{reserved:m.coreMaintenance==='PAUSE_NEW_STARTS_DRAIN_360S_V1'});
+   },{reserved:approvedCoreDrainWindowMs(m.coreMaintenance)!==null});
    journal('ROLLBACK_CORE_PAUSED');
   },
   async restoreOriginalConfig(){
