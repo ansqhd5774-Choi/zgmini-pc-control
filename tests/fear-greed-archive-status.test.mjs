@@ -478,3 +478,35 @@ test('fixed R10 child source can localize an exact reason without leaking source
  assert.equal(good.d1Writes,0);
  assert.equal(good.providerCalls,0);
 });
+
+test('pinned static last-run writer and guard candidate are exposed without source or secrets',()=>{
+  const f=fixture(),dir=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(dir);
+  const secret='GH_PAT_NEVER_RETURN_SIDE_CAR_CONTENT';
+  const js="const ledger=path.join(dir,'last-run.json');\\nif (actualSourceSha !== config.source) stop('SOURCE_SHA');\\nfs.writeFileSync(ledger, JSON.stringify({secret}));\\n";
+  const vbs='WScript.Echo "archive-run.mjs"\\n';
+  fs.writeFileSync(path.join(dir,'archive-run.mjs'),js);
+  fs.writeFileSync(path.join(dir,'run-original-then-archive.vbs'),vbs);
+  const earlier=new Date(Date.now()-30000);
+  for(const name of ['archive-run.mjs','run-original-then-archive.vbs'])fs.utimesSync(path.join(dir,name),earlier,earlier);
+  fs.writeFileSync(path.join(dir,'last-run.json'),JSON.stringify({status:'BLOCKED',reason:'SOURCE_SHA',token:secret}));
+  const before=digest(fs.readFileSync(f.dbFile));
+  const r=inspectSidecarSourceGate(f.dataRoot,{expectedHashes:{
+    'archive-run.mjs':digest(js),'run-original-then-archive.vbs':digest(vbs)}});
+  assert.deepEqual(r.ledgerOriginCandidates,['archive-run.mjs']);
+  assert.deepEqual(r.sourceGuardCandidates,[{file:'archive-run.mjs',line:2,kind:'SOURCE_APPROVAL_REFERENCE'}]);
+  assert.equal(r.staticGateProvenance,'UNVERIFIED_SOURCE_ONLY');
+  assert.equal(r.matchingErrorSite,'NONE');
+  assert.equal(r.operationalWrites,0);assert.equal(r.providerCalls,0);assert.equal(r.d1Writes,0);
+  assert.equal(digest(fs.readFileSync(f.dbFile)),before);
+  assert.doesNotMatch(JSON.stringify(r),/GH_PAT_NEVER_RETURN_SIDE_CAR_CONTENT|actualSourceSha|config\\.source|SOURCE_SHA/);
+});
+
+test('changed script cannot contribute static last-run attribution',()=>{
+  const f=fixture(),dir=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(dir);
+  fs.writeFileSync(path.join(dir,'archive-run.mjs'),"const f='last-run.json'; fs.writeFileSync(f,'SECRET');");
+  fs.writeFileSync(path.join(dir,'last-run.json'),JSON.stringify({reason:'SOURCE SHA'}));
+  const r=inspectSidecarSourceGate(f.dataRoot);
+  assert.deepEqual(r.ledgerOriginCandidates,[]);
+  assert.deepEqual(r.sourceGuardCandidates,[]);
+  assert.equal(r.matchingErrorSite,'NOT_CHECKED');
+});
