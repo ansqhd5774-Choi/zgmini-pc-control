@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {sha256,authorizeWriterBIssue,validateWriterBManifest,
   isScopedWriterPath,REQUEST_SCHEMA,APPROVAL_SCHEMA,OPERATION,SCOPE,
   CONTROL_REPO,SOURCE_REPO,ISSUE_TITLE,ISSUE_LABEL,
-  approvedCoreDrainWindowMs} from './contract.mjs';
+  approvedCoreDrainWindowMs,EXTENDED_DRAIN_LABEL} from './contract.mjs';
 
 const H=value=>sha256(Buffer.from(value));
 const A='a'.repeat(40),B='b'.repeat(40);
@@ -74,6 +74,24 @@ test('reserved maintenance is exact opt-in bound to approved original Task XML',
   {code:'WRITER_B_MAINTENANCE_APPROVAL_STOP'});
 });
 
+test('extended drain requires matching GitHub job label and exact signed manifest',()=>{
+ const a=authFixture();
+ const long={...a.manifest,coreMaintenance:'PAUSE_NEW_STARTS_DRAIN_2400S_V1'};
+ const raw=Buffer.from(JSON.stringify(long));
+ const request={...a.request,approvalManifestSha256:sha256(raw)};
+ const withLabel={...a.event,issue:{...a.event.issue,
+  labels:[{name:ISSUE_LABEL},{name:EXTENDED_DRAIN_LABEL}],
+  body:JSON.stringify(request)}};
+ const valid=authorizeWriterBIssue({...a,event:withLabel,manifestBytes:raw});
+ assert.equal(valid.manifest.coreMaintenance,'PAUSE_NEW_STARTS_DRAIN_2400S_V1');
+ assert.throws(()=>authorizeWriterBIssue({...a,manifestBytes:raw,event:{
+  ...withLabel,issue:{...withLabel.issue,labels:[{name:ISSUE_LABEL}]}}}),
+  {code:'WRITER_B_EXTENDED_DRAIN_LABEL_STOP'});
+ assert.throws(()=>authorizeWriterBIssue({...a,event:{
+  ...a.event,issue:{...a.event.issue,
+   labels:[{name:ISSUE_LABEL},{name:EXTENDED_DRAIN_LABEL}]}}}),
+  {code:'WRITER_B_EXTENDED_DRAIN_LABEL_STOP'});
+});
 test('strict path scope and duplicate names prevent traversal and accidental targets',()=>{
  for(const candidate of ['../.env','scripts/pc-writer/../../secrets.mjs',
   'scripts/pc-writer/evil.cmd','E:\\ZGmini\\secrets.mjs','scripts/pc-writer/.hidden.mjs',

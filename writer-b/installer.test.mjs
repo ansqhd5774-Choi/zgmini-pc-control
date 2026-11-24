@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {sha256,authorizeWriterBIssue,APPROVAL_SCHEMA,SCOPE,SOURCE_REPO,
- REQUEST_SCHEMA,OPERATION,CONTROL_REPO,ISSUE_LABEL,ISSUE_TITLE} from './contract.mjs';
+ REQUEST_SCHEMA,OPERATION,CONTROL_REPO,ISSUE_LABEL,ISSUE_TITLE,
+ EXTENDED_DRAIN_LABEL} from './contract.mjs';
 import {performWriterBInstall,verifyWriterBPreimage,
   verifyWriterBCandidate,verifyPreparedWriterCommit} from './installer.mjs';
 
@@ -44,7 +45,9 @@ const auth=(overrides={})=>{
    GITHUB_RUN_ATTEMPT:'1',GITHUB_SHA:'a'.repeat(40)},
   event:{repository:{full_name:CONTROL_REPO,private:true},
    sender:{login:'ansqhd5774-Choi'},issue:{user:{login:'ansqhd5774-Choi'},
-    title:ISSUE_TITLE,number:777,labels:[{name:ISSUE_LABEL}],
+    title:ISSUE_TITLE,number:777,labels:[{name:ISSUE_LABEL},
+    ...((overrides.coreMaintenance==='PAUSE_NEW_STARTS_DRAIN_2400S_V1')?
+    [{name:EXTENDED_DRAIN_LABEL}]:[])],
     body:JSON.stringify({schema:REQUEST_SCHEMA,requestId:RID,
      chatId:'11234567-89ab-4cde-8fab-1123456789ab',operation:OPERATION,
      controlRepository:CONTROL_REPO,

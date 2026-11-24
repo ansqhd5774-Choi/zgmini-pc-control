@@ -6,6 +6,9 @@ import {validateInsertions} from './insert-only-patch.mjs';
 export const OPERATION='pc-writer-source-install';
 export const ISSUE_TITLE='pc-writer-source-install';
 export const ISSUE_LABEL='pc-writer-b-install';
+// Label selects the GitHub job's extended deadline; exact approved manifest
+// must independently select the identical 2400-second mode.
+export const EXTENDED_DRAIN_LABEL='pc-writer-b-extended-drain-2400';
 export const REQUEST_SCHEMA='ZGMINI_PC_WRITER_SOURCE_B_REQUEST_V1';
 export const APPROVAL_SCHEMA='ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1';
 export const CONTROL_REPO='ansqhd5774-Choi/zgmini-pc-control';
@@ -169,6 +172,10 @@ export function authorizeWriterBIssue({event,env,manifestBytes}){
  try{manifest=JSON.parse(manifestBytes.toString('utf8'));}
  catch{fail('WRITER_B_MANIFEST_JSON_STOP');}
  validateWriterBManifest(manifest);
+ const issueExtended=event.issue.labels.some(x=>x?.name===EXTENDED_DRAIN_LABEL);
+ need(issueExtended===
+   (manifest.coreMaintenance==='PAUSE_NEW_STARTS_DRAIN_2400S_V1'),
+  'WRITER_B_EXTENDED_DRAIN_LABEL_STOP');
  for(const entry of manifest.files){
   if(Object.hasOwn(entry,'insertions')){
    for(const insertion of entry.insertions)Object.freeze(insertion);
