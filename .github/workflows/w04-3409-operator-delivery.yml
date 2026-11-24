@@ -1,0 +1,47 @@
+name: W04 3409 Pinned Independent Operator Delivery Bundle
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - '.github/workflows/w04-3409-operator-delivery.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  source-only-bundle:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.event.pull_request.user.login == 'ansqhd5774-Choi' &&
+      github.event.pull_request.head.repo.full_name == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.pull_request.head.ref == 'codex/issues-lifecycle-manager-20261125-w04-3409-artifact-delivery'
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 4
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Checkout exactly approved merged source, not the PR worktree
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: '728c1919195c4679181f29b45659159cd92196b6'
+          persist-credentials: false
+      - name: Set up isolated source bundling runtime
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Authenticate immutable two-file operator bundle
+        run: |
+          node -e "const f=require('node:fs'),c=require('node:crypto'),e=require('node:child_process');const head=e.execFileSync('git',['rev-parse','HEAD']).toString().trim();const expected='728c1919195c4679181f29b45659159cd92196b6';const a='tools/operator-packets/W04_3409_INDEPENDENT_RECOVERY_ONCE_V1.cmd',b='tools/operator-packets/w04-3409-recovery-once.mjs';const hash=p=>{const x=f.readFileSync(p);return c.createHash('sha1').update(Buffer.from('blob '+x.length+'\0')).update(x).digest('hex')};const sa=hash(a),sb=hash(b);if(head!==expected||sa!=='dcdcbbb4a53c1892482c8e7fba11c1b25a671017'||sb!=='9757f8fe2ee5b52cc269f4458dd0a0d3e5e81fdc'||!f.readFileSync(a,'utf8').includes('set \"ZG_JS_BLOB='+sb+'\"'))process.exit(21);console.log('W04_3409_PINNED_TWO_FILE_BUNDLE_VERIFIED')"
+      - name: Publish source-only private artifact for independent Windows handoff
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: W04_3409_OPERATOR_ONCE_MERGE_728c1919
+          path: |
+            tools/operator-packets/W04_3409_INDEPENDENT_RECOVERY_ONCE_V1.cmd
+            tools/operator-packets/w04-3409-recovery-once.mjs
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
