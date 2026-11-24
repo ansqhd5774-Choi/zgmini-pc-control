@@ -45,6 +45,17 @@ test('completed fixed BLS PPI8 Issue intake is retired while approved paths surv
    'pc-approved-runtime-b-once.yml','pc-job.yml','pc-writer-b-source-once.yml'])
   assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
 });
+// #210 is the terminal 2026-11-04 NY Fed SCE #31 private capture;
+// retain its fixed approval, test and collector without the old Issue intake.
+test('terminal SCE31 Issue-opened workflow is retired with source approvals preserved',()=>{
+ assert.equal(existsSync(path.join(root,'.github/workflows','pc-inflation-sce31-approved-once.yml')),false);
+ for(const file of ['inflation-sce31-b-once.mjs','INFLATION_SCE31_B_APPROVAL.json',
+   'tests/inflation-sce31-b-once.test.mjs'])
+  assert.equal(existsSync(path.join(root,file)),true,file);
+ for(const name of ['pc-approved-runtime-a-once.yml','pc-approved-runtime-b-once.yml',
+   'pc-job.yml','pc-writer-b-source-once.yml','pc-inflation-19-inventory-b-once.yml'])
+  assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
+});
 test('common A/B and unfinished inflation and R54 readers are preserved',()=>{
  for(const name of kept)assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
 });
