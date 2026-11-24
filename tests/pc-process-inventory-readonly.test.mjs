@@ -12,6 +12,7 @@ import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,proj
 import {inspect3160RecoveryCasReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 import {inspect3160RollbackPreflightReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 import {projectCnnSidecarStaticGuard} from '../tools/pc-process-inventory-readonly.mjs';
+import {projectCnnGitInputs} from '../tools/cnn-sidecar-git-inputs-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
  const request={schema:SCHEMA,operation:ROLE_OPERATION,role,
@@ -1691,4 +1692,61 @@ test('CNN static projection exposes only pinned candidates, never raw private te
   assert.deepEqual(r.sourceGuardCandidates,[]);
   assert.equal(r.sidecarFailureResolved,false);
  }
+});
+
+
+test('CNN Git-input A probe is fixed operating-only and rejects arbitrary paths',()=>{
+ const e=event(),body=JSON.parse(e.issue.body);
+ const request={...body,probe:'cnn-sidecar-git-inputs-readonly'};
+ const exact={...e,issue:{...e.issue,body:JSON.stringify(request)}};
+ assert.equal(authenticateProcess(exact,env,'operating').cnnSidecarGitInputs,true);
+ assert.throws(()=>authenticateProcess(exact,env,'handoff'));
+ for(const payload of [
+  {...request,root:'E:/secret'}, {...request,gitArgs:['log','-p']},
+  {...request,probe:'cnn-sidecar-git-inputs-readonly;cmd'},
+  {...request,script:'archive-run.mjs'},
+ ])assert.throws(()=>authenticateProcess({...e,issue:{
+  ...e.issue,body:JSON.stringify(payload)}},env,'operating'));
+});
+
+test('CNN Git-input comparison returns bounded booleans, not leaked source or a causal claim',()=>{
+ const base={
+  sourcePinned:true,guardCandidatesVerified:true,ledgerStable:true,
+  ledgerReason:'SOURCE SHA',sourceHead:'a'.repeat(40),sourceHeadStable:true,
+  approvedConfigSource:'a'.repeat(40),configStable:true,branch:'main',
+  trackedStatus:'',scriptText:'var source="zgmini-earnings-history-pc-release"; SECRET_TOKEN'
+ };
+ const good=projectCnnGitInputs(base);
+ assert.equal(good.status,'PASS');
+ assert.equal(good.headMatchesApprovedSource,true);
+ assert.equal(good.trackedTreeClean,true);
+ assert.equal(good.ledgerReasonClass,'SOURCE_SHA_BLOCKED');
+ assert.equal(good.sidecarLiteralCheckoutReference,'PRESENT');
+ assert.equal(good.sidecarRuntimeSourceRoot,'UNVERIFIED');
+ assert.equal(good.historicalFalsePredicate,'UNVERIFIED');
+ assert.doesNotMatch(JSON.stringify(good),/SECRET_TOKEN|var source/);
+ const dirty=projectCnnGitInputs({...base,sourceHead:'b'.repeat(40),
+  trackedStatus:' M scripts/private-secret.mjs\n'});
+ assert.equal(dirty.status,'PASS');
+ assert.equal(dirty.headMatchesApprovedSource,false);
+ assert.equal(dirty.trackedTreeClean,false);
+ assert.doesNotMatch(JSON.stringify(dirty),/private-secret/);
+ for(const invalid of [
+  {...base,sourcePinned:false},
+  {...base,ledgerStable:false},
+  {...base,guardCandidatesVerified:false},
+  {...base,configStable:false},
+  {...base,sourceHeadStable:false},
+  {...base,approvedConfigSource:'BAD'},
+  {...base,trackedStatus:null},
+ ]){
+  const result=projectCnnGitInputs(invalid);
+  assert.equal(result.status,'STATE_UNKNOWN');
+  assert.equal(result.historicalFalsePredicate,'UNVERIFIED');
+  assert.equal(result.operationalWrites,0);
+ }
+ const txt=toText({schema:'ZGMINI_PC_PROCESS_INVENTORY_RESULT_V1',
+  cnnSidecarGitInputs:good});
+ assert.match(txt,/cnnHistoricalFalsePredicate=UNVERIFIED/);
+ assert.match(txt,/cnnGitHeadMatchesConfig=true/);
 });
