@@ -1,0 +1,59 @@
+{
+  "schema": "ZGMINI_PC_UPDATE_V1",
+  "installedSha": "3c20e036ffa56a9a9670916d68c30451d6a699bc",
+  "targetSha": "8d27af47b5d09ef572e3ec1bf6c9d4e4ab25f12a",
+  "allowFiles": [
+    {
+      "path": "config/operations.json",
+      "sha256": "bd58b66f0b8f0a79add66ac0369aeb9834e7c74d816915ae3302fe2a0682be82"
+    },
+    {
+      "path": "controller/core-completed-lineage-readonly.mjs",
+      "sha256": "d7e9be385dccc7612542b5e161346f75d73ad559eeca15aacf6385d1787c316a"
+    },
+    {
+      "path": "controller/engine.mjs",
+      "sha256": "f669a813d0c2f06de9a4663c429a25ace840b588d0346a4e75f1ae08c510b001"
+    },
+    {
+      "path": "controller/operations.mjs",
+      "sha256": "b2ba3f91b52512001626b7b4bc9b73cc9c1a263ffc5ec55d72710f82d5bd0af9"
+    },
+    {
+      "path": "controller/w05-writer-inventory-chunk-readonly.mjs",
+      "sha256": "1c0e350fdb50fcda827fc738a053e70c03ed4ffa30c15b3c605847da08b8a7b5"
+    }
+  ],
+  "purpose": "pc-controller-maintenance",
+  "controllerOnlyInstall": true,
+  "approval": {
+    "grade": "B",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3350",
+    "scope": "PC_CONTROL_CONTROLLER_UPDATE"
+  },
+  "checks": {
+    "targetSha": "8d27af47b5d09ef572e3ec1bf6c9d4e4ab25f12a",
+    "status": "PASS",
+    "manifestSha256": "10a4153a464a79a4973bf8ac6f49e39ce00a44e2d54d6bbdd0944531f0257f04"
+  },
+  "backup": {
+    "strategy": "VERSIONED_SNAPSHOT",
+    "rollback": {
+      "kind": "RESTORE_INSTALLED_SHA",
+      "sha": "3c20e036ffa56a9a9670916d68c30451d6a699bc"
+    }
+  },
+  "postOperation": "core-status",
+  "postSourceBranch": "main",
+  "postSourceSha": "af1d0fb54bfa84253929d42cfef8ee8d89d63a8b",
+  "selectiveSource": {
+    "schema": "ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1",
+    "branch": "codex/w05-post-w04-3c20-singleparent-20261124",
+    "mainSha": "9701d2bbfd40958c47b083ea4022570dcf1eaa65",
+    "customPaths": [
+      "config/operations.json",
+      "controller/engine.mjs",
+      "controller/operations.mjs"
+    ]
+  }
+}
