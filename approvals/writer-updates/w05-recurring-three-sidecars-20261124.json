@@ -1,0 +1,158 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "codex/w05-recurring-three-sidecar-activation-20261124",
+  "candidateSourceSha": "e92dfd8042a26fdc40a45ac0cceafc264db5a406",
+  "baseHead": "a163c4f34e4e1c50987feaea0f3a7ef00442afaf",
+  "baseConfigSourceSha": "a163c4f34e4e1c50987feaea0f3a7ef00442afaf",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/run-local.mjs",
+      "change": "M",
+      "beforeSha256": "58e2b08153a7ece51071122f565973f2c6b45f0013c650b924cf90c57126bc77",
+      "afterSha256": "a96c0c7c3513fda6f9d51b35caee7d634e2a05c69ff3575d3b99c37072a60ec6",
+      "candidateSha256": "323867bcccdebf90d67a91fc5bd910858acd90cdd9cce5ff1708398b0b9c8ae1",
+      "insertions": [
+        {
+          "anchor": "  await attemptOutput(report,'rate-sentiment-publication',async()=>{report.rateSentiment.publication=(await publishPublicRateSentiment(remote,config.core,rateSentiment)).status;});",
+          "position": "before",
+          "text": "  {\n   const W05_SAVED_SIDECARS_AUTO_PUBLICATION_APPROVED=true;\n  // W05 saved-only informational sidecars. Activation candidate for the\n  // three-key recurring D1 scope; install only through exact Writer B CAS.\n  // Reuse the existing run-local Writer lane and its attemptOutput isolation;\n  // never create a second Task, scheduler, provider call or DB writer.\n  if(W05_SAVED_SIDECARS_AUTO_PUBLICATION_APPROVED){\n   const {W05_SAVED_IDS,publishW05StoredSidecar}=await import(\n    './w05-stored-sidecar-publication-r1.mjs');\n   report.w05SavedSidecars={};\n   for(const id of W05_SAVED_IDS){\n    await attemptOutput(report,'w05-saved-sidecar:'+id,async()=>{\n     report.w05SavedSidecars[id]=await publishW05StoredSidecar({\n      id,pcHome:base,remote,coreDb:config.core,now,\n     });\n    });\n   }\n  }\n  }\n"
+        }
+      ]
+    },
+    {
+      "path": "scripts/pc-writer/EARNINGS_R4_C_READ_MODEL_PREVIEW_READONLY.mjs",
+      "change": "M",
+      "beforeSha256": "f3f6e41b3b61039580db7ab7f6bed3133eb305ffef35e4b4b7ea919e0220ea77",
+      "afterSha256": "341a62faa459f31bcc72107bdf0be6d1b0ba835a8e069dbd24bfe604ccd581fc"
+    },
+    {
+      "path": "scripts/pc-writer/w05-stored-sidecar-publication-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "63c26de726ec47bc4c998a1fed6b8d717d8d38c560d407810a2b38165ec68d0a"
+    },
+    {
+      "path": "worker/earnings-companion-c-r4.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "23cede94ca1d6d1a32b77e1ecb0838bd46a2d6b697e8cf0ad117c7e69533912a"
+    },
+    {
+      "path": "worker/earnings-companion-c-qfr-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "990e9bb88c607cfa5400160398e6322b30e0b18103cea5302408bfb0a83a38fe"
+    },
+    {
+      "path": "worker/earnings-bea-unit-profit-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "174080dcb994119a997aed86bcaf0ca6a44ecf5c0a1368e4c4ea507c91d4f5ba"
+    },
+    {
+      "path": "scripts/pc-writer/EARNINGS_CENSUS_QFR_R3_STORED_PREVIEW_READONLY.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "4119bba808819a71f58b6d76ccb3872b5151c7c80df666b483f4f871bc075933"
+    },
+    {
+      "path": "scripts/pc-writer/EARNINGS_CENSUS_QFR_R4_D1_ONCE.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "7b08d799dfce2c5ab720dd69791d727834c2c5c83ed365c39fd89cd3c7853005"
+    },
+    {
+      "path": "scripts/pc-writer/EARNINGS_BEA_UNIT_NIPA_ARCHIVE_R1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "58c3f81a2361ab3465a5b68b97bdc293ed94fafa19753b4de949d1bcfb4a7f88"
+    },
+    {
+      "path": "scripts/pc-writer/EARNINGS_BEA_UNIT_NIPA_PUBLIC_PROJECTION_R1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "1a3e45c5c77b4673f8bdb23d01586bc0842e2673b53c4ee7349665354623032d"
+    },
+    {
+      "path": "scripts/pc-writer/EARNINGS_CENSUS_QFR_R1_READONLY.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "5286287be8773dd8d2d4bdc943e7ee40131d88669c1ec981f4be68a34025879a"
+    },
+    {
+      "path": "scripts/pc-writer/EARNINGS_CENSUS_QFR_R2_SQLITE_APPEND.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "9d3cd0296d41baa9d6deb12897b164fe13115eada4df17ed14196d89ed9273d0"
+    },
+    {
+      "path": "scripts/pc-writer/EARNINGS_CENSUS_QFR_R4_PROJECTION_DRAFT_READONLY.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "59e4303e2135bfad20b9e51c6e48763be655fad5d2f00eb1e9d50b5cb0e3c002"
+    },
+    {
+      "path": "scripts/pc-writer/EARNINGS_R4_C_D1_DUAL_SOURCE_GATES.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "6106ff55993324b905186330163692f8918f3f49354f266cae430b50093a9377"
+    },
+    {
+      "path": "scripts/pc-writer/EARNINGS_BEA_UNIT_NIPA_EQUIVALENCE_R1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "b3a745bcf773dae56dca19179cd8fbc931c7c05e2f13c15634f191c25c38e36c"
+    },
+    {
+      "path": "lib/market-score/earnings-bea-unit-profit-source-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "c76cfbc3b228ecea5de766f45789309cb452f77003bc63604afc6aae4ba1943b"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "scripts/pc-writer/EARNINGS_R3D_STORED_BLS_CALC_READONLY.mjs",
+      "sha256": "b441a52551a015ab9522280ee7c3f620fc8efd967c8dd0e6e04865bb72c97b31"
+    },
+    {
+      "path": "scripts/pc-writer/d1.mjs",
+      "sha256": "10beefecc524b569eba9abf826036fc8e069b4b6f0c3b3340a7bd6a5ab6353a5"
+    },
+    {
+      "path": "scripts/pc-writer/d1-transient.mjs",
+      "sha256": "5fd4be11dc4a671a9634757bb449807e497a7974c5fd061faa06b455dd0d253e"
+    },
+    {
+      "path": "scripts/pc-writer/d1-diagnostics.mjs",
+      "sha256": "eb5ffbcdb56805ca15affac876493217de52b21e0f90f99976bbcff8ddc13037"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": [
+      {
+        "id": "core-launcher",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+        "dependsOn": [
+          "scripts/pc-writer/run-local.mjs"
+        ]
+      }
+    ]
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false,
+  "coreMaintenance": "PAUSE_NEW_STARTS_DRAIN_360S_V1"
+}
