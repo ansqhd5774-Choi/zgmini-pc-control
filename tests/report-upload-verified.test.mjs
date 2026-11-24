@@ -89,7 +89,7 @@ test('caller posts Issue comment only after await of both verified artifacts',()
  const src=fs.readFileSync(entry,'utf8');
  assert.ok(src.indexOf('await uploadVerifiedReportPair(')>=0);
  assert.ok(src.indexOf('await uploadVerifiedReportPair(')<src.indexOf('const allComments='));
- assert.ok(src.indexOf('const allComments=')<src.indexOf('if(!comments.some('));
+ assert.ok(src.indexOf('const allComments=')<src.indexOf('if(!hasVerifiedReportComment('));
  assert.match(src,/resultFiles:files\.length/);
 });
 
