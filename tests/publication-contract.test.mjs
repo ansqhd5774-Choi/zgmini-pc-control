@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {sha256,operationSpec,validatePublicationRequest,validatePublicationApproval,
   validateBApprovalComment,validateSourceCheckpoints,classifyPublicationLedger,
   validatePublicationReadback,validatePublisherFileDigests,CONTROL_REPOSITORY,SOURCE_REPOSITORY,
@@ -246,4 +247,19 @@ test('BEA native JSON uses a separately approved effect in the existing one-key 
   'scripts/pc-writer/EARNINGS_BEA_UNIT_NIPA_PUBLIC_PROJECTION_R1.mjs'];
  repin(missingFile);
  assert.throws(()=>admitted(missingFile),/PUBLICATION_SOURCE_FILES_INVALID/);
+});
+
+test('publication B approval manifest edits trigger existing isolated contract CI',()=>{
+ const workflow=readFileSync(
+  new URL('../.github/workflows/w05-publication-source-ci.yml',import.meta.url),'utf8');
+ const trigger=workflow.slice(0,workflow.indexOf('\npermissions:'));
+ assert.match(trigger,/pull_request:/);
+ assert.match(trigger,/      - 'approvals\/publications\/\*\*'/);
+ assert.match(trigger,/      - 'tools\/publication-\*\.mjs'/);
+ assert.match(trigger,/      - 'tests\/publication-\*\.test\.mjs'/);
+ assert.match(workflow,/tests\/publication-contract\.test\.mjs/);
+ assert.match(workflow,/tests\/publication-preflight\.test\.mjs/);
+ assert.match(workflow,/tests\/publication-executor\.test\.mjs/);
+ assert.match(workflow,/runs-on: \[self-hosted, Windows, X64, zgmini-handoff-ci-isolated\]/);
+ assert.doesNotMatch(trigger,/schedule:|workflow_dispatch:/);
 });
