@@ -1842,3 +1842,36 @@ test('CNN SHA40 literal comparison is bounded and never exposes private pins',as
  assert.equal(output.operationalWrites,0);
  assert.doesNotMatch(JSON.stringify(output),/PRIVATE_CODE_OR_TOKEN|bbbbbbbbbbbb|aaaaaaaaaaaa/);
 });
+
+test('CNN fixed SHA guard reference only reports candidate line categories',async()=>{
+ const {classifyPinnedCnnGuardOrigin,projectCnnGitEvidence}=
+  await import('../controller/cnn-sidecar-git-predicates-readonly.mjs');
+ const lines=Array.from({length:26},()=>'const noop=0;');
+ lines[0]='const APPROVED_SOURCE_SHA="'+('a'.repeat(40))+'";';
+ lines[18]="if(head !== APPROVED_SOURCE_SHA) throw Error('SOURCE SHA');";
+ lines[20]="if(config !== head) throw Error('OTHER');";
+ lines[22]="if(dirty) throw Error('DIRTY');";
+ const original=lines.join('\n')+'\nconst PRIVATE_SECRET="NEVER_PUBLISH";';
+ const exact=classifyPinnedCnnGuardOrigin(original,'b'.repeat(40));
+ assert.equal(exact.fixedShaRelation,'MISMATCH');
+ assert.equal(exact.fixedShaGuardReference,'LINE_19');
+ assert.doesNotMatch(JSON.stringify(exact),/NEVER_PUBLISH|APPROVED_SOURCE_SHA|aaaaaaaa/);
+ lines[18]="if(head !== other) throw Error('SOURCE SHA');";
+ assert.equal(classifyPinnedCnnGuardOrigin(lines.join('\n'),'b'.repeat(40))
+  .fixedShaGuardReference,'NOT_REFERENCED_IN_CANDIDATE_GUARDS');
+ lines[18]="if(head !== APPROVED_SOURCE_SHA) throw Error('SOURCE SHA');";
+ lines[20]="if(config !== APPROVED_SOURCE_SHA) throw Error('OTHER');";
+ assert.equal(classifyPinnedCnnGuardOrigin(lines.join('\n'),'b'.repeat(40))
+  .fixedShaGuardReference,'MULTIPLE_CANDIDATE_GUARDS');
+ const output=projectCnnGitEvidence({sourcePin:true,ledgerStable:true,ledgerStatus:'BLOCKED',
+  gitVerified:true,trackedClean:true,wholeTreeClean:true,
+  head:'b'.repeat(40),approved:'b'.repeat(40),checkpoint:'b'.repeat(40),
+  sourceShaLiterals:['a'.repeat(40)],guardOrigin:exact});
+ assert.equal(output.guardOrigin.fixedShaGuardReference,'LINE_19');
+ assert.equal(output.pinnedScriptSha40LiteralRelation,'OTHER_ONLY');
+ assert.equal(output.failurePredicateResolved,false);
+ assert.equal(output.operationalWrites,0);
+ assert.equal(output.providerCalls,0);
+ assert.equal(output.d1Writes,0);
+ assert.equal(projectCnnGitEvidence({...output,sourcePin:false}).guardOrigin,null);
+});
