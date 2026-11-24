@@ -410,7 +410,11 @@ const ETA538_CURRENT_TABLE='market_score_employment_r4_shadow_current_v1';
 const eta538Sha=value=>createHash('sha256').update(value).digest('hex');
 const eta538Fail=code=>({status:code,releaseDate:null,verifiedNationalRows:0,
  originalPdfSha256Matched:false,valuesReparsed:false,pitAttested:false});
-export function auditStoredEta538PdfRawLinkage(db){
+// Pinned to the immutable, owner-approved W04 B V2 release, never "latest".
+export function auditStoredEta538PdfRawLinkage(db,{
+ releaseDate='2026-11-19',
+ approvedPdfSha256='a11a33cbd30081e869f2cad4cc4a6ccb6b19feeb20731d233ef83d29d15995ec',
+}={}){
  const requiredRaw=['snapshot_id','chunk_index','chunk_count','release_group',
   'provider','request_key','retrieved_at','body_sha256','body_chunk',
   'detail_json','content_type'];
@@ -423,13 +427,15 @@ export function auditStoredEta538PdfRawLinkage(db){
  if(!requiredRaw.every(k=>rawCols.has(k))||
     !requiredCurrent.every(k=>currentCols.has(k)))
   return eta538Fail('SCHEMA_UNAVAILABLE');
+ if(!/^20\\d{2}-\\d{2}-\\d{2}$/.test(releaseDate)||
+  !/^[0-9a-f]{64}$/.test(approvedPdfSha256))
+  return eta538Fail('PIN_INVALID');
  const keyPrefix='DOL_ETA538_PDF:';
  const first=db.prepare("SELECT * FROM "+ETA538_RAW_TABLE+
   " WHERE release_group='DOL_UI_WEEKLY_CLAIMS' AND provider='DOL_ETA'"+
-  " AND request_key LIKE 'DOL_ETA538_PDF:%' AND chunk_index=0"+
-  " ORDER BY retrieved_at DESC LIMIT 1").get();
+  " AND request_key=? AND chunk_index=0"+
+  " ORDER BY retrieved_at DESC LIMIT 1").get(keyPrefix+releaseDate);
  if(!first)return eta538Fail('NOT_STORED');
- const releaseDate=String(first.request_key??'').slice(keyPrefix.length);
  if(!/^20\d{2}-\d{2}-\d{2}$/.test(releaseDate)||
   first.request_key!==keyPrefix+releaseDate||
   !Number.isSafeInteger(first.chunk_count)||first.chunk_count<1||
@@ -468,6 +474,7 @@ export function auditStoredEta538PdfRawLinkage(db){
  const bytes=Buffer.from(encoded,'base64'),bodyTextHash=eta538Sha(encoded);
  if(bytes.toString('base64')!==encoded||
   bytes.length!==detail.originalBodyBytes||
+  detail.originalBodySha256!==approvedPdfSha256||
   bodyTextHash!==first.body_sha256||bodyTextHash!==detail.bodyTextSha256||
   eta538Sha(bytes)!==detail.originalBodySha256||
   eta538Sha('DOL_UI_WEEKLY_CLAIMS|DOL_ETA|'+first.request_key+'|'+bodyTextHash)!==first.snapshot_id||
