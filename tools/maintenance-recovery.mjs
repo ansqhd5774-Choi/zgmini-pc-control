@@ -181,6 +181,14 @@ export function installedRecoveryCase(requestId){
  return Object.hasOwn(installedRecoveryCases,requestId)?
   installedRecoveryCases[requestId]:null;
 }
+// #2960 allowed a pinned Writer config delta; #3409 has independently
+// proven exact protection equality. Never widen either case to arbitrary drift.
+export function installedRecoveryProtectionAllowed(scope,choice){
+ return choice?.allowed===true&&(
+  scope?.issueNumber===2960&&choice.preservedWriterConfig===true||
+  scope?.issueNumber===3409&&
+   choice.code==='RECOVERY_ORIGINAL_PROTECTION_UNCHANGED');
+}
 export function classifyInstalledReconciliationProof(proof){
  const checks={
   ORIGINAL_LEDGER:proof?.originalLedger===true,
@@ -355,8 +363,7 @@ async function reconcileInstalledRecovery({id,source,g,before}){
   workflowActive:before.state.workflow==='active',
   backlogReconciled:pending,
   supervisorVerified:verifyInstalledRecoverySupervisor(scope.targetSha),
-  protectedWriterPreserved:protectedChoice.allowed===true&&
-   protectedChoice.preservedWriterConfig===true,
+  protectedWriterPreserved:installedRecoveryProtectionAllowed(scope,protectedChoice),
   sourceAndCasVerified:true,currentAReceiptVerified:success,
   operatorVerified:true
  };
