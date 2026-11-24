@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {sha256,TARGET} from './contract.mjs';
+import {sha256,TARGET,PREIMAGE} from './contract.mjs';
 import {decodeTaskXmlBytes,coreReadyForMaintenance}
  from '../writer-b/windows-guards.mjs';
 import {maintenanceLockStatus} from '../tools/maintenance-lock.mjs';
@@ -141,4 +141,38 @@ export function createOperatingSidecarProbe({manifest,requestId,sourceApproved})
   maintenanceBusy:maintenanceLockStatus(DATA,'controller-install').held,
   lockOwner:fs.readFileSync(SHARED_LOCK,'utf8')
  },manifest,requestId);
+}
+
+
+// Source-only preflight for an approved exact one-file B manifest. This does
+// not claim a lease, pause a Task, run the Sidecar or authorize installation.
+const SHA64=/^[0-9a-f]{64}$/;
+export function projectSidecarBManifestPreimageReadonly(raw){
+ const empty={schema:'ZGMINI_CNN_SIDECAR_B_PREIMAGE_PINS_V1',
+  status:'STATE_UNKNOWN',code:'CNN_B_PREIMAGE_PINS_UNVERIFIED',
+  head:null,configSource:null,taskDefinitionSha256:null,
+  wrapperSha256:null,beforeSha256:null,
+  operationalWrites:0,providerCalls:0,d1Writes:0};
+ if(!raw||!SHA40.test(raw.head??'')||
+    raw.head!==raw.configSource||
+    !SHA64.test(raw.taskDefinitionSha256??'')||
+    !SHA64.test(raw.wrapperSha256??'')||
+    raw.targetSha256!==PREIMAGE)return empty;
+ return {...empty,status:'PASS',code:'CNN_B_PREIMAGE_PINS_COLLECTED',
+  head:raw.head,configSource:raw.configSource,
+  taskDefinitionSha256:raw.taskDefinitionSha256,
+  wrapperSha256:raw.wrapperSha256,beforeSha256:raw.targetSha256};
+}
+export function inspectSidecarBManifestPreimageReadonly(){
+ if(process.platform!=='win32')return projectSidecarBManifestPreimageReadonly(null);
+ try{
+  const head=observedHead(),config=configSource();
+  if(head!==config)return projectSidecarBManifestPreimageReadonly(null);
+  return projectSidecarBManifestPreimageReadonly({
+   head,configSource:config,
+   taskDefinitionSha256:taskXML(),
+   wrapperSha256:sha256(fileBytes(WRAPPER,WRITER,131072)),
+   targetSha256:sha256(fileBytes(TARGET,WRITER,131072))
+  });
+ }catch{return projectSidecarBManifestPreimageReadonly(null);}
 }
