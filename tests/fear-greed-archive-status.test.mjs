@@ -144,7 +144,7 @@ test('a changed Sidecar script fails closed without attributing an unknown reaso
  fs.writeFileSync(path.join(dir,'run-original-then-archive.vbs'),'WScript.Quit 0\n');
  fs.writeFileSync(path.join(dir,'last-run.json'),JSON.stringify({status:'BLOCKED',reason:'SECRET_DYNAMIC'}));
  const r=inspectSidecarSourceGate(f.dataRoot);
- assert.deepEqual(r.scriptStatus.map(x=>x.status),['CHANGED','CHANGED']);
+ assert.deepEqual(r.scriptStatus.map(x=>x.status),['CHANGED','CHANGED','MISSING','MISSING']);
  assert.equal(r.matchingErrorSite,'NOT_CHECKED');
  assert.deepEqual(r.gatePatternCategories,[]);
  assert.deepEqual(r.matchedGateCategories,[]);
@@ -175,7 +175,7 @@ test('Sidecar source symlink and oversized script are rejected without external 
  fs.writeFileSync(path.join(dir,'run-original-then-archive.vbs'),'x'.repeat(131073));
  fs.writeFileSync(path.join(dir,'last-run.json'),JSON.stringify({reason:'SOURCE_FAILURE'}));
  const r=inspectSidecarSourceGate(f.dataRoot);
- assert.deepEqual(r.scriptStatus.map(x=>x.status),['UNSAFE','INVALID_SIZE']);
+ assert.deepEqual(r.scriptStatus.map(x=>x.status),['UNSAFE','INVALID_SIZE','MISSING','MISSING']);
  assert.equal(r.matchingErrorSite,'NOT_CHECKED');
  assert.doesNotMatch(JSON.stringify(r),/SECRET_OUTSIDE_ROOT|SOURCE_FAILURE/);
 });
@@ -445,4 +445,36 @@ test('read-only Sidecar diagnosis accepts only explicitly pinned source generati
  assert.equal(unknown.matchingErrorSite,'NOT_CHECKED');
  assert.deepEqual(unknown.matchedGateCategories,[]);
  assert.equal(digest(fs.readFileSync(f.dbFile)),before);
+});
+
+test('fixed R10 child source can localize an exact reason without leaking source or modifying SQLite',()=>{
+ const f=fixture(),dir=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(dir);
+ const scripts={
+  'archive-run.mjs':'const run=true;\n',
+  'run-original-then-archive.vbs':'WScript.Echo "archive-run.mjs"\n',
+  'archive-core-r10.mjs':"const approvedSourceSha=config.source;\nthrow Error('SOURCE_SHA_GATE_PRIVATE');\n",
+  'verified-checks-r10.mjs':'const check=true;\n',
+ };
+ const past=new Date(Date.now()-30000);
+ for(const [name,body] of Object.entries(scripts)){
+  fs.writeFileSync(path.join(dir,name),body);
+  fs.utimesSync(path.join(dir,name),past,past);
+ }
+ fs.writeFileSync(path.join(dir,'last-run.json'),JSON.stringify({status:'BLOCKED',reason:'SOURCE_SHA_GATE_PRIVATE'}));
+ const before=digest(fs.readFileSync(f.dbFile));
+ const expectedHashes=Object.fromEntries(Object.entries(scripts).map(([name,body])=>[name,digest(body)]));
+ const good=inspectSidecarSourceGate(f.dataRoot,{expectedHashes});
+ assert.deepEqual(good.scriptStatus.map(x=>x.status),['MATCH','MATCH','MATCH','MATCH']);
+ assert.equal(good.matchingErrorSite,'UNIQUE');
+ assert.equal(good.matchedScript,'archive-core-r10.mjs');
+ assert.equal(good.siteLine,2);
+ assert.deepEqual(good.matchedGateCategories,['SOURCE_APPROVAL_REFERENCE']);
+ assert.doesNotMatch(JSON.stringify(good),/SOURCE_SHA_GATE_PRIVATE|config\.source/);
+ const changed=inspectSidecarSourceGate(f.dataRoot,{expectedHashes:{...expectedHashes,'verified-checks-r10.mjs':digest('other')}});
+ assert.equal(changed.matchingErrorSite,'NOT_CHECKED');
+ assert.deepEqual(changed.matchedGateCategories,[]);
+ assert.equal(digest(fs.readFileSync(f.dbFile)),before);
+ assert.equal(good.operationalWrites,0);
+ assert.equal(good.d1Writes,0);
+ assert.equal(good.providerCalls,0);
 });
