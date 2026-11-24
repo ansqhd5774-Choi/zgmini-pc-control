@@ -251,3 +251,27 @@
 - #29 Bundle Size CI: **실측 수집·아티팩트·main 반영 완료**, 장기 baseline 기반 자동 비교는 미완료.
 - 따라서 12종 중 **4종에 소스 개선이 반영**, 나머지 8종은 원래 검토·보류 또는 선별 단계 유지. **12/12 전체 개선 완료나 금융 데이터·운영 수집 정상화 100%로 보고하지 않는다.**
 - 다음 단계는 #8/#24의 **실제 Lighthouse 측정 환경·비용·오탐 분리** 검토 또는 #25/#23의 **기존 Playwright 한정 접근성/크로스브라우저 보완**. #29 기준선을 자동 비교할 때에는 기존 실제 main 아티팩트를 읽는 안전한 방법과 권한·계약을 먼저 검증한다.
+
+
+## R2 #8 Performance Budget / #24 Performance CI 실험 판정 — 2026-11-25
+
+**판정:** 현재 두 기능 모두 **DEFERRED/UNVERIFIED**. 이번 실험의 신규 소스·Workflow 변경은 실제 main에 **0건 병합**. 자동 Budget Gate **도입 0건**, 유효한 TTFB/FCP/LCP/CLS/Lighthouse 측정값 **0건**. 이는 운영 홈페이지의 성능 장애를 뜻하지 않는다.
+
+### 확인한 원인·구분 증거
+
+| 시도 | 실제 Run | 기존 검증과 실패 조건 | 판정 |
+|---|---|---|---|
+| 공식 [Lighthouse CI v0.16.1](https://github.com/GoogleChrome/lighthouse-ci/releases/tag/v0.16.1) + `vinext start`를 기존 Node CI에서 호출 | [#45485529459](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45485529459) | Build·기존 번들 기록 성공. 일반 Node 런타임에서 `cloudflare:` 모듈을 import하지 못해 로컬 preview 기동 실패 | 로컬 실행 환경 문제, 성능 점수 미측정 |
+| 공식 Cloudflare Workers `vite preview` + Lighthouse | [#45485882649](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45485882649) | `vite preview` 실제 HTTP 준비 PASS, LHCI `Running Lighthouse 1 time(s)` 확인, 단일 호출이 **4분 timeout** | 정상 Node PR 전체 검사에 추가하기엔 과도한 자원·실행시간; 철회 |
+| 기존 Playwright Chromium·브라우저 Performance API 재사용, `domcontentloaded` | [#45487121357](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45487121357) | 기존 Playwright 18개 단계, 로컬 프로덕션 Build PASS. `page.goto` **20초 timeout** | 실측 없음. 소스 변경으로 운영 UI 실패 주장 금지 |
+| 로컬 HTTP 응답 `commit`과 실제 `main` 렌더링 분리 | [#45488535706](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45488535706) | 기존 Playwright 18개 단계, 로컬 Build PASS. `page.goto(waitUntil:'commit')`도 20초 timeout | 다른 로딩 wait 조건에서도 재현. 기능 미완료 |
+
+- 위 단계에서 기존 본체 [Node CI #45487121599](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45487121599), [#45488535644](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45488535644)는 **SUCCESS**; CodeQL·Secret Scan도 성공. 신규 파서·예산 계약 회귀시험 6건 포함 5,838 PASS / 0 FAIL이었으나, 이 fixture 결과를 실제 성능 측정 성공으로 간주하지 않는다.
+- 기존 정상 Node.js CI 및 Playwright Workflow에 무검증 성능 검사를 강제하지 않기 위해 [PR #1587](https://github.com/ansqhd5774-Choi/zgmini/pull/1587)은 **CLOSED/unmerged**로 종료했다. 정확한 main readback에서 신규 측정 단계는 존재하지 않았음. 브랜치의 임시 `scripts/ci-browser-performance.mjs`와 회귀시험은 main에 반영하지 않았다.
+- 이 실험 때문에 만들어진 CI Issue [#1588](https://github.com/ansqhd5774-Choi/zgmini/issues/1588)·[#1591](https://github.com/ansqhd5774-Choi/zgmini/issues/1591)는 원본 실패·후속 원인·철회 근거를 기록한 뒤 `CLOSED/not_planned` 처리했다. **오류가 해결됐다고 속이지 않고 실험 기능 철회로 종결**. 타 담당 [#1582](https://github.com/ansqhd5774-Choi/zgmini/issues/1582) 등 독립 Issue는 건드리지 않았다.
+
+### 적용 효과와 앞으로의 기준
+
+- 기존 #12·#19·#1·#29의 4종 main 반영 및 유효 검증을 보존한다. **R2 누적 실제 코드 고도화 4/12**, #8·#24 신규 고도화 채택 0건. 실패한 실험의 CI를 6/12 실구현이나 웹 운영 성능 개선으로 계산하지 않는다.
+- 무작정 타임아웃을 늘리거나 실패한 검사를 `continue-on-error`로 숨기거나 사용자 Production을 일반 성능 fixture로 삼지 않는다. 외부 Lighthouse 임시 서버 업로드·유료 서비스·Runner/cron 추가 금지 유지.
+- 다음 독립 후보는 #25 Accessibility CI 또는 #23 Cross-browser CI. 현 정상 Playwright와 기존 모바일/데스크톱 검사 재사용을 우선하며, 경량·실행비용·접근성 오류 유효 증거가 있는 변경만 정규 병합한다. #8/#24는 로컬 Workers Browser 탐색의 실제 원인이 **새 증거**로 확인되기 전 동일 조건을 반복하지 않는다.
