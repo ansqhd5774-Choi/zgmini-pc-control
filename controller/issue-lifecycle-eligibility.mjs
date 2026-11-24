@@ -10,6 +10,7 @@ const APPROVED = Object.freeze({
   'release-calendar-runtime-readonly': new Set(['RELEASE_CALENDAR_SOURCE_INVENTORY_READONLY'])
 });
 const validText = value => typeof value === 'string' && value.length > 0;
+const validSha = value => typeof value === 'string' && /^[a-f0-9]{40}$/i.test(value);
 const deny = reason => ({eligible:false,reason});
 /**
  * @param {object} input
@@ -32,6 +33,19 @@ export function classifyIssueCompletion({issue,request,result,evidence,intent} =
   if (!boundRequest || typeof boundRequest !== 'object' || Array.isArray(boundRequest) ||
       boundRequest.schema !== request.schema || boundRequest.operation !== request.operation ||
       boundRequest.requestId !== request.requestId) return deny('ISSUE_BODY_UNVERIFIED');
+  if (!validSha(request.sourceSha) || !validText(request.sourceRepository) ||
+      !validText(request.sourceBranch) || boundRequest.sourceSha !== request.sourceSha ||
+      boundRequest.sourceRepository !== request.sourceRepository ||
+      boundRequest.sourceBranch !== request.sourceBranch ||
+      result.requestedSourceSha !== request.sourceSha ||
+      result.sourceRepository !== request.sourceRepository ||
+      result.sourceBranch !== request.sourceBranch) return deny('SOURCE_IDENTITY_MISMATCH');
+  if (result.schema !== 'ZGMINI_PC_RESULT_V1' ||
+      result.controlRepository !== 'ansqhd5774-Choi/zgmini-pc-control')
+    return deny('RECEIPT_SCHEMA_UNVERIFIED');
+  if (!validSha(result.controlSourceSha) ||
+      result.actualExecutionSha !== result.controlSourceSha)
+    return deny('EXECUTION_IDENTITY_MISMATCH');
   // process-inventory uses a different receipt schema; do not auto-admit it here.
   if (request.schema !== 'ZGMINI_PC_JOB_V1') return deny('SCHEMA_NOT_APPROVED');
   if (!validText(request.requestId) || !validText(request.operation) ||
