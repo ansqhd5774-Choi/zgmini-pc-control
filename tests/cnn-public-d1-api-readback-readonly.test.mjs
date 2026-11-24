@@ -114,13 +114,13 @@ test('API outage never masquerades as bad D1 content',()=>{
  assert.equal(result.api.periods['1D'].status,'UNAVAILABLE');
 });
 test('local data missing date stops before remote read',async()=>{
- const f=fixture();f.local.local.checks.recentDates=[];
+ const f=fixture();f.local.local.checks.recentDates=[];let calls=0;
  const result=await inspectCnnPublicReadback(root,{
   localProbe:()=>f.local,
-  queryFixed:async()=>f.rows,fetchFixed:async period=>f.replies[period],
+  queryFixed:async()=>{calls++;return f.rows;},fetchFixed:async period=>f.replies[period],
   clock:()=>Date.parse(DAY+'T10:40:00.000Z')
  });
- assert.equal(result.code,'CNN_LOCAL_DAY_INCOMPLETE');
+ assert.equal(result.code,'CNN_LOCAL_DAY_INCOMPLETE');assert.equal(calls,0);
 });
 test('old source cannot be validated as a current 1D point',async()=>{
  const f=fixture();let calls=0;
