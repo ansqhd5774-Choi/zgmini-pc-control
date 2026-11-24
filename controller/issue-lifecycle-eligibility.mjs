@@ -1,0 +1,93 @@
+/**
+ * Pure, offline-only lifecycle eligibility classifier.
+ * NOT connected to upload.mjs, GitHub mutations or operating PCs.
+ * Every caller must bind trusted issue, approved intent and verified artifacts.
+ * Fail closed on ambiguous evidence. This module does not close issues.
+ */
+const APPROVED = Object.freeze({
+  'core-runtime-source-readonly': new Set(['CORE_RUNTIME_SOURCE_VERIFIED']),
+  'fear-greed-archive-status': new Set(['FEAR_GREED_ARCHIVE_READONLY_DIAGNOSIS']),
+  'release-calendar-runtime-readonly': new Set(['RELEASE_CALENDAR_SOURCE_INVENTORY_READONLY'])
+});
+const validText = value => typeof value === 'string' && value.length > 0;
+const validSha = value => typeof value === 'string' && /^[a-f0-9]{40}$/i.test(value);
+const deny = reason => ({eligible:false,reason});
+/**
+ * @param {object} input
+ * @param {object} input.issue - trusted GitHub Issue snapshot
+ * @param {object} input.request - validated original request body
+ * @param {object} input.result - complete result JSON from pinned remote file
+ * @param {object} input.evidence - independently verified artifact and comment details
+ * @param {object} input.intent - separate approved intent, NOT derived from the untrusted title
+ * @returns {{eligible:boolean,reason:string}}
+ */
+export function classifyIssueCompletion({issue,request,result,evidence,intent} = {}) {
+  if (!issue || !request || !result || !evidence || !intent) return deny('MISSING_INPUT');
+  if (issue.state !== 'open' || !Number.isSafeInteger(issue.number) || issue.number < 1) return deny('ISSUE_NOT_OPEN');
+  if (intent.autoCloseEnabled !== true) return deny('DEFAULT_OFF');
+  if (intent.kind !== 'SINGLE_READONLY_DIAGNOSTIC' || intent.objectiveSatisfied !== true ||
+      intent.approvedByIndependentPolicy !== true) return deny('OBJECTIVE_UNVERIFIED');
+  // Verify original GitHub Issue body, not only caller-supplied request data.
+  let boundRequest;
+  try { boundRequest = JSON.parse(issue.body); } catch { return deny('ISSUE_BODY_UNVERIFIED'); }
+  if (!boundRequest || typeof boundRequest !== 'object' || Array.isArray(boundRequest) ||
+      boundRequest.schema !== request.schema || boundRequest.operation !== request.operation ||
+      boundRequest.requestId !== request.requestId) return deny('ISSUE_BODY_UNVERIFIED');
+  if (!validSha(request.sourceSha) || !validText(request.sourceRepository) ||
+      !validText(request.sourceBranch) || boundRequest.sourceSha !== request.sourceSha ||
+      boundRequest.sourceRepository !== request.sourceRepository ||
+      boundRequest.sourceBranch !== request.sourceBranch ||
+      result.requestedSourceSha !== request.sourceSha ||
+      result.sourceRepository !== request.sourceRepository ||
+      result.sourceBranch !== request.sourceBranch) return deny('SOURCE_IDENTITY_MISMATCH');
+  if (result.schema !== 'ZGMINI_PC_RESULT_V1' ||
+      result.controlRepository !== 'ansqhd5774-Choi/zgmini-pc-control')
+    return deny('RECEIPT_SCHEMA_UNVERIFIED');
+  if (!validSha(result.controlSourceSha) ||
+      result.actualExecutionSha !== result.controlSourceSha)
+    return deny('EXECUTION_IDENTITY_MISMATCH');
+  // process-inventory uses a different receipt schema; do not auto-admit it here.
+  if (request.schema !== 'ZGMINI_PC_JOB_V1') return deny('SCHEMA_NOT_APPROVED');
+  if (!validText(request.requestId) || !validText(request.operation) ||
+      request.requestId !== result.requestId || request.operation !== result.operation ||
+      intent.requestId !== request.requestId) return deny('REQUEST_MISMATCH');
+  if (!Object.hasOwn(APPROVED, request.operation) || !APPROVED[request.operation].has(result.code))
+    return deny('OPERATION_CODE_NOT_APPROVED');
+  if (result.result?.status !== 'PASS' || result.result?.code !== result.code ||
+      result.exitCode !== 0) return deny('NESTED_RESULT_MISMATCH');
+  if (result.status !== 'PASS' || result.firstFail != null ||
+      result.protectedStateUnchanged !== true) return deny('RESULT_NOT_SAFE_PASS');
+  if (result.operationalWrites !== 0 || result.providerCalls !== 0 || result.d1Writes !== 0)
+    return deny('UNSAFE_SIDE_EFFECTS');
+  if (!/^[0-9a-f]{64}$/i.test(String(result.protectedBeforeSha256 ?? '')) ||
+      result.protectedAfterSha256 !== result.protectedBeforeSha256)
+    return deny('PROTECTED_STATE_HASH_MISMATCH');
+  // Parent PASS is not proof that nested observations are complete.
+  if (result.result?.earningsApiRequestObservations?.status === 'STATE_UNKNOWN' ||
+      result.result?.earningsApiRequestObservations?.coverage === 'PARTIAL' ||
+      result.result?.earningsApiRequestObservations?.tailTruncated === true)
+    return deny('NESTED_OBSERVATION_INCOMPLETE');
+  if (result.reportTransfer?.status === 'SUMMARY_ONLY' || evidence.reportTransfer === 'SUMMARY_ONLY' ||
+      result.result?.inventoryTruncated === true || result.result?.operationalReadiness === 'NOT_ASSERTED' && intent.requiresOperationalReadiness === true)
+    return deny('PARTIAL_EVIDENCE');
+  // The deployed PC result contract carries jobId=run-<run>-<attempt>-seat-<seat>, not runId.
+  const canonicalJobId = `run-${evidence.runId}-${evidence.attempt}-seat-${evidence.seat}`;
+  if (evidence.issueNumber !== issue.number || evidence.requestId !== request.requestId ||
+      !/^[0-9]{1,20}$/.test(String(evidence.runId ?? '')) ||
+      result.jobId !== canonicalJobId || !Number.isSafeInteger(evidence.attempt) ||
+      evidence.attempt < 1 || !Number.isSafeInteger(evidence.seat) || evidence.seat < 1 ||
+      evidence.seat > 6) return deny('PROVENANCE_MISMATCH');
+  if (evidence.jsonVerified !== true || evidence.txtVerified !== true ||
+      evidence.commentVerified !== true || evidence.runConcludedSuccessfully !== true)
+    return deny('RECEIPT_NOT_VERIFIED');
+  if (request.operation === 'core-runtime-source-readonly' &&
+      result.result?.runtimeSourceVerified !== true) return deny('RUNTIME_SOURCE_UNVERIFIED');
+  if (intent.requiresRuntimeSourceVerified === true &&
+      result.result?.runtimeSourceVerified !== true) return deny('RUNTIME_SOURCE_UNVERIFIED');
+  if (intent.requiresCoreLockReleased === true &&
+      result.result?.core?.lockPresent !== false) return deny('CORE_LOCK_NOT_RELEASED');
+  // Eligibility is not an authorization token. No automated GitHub state mutation.
+  return Object.freeze({eligible:true,closeAuthorized:false,requiresHumanReview:true,
+    reason:'ELIGIBLE_FOR_HUMAN_REVIEW_ONLY'});
+}
+export const approvedDiagnosticCodes = Object.freeze(Object.keys(APPROVED));
