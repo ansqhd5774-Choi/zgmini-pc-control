@@ -48,3 +48,23 @@ test('optional W05 receipt fixture executes on installed-base trees that contain
  // Only fixture existence is optional. No operative protection assertion is removed.
  assert.match(workflow,/name: Run scoped maintenance and Controller runtime safety regressions/);
 });
+
+test('Controller integration workflow triggers for owning source edits',()=>{
+ const y=fs.readFileSync(new URL('../.github/workflows/controller-maintenance-source-tests.yml',import.meta.url),'utf8');
+ const trigger=y.slice(0,y.indexOf('\npermissions:'));
+ const required=[
+  'tools/maintenance-agent.mjs',
+  'tools/source-bundle-register.mjs',
+  'controller/engine.mjs',
+  'controller/memory-admission.mjs'
+ ];
+ for(const p of required){
+  assert.ok(trigger.includes("      - '"+p+"'"),'missing PR trigger: '+p);
+  assert.deepEqual(selectGroups([p]),GROUPS);
+ }
+ assert.match(y,/tests\/maintenance-agent\.test\.mjs/);
+ assert.match(y,/tests\/source-bundle-register\.test\.mjs/);
+ assert.match(y,/tests\/engine\.test\.mjs/);
+ assert.match(y,/runs-on: \[self-hosted, Windows, X64, zgmini-handoff-ci-isolated\]/);
+ assert.doesNotMatch(trigger,/schedule:|workflow_dispatch:/);
+});
