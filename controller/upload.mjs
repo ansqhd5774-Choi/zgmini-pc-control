@@ -1,5 +1,5 @@
 import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';import {need,exclusive,readAllPages} from './common.mjs';
-import {renderBoundedReport,uploadVerifiedReportPair,resolveUploadPolicy,hasVerifiedReportComment} from './report-upload-verified.mjs';
+import {renderBoundedReport,uploadVerifiedReportPair,resolveUploadPolicy,hasVerifiedReportComment,confirmVerifiedReportComment} from './report-upload-verified.mjs';
 import {cleanupVerifiedJobTemps} from './report-temp-retention.mjs';
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const token=process.env.GITHUB_TOKEN;need(token,'REPORT_AUTH_MISSING');
@@ -23,13 +23,14 @@ const body=`${marker}\n**${report.status} — ${report.code}**${scopeNotice}\n\n
 const allComments=()=>readAllPages(async page=>{const r=await api(`issues/${pointer.issueNumber}/comments?per_page=100&page=${page}`);need(r.status===200,'REPORT_COMMENTS_LOOKUP_FAILED');return r.data;});
 let comments=await allComments();
 if(!hasVerifiedReportComment(comments,{marker,body})){try{const post=await api(`issues/${pointer.issueNumber}/comments`,'POST',{body});need(post.status===201,'REPORT_COMMENT_WRITE_FAILED');}catch(error){comments=await allComments();need(hasVerifiedReportComment(comments,{marker,body}),'REPORT_COMMENT_OUTCOME_UNKNOWN');}}
+// A successful POST response is not enough: require exact remote bot receipt.
+// Read-only bounded retries absorb GitHub indexing delay; never repeat POST.
+await confirmVerifiedReportComment({readComments:allComments,marker,body});
 console.log(JSON.stringify({status:'REPORT_UPLOADED',issueNumber:pointer.issueNumber,resultFiles:files.length,artifactBytes:0,runUrl}));
-// The report is already published. An optional cleanup failure cannot cause a
-// duplicate execution, retroactively fail upload, or remove recovery evidence.
-let commentVerified=false;
-try{commentVerified=(await allComments()).some(x=>x.user?.login==='github-actions[bot]'&&x.body===body);}catch{}
+// Only after the durable JSON/TXT pair and matching comment are confirmed may
+// optional local temporary cleanup begin; its failure remains non-fatal.
 const cleanup=cleanupVerifiedJobTemps({root,runId,attempt,seat,issueNumber:pointer.issueNumber,
- report,remoteFilesVerified:files.length===2,commentVerified});
+ report,remoteFilesVerified:files.length===2,commentVerified:true});
 console.log(JSON.stringify({tempCleanup:cleanup.status,code:cleanup.code??null,removedFiles:cleanup.files??0}));
 }finally{releaseUpload();}
 
