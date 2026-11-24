@@ -1,0 +1,15 @@
+{
+  "schema": "ZGMINI_CONTROLLER_SELECTIVE_PIN_V1",
+  "installedSha": "03fdedc58e0aadf207f04bc66cb08580dc3d113f",
+  "targetSha": "ff105611be1bd67bb12e6ecc4abdd93d27464338",
+  "sourceMainSha": "270733b3468f09f5e528e722eefe4e12b03a79b0",
+  "targetBranch": "codex/w05-5key-lib-controller-singleparent-03fd-20261124",
+  "customPaths": [],
+  "allowFiles": [
+    {
+      "path": "controller/w05-five-key-d1-api-readback-readonly.mjs",
+      "sha256": "5a4afcf3b617d5e093e5772270b8e2ae7856ca6d53781a3f9e3de498ac3aca93"
+    }
+  ],
+  "approvalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1"
+}
