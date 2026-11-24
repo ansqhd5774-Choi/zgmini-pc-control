@@ -310,3 +310,11 @@
 - 본체 [Draft PR #1594](https://github.com/ansqhd5774-Choi/zgmini/pull/1594), 작업 브랜치 codex/ci-crossbrowser-core-r2-20261125. Firefox/WebKit × 로컬 /·/about/ × 390/1440 = 8조합. 외부 요청 차단, API 503 UNAVAILABLE. HTTP 200·main 존재 검사 및 overflow/JS 오류 건수만 기록.
 - 정확 최신 후보 HEAD f7a0cb80b1037fc954c5ff60bda65ee2a695273d는 #25와 #24 및 기존 18개 Chromium 테스트를 함께 유지하는 비강제 병합 커밋. 최신 CI·브라우저 8조합 결과/Artifact 검증 진행 중.
 - #23의 실제 Run·JSON readback 및 main 병합 전에는 6/12에 산입하지 않는다. 독립 작업 장애 Issue를 이 PR로 묶거나 임의 종결하지 않는다.
+
+
+### #23 Cross-browser CI 검증·main 병합 완료 — 2026-11-25
+
+- 본체 [PR #1594](https://github.com/ansqhd5774-Choi/zgmini/pull/1594) → main 정규 병합 SHA 6d965f47d34e5ce5bb1544d2be2dc04cedf79472. 최신 통합 HEAD f7a0cb80b1037fc954c5ff60bda65ee2a695273d의 [Node #45494289109](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45494289109), [CodeQL #45494288990](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45494288990), [Secret #45494289227](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45494289227), [Playwright #45494289070](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45494289070): **4/4 SUCCESS**.
+- 정확 브라우저 Job 138800520577에서 기존 Chromium 18개 테스트, #24 Performance Lab, #25 axe 접근성, #23 Firefox/WebKit 모두 SUCCESS. CI_CROSS_BROWSER_OBSERVED: Firefox·WebKit × 모바일390/PC1440 × 로컬 홈/소개 8/8에서 overflowPx=0, javascriptErrors=0. CI_AXE_OBSERVED는 두 viewport 각각 위반 규칙 0/미판정 규칙 1. 실제 아티팩트 community-chat-browser-r1 / id 14966389707 생성 확인.
+- 본체 main 재조회 SHA 6d965f47d34e5ce5bb1544d2be2dc04cedf79472. main Workflow에 기존 Chromium 18 검사·성능·axe·Firefox/WebKit·7일 아티팩트 보존 모두 남고 cross-browser 구현 및 테스트 2파일도 실제 readback 확인. 신규 Workflow/Runner/예약/운영 PC/DB/D1/Cloudflare 직접 변경 없음.
+- **R2 소스 고도화 누적 7/12종(약 58.3%)**: 기존 4종 (#12/#19/#1/#29) + #24 성능 실측 + #25 접근성 + #23 교차 브라우저. **#8 Performance Budget은 비교·승인 계약만 존재하고 실제 정책 임계치/PR gate는 NOT_CONFIGURED**, Lighthouse 점수와 Production 실제 사용자 체감/전후 개선율은 여전히 미확인. 기존 검토 목록 나머지 선정 항목의 구현은 별도 미완료, 본 기록으로 완료를 주장하지 않는다.
