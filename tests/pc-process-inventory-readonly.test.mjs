@@ -1896,3 +1896,49 @@ test('CNN guard classifier includes exact source and approved names rather than 
  const d=classifyPinnedCnnGuardOrigin(make('irrelevant'),'b'.repeat(40));
  assert.equal(d.fixedShaGuardReference,'UNVERIFIED');
 });
+
+test('CNN pinned source-guard windows do not double count an adjacent guard',async()=>{
+ const {classifyPinnedCnnGuardOrigin,projectCnnGitEvidence}=
+  await import('../controller/cnn-sidecar-git-predicates-readonly.mjs');
+ const pin='a'.repeat(40),approved='b'.repeat(40);
+ const make=()=>Array.from({length:26},(_,i)=>i===0?
+  'const APPROVED_SOURCE_SHA="'+pin+'";':'const noop=0;');
+ const classify=lines=>classifyPinnedCnnGuardOrigin(lines.join('\n'),approved);
+ let lines=make();
+ lines[18]="if (a) need(true,'OTHER');";
+ lines[20]="if (head!==APPROVED_SOURCE_SHA) need(false,'SOURCE SHA');";
+ lines[22]="if (dirty) need(false,'DIRTY');";
+ let result=classify(lines);
+ // Prior [19,22) and [21,24) scans both included physical line 21.
+ assert.equal(result.fixedShaRelation,'MISMATCH');
+ assert.equal(result.fixedShaGuardReference,'LINE_21');
+ lines=make();
+ lines[18]="if (a) need(true,'OTHER');";
+ lines[20]="if (b) need(true,'OTHER');";
+ lines[22]="if (head!==APPROVED_SOURCE_SHA) need(false,'SOURCE SHA');";
+ result=classify(lines);
+ assert.equal(result.fixedShaGuardReference,'LINE_23');
+ lines[18]="if (head!==APPROVED_SOURCE_SHA) need(false,'SOURCE SHA');";
+ assert.equal(classify(lines).fixedShaGuardReference,'MULTIPLE_CANDIDATE_GUARDS');
+ lines=make();
+ lines[18]="if (head !== (";
+ lines[19]="APPROVED_SOURCE_SHA)) need(false,'SOURCE SHA');";
+ lines[20]="if (other) need(true,'OTHER');";
+ lines[22]="if (dirty) need(false,'DIRTY');";
+ assert.equal(classify(lines).fixedShaGuardReference,'LINE_19');
+ lines=make();
+ lines[18]="if (other) need(true,'OTHER');";
+ lines[20]="if (other) need(true,'OTHER');";
+ lines[22]="if (dirty) need(false,'DIRTY');";
+ assert.equal(classify(lines).fixedShaGuardReference,'NOT_REFERENCED_IN_CANDIDATE_GUARDS');
+ assert.equal(classify(lines).gitBinaryClass,'UNVERIFIED');
+ assert.doesNotMatch(JSON.stringify(result),/aaaaaaaaaaaaaaaa|bbbbbbbbbbbb/);
+ const output=projectCnnGitEvidence({sourcePin:true,ledgerStable:true,
+  ledgerStatus:'BLOCKED',head:approved,approved,checkpoint:approved,
+  gitVerified:true,trackedClean:true,wholeTreeClean:true,guardOrigin:result});
+ assert.equal(output.failurePredicateResolved,false);
+ assert.equal(output.sidecarFailureResolved,false);
+ assert.equal(output.operationalWrites,0);
+ assert.equal(output.providerCalls,0);
+ assert.equal(output.d1Writes,0);
+});
