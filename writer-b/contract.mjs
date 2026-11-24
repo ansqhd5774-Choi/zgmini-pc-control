@@ -2,6 +2,7 @@
 // This module never executes a shell, opens a PC file or applies a change.
 import {createHash} from 'node:crypto';
 import {validateInsertions} from './insert-only-patch.mjs';
+import {isReservedCoreMaintenance} from './core-idle-window.mjs';
 
 export const OPERATION='pc-writer-source-install';
 export const ISSUE_TITLE='pc-writer-source-install';
@@ -58,7 +59,7 @@ export function validateWriterBManifest(manifest){
  const maintenance=Object.hasOwn(manifest??{},'coreMaintenance');
  need(exact(manifest,maintenance?[...APPROVAL_KEYS,'coreMaintenance']:APPROVAL_KEYS),
   'WRITER_B_MANIFEST_FIELDS_STOP');
- if(maintenance)need(manifest.coreMaintenance==='PAUSE_NEW_STARTS_DRAIN_360S_V1'&&
+ if(maintenance)need(isReservedCoreMaintenance(manifest.coreMaintenance)&&
   SHA64.test(manifest.runtimeDependencies?.taskXmlSha256??''),
   'WRITER_B_MAINTENANCE_APPROVAL_STOP');
  need(manifest.schema===APPROVAL_SCHEMA&&manifest.status==='APPROVED_B'&&
