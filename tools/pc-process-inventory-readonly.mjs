@@ -405,8 +405,20 @@ export function project2960MaintenanceStatus(raw){
   schema:'ZGMINI_W05_2960_MAINTENANCE_READONLY_V1',codePrefix:'W05_2960'});
 }
 export function project3409MaintenanceStatus(raw){
- return projectFixedMaintenanceStatus(raw,{requestId:TARGET3409,
+ const out=projectFixedMaintenanceStatus(raw,{requestId:TARGET3409,
   schema:'ZGMINI_W04_3409_MAINTENANCE_READONLY_V1',codePrefix:'W04_3409'});
+ const b=out.recoveryEvidence?.backlog;
+ const w=raw?.recoveryEvidence?.requestId===TARGET3409?
+  raw.recoveryEvidence?.backlog?.pauseWindow:null;
+ const utc=v=>typeof v==='string'&&
+  /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/.test(v)&&
+  Number.isFinite(Date.parse(v))?v:null;
+ const paused=utc(w?.pausedAt),resumed=utc(w?.resumedAt);
+ // The window alone is observational evidence, never an install-recovery GO.
+ if(b)b.pauseWindow=b.windows===1&&b.openWindows===0&&paused&&resumed&&
+  Date.parse(resumed)>=Date.parse(paused)?
+  {pausedAt:paused,resumedAt:resumed}:null;
+ return out;
 }
 // Compare only the exact #2960 approved protected snapshot, never dump its
 // file hashes, local paths, secrets or current operating configuration.
