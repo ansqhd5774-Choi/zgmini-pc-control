@@ -7,6 +7,8 @@ on:
       - 'controller/sector-r3-dated-ledger-readonly.mjs'
       - 'controller/sector-r3-d1-api-readback-readonly.mjs'
       - 'controller/operations.mjs'
+      - 'controller/w05-five-key-d1-api-readback-readonly.mjs'
+      - 'tests/w05-five-key-controller-readonly.test.mjs'
       - 'tests/d05-lineage-readonly.test.mjs'
       - 'tests/sector-r3-dated-ledger-readonly.test.mjs'
       - 'tests/sector-r3-d1-api-readback-readonly.test.mjs'
@@ -50,3 +52,5 @@ jobs:
           )
       - name: Run D05 isolated read-only fixture tests
         run: node --test --test-concurrency=1 tests/d05-lineage-readonly.test.mjs tests/sector-r3-dated-ledger-readonly.test.mjs tests/sector-r3-d1-api-readback-readonly.test.mjs
+      - name: Run W05 fixed five-key Controller A source-only regression tests
+        run: node --test --test-concurrency=1 tests/w05-five-key-controller-readonly.test.mjs
