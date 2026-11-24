@@ -764,6 +764,8 @@ test('STAGED partial intake journal and matching recovery owner are summarized w
   assert.equal(result.artifacts.snapshotRoot,'ABSENT');
   assert.equal(result.artifacts.stagedHost,'PRESENT');
   assert.equal(result.backlog.openWindows,1);
+  assert.deepEqual(result.backlog.pauseWindow,{
+   pausedAt:'2026-11-18T04:18:00Z',resumedAt:null});
   assert.equal(result.lease.ownerMarkerMatch,true);
   const txt=JSON.stringify(result);
   assert.equal(txt.includes(nonce),false);
