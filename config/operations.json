@@ -8,6 +8,7 @@
     "runner-smoke": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "core-status": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "d05-lineage-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
+    "d05-market-final-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "sector-r3-dated-ledger-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "sector-r3-d1-api-readback-readonly": {"grade":"A","timeoutSeconds":90,"resource":"light"},
     "core-runtime-source-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
