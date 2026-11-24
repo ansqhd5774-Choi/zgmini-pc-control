@@ -121,6 +121,34 @@ function mockIO({failAt=null,rollbackFail=false,dirtyTarget=false,
 }
 
 const maintenanceAuth=()=>auth({coreMaintenance:'PAUSE_NEW_STARTS_DRAIN_360S_V1'});
+const extendedMaintenanceAuth=()=>auth({coreMaintenance:'PAUSE_NEW_STARTS_DRAIN_1200S_V1'});
+test('explicitly approved long drain keeps Core paused until natural finish, then restores',async()=>{
+ const {io,state}=mockIO({failAt:'window'});
+ let running=true;
+ io.waitForCoreDrain=async()=>{
+  assert.equal(state.coreEnabled,false);
+  assert.equal(state.head,manifest().baseHead);
+  state.steps.push('long-running-core-finishes');running=false;
+ };
+ const originalQuiet=io.assertCoreQuiet;
+ io.assertCoreQuiet=async()=>{assert.equal(running,false);await originalQuiet();};
+ const out=await performWriterBInstall(extendedMaintenanceAuth(),io);
+ assert.equal(out.status,'WRITER_B_INSTALLED_VERIFIED');
+ assert.ok(state.steps.indexOf('long-running-core-finishes')<state.steps.indexOf('switch'));
+ assert.equal(state.coreEnabled,true);
+ assert.equal(state.retained,false);
+ assert.equal(state.steps.some(step=>step.startsWith('window')),false);
+});
+test('long drain timeout restores source, config and Task without switching files',async()=>{
+ const {io,state}=mockIO({failAt:'drain'});
+ const out=await performWriterBInstall(extendedMaintenanceAuth(),io);
+ assert.equal(out.status,'WRITER_B_INSTALL_STOP_RESTORED');
+ assert.equal(state.coreEnabled,true);
+ assert.equal(state.head,manifest().baseHead);
+ assert.equal(state.config,manifest().baseHead);
+ assert.equal(state.steps.includes('switch'),false);
+ assert.equal(state.retained,false);
+});
 test('approved maintenance stages before inhibition and drains active Core without natural-idle lottery',async()=>{
  const {io,state}=mockIO({failAt:'window'});
  let active=true;
