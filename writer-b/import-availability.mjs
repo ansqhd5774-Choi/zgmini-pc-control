@@ -44,6 +44,7 @@ function sourceTokens(code){
    while(previous>=0&&/\s/.test(code[previous]))previous--;
    const last=out.at(-1);
    const startsExpression=previous<0||'([{:;,=!?&|'.includes(code[previous])||
+    (code[previous]==='>'&&code[previous-1]==='=')||
     (last?.kind==='word'&&['return','throw','case','yield','await'].includes(last.value));
    if(startsExpression){
     let end=i+1,characterClass=false,escaped=false,closed=false;
