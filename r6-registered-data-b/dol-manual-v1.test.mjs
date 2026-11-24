@@ -216,6 +216,7 @@ test('sealed DOL B authorization supplies manual intent only for scoped ONE_YEAR
 
 const pdfFiles=[
  'lib/market-score/employment-r6-dol-advance-pdf-candidate.mjs',
+ 'lib/market-score/employment-r6-dol-release-text.mjs',
  'lib/market-score/employment-r6-dol-advance-store-candidate.mjs',
  'lib/market-score/employment-r6-dol-pdf-raw-envelope.mjs',
  'lib/market-score/employment-r6-dol-eta538-provider.mjs',
@@ -237,7 +238,7 @@ test('W04 ETA538 V2 extends same existing DOL one-shot only with exact pinned ar
  const auth=authorizeDolManual(fixture(approvedPdfV2()));
  assert.equal(auth.approval.schema,DOL_MANUAL_PDF_SCHEMA);
  assert.equal(auth.approval.maxDolCalls,2);
- assert.equal(Object.keys(auth.approval.fileHashes).length,8);
+ assert.equal(Object.keys(auth.approval.fileHashes).length,9);
  assert.equal(auth.approval.effects.blsProviderCalls,false);
  assert.equal(auth.approval.effects.d1Writes,false);
  assert.equal(auth.approval.effects.eta538PdfGet,true);
@@ -262,6 +263,7 @@ test('W04 V2 wrong source/date/effect/file hashes reject before the PC lock or p
   [x=>{x.effects.blsProviderCalls=true},'R6_DOL_EFFECT_SCOPE_STOP'],
   [x=>{x.effects.d1Writes=true},'R6_DOL_EFFECT_SCOPE_STOP'],
   [x=>{delete x.fileHashes[pdfFiles[0]]},'R6_DOL_FILE_SCOPE_STOP'],
+  [x=>{delete x.fileHashes['lib/market-score/employment-r6-dol-release-text.mjs']},'R6_DOL_FILE_SCOPE_STOP'],
   [x=>{x.fileHashes['scripts/pc-writer/arbitrary.mjs']='b'.repeat(64)},'R6_DOL_FILE_SCOPE_STOP'],
   [x=>{x.maxDolCalls=3},'R6_DOL_SCOPE_STOP'],
  ];
@@ -278,7 +280,7 @@ test('W04 V2 reuses same preflight, Core lock and durable one-shot claim order',
  const verify=options=>{
   o.calls.push('VERIFY');
   assert.equal(options.pdfApproved,true);
-  assert.equal(options.overlay.files.length,8);
+  assert.equal(options.overlay.files.length,9);
   assert.deepEqual(new Set(options.overlay.files.map(x=>x.path)),
     new Set([...Object.keys(fileHashes),...pdfFiles]));
  };
