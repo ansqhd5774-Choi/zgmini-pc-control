@@ -6,7 +6,7 @@ const worker=fileURLToPath(new URL('./worker.mjs',import.meta.url));
 // Only reviewed fixed operations with no provider/DB/operational write effect
 // may return useful reads when an unrelated Scheduler observation is missing.
 // The caller cannot select or expand this class in the Issue payload.
-const ISOLATED_READS=new Set(['runner-smoke','core-status','core-runtime-source-readonly','writer-install-preimage-readonly']);
+const ISOLATED_READS=new Set(['runner-smoke','core-status','core-runtime-source-readonly','core-completed-lineage-readonly','w05-writer-inventory-chunk-0-readonly','w05-writer-inventory-chunk-1-readonly','w05-writer-inventory-chunk-2-readonly','w05-writer-inventory-chunk-3-readonly','w05-writer-inventory-chunk-4-readonly','writer-install-preimage-readonly']);
 const unavailableProtection=e=>['RETIRED_IRAN_INVENTORY_UNAVAILABLE',
  'PROTECTED_TASK_XML_QUERY_FAILED'].includes(errorCode(e));
 export function readFixedR6Stage(workspace){
