@@ -8,12 +8,15 @@ import {
  createMaintenanceAgent,INSTALLED_RECOVERY_OPERATION,INSTALLED_RECOVERY_ISSUE_TITLE,
  INSTALLED_RECOVERY_ORIGINAL_ID,INSTALLED_RECOVERY_SOURCE_SHA,
  INSTALLED_RECOVERY_CONTROLLER_SHA,INSTALLED_RECOVERY_MANIFEST_PATH,
+ W04_INSTALLED_RECOVERY_ORIGINAL_ID,W04_INSTALLED_RECOVERY_SOURCE_SHA,
+ W04_INSTALLED_RECOVERY_CONTROLLER_SHA,verifyInstalledRecoveryLocalSource,
  prepareInstalledRecoveryRequest,validateInstalledRecoveryIssueEnvelope,
 } from '../tools/maintenance-agent.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control',ACTOR='ansqhd5774-Choi';
 const digest=b=>createHash('sha256').update(b).digest('hex');
-const approved=(mutate=x=>x)=>{
+const approved=(mutate=x=>x,which='legacy')=>{
+ const w04=which==='w04';
  const casKeys=['ledgerSha256','ownerSha256','markerSha256','backlogSha256',
   'snapshotSha256','protectionSha256','writerSha256'];
  const casDigests=Object.fromEntries(casKeys.map(k=>[k,'a'.repeat(64)]));
@@ -22,13 +25,17 @@ const approved=(mutate=x=>x)=>{
   .map(p=>({path:p,sha256:'b'.repeat(64)}));
  const payload={
   schema:'ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V1',approved:true,
-  operation:'RECONCILE_INSTALLED',requestId:INSTALLED_RECOVERY_ORIGINAL_ID,
-  issueNumber:2960,sourceSha:INSTALLED_RECOVERY_SOURCE_SHA,
-  targetControllerSha:INSTALLED_RECOVERY_CONTROLLER_SHA,
+  operation:'RECONCILE_INSTALLED',
+  requestId:w04?W04_INSTALLED_RECOVERY_ORIGINAL_ID:INSTALLED_RECOVERY_ORIGINAL_ID,
+  issueNumber:w04?3409:2960,
+  sourceSha:w04?W04_INSTALLED_RECOVERY_SOURCE_SHA:INSTALLED_RECOVERY_SOURCE_SHA,
+  targetControllerSha:w04?W04_INSTALLED_RECOVERY_CONTROLLER_SHA:INSTALLED_RECOVERY_CONTROLLER_SHA,
   approvedCurrentWriterConfigSha256:casDigests.writerSha256,
   files,casDigests,proof:{
-   issueNumber:2982,runId:45186420113,jobId:137733094098,
-   runnerName:'zgmini-pc-04',resultPath:'results/45186420113-1-seat-4.json',
+   issueNumber:w04?3438:2982,runId:w04?45457196689:45186420113,
+   jobId:w04?138669741465:137733094098,
+   runnerName:w04?'zgmini-pc-03':'zgmini-pc-04',
+   resultPath:w04?'results/45457196689-1-seat-3.json':'results/45186420113-1-seat-4.json',
    resultSha256:'c'.repeat(64),
   },
  };
@@ -55,11 +62,20 @@ test('fixed admission disallows original ID reuse, changed effect, target or act
  }))));
 });
 
-function setup(t,{wrongApproval=false,throwAfterExec=false,approvalMutation=null,encodedMutation=null}={}){
+function setup(t,{wrongApproval=false,throwAfterExec=false,approvalMutation=null,encodedMutation=null,
+ which='legacy',sourceReady=true}={}){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-installed-recovery-'));
  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  const leaseRoot=path.join(root,'leases');fs.mkdirSync(leaseRoot);
- const manifest=approved(approvalMutation??(x=>x)),request=prepareInstalledRecoveryRequest(manifest);
+ const manifest=approved(approvalMutation??(x=>x),which),request=prepareInstalledRecoveryRequest(manifest);
+ const fixed=which==='w04'?{
+  originalId:W04_INSTALLED_RECOVERY_ORIGINAL_ID,sourceSha:W04_INSTALLED_RECOVERY_SOURCE_SHA,
+  controllerSha:W04_INSTALLED_RECOVERY_CONTROLLER_SHA,
+  path:'approvals/maintenance-recoveries/'+W04_INSTALLED_RECOVERY_ORIGINAL_ID+'.installed.json',
+ }:{
+  originalId:INSTALLED_RECOVERY_ORIGINAL_ID,sourceSha:INSTALLED_RECOVERY_SOURCE_SHA,
+  controllerSha:INSTALLED_RECOVERY_CONTROLLER_SHA,path:INSTALLED_RECOVERY_MANIFEST_PATH,
+ };
  const issue={number:4001,title:INSTALLED_RECOVERY_ISSUE_TITLE,state:'OPEN',
   body:JSON.stringify(request),author:{login:ACTOR},
   labels:[{name:'pc-maintenance'}],comments:[]};
@@ -80,7 +96,7 @@ function setup(t,{wrongApproval=false,throwAfterExec=false,approvalMutation=null
    }
    if(args[0]==='api'){
     const resource=args[1].split('?')[0];
-    if(resource.endsWith('/'+INSTALLED_RECOVERY_MANIFEST_PATH))
+    if(resource.endsWith('/'+fixed.path))
      return {stdout:JSON.stringify({type:'file',encoding:'base64',
       content:(encodedMutation??(x=>x))((wrongApproval?Buffer.from('{"approved":false}'):manifest).toString('base64'))})};
     assert.match(resource,/\/contents\/results\/maintenance-/);
@@ -99,7 +115,7 @@ function setup(t,{wrongApproval=false,throwAfterExec=false,approvalMutation=null
   assert.equal(file,process.execPath);
   assert.equal(args[0],'E:/ZGmini/projects/zgmini-pc-control/tools/maintenance-recovery.mjs');
   assert.deepEqual(args.slice(1),['reconcile-installed','--request-id',
-   INSTALLED_RECOVERY_ORIGINAL_ID,'--source-sha',INSTALLED_RECOVERY_SOURCE_SHA]);
+   fixed.originalId,'--source-sha',fixed.sourceSha]);
   assert.equal(opts.env.GITHUB_ACTIONS,undefined);
   assert.equal(opts.env.RUNNER_NAME,undefined);
   stats.recoveries++;
@@ -107,12 +123,12 @@ function setup(t,{wrongApproval=false,throwAfterExec=false,approvalMutation=null
   return {stdout:JSON.stringify({
    status:'RECOVERED_INSTALLED_STATE',
    code:'INSTALLED_RUNTIME_RECOVERED_HISTORIC_POSTCHECK_UNKNOWN',
-   requestId:INSTALLED_RECOVERY_ORIGINAL_ID,
-   installedSha:INSTALLED_RECOVERY_CONTROLLER_SHA,leaseArchived:true,
+   requestId:fixed.originalId,
+   installedSha:fixed.controllerSha,leaseArchived:true,
   })};
  };
  const agent=createMaintenanceAgent({stateDir:root,leaseRoot,execFileImpl:fakeExec,
-  verifyInstalledSource:()=>{}});
+  verifyInstalledSource:()=>{},verifyRecoverySource:()=>sourceReady});
  return {agent,issue,request,stats,calls,remote,root};
 }
 
@@ -174,6 +190,71 @@ test('incomplete but correctly hashed approval is rejected before the one-shot c
    assert.equal(f.agent.loadLedger(f.request.requestId),null);
   });
  }
+});
+
+test('W04 exact approval routes to the existing independent recovery child once',async t=>{
+ const f=setup(t,{which:'w04'});
+ const first=await f.agent.pollOnce();
+ assert.equal(first[0].status,'SUCCEEDED',JSON.stringify(first));
+ assert.equal(f.stats.recoveries,1);
+ assert.equal(first[0].originalRequestId,W04_INSTALLED_RECOVERY_ORIGINAL_ID);
+ assert.equal(f.agent.loadLedger(f.request.requestId).result.status,'SUCCEEDED');
+ await f.agent.pollOnce();assert.equal(f.stats.recoveries,1);
+});
+
+test('W04 source absent prevents one-shot claim and leaves retryable block',async t=>{
+ const f=setup(t,{which:'w04',sourceReady:false});
+ const result=await f.agent.pollOnce();
+ assert.equal(result[0].status,'BLOCKED');
+ assert.equal(result[0].code,'INSTALLED_RECOVERY_LOCAL_SOURCE_UNAVAILABLE');
+ assert.equal(result[0].executionStarted,false);
+ assert.equal(f.stats.recoveries,0);
+ assert.equal(f.agent.loadLedger(f.request.requestId),null);
+ const files=fs.readdirSync(path.join(f.root,'requests'));
+ assert.equal(files.some(v=>v.startsWith('effect-')),false);
+});
+
+test('W04 changed proof is rejected before operator source preclaim',async t=>{
+ const f=setup(t,{which:'w04',
+  approvalMutation:x=>({...x,proof:{...x.proof,runId:45186420113}})});
+ const result=await f.agent.pollOnce();
+ assert.equal(result[0].code,'INSTALLED_RECOVERY_APPROVAL_SCOPE_INVALID');
+ assert.equal(f.stats.recoveries,0);
+});
+
+test('W04 approval cannot impersonate the legacy fixed case',()=>{
+ const raw=JSON.parse(approved(x=>x,'w04'));
+ for(const mutated of [
+  {...raw,sourceSha:INSTALLED_RECOVERY_SOURCE_SHA},
+  {...raw,requestId:INSTALLED_RECOVERY_ORIGINAL_ID},
+  {...raw,issueNumber:2960},
+ ]){
+  assert.throws(()=>prepareInstalledRecoveryRequest(Buffer.from(JSON.stringify(mutated))));
+ }
+});
+
+test('source preclaim checks exact local file bytes and git ancestor without writes',()=>{
+ const content=Buffer.from('pinned-tool');
+ const hash=digest(content), fixed={sourceSha:W04_INSTALLED_RECOVERY_SOURCE_SHA};
+ const manifest={files:[{path:'tools/maintenance-recovery.mjs',sha256:hash}]};
+ const calls=[];
+ const inspect=opts=>verifyInstalledRecoveryLocalSource(fixed,manifest,{
+  readFile:()=>content,lstat:()=>({isFile:()=>true,isSymbolicLink:()=>false,size:content.length}),
+  git:args=>{calls.push(args);
+   if(args.includes('merge-base'))return Buffer.alloc(0);
+   if(args.includes('show'))return opts?.badBlob?Buffer.from('other'):content;
+   throw Error('UNEXPECTED_GIT');
+  },
+ });
+ assert.equal(inspect(),true);
+ assert.equal(calls.length,2);
+ assert.equal(calls[0].includes('--is-ancestor'),true);
+ assert.equal(inspect({badBlob:true}),false);
+ assert.equal(verifyInstalledRecoveryLocalSource(fixed,manifest,{
+  readFile:()=>Buffer.from('drift'),
+  lstat:()=>({isFile:()=>true,isSymbolicLink:()=>false,size:5}),
+  git:()=>{throw Error('SHOULD_NOT_RUN_GIT');},
+ }),false);
 });
 
 test('GitHub API base64 corruption is blocked even when permissive decoding would match approved bytes',async t=>{

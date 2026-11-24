@@ -30,6 +30,50 @@ export const INSTALLED_RECOVERY_SOURCE_SHA='e6c96e8d19bd9084b8021c7df31678f56ef1
 export const INSTALLED_RECOVERY_CONTROLLER_SHA='b9a423cf38d0967d6ed336912a66433f79502d3d';
 export const INSTALLED_RECOVERY_MANIFEST_PATH=
  'approvals/maintenance-recoveries/'+INSTALLED_RECOVERY_ORIGINAL_ID+'.installed.json';
+// Only these two previously established installed-state cases may be routed.
+export const W04_INSTALLED_RECOVERY_ORIGINAL_ID='pc-update-71ea39dc-7048-4e10-9d11-d4be7f6c3ec0';
+export const W04_INSTALLED_RECOVERY_SOURCE_SHA='fcb098d20fb9a6c48f371786c69f7f1fdf5bc34a';
+export const W04_INSTALLED_RECOVERY_CONTROLLER_SHA='6b3c9c0ce77354d81babe4c9ea7785663c6c2cb4';
+const INSTALLED_RECOVERY_CASES=Object.freeze([
+ Object.freeze({originalId:INSTALLED_RECOVERY_ORIGINAL_ID,
+  sourceSha:INSTALLED_RECOVERY_SOURCE_SHA,controllerSha:INSTALLED_RECOVERY_CONTROLLER_SHA,
+  issueNumber:2960,proof:Object.freeze({issueNumber:2982,runId:45186420113,
+   jobId:137733094098,runnerName:'zgmini-pc-04',
+   resultPath:'results/45186420113-1-seat-4.json'})}),
+ Object.freeze({originalId:W04_INSTALLED_RECOVERY_ORIGINAL_ID,
+  sourceSha:W04_INSTALLED_RECOVERY_SOURCE_SHA,controllerSha:W04_INSTALLED_RECOVERY_CONTROLLER_SHA,
+  issueNumber:3409,proof:Object.freeze({issueNumber:3438,runId:45457196689,
+   jobId:138669741465,runnerName:'zgmini-pc-03',
+   resultPath:'results/45457196689-1-seat-3.json'})}),
+]);
+const recoveryCaseForTarget=sha=>INSTALLED_RECOVERY_CASES.find(c=>c.controllerSha===sha)??null;
+const recoveryCaseForApproval=a=>{
+ const fixed=recoveryCaseForTarget(a?.targetControllerSha);
+ return fixed&&a?.requestId===fixed.originalId&&a?.sourceSha===fixed.sourceSha&&
+  a?.issueNumber===fixed.issueNumber?fixed:null;
+};
+// This is a read-only local preclaim check, not a source downloader or an
+// alternative operator. Do not create the one-shot effect claim if the pinned
+// source commit or running recovery tool is absent from the operating checkout.
+export function verifyInstalledRecoveryLocalSource(fixed,approval,{
+ readFile=fs.readFileSync,lstat=fs.lstatSync,
+ git=args=>execFileSync('git',args,{cwd:'E:/ZGmini/projects/zgmini-pc-control',
+  windowsHide:true,timeout:10000,stdio:'pipe',maxBuffer:2_000_000,
+  env:{...process.env,GIT_OPTIONAL_LOCKS:'0',GIT_TERMINAL_PROMPT:'0'}}),
+}={}){
+ const filepath='E:/ZGmini/projects/zgmini-pc-control/tools/maintenance-recovery.mjs';
+ const pinned=approval?.files?.find(f=>f?.path==='tools/maintenance-recovery.mjs');
+ if(!fixed||!pinned||!(/^[a-f0-9]{64}$/).test(pinned.sha256))return false;
+ try{
+  const stat=lstat(filepath);
+  if(!stat.isFile()||stat.isSymbolicLink()||stat.size<1||stat.size>131072)return false;
+  if(sha256(readFile(filepath))!==pinned.sha256)return false;
+  git(['--no-optional-locks','merge-base','--is-ancestor',fixed.sourceSha,'HEAD']);
+  const source=git(['--no-optional-locks','show',
+   fixed.sourceSha+':tools/maintenance-recovery.mjs']);
+  return sha256(source)===pinned.sha256;
+ }catch{return false;}
+}
 const INSTALLED_RECOVERY_FIELDS=['schema','requestId','chatId','operation',
  'controlRepository','targetControllerSha','approvalManifestSha256'];
 const RECOVERY_ID=/^pc-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
@@ -48,11 +92,11 @@ export function validateInstalledRecoveryIssueEnvelope(request,{
     request.operation!==INSTALLED_RECOVERY_OPERATION)
   throw coded('INSTALLED_RECOVERY_OPERATION_DENIED');
  if(typeof request.requestId!=='string'||!RECOVERY_ID.test(request.requestId)||
-    request.requestId===INSTALLED_RECOVERY_ORIGINAL_ID)
+    INSTALLED_RECOVERY_CASES.some(c=>c.originalId===request.requestId))
   throw coded('INSTALLED_RECOVERY_REQUEST_ID_INVALID');
  if(typeof request.chatId!=='string'||!/^chat-[a-z0-9-]{1,75}$/.test(request.chatId))
   throw coded('INSTALLED_RECOVERY_CHAT_ID_INVALID');
- if(request.targetControllerSha!==INSTALLED_RECOVERY_CONTROLLER_SHA)
+ if(!recoveryCaseForTarget(request.targetControllerSha))
   throw coded('INSTALLED_RECOVERY_TARGET_DENIED');
  if(typeof request.approvalManifestSha256!=='string'||
     !/^[a-f0-9]{64}$/.test(request.approvalManifestSha256))
@@ -61,17 +105,15 @@ export function validateInstalledRecoveryIssueEnvelope(request,{
 }
 export function prepareInstalledRecoveryRequest(approvedRawBytes,{chatId}={}){
  const raw=JSON.parse(Buffer.from(approvedRawBytes).toString('utf8'));
- if(raw?.schema!=='ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V1'||
-    raw.approved!==true||raw.operation!=='RECONCILE_INSTALLED'||
-    raw.requestId!==INSTALLED_RECOVERY_ORIGINAL_ID||raw.issueNumber!==2960||
-    raw.sourceSha!==INSTALLED_RECOVERY_SOURCE_SHA||
-    raw.targetControllerSha!==INSTALLED_RECOVERY_CONTROLLER_SHA)
+ const fixed=recoveryCaseForApproval(raw);
+ if(!fixed||raw?.schema!=='ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V1'||
+    raw.approved!==true||raw.operation!=='RECONCILE_INSTALLED')
   throw coded('INSTALLED_RECOVERY_APPROVAL_UNVERIFIED');
  return validateInstalledRecoveryIssueEnvelope({
   schema:'ZGMINI_PC_MAINTENANCE_REQUEST_V1',
   requestId:'pc-'+crypto.randomUUID(),chatId:chatId??('chat-'+crypto.randomUUID()),
   operation:INSTALLED_RECOVERY_OPERATION,controlRepository:CONTROL_REPOSITORY,
-  targetControllerSha:INSTALLED_RECOVERY_CONTROLLER_SHA,
+  targetControllerSha:fixed.controllerSha,
   approvalManifestSha256:crypto.createHash('sha256').update(approvedRawBytes).digest('hex'),
  },{actor:ALLOWED_ACTORS[0]});
 }
@@ -296,7 +338,7 @@ export function createMaintenanceAgent({
   ghBinary="C:/Program Files/GitHub CLI/gh.exe",nodeBinary=process.execPath,
   leaseRoot=FIXED_LEASE_ROOT,leaseAttempts=120,leaseWaitMs=500,
   updateScript=path.join(path.dirname(fileURLToPath(import.meta.url)),"update.mjs"),
-  verifyInstalledSource=()=>{},
+  verifyInstalledSource=()=>{},verifyRecoverySource=verifyInstalledRecoveryLocalSource,
   installedShaFromStatus=result=>result?.actualControllerSha,
   ghTimeoutMs=20_000,updateTimeoutMs=0,
   now=()=>new Date().toISOString(),
@@ -679,6 +721,7 @@ export function createMaintenanceAgent({
   // before an immutable one-shot claim is created. The pinned independent
   // operator still rechecks the live bytes, provenance and source digests.
   function completeInstalledRecoveryApproval(approval){
+    const fixed=recoveryCaseForApproval(approval);
     const digestPattern=/^[a-f0-9]{64}$/;
     const filePaths=['tools/maintenance-recovery.mjs','tools/update.mjs',
       'tools/maintenance-contract.mjs','controller/fixed-readonly-bytes.mjs'];
@@ -688,10 +731,10 @@ export function createMaintenanceAgent({
     const proof=approval?.proof;
     return approval?.schema==='ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V1'&&
       approval.approved===true&&approval.operation==='RECONCILE_INSTALLED'&&
-      approval.requestId===INSTALLED_RECOVERY_ORIGINAL_ID&&
-      approval.issueNumber===2960&&
-      approval.sourceSha===INSTALLED_RECOVERY_SOURCE_SHA&&
-      approval.targetControllerSha===INSTALLED_RECOVERY_CONTROLLER_SHA&&
+      fixed!==null&&approval.requestId===fixed.originalId&&
+      approval.issueNumber===fixed.issueNumber&&
+      approval.sourceSha===fixed.sourceSha&&
+      approval.targetControllerSha===fixed.controllerSha&&
       digestPattern.test(approval.approvedCurrentWriterConfigSha256??'')&&
       Array.isArray(files)&&files.length===filePaths.length&&
       filePaths.every(name=>files.filter(x=>x?.path===name&&
@@ -700,10 +743,10 @@ export function createMaintenanceAgent({
       Object.keys(cas).length===casKeys.length&&
       casKeys.every(key=>digestPattern.test(cas[key]??''))&&
       cas.writerSha256===approval.approvedCurrentWriterConfigSha256&&
-      proof?.issueNumber===2982&&
-      proof?.runId===45186420113&&proof?.jobId===137733094098&&
-      proof?.runnerName==='zgmini-pc-04'&&
-      proof?.resultPath==='results/45186420113-1-seat-4.json'&&
+      proof?.issueNumber===fixed.proof.issueNumber&&
+      proof?.runId===fixed.proof.runId&&proof?.jobId===fixed.proof.jobId&&
+      proof?.runnerName===fixed.proof.runnerName&&
+      proof?.resultPath===fixed.proof.resultPath&&
       digestPattern.test(proof?.resultSha256??'');
   }
   async function processInstalledRecoveryIssue(issue){
@@ -716,6 +759,9 @@ export function createMaintenanceAgent({
       request=validateInstalledRecoveryIssueEnvelope(parseIssueBody(issue.body),
         {actor:issue.author.login,allowedActors,controlRepository:repo});
     }catch(error){return rejectAdmission(issue,error?.message);}
+    const fixed=recoveryCaseForTarget(request.targetControllerSha);
+    if(!fixed)return {status:'BLOCKED',code:'INSTALLED_RECOVERY_TARGET_DENIED',
+      requestId:request.requestId,executionStarted:false};
     const bodyDigest=sha256(issue.body),fingerprint=sha256(JSON.stringify(request));
     const prior=loadLedger(request.requestId);
     if(prior){
@@ -737,7 +783,7 @@ export function createMaintenanceAgent({
     let approval;
     try{
       const response=await githubJson(['api',
-        `repos/${repo}/contents/${INSTALLED_RECOVERY_MANIFEST_PATH}?ref=main`],
+        `repos/${repo}/contents/approvals/maintenance-recoveries/${fixed.originalId}.installed.json?ref=main`],
         'INSTALLED_RECOVERY_APPROVAL_READ_FAILED');
       if(response?.type!=='file'||response.encoding!=='base64'||
         typeof response.content!=='string')throw coded('INSTALLED_RECOVERY_APPROVAL_INVALID');
@@ -751,21 +797,32 @@ export function createMaintenanceAgent({
          sha256(raw)!==request.approvalManifestSha256)
         throw coded('INSTALLED_RECOVERY_APPROVAL_HASH_MISMATCH');
       approval=JSON.parse(raw.toString('utf8'));
-      if(!completeInstalledRecoveryApproval(approval))
+      if(!completeInstalledRecoveryApproval(approval)||
+         approval.targetControllerSha!==request.targetControllerSha)
         throw coded('INSTALLED_RECOVERY_APPROVAL_SCOPE_INVALID');
     }catch(error){
       return {status:'BLOCKED',code:safeCode(error?.code??error?.message),
         requestId:request.requestId,executionStarted:false};
+    }
+    // A missing commit/tool is a local precondition failure, not an UNKNOWN
+    // recovery outcome. No irreversible one-shot claim before source proof.
+    try{
+      verifyInstalledSource();
+      if(verifyRecoverySource(fixed,approval)!==true)
+        throw coded('INSTALLED_RECOVERY_LOCAL_SOURCE_UNAVAILABLE');
+    }catch{
+      return {status:'BLOCKED',code:'INSTALLED_RECOVERY_LOCAL_SOURCE_UNAVAILABLE',
+       requestId:request.requestId,executionStarted:false,operationalWrites:0};
     }
     const held=claim(request,issue,fingerprint,bodyDigest);
     if(!held.created)return {status:'UNKNOWN',code:'INSTALLED_RECOVERY_CLAIM_UNCERTAIN',
       requestId:request.requestId,executionStarted:false};
     // A second request ID must not replay the same approved lease archival.
     const effectFile=path.join(requestsDir,'effect-'+sha256(
-      'INSTALLED_RECOVERY:'+INSTALLED_RECOVERY_ORIGINAL_ID)+'.json');
+      'INSTALLED_RECOVERY:'+fixed.originalId)+'.json');
     try{
       fs.writeFileSync(effectFile,JSON.stringify({requestId:request.requestId,
-        issueNumber:issue.number,originalRequestId:INSTALLED_RECOVERY_ORIGINAL_ID})+'\n',
+        issueNumber:issue.number,originalRequestId:fixed.originalId})+'\n',
         {encoding:'utf8',flag:'wx',mode:0o600});
     }catch(error){
       const result=normalizedResult(request,{status:error?.code==='EEXIST'?'BLOCKED':'UNKNOWN',
@@ -782,13 +839,13 @@ export function createMaintenanceAgent({
       // original ID. Child must independently attest Windows operator lineage.
       const script='E:/ZGmini/projects/zgmini-pc-control/tools/maintenance-recovery.mjs';
       const output=parseJsonOutput(await exec(nodeBinary,[script,'reconcile-installed',
-        '--request-id',INSTALLED_RECOVERY_ORIGINAL_ID,
-        '--source-sha',INSTALLED_RECOVERY_SOURCE_SHA],updateTimeoutMs,safeUpdaterEnv()),
+        '--request-id',fixed.originalId,
+        '--source-sha',fixed.sourceSha],updateTimeoutMs,safeUpdaterEnv()),
         'INSTALLED_RECOVERY_RESULT_INVALID');
       if(output?.status==='RECOVERED_INSTALLED_STATE'&&
          output.code==='INSTALLED_RUNTIME_RECOVERED_HISTORIC_POSTCHECK_UNKNOWN'&&
-         output.leaseArchived===true&&output.requestId===INSTALLED_RECOVERY_ORIGINAL_ID&&
-         output.installedSha===INSTALLED_RECOVERY_CONTROLLER_SHA)
+         output.leaseArchived===true&&output.requestId===fixed.originalId&&
+         output.installedSha===fixed.controllerSha)
         result=normalizedResult(request,{status:'SUCCEEDED',
           actualControllerSha:output.installedSha},output.code);
       else result=normalizedResult(request,{status:'UNKNOWN',
@@ -804,7 +861,7 @@ export function createMaintenanceAgent({
     const stored=await deliverReports(persistResult(held.entry,result),request.operation);
     await commentOnceAndRecord(stored);
     return {status:result.status,code:result.code,requestId:request.requestId,
-      originalRequestId:INSTALLED_RECOVERY_ORIGINAL_ID};
+      originalRequestId:fixed.originalId};
   }
   async function processIssue(issue){
     if(issue?.title===INSTALLED_RECOVERY_ISSUE_TITLE)
