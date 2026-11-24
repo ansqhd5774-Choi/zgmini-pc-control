@@ -54,6 +54,11 @@ import {inspectBeaNipaCaptureReadonly} from './earnings-bea-nipa-capture-readonl
 import {runW05ServiceStoredReadonly} from './w05-wpsfd42-service-readonly.mjs';
 import {inspectInflation19D1Readback} from './inflation19-d1-readback-readonly.mjs';
 const activeTasks=['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea'];
+export const CORE_STATUS_STAGES=Object.freeze([
+ 'CORE_STATUS_ENTERED','CORE_LOCK_READ','CORE_CHECKPOINT_CYCLE',
+ 'CORE_CHECKPOINT_COLLECTION','CORE_CHECKPOINT_WRITER','CORE_CONFIG',
+ 'CORE_TASK_HASHES','CORE_STATUS_DONE'
+]);
 const retiredIranTask='ZGMINI-PC-Iran-Progress-R13';
 const taskNotFound=text=>/cannot find the file|cannot find the specified|does not exist|지정.*(?:파일|작업|경로).*찾을 수 없|찾을 수 없.*(?:파일|작업|경로)/i.test(text);
 const decodeTaskOutput=bytes=>new TextDecoder('euc-kr').decode(bytes);
@@ -162,9 +167,12 @@ function r6PublicationProjection(report,root){
  }
  return projected;
 }
-export function readCore(dataRoot,{queryTask,retiredTaskEvidence=nativeRetiredIranEvidence}={}){
+export function readCore(dataRoot,{queryTask,retiredTaskEvidence=nativeRetiredIranEvidence,onStage}={}){
+ const stage=value=>{if(typeof onStage==='function')onStage(value);};
+ stage('CORE_LOCK_READ');
  const root=path.join(dataRoot,'pc-writer'),out={lockPresent:fs.existsSync(path.join(root,'local-cycle.lock')),checkpoints:{},taskXmlHashes:{}};
- for(const file of ['local-cycle-last-run.json','local-collection-last-run.json','local-writer-last-run.json']){
+ for(const [index,file] of ['local-cycle-last-run.json','local-collection-last-run.json','local-writer-last-run.json'].entries()){
+  stage(['CORE_CHECKPOINT_CYCLE','CORE_CHECKPOINT_COLLECTION','CORE_CHECKPOINT_WRITER'][index]);
   const p=path.join(root,file);if(!fs.existsSync(p)){out.checkpoints[file]={exists:false};continue;}
   const s=fs.statSync(p);let data;try{data=JSON.parse(fs.readFileSync(p));}catch{data={};}
   out.checkpoints[file]={exists:true,modifiedAt:s.mtime.toISOString(),bytes:s.size,status:typeof data.status==='string'&&/^[A-Z0-9_:-]{1,80}$/.test(data.status)?data.status:null};
@@ -177,11 +185,14 @@ export function readCore(dataRoot,{queryTask,retiredTaskEvidence=nativeRetiredIr
    if(employmentR6)out.checkpoints[file].employmentR6=employmentR6;
   }
  }
+ stage('CORE_CONFIG');
  const config=path.join(root,'config.json');if(fs.existsSync(config)){const c=JSON.parse(fs.readFileSync(config));const x=c.source;out.approvedSourceSha=[x?.sha,x?.commit,x?.commitSha,x,c.sourceSha].find(v=>typeof v==='string'&&/^[a-f0-9]{40}$/.test(v))??null;}
+ stage('CORE_TASK_HASHES');
  if(queryTask){
   for(const task of activeTasks)out.taskXmlHashes[task]=digest(queryTask(task));
   out.taskXmlHashes[retiredIranTask]=retiredTaskEvidence();
  }
+ stage('CORE_STATUS_DONE');
  return out;
 }
 export function nativeTaskXml(task){return execFileSync(path.join(process.env.SystemRoot||'C:/Windows','System32','schtasks.exe'),['/Query','/TN',task,'/XML'],{windowsHide:true,timeout:12000,maxBuffer:262144});}
@@ -192,7 +203,13 @@ export async function runOperation(request,context){
   // Only the fixed engine's missing pre-snapshot activates this scope. The
   // outer result must remain STATE_UNKNOWN; local Core evidence is still useful.
   const partial=context.skipProtectedTaskObservation===true&&policy.mutationsEnabled===false;
-  return {status:'PASS',code:'CORE_READONLY_DIAGNOSIS',core:readCore(dataRoot,partial?{}:{queryTask,retiredTaskEvidence}),
+  const onStage=stage=>{
+   if(typeof workspace!=='string'||!CORE_STATUS_STAGES.includes(stage))return;
+   try{writeJson(path.join(workspace,'core-status-readonly-stage.json'),{stage});}catch{}
+  };
+  onStage('CORE_STATUS_ENTERED');
+  const options=partial?{onStage}:{queryTask,retiredTaskEvidence,onStage};
+  return {status:'PASS',code:'CORE_READONLY_DIAGNOSIS',core:readCore(dataRoot,options),
    ...(partial?{taskObservation:'UNVERIFIED'}:{}),providerCalls:0,d1Writes:0,sqliteOpened:false};
  }
  if(request.operation==='d05-lineage-readonly')return summarizeD05LineageOperation(
