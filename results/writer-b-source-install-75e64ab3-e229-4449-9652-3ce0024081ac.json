@@ -1,0 +1,21 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "75e64ab3-e229-4449-9652-3ce0024081ac",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "acf8ef23e6400a9a07e9897f48005c95bbbc6416",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "a163c4f34e4e1c50987feaea0f3a7ef00442afaf",
+  "candidateSourceSha": "0d409c5ec0b6c392429f2bbdf9ce78e34deed133",
+  "manifestSha256": "907bb0b027d223d9517180b1e263010deaa34dc983b03291a2ca696cc955f9ae",
+  "baseTreeOid": "c54d5786896420191e700c578af6fe13ec6238cc",
+  "preparedTreeOid": "a050d53d9eaff7b18e5dc0029b8d557d780a642a",
+  "provenanceSha256": "63c5176404360f454dc274e0b13a1f4dc455454bf232e517dcbce39aac2952a7",
+  "runId": "45311145439",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "lib/composite-observed-history-r1.mjs",
+    "scripts/pc-writer/composite-observed-archive-r1.mjs"
+  ]
+}
