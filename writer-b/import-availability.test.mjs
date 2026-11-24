@@ -119,6 +119,22 @@ test('division remains a binary operator; missing real import still stops',()=>{
  }),{code:'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP'});
 });
 
+test('W05 QFR arrow-body regexp is not a false import syntax STOP',()=>{
+ const source="console.log(lines.filter(line=>/^(MODE|SOURCE_GATES|ERROR|D1_RESULT|RESULT)=/.test(line)).join('\\n'));\n"+
+  "const ratio=(a)=>a / 2;\n"+
+  "import './required.mjs';\n";
+ const file='scripts/pc-writer/EARNINGS_CENSUS_QFR_R4_D1_ONCE.mjs';
+ assert.deepEqual(relativeModuleReferences(file,B(source)),['scripts/pc-writer/required.mjs']);
+ assert.throws(()=>verifyWriterBImportAvailability({
+  afterFiles:new Map([[file,B(source)]]),existing:()=>false,
+ }),{code:'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP'});
+ assert.equal(verifyWriterBImportAvailability({
+  afterFiles:new Map([[file,B(source)]]),existing:()=>true,
+ }).status,'PASS');
+ assert.throws(()=>relativeModuleReferences(file,B("const bad=()=>/unterminated;\n")),
+  {code:'WRITER_B_IMPORT_SOURCE_SYNTAX_STOP'});
+});
+
 test('unterminated regex stays a strict source syntax STOP',()=>{
  assert.throws(()=>relativeModuleReferences('lib/probe.mjs',
   B("const bad=/[\\\"'];\nimport './real.mjs';\n")),
