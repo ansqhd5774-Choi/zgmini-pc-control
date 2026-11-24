@@ -38,7 +38,8 @@ const make=()=>{
  const prefix='repos/'+REPO+'/';
  const paths=new Map([
   [prefix+'issues/'+issueNumber,{number:issueNumber,state:'open',body:JSON.stringify(request),
-     repository_url:'https://api.github.com/repos/'+REPO}],
+     repository_url:'https://api.github.com/repos/'+REPO,
+     updated_at:'2026-11-24T16:00:00Z'}],
   [prefix+'actions/runs/'+runId,{id:runId,status:'completed',conclusion:'success',
      event:'issues',name:'ZGMINI PC Job',run_attempt:1,repository:{full_name:REPO}}],
   [prefix+'issues/comments/'+commentId,{id:commentId,body,
@@ -87,3 +88,63 @@ for(const [name,mutate,expected] of faults){
    assert.equal((await readVerifiedPcJobReceipt(x.args)).reason,expected);
  });
 }
+
+test('Issue state change between reads fails closed',async()=>{
+ const x=make(),issuePath=x.prefix+'issues/'+issueNumber;
+ const original=x.args.githubGet;let calls=0;
+ x.args.githubGet=async path=>{
+   if(path===issuePath&&++calls===2){
+     const changed={...x.paths.get(path),state:'closed',updated_at:'2026-11-24T16:01:00Z'};
+     return {status:200,data:changed};
+   }
+   return original(path);
+ };
+ assert.equal((await readVerifiedPcJobReceipt(x.args)).reason,
+   'SNAPSHOT_CHANGED_DURING_REVIEW');
+});
+test('Issue body change between reads fails closed',async()=>{
+ const x=make(),issuePath=x.prefix+'issues/'+issueNumber;
+ const original=x.args.githubGet;let calls=0;
+ x.args.githubGet=async path=>{
+   if(path===issuePath&&++calls===2){
+     return {status:200,data:{...x.paths.get(path),
+       body:JSON.stringify({...request,requestId:'changed'}),
+       updated_at:'2026-11-24T16:02:00Z'}};
+   }
+   return original(path);
+ };
+ assert.equal((await readVerifiedPcJobReceipt(x.args)).reason,
+   'SNAPSHOT_CHANGED_DURING_REVIEW');
+});
+test('Issue timestamp change during review fails closed',async()=>{
+ const x=make(),issuePath=x.prefix+'issues/'+issueNumber;
+ const original=x.args.githubGet;let calls=0;
+ x.args.githubGet=async path=>{
+   if(path===issuePath&&++calls===2)
+     return {status:200,data:{...x.paths.get(path),updated_at:'2026-11-24T16:03:00Z'}};
+   return original(path);
+ };
+ assert.equal((await readVerifiedPcJobReceipt(x.args)).reason,
+   'SNAPSHOT_CHANGED_DURING_REVIEW');
+});
+test('Run rerun during artifact read fails closed',async()=>{
+ const x=make(),runPath=x.prefix+'actions/runs/'+runId;
+ const original=x.args.githubGet;let calls=0;
+ x.args.githubGet=async path=>{
+   if(path===runPath&&++calls===2)
+     return {status:200,data:{...x.paths.get(path),run_attempt:2,status:'in_progress'}};
+   return original(path);
+ };
+ assert.equal((await readVerifiedPcJobReceipt(x.args)).reason,
+   'SNAPSHOT_CHANGED_DURING_REVIEW');
+});
+test('Second GitHub read unavailable is not verified',async()=>{
+ const x=make(),runPath=x.prefix+'actions/runs/'+runId;
+ const original=x.args.githubGet;let calls=0;
+ x.args.githubGet=async path=>{
+   if(path===runPath&&++calls===2)return {status:503,data:null};
+   return original(path);
+ };
+ assert.equal((await readVerifiedPcJobReceipt(x.args)).reason,
+   'SNAPSHOT_CHANGED_DURING_REVIEW');
+});
