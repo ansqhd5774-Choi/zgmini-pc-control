@@ -7,7 +7,7 @@ import {inspectTask, TASK} from '../tools/marketparquet-task-source-readonly.mjs
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
 import assert from 'node:assert/strict';
 import {classifyInstalledReconciliationProof,main as maintenanceRecoveryMain} from '../tools/maintenance-recovery.mjs';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,project2960MaintenanceStatus,compare2960ProtectedBaseline,classify2960ProtectionDifference,assess2960OriginalLeaseLineage,compact2960ProcessResult,projectD05WriterCheckpoint,compactD05WriterResult,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,project2960MaintenanceStatus,project3076MaintenanceStatus,compact3076ProcessResult,compare2960ProtectedBaseline,classify2960ProtectionDifference,assess2960OriginalLeaseLineage,compact2960ProcessResult,projectD05WriterCheckpoint,compactD05WriterResult,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
@@ -1436,4 +1436,39 @@ test('#2960 B reconciliation is not callable inside any Actions or isolated runn
   'reconcile-installed','--request-id',
   'pc-update-e8767e20-6bad-4418-97c6-561cf79a8213',
   '--source-sha','a'.repeat(40)]),/RECOVERY_OPERATOR_WINDOWS_REQUIRED/);
+});
+
+test('#3076 fixed maintenance receipt is owner/operating/attempt-one only',()=>{
+ const e=event(),p=JSON.parse(e.issue.body);
+ const make=(extra={})=>({...e,issue:{...e.issue,body:JSON.stringify({...p,probe:'cnn-3076-maintenance-status-readonly',...extra})}});
+ assert.equal(authenticateProcess(make(),env,'operating').cnn3076MaintenanceStatus,true);
+ assert.throws(()=>authenticateProcess(make(),env,'handoff'));
+ assert.throws(()=>authenticateProcess(make(),{...env,GITHUB_RUN_ATTEMPT:'2'},'operating'));
+ assert.throws(()=>authenticateProcess(make(),{...env,GITHUB_ACTOR:'other'},'operating'));
+ for(const extra of [{targetRequestId:'pc-update-other'},{probe:'cnn-3076-maintenance-status-readonly;cmd'},{path:'SECRET'}])
+  assert.throws(()=>authenticateProcess(make(extra),env,'operating'));
+});
+test('#3076 fixed status separates host state, historical evidence and delivery; never authorizes execution',()=>{
+ const id='pc-update-1f6d54c3-00a4-46b1-abdf-61964d170012';
+ const raw={actualControllerSha:'a'.repeat(40),workflowState:'active',
+  historicalRequest:{requestId:id,status:'RUNNING',phase:'POSTCHECK_PENDING',reportUploadStatus:'REPORT_UPLOAD_PENDING',secret:'SECRET_H'},
+  recoveryEvidence:{requestId:id,leaseHeld:true,recoveryRequired:false,installLease:{directory:'PRESENT',nonce:'SECRET_L'}},
+  installLock:{held:true,recoveryRequired:false},maintenanceSourceSha:'b'.repeat(40),maintenanceFilesVerified:true};
+ const out=project3076MaintenanceStatus(raw);
+ assert.equal(out.status,'READ_ONLY_OBSERVED');
+ assert.equal(out.historicalRequest.phase,'POSTCHECK_PENDING');
+ assert.equal(out.reportUploadStatus,'REPORT_UPLOAD_PENDING');
+ assert.equal(out.actualControllerSha,'a'.repeat(40));
+ assert.equal(out.recoveryEligible,false);
+ assert.equal(out.executionAuthorized,false);
+ assert.doesNotMatch(JSON.stringify(out),/SECRET|nonce/);
+ assert.equal(project3076MaintenanceStatus({...raw,historicalRequest:{...raw.historicalRequest,requestId:'wrong'}}).status,'STATE_UNKNOWN');
+ assert.equal(project3076MaintenanceStatus({...raw,recoveryEvidence:{...raw.recoveryEvidence,requestId:'wrong'}}).status,'STATE_UNKNOWN');
+ assert.equal(project3076MaintenanceStatus(null).status,'STATE_UNKNOWN');
+ const receipt=compact3076ProcessResult({role:'operating',operationalWrites:0},out);
+ assert.equal(receipt.status,'PASS');
+ assert.equal(receipt.snapshot,undefined);
+ assert.ok(Buffer.byteLength(serializeProcessResult(receipt))<32768);
+ assert.match(toText(receipt),/cnn3076HistoricalStatus=RUNNING/);
+ assert.equal(compact3076ProcessResult({},null).status,'PARTIAL');
 });
