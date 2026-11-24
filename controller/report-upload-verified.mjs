@@ -117,6 +117,23 @@ export function hasVerifiedReportComment(comments,{marker,body}){
  return tagged.length>0;
 }
 
+// POST 201 or an earlier matching comment lookup is not a published
+// receipt. Confirm the exact bot comment is remotely readable before success.
+// Retry only GET: a lost POST outcome must never trigger a duplicate POST.
+export async function confirmVerifiedReportComment({readComments,marker,body,
+ wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}){
+ for(let attempt=0;attempt<4;attempt++){
+  try{
+   if(hasVerifiedReportComment(await readComments(),{marker,body}))return true;
+  }catch(error){
+   // A changed receipt is evidence conflict, never an eventual-consistency miss.
+   if(error?.code==='REPORT_COMMENT_CONTENT_CHANGED')throw error;
+  }
+  if(attempt<3)await wait(300*(attempt+1));
+ }
+ fail('REPORT_COMMENT_OUTCOME_UNKNOWN');
+}
+
 function verifyRemoteFile(response,bytes){
  if(response.status!==200)return false;
  const data=response.data;

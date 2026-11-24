@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
-import {renderBoundedReport,projectSourcePreflightReport,uploadVerifiedReportPair,resolveUploadPolicy,hasVerifiedReportComment} from '../controller/report-upload-verified.mjs';
+import {renderBoundedReport,projectSourcePreflightReport,uploadVerifiedReportPair,resolveUploadPolicy,hasVerifiedReportComment,confirmVerifiedReportComment} from '../controller/report-upload-verified.mjs';
 
 const params={repository:'ansqhd5774-Choi/zgmini-pc-control',runId:'12345',attempt:'1',seat:'2',
  json:'{"ok":true}\n',txt:'status=PASS\r\n',wait:async()=>{}};
@@ -125,6 +125,56 @@ test('uploader requires exact body receipt rather than embedded marker substring
  assert.match(src,/if\(!hasVerifiedReportComment\(comments,\{marker,body\}\)\)/);
  assert.match(src,/need\(hasVerifiedReportComment\(comments,\{marker,body\}\),'REPORT_COMMENT_OUTCOME_UNKNOWN'\)/);
  assert.doesNotMatch(src,/body\?\.includes\(marker\)/);
+});
+
+test('reporter confirms GitHub bot comment after successful POST before upload success',async()=>{
+ const marker='<!-- zgmini-pc-result:12345:1:2 -->';
+ const body=marker+'\n**PASS — FIXED_READONLY**\n';
+ const bot={user:{login:'github-actions[bot]'},body};
+ let calls=0,waits=0;
+ assert.equal(await confirmVerifiedReportComment({
+  readComments:async()=>{calls++;return calls===3?[bot]:[];},
+  marker,body,wait:async()=>{waits++},
+ }),true);
+ assert.equal(calls,3);
+ assert.equal(waits,2);
+});
+
+test('missing or unreadable GitHub bot receipt fails closed without replaying POST',async()=>{
+ const marker='<!-- zgmini-pc-result:12345:1:2 -->';
+ const body=marker+'\n**PASS — FIXED_READONLY**\n';
+ let reads=0,waits=0;
+ await assert.rejects(confirmVerifiedReportComment({
+  readComments:async()=>{reads++;if(reads===2)throw Error('REMOTE_GET_TIMEOUT');return [];},
+  marker,body,wait:async()=>{waits++},
+ }),{code:'REPORT_COMMENT_OUTCOME_UNKNOWN'});
+ assert.equal(reads,4);
+ assert.equal(waits,3);
+});
+
+test('conflicting published bot receipt stops immediately and does not wait',async()=>{
+ const marker='<!-- zgmini-pc-result:12345:1:2 -->';
+ const body=marker+'\n**PASS — FIXED_READONLY**\n';
+ let reads=0,waits=0;
+ await assert.rejects(confirmVerifiedReportComment({
+  readComments:async()=>{reads++;return [{user:{login:'github-actions[bot]'},
+   body:marker+'\n**FAIL — CHANGED**\n'}];},
+  marker,body,wait:async()=>{waits++},
+ }),{code:'REPORT_COMMENT_CONTENT_CHANGED'});
+ assert.equal(reads,1);
+ assert.equal(waits,0);
+});
+
+test('REPORT_UPLOADED success is logged only after exact bot comment readback',()=>{
+ const src=fs.readFileSync(fileURLToPath(new URL('../controller/upload.mjs',import.meta.url)),'utf8');
+ const proof=src.indexOf('await confirmVerifiedReportComment({readComments:allComments,marker,body})');
+ const success=src.indexOf("status:'REPORT_UPLOADED'");
+ const cleanup=src.indexOf('const cleanup=cleanupVerifiedJobTemps(');
+ assert.ok(proof>src.indexOf('await uploadVerifiedReportPair('));
+ assert.ok(proof>src.indexOf('if(!hasVerifiedReportComment('));
+ assert.ok(proof<success);
+ assert.ok(success<cleanup);
+ assert.match(src,/commentVerified:true/);
 });
 
 test('reports already within the combined limit retain the existing pretty JSON and TXT',()=>{
