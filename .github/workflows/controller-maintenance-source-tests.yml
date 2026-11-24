@@ -48,6 +48,8 @@ on:
       - 'tests/earnings-c-checkpoint-readonly.test.mjs'
       - 'tests/earnings-bea-mfg-archive-readonly.test.mjs'
       - 'controller/w05-wpsfd42-service-readonly.mjs'
+      - 'controller/w05-five-key-d1-api-readback-readonly.mjs'
+      - 'tests/w05-five-key-controller-readonly.test.mjs'
       - 'controller/writer-publication-evidence-readonly.mjs'
       - 'tests/writer-publication-evidence-readonly.test.mjs'
       - 'tests/w05-wpsfd42-service-readonly.test.mjs'
@@ -326,6 +328,8 @@ jobs:
       - name: Verify exact dedicated Windows operations are not falsely rejected by shared admission
         if: steps.scope.outputs.core == 'true'
         run: node --test --test-concurrency=1 tests/shared-resource-issue-admission.test.mjs
+      - name: Verify W05 fixed five-key D1/API reader stays source-only, private and fail closed
+        run: node --test --test-concurrency=1 tests/w05-five-key-controller-readonly.test.mjs
       - name: Verify W05 immutable service-only BLS source adapter and isolated PC workspace
         if: steps.scope.outputs.w05 == 'true'
         run: node --test --test-concurrency=1 tests/w05-wpsfd42-service-readonly.test.mjs
