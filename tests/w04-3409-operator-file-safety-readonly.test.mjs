@@ -21,7 +21,7 @@ const mock=({bad=null,manifestLinks=1,evil=false}={})=>{
   lstatSync:p=>{
    stats++;
    if(p.endsWith('MAINTENANCE_INSTALL.json'))return stat({links:manifestLinks});
-   if(bad&&p.endsWith(bad))return stat({links:2});
+   if(bad&&p.replaceAll('\\','/').endsWith(bad))return stat({links:2});
    return stat();
   }
  };
