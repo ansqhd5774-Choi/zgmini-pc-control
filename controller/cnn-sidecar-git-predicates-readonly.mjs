@@ -43,6 +43,41 @@ function gitRead(checkout,args){
   encoding:'utf8',windowsHide:true,timeout:10000,maxBuffer:65536,
   env:{...process.env,GIT_OPTIONAL_LOCKS:'0',GIT_TERMINAL_PROMPT:'0'}});
 }
+
+// Pinned-source lexical provenance only. No execution, source disclosure or
+// causal claim. Unknown/ambiguous syntax remains UNVERIFIED.
+export function classifyPinnedCnnGuardOrigin(source,approved){
+ if(typeof source!=='string'||source.length>131072)
+  return {reasonLine:null,reasonSiteClass:'UNVERIFIED',
+   gitBinaryClass:'UNVERIFIED',fixedShaRelation:'UNVERIFIED'};
+ const lines=source.split(/\r?\n/),sites=[];
+ for(let i=0;i<lines.length;i++){
+  const line=lines[i];
+  if(/^\s*(?:\/\/|\/\*|\*)/.test(line))continue;
+  if(!/(['"])SOURCE SHA\1/.test(line))continue;
+  const kind=/\bthrow\b/.test(line)?'THROW':
+   /\b(?:need|check|ensure|assert|stop|fail)\s*\(/.test(line)?'CHECK_HELPER':
+   /(?:reason|blockedBy)\s*[:=]/.test(line)?'LEDGER_REASON':'OTHER_LITERAL';
+  sites.push({line:i+1,kind});
+ }
+ const live=lines.filter(x=>! /^\s*(?:\/\/|\/\*|\*)/.test(x)).join('\n');
+ const bare=/(?:execFileSync|spawnSync|execSync)\s*\(\s*['"]git(?:\.exe)?['"]/i.test(live);
+ const fixed=/C:[\\/]+Program Files(?: \(x86\))?[\\/]+Git[\\/]+(?:cmd|bin)[\\/]+git\.exe/i.test(live);
+ const className=bare&&fixed?'MIXED':bare?'PATH_LOOKUP':fixed?'FIXED_BINARY':'UNVERIFIED';
+ const matches=[...live.matchAll(/\b(?:const|let|var)\s+\w*(?:source|approved|expected|sha)\w*\s*=\s*(['"])([0-9a-f]{40})\1/gi)]
+  .map(m=>m[2].toLowerCase());
+ const uniques=[...new Set(matches)];
+ const expected=typeof approved==='string'&&/^[a-f0-9]{40}$/i.test(approved)?
+  approved.toLowerCase():null;
+ const relation=!expected||!uniques.length?'UNVERIFIED':
+  uniques.length!==1?'AMBIGUOUS':
+  uniques[0]===expected?'MATCH':'MISMATCH';
+ return {reasonLine:sites.length===1&&sites[0].line<=10000?sites[0].line:null,
+  reasonSiteClass:sites.length===1?sites[0].kind:
+   sites.length===0?'NO_DIRECT_LITERAL':'MULTIPLE_LITERAL_SITES',
+  gitBinaryClass:className,fixedShaRelation:relation};
+}
+
 // Values are derived from independently fixed files/Git reads. No source
 // statement is executed or inferred to have raised the observed ledger reason.
 export function projectCnnGitEvidence(raw){
@@ -80,6 +115,19 @@ export function projectCnnGitEvidence(raw){
   pinnedScriptMentionsCheckout:pin?
    (raw?.mentionsCheckout===true?true:raw?.mentionsCheckout===false?false:null):null,
   sourceGuardCandidatesVerified:pin&&raw?.guardSites===true,
+  // Static literal/loader classes are diagnostic categories only.
+  guardOrigin:pin&&stable?{
+   reasonLine:Number.isSafeInteger(raw?.guardOrigin?.reasonLine)&&
+    raw.guardOrigin.reasonLine>0&&raw.guardOrigin.reasonLine<=10000?
+    raw.guardOrigin.reasonLine:null,
+   reasonSiteClass:['THROW','CHECK_HELPER','LEDGER_REASON','OTHER_LITERAL',
+    'NO_DIRECT_LITERAL','MULTIPLE_LITERAL_SITES'].includes(
+    raw?.guardOrigin?.reasonSiteClass)?raw.guardOrigin.reasonSiteClass:'UNVERIFIED',
+   gitBinaryClass:['PATH_LOOKUP','FIXED_BINARY','MIXED'].includes(
+    raw?.guardOrigin?.gitBinaryClass)?raw.guardOrigin.gitBinaryClass:'UNVERIFIED',
+   fixedShaRelation:['MATCH','MISMATCH','AMBIGUOUS'].includes(
+    raw?.guardOrigin?.fixedShaRelation)?raw.guardOrigin.fixedShaRelation:'UNVERIFIED'
+  }:null,
   // A head mismatch / dirty worktree may be relevant, but not necessarily
   // the predicate which generated the ledger's SOURCE SHA reason.
   failurePredicateResolved:false,sidecarFailureResolved:false,
@@ -128,6 +176,7 @@ export function inspectCnnGitPredicatesReadonly(dataRoot,{strictPlatform=true,
  const config=safeJson(fixedRead(path.join(root,'pc-writer','config.json'),root,131072));
  empty.approved=[config?.source?.sha,config?.source?.commit,
   config?.source?.commitSha,config?.source,config?.sourceSha].map(safeSha).find(Boolean)??null;
+ empty.guardOrigin=classifyPinnedCnnGuardOrigin(initial.toString('utf8'),empty.approved);
  const checkpoint=safeJson(fixedRead(path.join(root,'pc-writer','local-writer-last-run.json'),
   root,131072));
  empty.checkpoint=safeSha(checkpoint?.source);
