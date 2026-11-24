@@ -136,9 +136,17 @@ function r6CollectionProjection(raw){
      .map(key=>[key,r6Time(item[key])]).filter(([,value])=>value!==null))
    }: {})}];
  }).slice(0,6):[];
+ const stored=raw.lastStoredDolRelease;
+ const storedRelease=stored&&typeof stored==='object'&&!Array.isArray(stored)
+  &&['SUCCESS','PARTIAL','FAIL'].includes(stored.status)
+  &&r6Time(stored.completedAt)!==null
+  ?{status:stored.status,completedAt:stored.completedAt,
+    ...Object.fromEntries(R6_ROW_CHANGE_KEYS.filter(key=>r6RowCount(stored[key])!==null)
+      .map(key=>[key,stored[key]]))}:null;
  return {status:r6Code(raw.status),code:r6Code(raw.code),
   providerRequests:r6Count(raw.providerRequests),
-  groups:rows(raw.groups,false),plannedGroups:rows(raw.plannedGroups,true)};
+  groups:rows(raw.groups,false),plannedGroups:rows(raw.plannedGroups,true),
+  ...(storedRelease?{lastStoredDolRelease:storedRelease}:{})};
 }
 function r6LocalResultReadback(root,checksum,asOfDate,sourceStoredAt){
  if(!/^[a-f0-9]{64}$/.test(checksum??''))return 'NO_HASH';

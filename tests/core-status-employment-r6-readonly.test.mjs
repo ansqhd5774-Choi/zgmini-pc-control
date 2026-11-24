@@ -199,3 +199,38 @@ test('R6 row-change counter projection refuses missing invalid and unbounded val
   status:'PARTIAL',collectedRows:0,rawSnapshots:1}]);
  assert(!JSON.stringify(report).includes('PRIVATE_KEY_NOT_FOR_OUTPUT'));
 });
+
+
+test('W04 core-status distinguishes a stored prior DOL release from the latest NOOP',t=>{
+ const release='2026-11-24T19:23:15.174Z';
+ const result=fixture(t,{status:'NOOP',providerRequests:0,groups:[],plannedGroups:[],
+  lastStoredDolRelease:{status:'SUCCESS',completedAt:release,
+   collectedRows:2800,inserted:3,revised:1,noop:2796,rejected:0,
+   historyRowsAdded:4,rawHash:'PRIVATE_SHA',runId:'PRIVATE_ID'}},{}).
+  checkpoints['local-collection-last-run.json'].employmentR6;
+ assert.equal(result.status,'NOOP');
+ assert.deepEqual(result.groups,[]);
+ assert.deepEqual(result.lastStoredDolRelease,{status:'SUCCESS',completedAt:release,
+  collectedRows:2800,inserted:3,revised:1,noop:2796,rejected:0,historyRowsAdded:4});
+ assert.doesNotMatch(JSON.stringify(result),/PRIVATE_SHA|PRIVATE_ID/);
+});
+
+test('W04 invalid past DOL release timestamps and statuses cannot masquerade as verified evidence',t=>{
+ for(const bad of [
+  {status:'SUCCESS',completedAt:'2026-11-24T19:23:15Z',inserted:5},
+  {status:'READY',completedAt:'2026-11-24T19:23:15.174Z',inserted:5},
+  {status:'SUCCESS',completedAt:'https://example.com/token',inserted:5},
+ ]){
+  const result=fixture(t,{status:'NOOP',providerRequests:0,groups:[],
+   plannedGroups:[],lastStoredDolRelease:bad},{}).
+   checkpoints['local-collection-last-run.json'].employmentR6;
+  assert.equal(Object.hasOwn(result,'lastStoredDolRelease'),false);
+ }
+ const valid=fixture(t,{status:'NOOP',providerRequests:0,groups:[],plannedGroups:[],
+  lastStoredDolRelease:{status:'SUCCESS',completedAt:'2026-11-24T19:23:15.174Z',
+   inserted:0,revised:'4',noop:-5,collectedRows:1000001}},{}).
+  checkpoints['local-collection-last-run.json'].employmentR6;
+ assert.deepEqual(valid.lastStoredDolRelease,{
+  status:'SUCCESS',completedAt:'2026-11-24T19:23:15.174Z',inserted:0,
+ });
+});
