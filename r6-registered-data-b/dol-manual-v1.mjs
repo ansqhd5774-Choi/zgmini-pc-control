@@ -23,6 +23,7 @@ const FILES=[
 ];
 const PDF_FILES=[...FILES,
  'lib/market-score/employment-r6-dol-advance-pdf-candidate.mjs',
+ 'lib/market-score/employment-r6-dol-release-text.mjs',
  'lib/market-score/employment-r6-dol-advance-store-candidate.mjs',
  'lib/market-score/employment-r6-dol-pdf-raw-envelope.mjs',
  'lib/market-score/employment-r6-dol-eta538-provider.mjs',
