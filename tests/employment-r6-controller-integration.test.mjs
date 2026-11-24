@@ -41,8 +41,8 @@ function setup(t){
    entrypoint:ENTRY,manifestSha256:digest(manifest)}}};
  const policy={schema:'ZGMINI_PC_OPERATIONS_V1',controlRepository:'ansqhd5774-Choi/zgmini-pc-control',
   sourceRepository:'ansqhd5774-Choi/zgmini',allowedActors:['ansqhd5774-Choi'],seats:6,
-  mutationsEnabled:false,maxAutomaticRetries:0,maxHeavyJobs:1,minimumFreeMiBForHeavy:0,
-  operations:{'employment-r6-candidate-stage-readonly':{grade:'A',resource:'heavy',timeoutSeconds:20,minimumFreeMiB:0}}};
+  mutationsEnabled:false,maxAutomaticRetries:0,maxHeavyJobs:1,minimumFreeMiBForHeavy:1,
+  operations:{'employment-r6-candidate-stage-readonly':{grade:'A',resource:'heavy',timeoutSeconds:20,minimumFreeMiB:1}}};
  const request={schema:'ZGMINI_PC_JOB_V1',requestId:'pc-00000000-0000-4000-8000-000000000001',
   chatId:'chat-00000000-0000-4000-8000-000000000001',
   operation:'employment-r6-candidate-stage-readonly',
