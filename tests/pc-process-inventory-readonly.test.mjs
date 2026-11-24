@@ -1814,3 +1814,35 @@ test('CNN pinned SOURCE SHA origin classifier returns only bounded static classe
  assert.equal(unknown.guardOrigin,null);
  assert.equal(unknown.status,'STATE_UNKNOWN');
 });
+
+test('CNN fixed SHA usage is distinguished by exact guard line without raw code disclosure',async()=>{
+ const {classifyPinnedCnnGuardOrigin,projectCnnGitEvidence}=
+  await import('../controller/cnn-sidecar-git-predicates-readonly.mjs');
+ const lines=Array.from({length:25},()=>'const noop=0;');
+ lines[0]='const APPROVED_SOURCE_SHA="'+('a'.repeat(40))+'";';
+ lines[18]="if(head !== APPROVED_SOURCE_SHA) throw Error('SOURCE SHA');";
+ lines[20]="if(config !== head) throw Error('OTHER');";
+ lines[22]="if(dirty) throw Error('DIRTY');";
+ const source=lines.join('\n')+'\nconst PRIVATE_SECRET="NEVER_PUBLISH";';
+ const result=classifyPinnedCnnGuardOrigin(source,'b'.repeat(40));
+ assert.equal(result.fixedShaRelation,'MISMATCH');
+ assert.equal(result.fixedShaGuardReference,'LINE_19');
+ assert.equal(result.reasonSiteClass,'THROW');
+ assert.doesNotMatch(JSON.stringify(result),/NEVER_PUBLISH|APPROVED_SOURCE_SHA|aaaaaaaa/);
+ lines[18]="if(head !== other) throw Error('SOURCE SHA');";
+ const noUsage=classifyPinnedCnnGuardOrigin(lines.join('\n'),'b'.repeat(40));
+ assert.equal(noUsage.fixedShaGuardReference,'NOT_REFERENCED_IN_CANDIDATE_GUARDS');
+ lines[18]="if(head !== APPROVED_SOURCE_SHA) throw Error('SOURCE SHA');";
+ lines[20]="if(config !== APPROVED_SOURCE_SHA) throw Error('OTHER');";
+ const multiple=classifyPinnedCnnGuardOrigin(lines.join('\n'),'b'.repeat(40));
+ assert.equal(multiple.fixedShaGuardReference,'MULTIPLE_CANDIDATE_GUARDS');
+ const base={sourcePin:true,ledgerStable:true,ledgerStatus:'BLOCKED',gitVerified:true,
+  trackedClean:true,head:'b'.repeat(40),approved:'b'.repeat(40),checkpoint:'b'.repeat(40),
+  wholeTreeClean:true,guardSites:true,guardOrigin:result};
+ const projected=projectCnnGitEvidence(base);
+ assert.equal(projected.guardOrigin.fixedShaGuardReference,'LINE_19');
+ assert.equal(projected.failurePredicateResolved,false);
+ assert.equal(projected.operationalWrites,0);
+ const invalid=projectCnnGitEvidence({...base,sourcePin:false});
+ assert.equal(invalid.guardOrigin,null);
+});
