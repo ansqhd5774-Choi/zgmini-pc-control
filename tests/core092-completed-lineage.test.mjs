@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {classifyCompletedCoreLineage} from '../tools/core092-completed-lineage-readonly.mjs';
+import {classifyCompletedCoreLineage as classifyPackagedControllerLineage} from '../controller/core-completed-lineage-readonly.mjs';
 import {validateWriterBManifest} from '../writer-b/contract.mjs';
 const sha='a'.repeat(40),hash='b'.repeat(64),id='12345678-1234-4123-8123-123456789abc';
 const fixture=()=>({
@@ -48,4 +49,15 @@ test('startup correction installs one diagnostic source and protects six busines
  assert.equal(m.protectedFiles.length,6);assert.equal(m.allowTaskDefinitionChanges,false);
  assert.equal(m.allowD1Writes,false);assert.equal(m.allowProviderCalls,false);
  assert.equal(m.coreMaintenance,'PAUSE_NEW_STARTS_DRAIN_360S_V1');
+});
+
+test('packaged Controller readonly reader preserves approved 092 verdict semantics',()=>{
+ const valid=fixture();
+ assert.deepEqual(classifyPackagedControllerLineage(valid),classifyCompletedCoreLineage(valid));
+ for(const mutate of [x=>x.writer.coreCycleId='22345678-1234-4123-8123-123456789abc',
+  x=>x.identity.approvedSourceSha='c'.repeat(40),x=>x.cycle.publicationExit=1]){
+  const invalid=fixture();mutate(invalid);
+  assert.deepEqual(classifyPackagedControllerLineage(invalid),classifyCompletedCoreLineage(invalid));
+  assert.equal(classifyPackagedControllerLineage(invalid).status,'UNVERIFIED');
+ }
 });
