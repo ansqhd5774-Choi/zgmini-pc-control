@@ -8,7 +8,23 @@ const api=`https://api.github.com/repos/${CONTROL_REPOSITORY}`;
 
 async function json(fetchApi,url,opts,expected){
  const res=await fetchApi(url,opts);
- need(res?.status===expected,'CONFIG_B_PAIR_REMOTE_STOP');
+ if(res?.status!==expected){
+  // Only expose a bounded API phase and HTTP status; no request, path,
+  // response body, token, result contents, or automatic retry.
+  const method=opts?.method==='POST'?'POST':'GET';
+  const path=new URL(url).pathname;
+  const phase=path.endsWith('/git/ref/heads/main')?'GET_REF':
+    path.includes('/git/commits/')?'GET_COMMIT':
+    path.endsWith('/git/blobs')?'POST_BLOB':
+    path.endsWith('/git/trees')?'POST_TREE':
+    path.endsWith('/git/commits')?'POST_COMMIT':
+    path.startsWith('/repos/')&&path.includes('/contents/')?'GET_CONTENTS':
+    'OTHER_GITHUB_API';
+  const error=new Error('CONFIG_B_PAIR_REMOTE_STOP');
+  error.remoteStage=method+'_'+phase;
+  error.remoteStatus=Number.isInteger(res?.status)&&res.status>=100&&res.status<=599?res.status:null;
+  throw error;
+ }
  const value=await res.json();
  need(value&&typeof value==='object','CONFIG_B_PAIR_RESPONSE_STOP');
  return value;
