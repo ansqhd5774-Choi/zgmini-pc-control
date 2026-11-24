@@ -209,6 +209,11 @@ export async function runInstalledDolManual({auth,pcHome=R6_B_HOME,
    Number.isSafeInteger(nationalRows)&&nationalRows>=0&&
    Number.isSafeInteger(stateRows)&&stateRows>=0&&stateRows<=35000,
    'R6_DOL_READBACK_INVALID');
+  // The ETA538 opt-in includes one ETA539 state observation per core area.
+  // A successful collector return does not by itself prove current SQLite
+  // contains all 51 state rows from this specific one-shot run.
+  if(pdfMode&&output.status==='SUCCESS')
+   need(stateRows===51,'R6_DOL_ETA539_STATE_READBACK_INVALID');
   if(pdfMode&&output.status==='SUCCESS'){
    // Full PDF bytes and four National observations must read back as linked.
    const found=await db.prepare(`
