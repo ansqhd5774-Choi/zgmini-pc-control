@@ -1,0 +1,41 @@
+{
+  "schema": "ZGMINI_PC_UPDATE_V1",
+  "installedSha": "4396d2bb326d86b8ce9e27c528519bf0090b8e9e",
+  "targetSha": "56a3d9d7420709714a45dac37aeab74d055f4265",
+  "allowFiles": [
+    {
+      "path": "controller/fear-greed-archive-readonly.mjs",
+      "sha256": "8acd96d94104b92832116f5a2b76cf9615eaf745ffb85580e0fcd706048db8c1"
+    }
+  ],
+  "purpose": "pc-controller-maintenance",
+  "controllerOnlyInstall": true,
+  "approval": {
+    "grade": "B",
+    "ref": "PENDING_APPROVAL_PR_NUMBER",
+    "scope": "PC_CONTROL_CONTROLLER_UPDATE"
+  },
+  "checks": {
+    "targetSha": "56a3d9d7420709714a45dac37aeab74d055f4265",
+    "status": "PASS",
+    "manifestSha256": "56a4ceccc4486e9dd81ce74ad748811bf780606398502d25604d850c8d85a06d"
+  },
+  "backup": {
+    "strategy": "VERSIONED_SNAPSHOT",
+    "rollback": {
+      "kind": "RESTORE_INSTALLED_SHA",
+      "sha": "4396d2bb326d86b8ce9e27c528519bf0090b8e9e"
+    }
+  },
+  "postOperation": "fear-greed-archive-status",
+  "postSourceBranch": "main",
+  "postSourceSha": "a4065d0e19c74d1730f1ee95c69c31b4cb96ce44",
+  "selectiveSource": {
+    "schema": "ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1",
+    "branch": "codex/cnn1521-ledger-origin-selective-r2-20261124",
+    "mainSha": "033104b9a4c7575efb8cadf7a6f5d562b777eb64",
+    "customPaths": [
+      "controller/fear-greed-archive-readonly.mjs"
+    ]
+  }
+}
