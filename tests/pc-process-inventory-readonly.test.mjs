@@ -72,6 +72,7 @@ test('#3409 original maintenance ledger projection strips secrets and fails clos
   {pausedAt:'2026-11-24T17:05:00.000Z',resumedAt:'2026-11-24T17:08:00.000Z'});
  for(const bad of [
   {pausedAt:'SECRET',resumedAt:'2026-11-24T17:08:00.000Z'},
+  {pausedAt:'2026-02-30T17:05:00.000Z',resumedAt:'2026-03-02T17:08:00.000Z'},
   {pausedAt:'2026-11-24T17:09:00.000Z',resumedAt:'2026-11-24T17:08:00.000Z'},
   {pausedAt:'2026-11-24T17:05:00.000Z',resumedAt:null},
   {pausedAt:'2026-11-24T17:05:00.000Z',resumedAt:'2026-11-24T17:08:00Z PRIVATE'},
