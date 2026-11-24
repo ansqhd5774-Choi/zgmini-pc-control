@@ -48,5 +48,5 @@ test('CNN #1521 b9 known Sidecar hash allowlist focused regression on isolated W
  assert.equal(run.status,0,(run.stdout??'')+'\\n'+(run.stderr??''));
  assert.match(run.stdout,/# pass 1/);
  assert.match(run.stdout,/# fail 0/);
- assert.match(run.stdout,/ok \\d+ - read-only Sidecar diagnosis accepts only explicitly pinned source generations/);
+ assert.match(run.stdout,/ok [0-9]+ - read-only Sidecar diagnosis accepts only explicitly pinned source generations/);
 });
