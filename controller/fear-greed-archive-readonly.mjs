@@ -195,7 +195,8 @@ export function inspectSidecarSourceGate(dataRoot, {
     scriptStatus:[],ledgerStatus:'UNKNOWN',sameLedgerSnapshot:null,
     reasonShape:'NOT_CHECKED',reasonConcepts:[],
     matchingErrorSite:'NOT_CHECKED',matchedScript:null,siteLine:null,
-    gatePatternCategories:[],matchedGateCategories:[],operationalWrites:0,providerCalls:0,d1Writes:0};
+    gatePatternCategories:[],matchedGateCategories:[],ledgerOriginCandidates:[],sourceGuardCandidates:[],
+    staticGateProvenance:'UNVERIFIED_SOURCE_ONLY',operationalWrites:0,providerCalls:0,d1Writes:0};
   const directory=path.join(dataRoot,'pc-writer','archive-sidecar-r7');
   let stat;
   try{stat=fs.lstatSync(directory);}catch(error){return {...output,ledgerStatus:error?.code==='ENOENT'?'DIRECTORY_MISSING':'DIRECTORY_NOT_READABLE'};}
@@ -243,7 +244,9 @@ export function inspectSidecarSourceGate(dataRoot, {
       'CHECKOUT','WORKTREE','ARCHIVE','LOCK','PERMISSION','CLEAN'];
     output.reasonConcepts=concepts.filter(word=>tokens.has(word)).slice(0,12);
   }
-  const sites=[],gates=new Set();
+  // Candidate-only static evidence. Never interpret this as a runtime stack trace.
+  // A bounded source script must match its pinned hash and predate the ledger.
+  const sites=[],gates=new Set(),ledgerOrigins=[],sourceGuards=[];
   for(const name of Object.keys(SIDECAR_SOURCE_EXPECTED)){
     // Test callers may inject only the original two pins. Production defaults
     // always include both fixed children; never accept arbitrary filenames.
@@ -267,8 +270,24 @@ export function inspectSidecarSourceGate(dataRoot, {
     // Only explicit JS throw Error / VBS Err.Raise statements count. Comments,
     // logs, constants and other quoted literals cannot establish error sites.
     const lines=source.split(/\r?\n/);
+    // A literal ledger filename paired with a write API in the same pinned file
+    // identifies a *possible* last-run writer, not the process that wrote it.
+    if(lines.some(line=>/last-run\.json/i.test(line)) &&
+       lines.some(line=>/\b(?:writeFileSync|writeFile|appendFileSync|appendFile)\s*\(/.test(line)))
+      ledgerOrigins.push(name);
     for(let index=0;index<lines.length;index++){
       const line=lines[index];
+      // No raw code, paths, SHA literals, or ledger reason is returned.
+      // These are source guard *candidates*, not a diagnosis of the failure.
+      if(!/^\s*(?:\/\/|\/\*|\*|['"])/.test(line) &&
+         /(?:^\s*if\s*\(|\b(?:need|check|ensure|assert|stop|fail)\s*\()/i.test(line)){
+        const window=lines.slice(index,Math.min(index+3,lines.length)).join(' ');
+        const kind=/(?:config\.source|approvedSourceSha|sourceSha)/i.test(window)?
+          'SOURCE_APPROVAL_REFERENCE':/(?:rev-parse|git\.exe|execFileSync\s*\(\s*['"]git)/i.test(window)?
+          'GIT_REFERENCE':/(?:diff\s+--quiet|status\s+--porcelain|dirty)/i.test(window)?
+          'CLEAN_TREE_REFERENCE':null;
+        if(kind && sourceGuards.length<16)sourceGuards.push({file:name,line:index+1,kind});
+      }
       let matched=false;
       if(name.endsWith('.mjs')){
         const thrown=line.match(/^\s*throw\s+(?:new\s+)?Error\s*\(\s*(['"])([^'"\r\n]{2,160})\1\s*\)/);
@@ -293,6 +312,8 @@ export function inspectSidecarSourceGate(dataRoot, {
     output.matchingErrorSite='NOT_CHECKED';return output;
   }
   output.gatePatternCategories=[...gates].sort();
+   output.ledgerOriginCandidates=ledgerOrigins;
+   output.sourceGuardCandidates=sourceGuards;
   output.matchingErrorSite=sites.length===1?'UNIQUE':sites.length>1?'MULTIPLE':'NONE';
   if(sites.length===1){output.matchedScript=sites[0].name;output.siteLine=sites[0].line;
     output.matchedGateCategories=sites[0].categories;}
