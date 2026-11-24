@@ -53,3 +53,34 @@ test('unexpected paths and non-JSON/TXT pair cannot be published',async()=>{
   fetchApi:f.fetchApi}),/CONFIG_B_PAIR_INPUT_STOP/);
  assert.equal(f.counts.commits,0);
 });
+
+test('HTTP failure emits only bounded transport phase and status, never raw contents',async()=>{
+ const f=createGitPairFixture();
+ const deny=async(url,opts)=>{
+  if(url.endsWith('/git/ref/heads/main'))return{status:502};
+  return f.fetchApi(url,opts);
+ };
+ await assert.rejects(
+  uploadResultPairAtomic({outputs,headers,fetchApi:deny}),
+  error=>{
+   assert.equal(error.message,'CONFIG_B_PAIR_REMOTE_STOP');
+   assert.equal(error.remoteStage,'GET_GET_REF');
+   assert.equal(error.remoteStatus,502);
+   assert.doesNotMatch(JSON.stringify(error),/Bearer|writer-config|github.com|proof-990/);
+   return true;
+  });
+ assert.equal(f.counts.commits,0);
+ assert.equal(f.counts.updates,0);
+});
+test('remote API status diagnostic never retries or changes original fail-closed result',async()=>{
+ let calls=0;
+ await assert.rejects(uploadResultPairAtomic({outputs,headers,
+  fetchApi:async()=>{calls++;return {status:403};}
+ }),error=>{
+  assert.equal(error.message,'CONFIG_B_PAIR_REMOTE_STOP');
+  assert.equal(error.remoteStage,'GET_GET_REF');
+  assert.equal(error.remoteStatus,403);
+  return true;
+ });
+ assert.equal(calls,1);
+});
