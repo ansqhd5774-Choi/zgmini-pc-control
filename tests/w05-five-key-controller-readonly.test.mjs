@@ -149,7 +149,7 @@ test('invalid data root and missing config fail closed without touching provider
   assert.equal(absent.status,'STATE_UNKNOWN');
   assert.equal(absent.code,'W05_WRITER_CONFIG_NOT_AVAILABLE');
   mkdirSync(path.join(dir,'pc-writer'),{recursive:true});
-  writeFileSync(path.join(dir,'pc-writer','config.json'),'{');
+  writeFileSync(path.join(dir,'pc-writer','config.json'),'{bad');
   const malformed=await inspectW05FiveKeyD1ApiReadback(dir);
   assert.equal(malformed.code,'W05_WRITER_CONFIG_INVALID');
   writeFileSync(path.join(dir,'pc-writer','config.json'),JSON.stringify({
