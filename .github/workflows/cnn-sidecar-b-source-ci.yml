@@ -37,4 +37,6 @@ jobs:
         with:
           node-version: '22'
       - name: Validate fixed target, fail-closed install and rollback source tests
-        run: |\n          node --check sidecar-b/windows-file-adapter.mjs\n          node --test sidecar-b/contract.test.mjs sidecar-b/windows-file-adapter.test.mjs
+        run: |
+          node --check sidecar-b/windows-file-adapter.mjs
+          node --test sidecar-b/contract.test.mjs sidecar-b/windows-file-adapter.test.mjs
