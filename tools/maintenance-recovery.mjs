@@ -418,8 +418,9 @@ async function reconcileInstalledRecoveryFixed({id,source,g,before}){
   need(Object.keys(now).every(k=>bytes[k].equals(now[k]))&&
    before.state.ownerAlive===false&&alive(owner.pid)===false&&
    verifyInstalledRecoverySupervisor(targetSha)&&
-   selectPreservedRecoveryProtection(baseline,protectedSnapshot(),
-    {approvedCurrentWriterConfigSha256:approval.approvedCurrentWriterConfigSha256}).allowed===true,
+   permittedInstalledRecoveryProtection(fixed,
+    selectPreservedRecoveryProtection(baseline,protectedSnapshot(),
+     {approvedCurrentWriterConfigSha256:approval.approvedCurrentWriterConfigSha256})),
    'INSTALLED_RECOVERY_PREARCHIVE_CAS_DRIFT');
   // A fresh independent runtime+workflow readback is required at the exact
   // archive boundary. The seven-file CAS alone cannot prove live Controller
