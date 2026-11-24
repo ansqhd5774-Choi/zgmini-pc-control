@@ -29,8 +29,8 @@ const PDF_FILES=[...FILES,
 ];
 const isPdfApproval=approval=>approval?.schema===DOL_MANUAL_PDF_SCHEMA;
 const scopedFiles=approval=>isPdfApproval(approval)?PDF_FILES:FILES;
-const PDF_DATE=/^\\d{4}-\\d{2}-\\d{2}$/;
-const PDF_ISO=/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/;
+const PDF_DATE=/^\d{4}-\d{2}-\d{2}$/;
+const PDF_ISO=/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 const SHA40=/^[a-f0-9]{40}$/;
 const SHA64=/^[a-f0-9]{64}$/;
