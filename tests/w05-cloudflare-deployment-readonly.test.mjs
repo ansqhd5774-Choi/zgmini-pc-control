@@ -123,7 +123,7 @@ const CP=JSON.parse(readFileSync(new URL('../approvals/controller-selective-targ
 test('Cloudflare B single-parent three-file approval is fixed and reversible',()=>{
  assert.equal(CM.installedSha,'ff105611be1bd67bb12e6ecc4abdd93d27464338');
  assert.equal(CM.targetSha,'c5c7ee4d9554beeedf1572752e7e90aafa260730');
- assert.equal(CM.approval.ref,'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3293');
+ assert.equal(CM.approval.ref,'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3299');
  assert.equal(CM.approval.grade,'B');
  assert.equal(CM.approval.scope,'PC_CONTROL_CONTROLLER_UPDATE');
  assert.equal(CM.checks.status,'PASS');
@@ -133,7 +133,9 @@ test('Cloudflare B single-parent three-file approval is fixed and reversible',()
  assert.equal(validateControllerOnlyInstallDelta(CM.allowFiles.map(f=>f.path),CM.allowFiles),true);
  assert.deepEqual(CM.backup,{strategy:'VERSIONED_SNAPSHOT',
   rollback:{kind:'RESTORE_INSTALLED_SHA',sha:CM.installedSha}});
- assert.deepEqual(CM.selectiveSource.customPaths,[]);
+ assert.deepEqual(CM.selectiveSource.customPaths,['config/operations.json','controller/operations.mjs']);
+ assert.deepEqual(CP.customPaths,CM.selectiveSource.customPaths);
+ assert.equal(CM.selectiveSource.customPaths.includes('controller/w05-cloudflare-deployment-readonly.mjs'),false);
  assert.equal(CM.postOperation,'core-status');
  assert.equal(CM.postSourceSha,'a0735cac4a4dc56f0da0d3d0f82a93fd5b4486c7');
 });

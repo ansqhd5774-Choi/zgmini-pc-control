@@ -4,7 +4,10 @@
   "targetSha": "c5c7ee4d9554beeedf1572752e7e90aafa260730",
   "sourceMainSha": "edf55a2d64fb2687dafa20d6bcd9142b6fd37e76",
   "targetBranch": "codex/w05-cloudflare-active-deployment-a-20261124",
-  "customPaths": [],
+  "customPaths": [
+    "config/operations.json",
+    "controller/operations.mjs"
+  ],
   "allowFiles": [
     {
       "path": "config/operations.json",
@@ -19,5 +22,5 @@
       "sha256": "3c3d8090949ffc9e18f1c2191b91bcccda78f824c69942436aa86a2d68cf0c6d"
     }
   ],
-  "approvalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3293"
+  "approvalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3299"
 }

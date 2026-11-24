@@ -20,7 +20,7 @@
   "controllerOnlyInstall": true,
   "approval": {
     "grade": "B",
-    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3293",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3299",
     "scope": "PC_CONTROL_CONTROLLER_UPDATE"
   },
   "checks": {
@@ -42,6 +42,9 @@
     "schema": "ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1",
     "branch": "codex/w05-cloudflare-active-deployment-a-20261124",
     "mainSha": "edf55a2d64fb2687dafa20d6bcd9142b6fd37e76",
-    "customPaths": []
+    "customPaths": [
+      "config/operations.json",
+      "controller/operations.mjs"
+    ]
   }
 }
