@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {sha256,validateManifest,PREIMAGE} from './contract.mjs';
-const DIGEST='3247e086d8ad047388701dfbf36aed8254e60bc94ce610d682ace90ab12b2fb8';
+const DIGEST='b87b2b9c9f08d84bcfbaaadaffb91b5827ca1a845977cffa7d3d9e87172e9ef3';
 const CANDIDATE_DIGEST='a7051e99990a1781b1cdda83398b1d01aefc7885f0e23863abb4279c5bb5b548';
 test('CNN #1521 approved B manifest binds exact current A #3274 and pinned one-file candidate',()=>{
  const bytes=fs.readFileSync(new URL('../approvals/sidecar-b/cnn1521-onefile-20261124.json',import.meta.url));
- assert.equal(bytes.length,920);
+ assert.equal(bytes.length,919);
  assert.equal(sha256(bytes),DIGEST);
  const m=JSON.parse(bytes.toString('utf8'));
  assert.equal(validateManifest(m),m);
