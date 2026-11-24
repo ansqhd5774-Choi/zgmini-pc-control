@@ -20,6 +20,10 @@ export function verifyPcJobReceiptPair({issue,run,comment,jsonText,txtText,attem
       !Number.isSafeInteger(seat) || seat < 1 || seat > 6) return fail('INVALID_JOB_ID');
   if (run.status !== 'completed' || run.conclusion !== 'success' ||
       run.run_attempt !== attempt) return fail('GITHUB_RUN_NOT_SUCCESS');
+  // A successful unrelated workflow cannot attest an issues-triggered PC job.
+  if (run.event !== 'issues' || run.name !== 'ZGMINI PC Job' ||
+      run.repository?.full_name !== 'ansqhd5774-Choi/zgmini-pc-control')
+    return fail('RUN_PROVENANCE_UNVERIFIED');
   const jobId=`run-${runId}-${attempt}-seat-${seat}`;
   let report;
   try { report=JSON.parse(jsonText); } catch { return fail('INVALID_JSON'); }
@@ -47,8 +51,15 @@ export function verifyPcJobReceiptPair({issue,run,comment,jsonText,txtText,attem
   try {request=JSON.parse(issue.body);} catch {return fail('ISSUE_BODY_INVALID');}
   if (!request || typeof request!=='object' || Array.isArray(request) ||
       issue.state!=='open' || !Number.isSafeInteger(issue.number) ||
+      request.schema!=='ZGMINI_PC_JOB_V1' ||
       !request.requestId || request.requestId!==report.requestId ||
-      request.operation!==report.operation) return fail('ISSUE_REQUEST_MISMATCH');
+      request.operation!==report.operation ||
+      request.sourceRepository!==report.sourceRepository ||
+      request.sourceBranch!==report.sourceBranch ||
+      request.sourceSha!==report.requestedSourceSha ||
+      report.schema!=='ZGMINI_PC_RESULT_V1' ||
+      report.controlRepository!=='ansqhd5774-Choi/zgmini-pc-control')
+    return fail('ISSUE_REQUEST_MISMATCH');
   if (report.reportTransfer?.status==='SUMMARY_ONLY' ||
       report.result?.inventoryTruncated===true) return fail('PARTIAL_REPORT');
   return Object.freeze({verified:true,reason:'READONLY_RECEIPT_PAIR_MATCHED',
