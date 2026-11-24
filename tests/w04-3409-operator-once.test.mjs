@@ -62,7 +62,8 @@ test('operator child environment rejects Git executable, config, hooks and helpe
   NPM_CONFIG_USERCONFIG:'C:/untrusted/.npmrc',
   SSH_ASKPASS:'C:/untrusted-askpass',
   APPDATA:'C:/Users/Operator/AppData/Roaming',USERPROFILE:'C:/Users/Operator',
-  PATH:'C:/Windows/System32',GH_TOKEN:'test-placeholder-not-a-token'
+  PATH:'C:/attacker/path',Path:'C:/attacker/path2',ComSpec:'C:/attacker/cmd.exe',
+  GH_TOKEN:'test-placeholder-not-a-token'
  };
  const clean=sanitizedChildEnvironment(env);
  for(const k of Object.keys(env).filter(k=>/^GIT_|^GCM_|^NODE_|^NPM_CONFIG_|^SSH_ASKPASS$/.test(k)))
@@ -72,8 +73,28 @@ test('operator child environment rejects Git executable, config, hooks and helpe
  assert.equal(clean.GCM_INTERACTIVE,'never');
  assert.equal(clean.APPDATA,env.APPDATA);
  assert.equal(clean.USERPROFILE,env.USERPROFILE);
- assert.equal(clean.PATH,env.PATH);
+ assert.equal(Object.hasOwn(clean,'PATH'),false);
+ assert.equal(clean.Path,'C:\\Windows\\System32;C:\\Windows');
+ assert.equal(clean.ComSpec,'C:\\Windows\\System32\\cmd.exe');
  assert.equal(clean.GH_TOKEN,env.GH_TOKEN);
+});
+
+test('nested recovery child PATH is immutable and contains only trusted Git + Windows binaries',()=>{
+ const infected={
+  PATH:'C:/attacker/first',Path:'C:/attacker/second',
+  ComSpec:'C:/attacker/cmd.exe',GIT_EXEC_PATH:'C:/attacker/git',
+  TEMP:'C:/Users/Operator/AppData/Local/Temp',USERPROFILE:'C:/Users/Operator'
+ };
+ const clean=sanitizedChildEnvironment(infected,
+  {gitExecutable:'C:/Program Files/Git/cmd/git.exe'});
+ assert.equal(clean.Path,'C:\\Windows\\System32;C:\\Windows;C:/Program Files/Git/cmd');
+ assert.equal(clean.ComSpec,'C:\\Windows\\System32\\cmd.exe');
+ assert.equal(Object.hasOwn(clean,'PATH'),false);
+ assert.equal(Object.hasOwn(clean,'GIT_EXEC_PATH'),false);
+ assert.equal(clean.TEMP,infected.TEMP);
+ assert.equal(clean.USERPROFILE,infected.USERPROFILE);
+ assert.throws(()=>sanitizedChildEnvironment(infected,
+  {gitExecutable:'C:/attacker/git.exe'}),/OPERATOR_CHILD_GIT_PATH_INVALID/);
 });
 
 test('actual child Node cannot preload inherited NODE_OPTIONS or custom module path',t=>{
