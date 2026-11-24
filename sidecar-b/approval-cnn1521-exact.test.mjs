@@ -1,0 +1,24 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {sha256,validateManifest,PREIMAGE} from './contract.mjs';
+const DIGEST='3247e086d8ad047388701dfbf36aed8254e60bc94ce610d682ace90ab12b2fb8';
+const CANDIDATE_DIGEST='a7051e99990a1781b1cdda83398b1d01aefc7885f0e23863abb4279c5bb5b548';
+test('CNN #1521 approved B manifest binds exact current A #3274 and pinned one-file candidate',()=>{
+ const bytes=fs.readFileSync(new URL('../approvals/sidecar-b/cnn1521-onefile-20261124.json',import.meta.url));
+ assert.equal(bytes.length,920);
+ assert.equal(sha256(bytes),DIGEST);
+ const m=JSON.parse(bytes.toString('utf8'));
+ assert.equal(validateManifest(m),m);
+ assert.equal(m.requestId,'9ca75abe-81ab-49e8-a1c1-70bc12e54b52');
+ assert.equal(m.approvedSourceSha,'932182ff7b24aef84c347aba22c061e9efce1ba2');
+ assert.equal(m.installedHead,'24077edc2fb4196e83ba202fdd9681b1fe841447');
+ assert.equal(m.installedConfigSource,m.installedHead);
+ assert.equal(m.beforeSha256,PREIMAGE);
+ assert.equal(m.afterSha256,CANDIDATE_DIGEST);
+ assert.equal(sha256(fs.readFileSync(new URL('./approved/archive-run.mjs',import.meta.url))),m.afterSha256);
+ assert.equal(m.taskDefinitionSha256,'dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028');
+ assert.equal(m.wrapperSha256,'9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c');
+ assert.equal(m.runCount,1);
+ for(const k of ['allowProviderCalls','allowDbChanges','allowD1Writes','allowTaskChanges'])assert.equal(m[k],false);
+});
