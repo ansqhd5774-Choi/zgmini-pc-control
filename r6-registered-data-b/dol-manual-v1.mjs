@@ -26,6 +26,7 @@ const PDF_FILES=[...FILES,
  'lib/market-score/employment-r6-dol-advance-store-candidate.mjs',
  'lib/market-score/employment-r6-dol-pdf-raw-envelope.mjs',
  'lib/market-score/employment-r6-dol-eta538-provider.mjs',
+ 'lib/market-score/employment-r6-dol-advance-row-readback.mjs',
 ];
 const isPdfApproval=approval=>approval?.schema===DOL_MANUAL_PDF_SCHEMA;
 const scopedFiles=approval=>isPdfApproval(approval)?PDF_FILES:FILES;
@@ -226,6 +227,30 @@ export async function runInstalledDolManual({auth,pcHome=R6_B_HOME,
     attested.status==='CANDIDATE_ONLY'&&
     attested.evidence?.originalBodySha256===auth.approval.pdfArchive.originalPdfSha256,
     'R6_DOL_PDF_READBACK_INVALID');
+   // A four-row count is not an integrity proof. Authenticate each persisted
+   // current observation against the exact archived PDF bytes, text SHA and
+   // snapshot ID before the manual run may return SUCCESS.
+   const observations=(await db.prepare(`
+     SELECT * FROM market_score_employment_r4_shadow_current_v1 c
+     WHERE c.provider='DOL_ETA' AND c.geography_type='NATIONAL'
+       AND c.retrieved_at>=? AND json_extract(c.provenance_json,'$.rawSnapshotId')=?
+       AND json_extract(c.provenance_json,'$.responseHash')=?
+       AND c.logical_series_id IN
+        ('INITIAL_CLAIMS','INITIAL_CLAIMS_4W','CONTINUED_CLAIMS','INSURED_UNEMPLOYMENT_RATE')
+     ORDER BY c.logical_series_id`).bind(start,attested.snapshotId,
+       attested.evidence.bodyTextSha256).all()).results??[];
+   const {verifyDolAdvanceStoredRowLineage}=await import(pathToFileURL(
+     path.join(sourceRoot,'lib','market-score',
+       'employment-r6-dol-advance-row-readback.mjs')).href);
+   const lineage=verifyDolAdvanceStoredRowLineage({
+     rawChunks:chunks,observationRows:observations,
+     releaseDate:auth.approval.pdfArchive.releaseDate,
+     expectedInitialWeekEnd:auth.approval.pdfArchive.expectedInitialWeekEnd,
+   });
+   need(lineage.status==='LINEAGE_VERIFIED'&&lineage.verifiedRows===4&&
+    lineage.snapshotId===attested.snapshotId&&
+    lineage.originalPdfSha256===auth.approval.pdfArchive.originalPdfSha256,
+    'R6_DOL_PDF_ROW_LINEAGE_INVALID');
   }
   const safeGroups=groups.map(x=>({
    groupName:GROUP,status:x.status,providerRequests:x.providerRequests,
