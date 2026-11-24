@@ -1,0 +1,91 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "0d409c5ec0b6c392429f2bbdf9ce78e34deed133",
+  "baseHead": "37f9048705793da5e49c4ff271f90dff444ec44b",
+  "baseConfigSourceSha": "37f9048705793da5e49c4ff271f90dff444ec44b",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/sector-fear-greed-r3-local-cycle.mjs",
+      "change": "M",
+      "beforeSha256": "50a2029fe3568318bb74d74d7131fb52dbd00524cb02365b76d7ad266969ac25",
+      "afterSha256": "ebdd31823f668937515e60221f964ed6a977446217a4037f7f982995b824de99",
+      "candidateSha256": "a750c9063efcd0453f813d63a45025292304924bf7b1f11ceafb0a9fffe40df5",
+      "insertions": [
+        {
+          "anchor": "    report.storedAt=check.storedAt;",
+          "position": "after",
+          "text": "    // D05 verifies only the already calculated 11 final sector scores.\n    // Do not change the existing R3 publication or any source indicators.\n    try{\n     const {readVerifiedSectorFinalOutputs}=await import('../../lib/score-history/d05-final-sector-local-readback-r1.mjs');\n     report.d05FinalOutputReadback=await readVerifiedSectorFinalOutputs(core,{\n      calculatedAtMs:now,now:Date.now(),\n     });\n    }catch{report.d05FinalOutputReadback={status:'UNPROVEN_LOCAL_FINAL_SECTOR_OUTPUT'};}\n"
+        }
+      ]
+    },
+    {
+      "path": "scripts/pc-writer/theme-paid-cycle.mjs",
+      "change": "M",
+      "beforeSha256": "e1b11c0a89147303a9661c0d40ad89da6dd7b99c641b65f21f008f88b5e1741a",
+      "afterSha256": "53aeb6ef708d31421e0cf01bcafca3914460dfe496a78e778f44b61addd600b3",
+      "candidateSha256": "272bffe68b557e180adb219082aca3bb3e2c1c46e3a722aba83b7ee4f6e4f64b",
+      "insertions": [
+        {
+          "anchor": " const result={...report,status:'PRIVATE_CALCULATED',sourceLatestDate:phases.sourceLatest,confirmedDate:phases.confirmed,provisionalDate:phases.provisional,expectedIds:output.record.dataQuality.expectedPublicIds,readyIds:output.record.dataQuality.readyPublicIds,pendingIds:output.record.dataQuality.pendingPublicIds,privateResults:output.privateResults,privateStored,acquisition:{chunks:acquisition.acquired,proofs:saved.proofs.length},results:output.results};",
+          "position": "after",
+          "text": " // D05 verifies final confirmed theme scores from the existing immutable candidate.\n // This optional readback does not change publication, inputs or D1 writes.\n if(validPaidThemeRecord(output.record)){\n  try{\n   const {readVerifiedPaidThemeFinalOutputs}=await import('../../lib/score-history/d05-final-theme-candidate-readback-r1.mjs');\n   result.d05FinalOutputReadback=readVerifiedPaidThemeFinalOutputs({\n    candidatePath:candidate,calculatedAtMs:now,now:Date.now(),\n   });\n  }catch{result.d05FinalOutputReadback={status:'UNPROVEN_LOCAL_FINAL_THEME_OUTPUT'};}\n }\n"
+        }
+      ]
+    },
+    {
+      "path": "lib/score-history/d05-final-score-output-events-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "07283b49b13914f86f41ae54dbf88f95f5ea9f92db3e2276871ef3a6e80793b0"
+    },
+    {
+      "path": "lib/score-history/d05-final-sector-local-readback-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "047336ebaadd7a7e9d5aeb46e6bfd6f39d3f27f8d812ad4e0bf8b36856d6a847"
+    },
+    {
+      "path": "lib/score-history/d05-final-theme-candidate-readback-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "1eab44663396b43aa29d25d0c9618b5bf1cce5850199fa36251b6f43aaaa6267"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "scripts/pc-writer/local-cycle.mjs",
+      "sha256": "41912f24c2bdc13a9de52d2ee2b504fe90b733656a0d66827c617a5e2c6c0f4a"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": [
+      {
+        "id": "existing-core-launcher",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+        "dependsOn": [
+          "scripts/pc-writer/sector-fear-greed-r3-local-cycle.mjs",
+          "scripts/pc-writer/theme-paid-cycle.mjs",
+          "lib/score-history/d05-final-score-output-events-r1.mjs",
+          "lib/score-history/d05-final-sector-local-readback-r1.mjs",
+          "lib/score-history/d05-final-theme-candidate-readback-r1.mjs"
+        ]
+      }
+    ]
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
