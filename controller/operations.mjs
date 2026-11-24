@@ -1,6 +1,7 @@
 import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import {execFileSync,spawn,spawnSync} from 'node:child_process';import {TextDecoder} from 'node:util';import {need,digest,writeJson} from './common.mjs';
 import {waitForMemoryAdmission} from './memory-admission.mjs';
 import {inspectFearGreedArchive} from './fear-greed-archive-readonly.mjs';
+import {inspectCnnPublicReadback} from './cnn-public-d1-api-readback-readonly.mjs';
 import {inspectAlpacaQuotaReadonly} from './alpaca-quota-readonly.mjs';
 import {inspectPcSource} from './pc-source-readonly.mjs';
 import {inspectWriterInstallPreimage} from './writer-install-preimage-readonly.mjs';
@@ -235,6 +236,7 @@ export async function runOperation(request,context){
  if(request.operation==='shared-resource-release-readonly')return inspectSharedResourceReleaseReadonly({dataRoot,queryTask});
   if(request.operation==='writer-b-1063-recovery-readonly')return inspectWriterB1063Recovery();
  if(request.operation==='fear-greed-archive-status')return inspectFearGreedArchive(dataRoot,{queryTask});
+ if(request.operation==='cnn-public-d1-api-readback-readonly')return await inspectCnnPublicReadback(dataRoot);
  if(request.operation==='alpaca-quota-readonly')return inspectAlpacaQuotaReadonly(dataRoot);
  if(request.operation==='pc-source-preflight')return inspectPcSource({dataRoot,coreTaskXml:queryTask('ZGMINI-PC-Local-Core')});
  if(request.operation==='writer-install-preimage-readonly')return inspectWriterInstallPreimage(dataRoot,{coreTaskXml:queryTask('ZGMINI-PC-Local-Core'),approvedPreimageScope:context.approvedPreimageScope});
