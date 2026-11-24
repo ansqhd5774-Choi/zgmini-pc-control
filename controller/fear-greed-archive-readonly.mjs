@@ -21,6 +21,9 @@ const SIDECAR_SOURCE_EXPECTED = Object.freeze({
     'ce07af0b5e8d17625644e204f2815c1f754aff2468bc5434ac13c0dadcecd907', // current R10
   ]),
   'run-original-then-archive.vbs': '9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c',
+  // Fixed child digests observed by operating A #3060; not execution approval.
+  'archive-core-r10.mjs': 'e96d9ba669ee053d0b3558db36f1f5f7a28648b8ea26b7937f62a19bb4495c84',
+  'verified-checks-r10.mjs': 'f88f7b25a1a6f9157e1e7b23901a30076927f0a63e98e9aff88643a02854a02f',
 });
 function pinnedSidecarSourceMatch(actual,expected){
  const allowed=Array.isArray(expected)?expected:[expected];
@@ -183,7 +186,7 @@ function sidecarTrace(dataRoot) {
 }
 
 // The installed Sidecar is PC-only; do not publish its source or failure text.
-// Inspect two previously hashed fixed scripts and one bounded ledger in memory.
+// Inspect fixed launcher and child scripts and one bounded ledger in memory.
 // Explicit error-raising statements are static clues, never proof of execution.
 export function inspectSidecarSourceGate(dataRoot, {
   expectedHashes = SIDECAR_SOURCE_EXPECTED, priorSidecar = null,
@@ -242,6 +245,10 @@ export function inspectSidecarSourceGate(dataRoot, {
   }
   const sites=[],gates=new Set();
   for(const name of Object.keys(SIDECAR_SOURCE_EXPECTED)){
+    // Test callers may inject only the original two pins. Production defaults
+    // always include both fixed children; never accept arbitrary filenames.
+    if((name==='archive-core-r10.mjs'||name==='verified-checks-r10.mjs')&&
+       !Object.hasOwn(expectedHashes,name))continue;
     const file=readBounded(name,MAX_SIDECAR_SOURCE_BYTES);
     const item={file:name,status:file.status};
     if(file.status!=='READ'){output.scriptStatus.push(item);continue;}
@@ -255,7 +262,7 @@ export function inspectSidecarSourceGate(dataRoot, {
     if(/(?:config\.source|approvedSourceSha|sourceSha)/i.test(source))gates.add('SOURCE_APPROVAL_REFERENCE');
     if(/(?:rev-parse|git\.exe|execFileSync\(['"]git)/i.test(source))gates.add('GIT_REFERENCE');
     if(/(?:diff\s+--quiet|status\s+--porcelain|dirty)/i.test(source))gates.add('CLEAN_TREE_REFERENCE');
-    if(/(?:archive-core\.mjs|archive-run\.mjs)/i.test(source))gates.add('ARCHIVE_LAUNCH_REFERENCE');
+    if(/(?:archive-core(?:-r10)?\.mjs|archive-run\.mjs|verified-checks-r10\.mjs)/i.test(source))gates.add('ARCHIVE_LAUNCH_REFERENCE');
     if(typeof reason!=='string'||!reason.length)continue;
     // Only explicit JS throw Error / VBS Err.Raise statements count. Comments,
     // logs, constants and other quoted literals cannot establish error sites.
