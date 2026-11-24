@@ -35,6 +35,7 @@
     "source-inventory-runtime-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "provider-activity-runtime-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "fear-greed-archive-status": {"grade":"A","timeoutSeconds":60,"resource":"light"},
+    "cnn-public-d1-api-readback-readonly": {"grade":"A","timeoutSeconds":90,"resource":"light"},
     "alpaca-quota-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "market-calendar-r44-runtime-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "market-calendar-r44-input-audit-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
