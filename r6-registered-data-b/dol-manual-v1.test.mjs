@@ -220,6 +220,7 @@ const pdfFiles=[
  'lib/market-score/employment-r6-dol-pdf-raw-envelope.mjs',
  'lib/market-score/employment-r6-dol-eta538-provider.mjs',
  'lib/market-score/employment-r6-dol-advance-row-readback.mjs',
+ 'lib/market-score/employment-r6-dol-release-text.mjs',
 ];
 function approvedPdfV2(){
  return {...structuredClone(approval),
@@ -237,7 +238,7 @@ test('W04 ETA538 V2 extends same existing DOL one-shot only with exact pinned ar
  const auth=authorizeDolManual(fixture(approvedPdfV2()));
  assert.equal(auth.approval.schema,DOL_MANUAL_PDF_SCHEMA);
  assert.equal(auth.approval.maxDolCalls,2);
- assert.equal(Object.keys(auth.approval.fileHashes).length,8);
+ assert.equal(Object.keys(auth.approval.fileHashes).length,9);
  assert.equal(auth.approval.effects.blsProviderCalls,false);
  assert.equal(auth.approval.effects.d1Writes,false);
  assert.equal(auth.approval.effects.eta538PdfGet,true);
@@ -278,7 +279,7 @@ test('W04 V2 reuses same preflight, Core lock and durable one-shot claim order',
  const verify=options=>{
   o.calls.push('VERIFY');
   assert.equal(options.pdfApproved,true);
-  assert.equal(options.overlay.files.length,8);
+  assert.equal(options.overlay.files.length,9);
   assert.deepEqual(new Set(options.overlay.files.map(x=>x.path)),
     new Set([...Object.keys(fileHashes),...pdfFiles]));
  };

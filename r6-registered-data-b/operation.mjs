@@ -197,7 +197,7 @@ export function verifyInstalledR6Overlay(input={}){
 }
 export function verifyInstalledR6DolManualOverlay(input={}){
  // Only the exact, independently verified DOL B approval can select the
- // optional ETA538 eight-file source scope; V1 remains exactly three files.
+ // optional ETA538 nine-file source scope; V1 remains exactly three files.
  const files=input?.overlay?.files;
  const expected=new Set([
   'lib/market-score/employment-r6-provider.mjs',
@@ -209,6 +209,7 @@ export function verifyInstalledR6DolManualOverlay(input={}){
    'lib/market-score/employment-r6-dol-pdf-raw-envelope.mjs',
    'lib/market-score/employment-r6-dol-eta538-provider.mjs',
    'lib/market-score/employment-r6-dol-advance-row-readback.mjs',
+   'lib/market-score/employment-r6-dol-release-text.mjs',
   ]:[]),
  ]);
  need(Array.isArray(files)&&files.length===expected.size&&
