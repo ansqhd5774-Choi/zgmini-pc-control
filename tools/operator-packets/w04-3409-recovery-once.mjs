@@ -121,7 +121,8 @@ export function chooseTrustedGitExecutable({readStat=fs.lstatSync}={}){
    'C:/Program Files (x86)/Git/cmd/git.exe']){
   try{
    const st=readStat(candidate);
-   if(st.isFile()&&!st.isSymbolicLink()&&st.nlink===1&&st.size>0)
+   if(st.isFile()&&!st.isSymbolicLink()&&Number.isSafeInteger(st.nlink)&&
+     st.nlink>=1&&st.size>0)
     return candidate;
   }catch{/* Try the other supported installed Git location. */}
  }
