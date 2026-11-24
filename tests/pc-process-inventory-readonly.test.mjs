@@ -7,7 +7,7 @@ import {inspectTask, TASK} from '../tools/marketparquet-task-source-readonly.mjs
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
 import assert from 'node:assert/strict';
 import {classifyInstalledReconciliationProof,main as maintenanceRecoveryMain} from '../tools/maintenance-recovery.mjs';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,project2960MaintenanceStatus,compare2960ProtectedBaseline,classify2960ProtectionDifference,assess2960OriginalLeaseLineage,compact2960ProcessResult,projectD05WriterCheckpoint,compactD05WriterResult,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,project2960MaintenanceStatus,compare2960ProtectedBaseline,classify2960ProtectionDifference,assess2960OriginalLeaseLineage,compact2960ProcessResult,projectD05WriterCheckpoint,compactD05WriterResult,inspectD05PrivateFinalReceiptReadonly,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 import {inspect3160RecoveryCasReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 import {inspect3160RollbackPreflightReadonly} from '../tools/pc-process-inventory-readonly.mjs';
@@ -1572,4 +1572,70 @@ test('#3160 ENOENT preflight distinguishes absent local manifest from original l
  assert.equal(after.localApproval,'PRESENT');
  assert.equal(after.approvalIdentity,'EXPECTED_IDENTITY');
  assert.equal(after.recoveryEligible,false);
+});
+
+
+test('D05 #3178 private final receipt probe is exact, operating-only and refuses paths',()=>{
+ const e=event(),p=JSON.parse(e.issue.body);
+ const request=(probe,extra={})=>({...e,issue:{...e.issue,
+  body:JSON.stringify({...p,probe,...extra})}});
+ const q=request('d05-private-final-events-readonly');
+ assert.equal(authenticateProcess(q,env,'operating').d05PrivateFinalReceipt,true);
+ assert.throws(()=>authenticateProcess(q,env,'handoff'));
+ assert.throws(()=>authenticateProcess(request('d05-private-final-events-readonly;cmd'),env,'operating'));
+ assert.throws(()=>authenticateProcess(request('d05-private-final-events-readonly',{path:'E:/SECRET'}),env,'operating'));
+});
+
+test('D05 #3178 actual private receipt validates both immutable bytes and run linkage',()=>{
+ 
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'d05-private-receipt-'));
+ const dir=path.join(root,'marketparquet-paid'),derived=path.join(dir,'derived');
+ const calc='2026-11-24T05:01:30.000Z',confirmedDate='2026-11-24',
+  privateSha='a'.repeat(64);
+ const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
+ try{
+  fs.mkdirSync(derived,{recursive:true});
+  const envelope={schema:'ZGMINI_D05_PRIVATE_THEME_FINAL_EVENTS_R1',
+   privateBodySha256:privateSha,sourceVersion:'b'.repeat(64),
+   registrySha256:'c'.repeat(64),calculatedAt:calc,
+   confirmedObservationDate:confirmedDate,
+   events:[{scoreId:'theme:ai-software',phase:'CONFIRMED',
+    asOfDate:confirmedDate,calculatedAt:calc,score:51,secret:'SECRET_SCORE'}]};
+  const bytes=Buffer.from(JSON.stringify(envelope)),receiptSha=hash(bytes);
+  const receipt=path.join(derived,'d05-private-final-theme-'+receiptSha+'.json');
+  fs.writeFileSync(receipt,bytes);
+  const run={confirmedDate,privateStored:{status:'PRIVATE_STORED_READBACK_VERIFIED',
+   count:1,bodySha256:privateSha,secret:'SECRET_INPUT'},
+   d05PrivateFinalOutputReadback:{status:'LOCAL_PRIVATE_FINAL_THEME_EVENTS_VERIFIED',
+    calculatedAt:calc,confirmedObservationDate:confirmedDate,
+    scoreCount:1,privateBodySha256:privateSha,finalEventBodySha256:receiptSha},
+   credentials:'SECRET_TOKEN'};
+  const report=path.join(dir,'theme-last-run.json');
+  fs.writeFileSync(report,JSON.stringify(run));
+  const ok=inspectD05PrivateFinalReceiptReadonly({root,now:Date.parse(calc)+90000});
+  assert.equal(ok.status,'PASS');
+  assert.equal(ok.receiptMatched,true);
+  assert.equal(ok.scoreCount,1);
+  assert.equal(ok.calculatedAt,calc);
+  assert.equal(ok.finalEventBodySha256,receiptSha);
+  assert.equal(ok.operationalWrites,0);
+  assert.doesNotMatch(JSON.stringify(ok),/SECRET|score:51|SECRET_INPUT/);
+  assert.equal(ok.privateBodySha256,privateSha);
+  const serialized=serializeProcessResult({schema:'ZGMINI_PC_PROCESS_INVENTORY_RESULT_V1',
+   d05PrivateFinalReceipt:ok});
+  assert.ok(Buffer.byteLength(serialized)<32768);
+  assert.match(toText({schema:'ZGMINI_PC_PROCESS_INVENTORY_RESULT_V1',
+   d05PrivateFinalReceipt:ok}),/d05PrivateReceiptMatched=true/);
+  fs.writeFileSync(receipt,Buffer.from(JSON.stringify({...envelope,secret:'SECRET_TAMPER'})));
+  assert.equal(inspectD05PrivateFinalReceiptReadonly({root,now:Date.parse(calc)+90000}).code,
+   'D05_PRIVATE_RECEIPT_HASH_MISMATCH');
+  fs.writeFileSync(receipt,bytes);
+  fs.writeFileSync(report,JSON.stringify({...run,confirmedDate:'2026-11-23'}));
+  assert.equal(inspectD05PrivateFinalReceiptReadonly({root,now:Date.parse(calc)+90000}).code,
+   'D05_PRIVATE_RUN_RECEIPT_MISMATCH');
+  fs.writeFileSync(report,JSON.stringify({...run,d05PrivateFinalOutputReadback:
+   {status:'NO_VERIFIED_PRIVATE_FINAL_OUTPUT'}}));
+  assert.equal(inspectD05PrivateFinalReceiptReadonly({root,now:Date.parse(calc)+90000}).code,
+   'D05_PRIVATE_OUTPUT_NOT_VERIFIED');
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
