@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {authorizeDolManual,performDolManual,runDolManualOnce,DOL_MANUAL_SCHEMA,DOL_MANUAL_PDF_SCHEMA,createApprovedDolManualCollectorOptions} from './dol-manual-v1.mjs';
+import {authorizeDolManual,performDolManual,runDolManualOnce,DOL_MANUAL_SCHEMA,DOL_MANUAL_PDF_SCHEMA,createApprovedDolManualCollectorOptions,verifyDolEta539StateReadback} from './dol-manual-v1.mjs';
 import {readFileSync} from 'node:fs';
 import {sanitizeR6BResult} from './report.mjs';
 
@@ -306,4 +306,29 @@ test('W04 Controller B event dispatcher accepts only the existing manual workflo
  assert.ok(source.includes("'ZGMINI_R6_DOL_MANUAL_B_APPROVAL_V2'"));
  assert.ok(source.includes('pdfApproved===true'));
  assert.ok(source.includes('verifyInstalledR6DolManualOverlay'));
+});
+
+test('W04 PDF V2 success only follows all 51 ETA539 state current rows',()=>{
+  for(const stateRows of [0,1,49,50,52,NaN,null,undefined,51.5]){
+    assert.throws(()=>verifyDolEta539StateReadback({
+      pdfMode:true,collectorStatus:'SUCCESS',stateRows,
+    }),e=>e?.code==='R6_DOL_ETA539_STATE_READBACK_INVALID',
+    'missing or non-exact State row count must fail before PDF V2 success');
+  }
+  assert.equal(verifyDolEta539StateReadback({
+    pdfMode:true,collectorStatus:'SUCCESS',stateRows:51,
+  }),true);
+});
+
+test('W04 V1 and incomplete V2 preserve existing partial reporting',()=>{
+ for(const pdfMode of [false,true]){
+  for(const collectorStatus of ['PARTIAL','FAIL','NOOP']){
+   assert.equal(verifyDolEta539StateReadback({
+    pdfMode,collectorStatus,stateRows:0,
+   }),true);
+  }
+ }
+ assert.equal(verifyDolEta539StateReadback({
+  pdfMode:false,collectorStatus:'SUCCESS',stateRows:0,
+ }),true);
 });
