@@ -47,6 +47,16 @@ export function verifyPcJobReceiptPair({issue,run,comment,jsonText,txtText,attem
       !comment.body.includes(`results/${runId}-${attempt}-seat-${seat}.json`) ||
       !comment.body.includes(`results/${runId}-${attempt}-seat-${seat}.txt`))
     return fail('RESULT_COMMENT_UNVERIFIED');
+  // Upload posts the exact JSON/TXT bytes in the bot comment, not just links.
+  const fence=String.fromCharCode(96).repeat(3);
+  const jsonFence=fence+'json\n'+jsonText+fence;
+  const txtFence=fence+'text\n'+txtText+fence;
+  const commentBody=comment.body;
+  if(!commentBody.startsWith(marker+'\n') ||
+     !commentBody.includes(jsonFence) || !commentBody.includes(txtFence) ||
+     commentBody.indexOf(jsonFence)!==commentBody.lastIndexOf(jsonFence) ||
+     commentBody.indexOf(txtFence)!==commentBody.lastIndexOf(txtFence))
+    return fail('RESULT_COMMENT_CONTENT_MISMATCH');
   let request;
   try {request=JSON.parse(issue.body);} catch {return fail('ISSUE_BODY_INVALID');}
   if (!request || typeof request!=='object' || Array.isArray(request) ||

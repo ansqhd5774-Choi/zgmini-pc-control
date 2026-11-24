@@ -18,17 +18,24 @@ const fields=['schema','jobId','requestId','controlRepository','controlSourceSha
  'requestedSourceSha','sourceBranch','operation','seat','status','code','firstFail','exitCode',
  'operationalWrites','providerCalls','d1Writes','protectedStateUnchanged',
  'protectedBeforeSha256','protectedAfterSha256','actualExecutionSha'];
-const build=()=>({
+const fenced=(json,txt)=>{
+ const fence=String.fromCharCode(96).repeat(3);
+ return '<!-- zgmini-pc-result:43166235600:1:3 -->\n'+
+ 'results/43166235600-1-seat-3.json\nresults/43166235600-1-seat-3.txt\n'+
+ fence+'json\n'+json+fence+'\n'+fence+'text\n'+txt+fence+'\n';
+};
+const build=()=>{
+ const jsonText=JSON.stringify(result);
+ const txtText=fields.map(f=>f+'='+(result[f]===null?'null':String(result[f]))).join('\r\n')+'\r\n';
+ return {
  issue:{number:1299,state:'open',body:JSON.stringify(request)},
  run:{id:43166235600,status:'completed',conclusion:'success',run_attempt:1,
   event:'issues',name:'ZGMINI PC Job',repository:{full_name:'ansqhd5774-Choi/zgmini-pc-control'}},
- comment:{user:{login:'github-actions[bot]'},body:
-   '<!-- zgmini-pc-result:43166235600:1:3 -->\n'+
-   'results/43166235600-1-seat-3.json\nresults/43166235600-1-seat-3.txt'},
- jsonText:JSON.stringify(result),
- txtText:fields.map(f=>f+'='+(result[f]===null?'null':String(result[f]))).join('\r\n')+'\r\n',
- attempt:1,seat:3
-});
+ comment:{user:{login:'github-actions[bot]'},body:fenced(jsonText,txtText)},
+ jsonText,txtText,attempt:1,seat:3
+ };
+};
+const refreshComment=p=>{p.comment.body=fenced(p.jsonText,p.txtText);};
 test('valid paired GitHub result is a human review candidate only',()=>{
  const p=build(),a=verifyPcJobReceiptPair(p);
  assert.equal(a.verified,true);
@@ -40,6 +47,10 @@ test('valid paired GitHub result is a human review candidate only',()=>{
 });
 const cases=[
  ['no trusted snapshot',p=>delete p.comment,'MISSING_TRUSTED_SNAPSHOT'],
+ ['comment omits embedded results',p=>p.comment.body='<!-- zgmini-pc-result:43166235600:1:3 -->\nresults/43166235600-1-seat-3.json\nresults/43166235600-1-seat-3.txt','RESULT_COMMENT_CONTENT_MISMATCH'],
+ ['tampered JSON in bot comment',p=>p.comment.body=p.comment.body.replace('"status":"PASS"','"status":"BLOCKED"'),'RESULT_COMMENT_CONTENT_MISMATCH'],
+ ['tampered TXT in bot comment',p=>p.comment.body=p.comment.body.replace('status=PASS','status=BLOCKED'),'RESULT_COMMENT_CONTENT_MISMATCH'],
+ ['duplicate JSON fence',p=>p.comment.body+=String.fromCharCode(96).repeat(3)+'json\n'+p.jsonText+String.fromCharCode(96).repeat(3),'RESULT_COMMENT_CONTENT_MISMATCH'],
  ['cancelled workflow',p=>p.run.conclusion='cancelled','GITHUB_RUN_NOT_SUCCESS'],
  ['unrelated workflow event',p=>p.run.event='pull_request','RUN_PROVENANCE_UNVERIFIED'],
  ['unrelated workflow name',p=>p.run.name='Other Workflow','RUN_PROVENANCE_UNVERIFIED'],
@@ -53,8 +64,8 @@ const cases=[
  ['missing remote txt URL',p=>p.comment.body=p.comment.body.replace('results/43166235600-1-seat-3.txt','none'),'RESULT_COMMENT_UNVERIFIED'],
  ['different original request',p=>p.issue.body=JSON.stringify({...request,requestId:'other'}),'ISSUE_REQUEST_MISMATCH'],
  ['different source sha in original',p=>p.issue.body=JSON.stringify({...request,sourceSha:'other'}),'ISSUE_REQUEST_MISMATCH'],
- ['unexpected receipt schema',p=>{let x=JSON.parse(p.jsonText);x.schema='BAD';p.jsonText=JSON.stringify(x);p.txtText=p.txtText.replace('schema=ZGMINI_PC_RESULT_V1','schema=BAD');},'ISSUE_REQUEST_MISMATCH'],
- ['partial report',p=>{let x=JSON.parse(p.jsonText);x.reportTransfer={status:'SUMMARY_ONLY'};p.jsonText=JSON.stringify(x);},'PARTIAL_REPORT'],
+ ['unexpected receipt schema',p=>{let x=JSON.parse(p.jsonText);x.schema='BAD';p.jsonText=JSON.stringify(x);p.txtText=p.txtText.replace('schema=ZGMINI_PC_RESULT_V1','schema=BAD');refreshComment(p);},'ISSUE_REQUEST_MISMATCH'],
+ ['partial report',p=>{let x=JSON.parse(p.jsonText);x.reportTransfer={status:'SUMMARY_ONLY'};p.jsonText=JSON.stringify(x);refreshComment(p);},'PARTIAL_REPORT'],
  ['invalid json',p=>p.jsonText='{','INVALID_JSON'],
  ['missing core verification',p=>{let x=JSON.parse(p.jsonText);delete x.code;p.jsonText=JSON.stringify(x);},'PAIR_FIELD_MISMATCH']
 ];
