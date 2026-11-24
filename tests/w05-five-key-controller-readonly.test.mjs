@@ -187,7 +187,7 @@ test('W05 exact selective B pin covers only 3 approved files and the installed C
  assert.equal(m.purpose,'pc-controller-maintenance');
  assert.equal(m.approval.grade,'B');
  assert.equal(m.approval.scope,'PC_CONTROL_CONTROLLER_UPDATE');
- assert.equal(m.approval.ref,'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3247');
+ assert.equal(m.approval.ref,'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3260');
  assert.equal(m.checks.status,'PASS');
  assert.equal(m.checks.targetSha,W05_B_TARGET);
  assert.equal(m.checks.manifestSha256,manifestFingerprint(m.allowFiles).sha256);
