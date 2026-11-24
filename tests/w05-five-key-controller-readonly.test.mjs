@@ -4,6 +4,7 @@ import {readFileSync,mkdtempSync,mkdirSync,writeFileSync,rmSync,realpathSync} fr
 import path from 'node:path';
 import os from 'node:os';
 import {readFixedReadonlyBytes} from '../controller/fixed-readonly-bytes.mjs';
+import {validatePreimageApproval} from '../controller/preimage-manifest-contract.mjs';
 import {manifestFingerprint,validateControllerSelectivePin,validateControllerConfigTransition} from '../tools/maintenance-contract.mjs';
 import {createHash} from 'node:crypto';
 import {
@@ -40,9 +41,9 @@ test('W05 added readback is A/light, fixed dispatch and no visitor-triggered ope
 test('exact installed source must contain complete paid, inflation, employment validation closure',()=>{
  assert.equal(new Set(W05_SOURCE_FILES).size,W05_SOURCE_FILES.length);
  assert.equal(W05_SOURCE_FILES.length,12);
- for(const p of ['scripts/api-site/compare-five-public-readbacks-r1.mjs',
-  'scripts/api-site/five-key-inplace-readback-prework-r12.mjs',
-  'scripts/api-site/five-key-public-api-reader-r1.mjs',
+ for(const p of ['lib/w05-audit/compare-five-public-readbacks-r1.mjs',
+  'lib/w05-audit/five-key-inplace-readback-prework-r12.mjs',
+  'lib/w05-audit/five-key-public-api-reader-r1.mjs',
   'worker/theme-paid-contract.mjs',
   'worker/employment-r6-public-display.mjs',
   'lib/market-score/employment-r6-formula.mjs'])
@@ -218,7 +219,9 @@ test('W05 selective B cannot substitute another target or change live module byt
  const current=readFileSync(new URL(
   '../controller/w05-five-key-d1-api-readback-readonly.mjs',import.meta.url));
  const sourceHash=createHash('sha256').update(current).digest('hex');
- assert.equal(sourceHash,m.allowFiles[2].sha256);
+ // The changed source-only module is NOT the previously approved installed
+ // target. Do not silently rewrite its historical B file hash.
+ assert.notEqual(sourceHash,m.allowFiles[2].sha256);
  const policy=JSON.parse(readFileSync(new URL('../config/operations.json',import.meta.url),'utf8'));
  assert.equal(policy.operations[W05_FIVE_OPERATION].timeoutSeconds,90);
 });
@@ -231,4 +234,33 @@ test('W05 selective B denies approval PR and pin provenance divergence',()=>{
  assert.throws(()=>validateControllerSelectivePin(m,{...p,
   approvalRef:'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3254'}),
   /SELECTIVE_PIN_MISMATCH/);
+});
+
+test('W05 15-file exact preimage approval covers allowed lib and D1 dependencies only',()=>{
+ const a=JSON.parse(readFileSync(new URL(
+  '../approvals/writer-preimage/w05-five-key-lib-closure-20261124.json',import.meta.url),'utf8'));
+ assert.equal(a.schema,'ZGMINI_WRITER_PREIMAGE_SCOPE_APPROVAL_V1');
+ assert.equal(a.status,'APPROVED_A_READONLY');
+ assert.equal(a.scope,'PC_WRITER_APPROVED_SOURCE_PREIMAGE');
+ assert.equal(a.sourceRoot,'projects/zgmini-earnings-history-pc-release');
+ assert.equal(a.allowOtherPaths,false);
+ assert.equal(a.files.length,15);
+ const manifestPath='approvals/writer-preimage/w05-five-key-lib-closure-20261124.json';
+ const raw=readFileSync(new URL('../'+manifestPath,import.meta.url));
+ const digest=createHash('sha256').update(raw).digest('hex');
+ const checked=validatePreimageApproval(raw,{expectedSha256:digest,manifestPath});
+ assert.deepEqual(checked.files,a.files);
+ assert.deepEqual(a.files.slice(0,3).map(x=>x.path),[
+  'lib/w05-audit/compare-five-public-readbacks-r1.mjs',
+  'lib/w05-audit/five-key-inplace-readback-prework-r12.mjs',
+  'lib/w05-audit/five-key-public-api-reader-r1.mjs']);
+ assert.deepEqual(a.files.slice(0,3).map(x=>x.change),['A','A','A']);
+ assert.deepEqual(a.files.slice(-3).map(x=>x.path),[
+  'scripts/pc-writer/d1.mjs','scripts/pc-writer/d1-transient.mjs',
+  'scripts/pc-writer/d1-diagnostics.mjs']);
+ assert.equal(new Set(a.files.map(x=>x.path.toLowerCase())).size,15);
+ const allowed=/^(?:lib|worker|scripts\/pc-writer)\//;
+ assert.equal(a.files.every(x=>allowed.test(x.path)&&!x.path.includes('..')&&
+  !x.path.includes('scripts/api-site')&&['A','M'].includes(x.change)),true);
+ assert.equal(W05_SOURCE_FILES.every(p=>a.files.some(x=>x.path===p)),true);
 });

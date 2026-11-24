@@ -1,0 +1,69 @@
+{
+  "schema": "ZGMINI_WRITER_PREIMAGE_SCOPE_APPROVAL_V1",
+  "status": "APPROVED_A_READONLY",
+  "scope": "PC_WRITER_APPROVED_SOURCE_PREIMAGE",
+  "sourceRoot": "projects/zgmini-earnings-history-pc-release",
+  "files": [
+    {
+      "path": "lib/w05-audit/compare-five-public-readbacks-r1.mjs",
+      "change": "A"
+    },
+    {
+      "path": "lib/w05-audit/five-key-inplace-readback-prework-r12.mjs",
+      "change": "A"
+    },
+    {
+      "path": "lib/w05-audit/five-key-public-api-reader-r1.mjs",
+      "change": "A"
+    },
+    {
+      "path": "worker/theme-paid-contract.mjs",
+      "change": "M"
+    },
+    {
+      "path": "worker/public-display-freshness.mjs",
+      "change": "M"
+    },
+    {
+      "path": "worker/employment-r6-public-display.mjs",
+      "change": "M"
+    },
+    {
+      "path": "worker/inflation-causal-public-r1.mjs",
+      "change": "M"
+    },
+    {
+      "path": "worker/inflation-causal-candidates-public-7-r1.mjs",
+      "change": "M"
+    },
+    {
+      "path": "lib/market-score/employment-r6-formula.mjs",
+      "change": "M"
+    },
+    {
+      "path": "lib/market-score/employment-r6-window.mjs",
+      "change": "M"
+    },
+    {
+      "path": "lib/inflation-causal-public-catalog.mjs",
+      "change": "M"
+    },
+    {
+      "path": "lib/inflation-causal-candidates-public-7-catalog.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/d1.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/d1-transient.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/d1-diagnostics.mjs",
+      "change": "M"
+    }
+  ],
+  "allowOtherPaths": false
+}
