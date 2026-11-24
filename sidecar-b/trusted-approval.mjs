@@ -41,7 +41,7 @@ function committedManifest(root,relative,runGit){
  need(path.win32.normalize(dirReal).toLowerCase()===
   path.win32.normalize(path.join(baseReal,'approvals','sidecar-b')).toLowerCase()&&
   path.win32.normalize(fileReal).toLowerCase()===
-  path.win32.normalize(file).toLowerCase(),
+  path.win32.normalize(path.join(dirReal,path.basename(file))).toLowerCase(),
   'SIDECAR_B_APPROVAL_REDIRECT_STOP');
  need(runGit(root,['ls-files','--error-unmatch','--',relative]).status===0,
   'SIDECAR_B_APPROVAL_UNTRACKED_STOP');
