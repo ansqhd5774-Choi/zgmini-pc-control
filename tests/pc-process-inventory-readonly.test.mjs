@@ -7,7 +7,7 @@ import {inspectTask, TASK} from '../tools/marketparquet-task-source-readonly.mjs
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
 import assert from 'node:assert/strict';
 import {classifyInstalledReconciliationProof,main as maintenanceRecoveryMain} from '../tools/maintenance-recovery.mjs';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,project2960MaintenanceStatus,project3409MaintenanceStatus,compact3409ProcessResult,assess3409OriginalLeaseLineage,compare2960ProtectedBaseline,classify2960ProtectionDifference,assess2960OriginalLeaseLineage,compact2960ProcessResult,projectD05WriterCheckpoint,compactD05WriterResult,inspectD05PrivateFinalReceiptReadonly,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,project2960MaintenanceStatus,project3409MaintenanceStatus,compact3409ProcessResult,assess3409OriginalLeaseLineage,project3409PauseWindows,compare2960ProtectedBaseline,classify2960ProtectionDifference,assess2960OriginalLeaseLineage,compact2960ProcessResult,projectD05WriterCheckpoint,compactD05WriterResult,inspectD05PrivateFinalReceiptReadonly,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 import {inspect3160RecoveryCasReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 import {inspect3160RollbackPreflightReadonly} from '../tools/pc-process-inventory-readonly.mjs';
@@ -75,6 +75,20 @@ test('#3409 original maintenance ledger projection strips secrets and fails clos
  assert.equal(project3409MaintenanceStatus(null).status,'STATE_UNKNOWN');
  assert.equal(compact3409ProcessResult({requestId:'fixed'},
   project3409MaintenanceStatus(null)).status,'PARTIAL');
+});
+test('W04 #3409 pause-window projection is exact, bounded and redacts raw data',()=>{
+ const id='pc-update-71ea39dc-7048-4e10-9d11-d4be7f6c3ec0';
+ const pausedAt='2026-11-24T17:08:20.000Z',resumedAt='2026-11-24T17:09:30.000Z';
+ const x={schema:'ZGMINI_PC_BACKLOG_V1',requestId:id,
+  windows:[{pausedAt,resumedAt,nonce:'PRIVATE_VALUE'}],replays:{secret:'PRIVATE_VALUE'}};
+ assert.deepEqual(project3409PauseWindows(x),[{pausedAtUtc:pausedAt,resumedAtUtc:resumedAt}]);
+ assert.doesNotMatch(JSON.stringify(project3409PauseWindows(x)),/PRIVATE_VALUE|nonce|replays/);
+ assert.equal(project3409PauseWindows({...x,requestId:'wrong'}),null);
+ assert.equal(project3409PauseWindows({...x,windows:[{pausedAt,resumedAt:'2026-11-24T17:01:00.000Z'}]}),null);
+ assert.equal(project3409PauseWindows({...x,windows:Array(9).fill({pausedAt,resumedAt})}),null);
+ assert.deepEqual(project3409PauseWindows({...x,windows:[{pausedAt,resumedAt:null}]}),
+  [{pausedAtUtc:pausedAt,resumedAtUtc:null}]);
+ assert.equal(project3409PauseWindows({...x,windows:[{pausedAt:'NOT_DATE',resumedAt}]}),null);
 });
 test('W04 #3409 lease lineage requires exact request, target, owner and chronology',()=>{
  const id='pc-update-71ea39dc-7048-4e10-9d11-d4be7f6c3ec0';
