@@ -290,3 +290,49 @@ test('a run cannot attest future snapshots and the reader does not pretend to re
  assert.equal(r.legacyBedProof.canonicalMatched,1);assert.equal(r.legacyBedProof.runLinked,0);
  assert.equal(r.runCertifiedKeys,0);assert.equal(r.missingHistoryLineage.status,'SCHEMA_UNAVAILABLE');db.close();
 });
+
+
+test('W04 state claims bounded weekly missing History is not PIT attestation',()=>{
+ const db=new DatabaseSync(':memory:');schema(db);
+ const raw=snapshot(db,{requestKey:'PRIVATE_WEEK_EXAMPLE',body:'PRIVATE_WEEK_PAYLOAD'});
+ run(db,raw);
+ const cols='logical_series_id TEXT,geography_type TEXT,geography_code TEXT,observation_date TEXT,'+
+  'provider TEXT,source_hash TEXT,retrieved_at TEXT,available_at TEXT,provenance_json TEXT';
+ db.exec('CREATE TABLE market_score_employment_r4_shadow_current_v1('+cols+');'+
+  'CREATE TABLE market_score_employment_r4_shadow_history_v1('+cols+');');
+ const insert=db.prepare('INSERT INTO market_score_employment_r4_shadow_current_v1 VALUES(?,?,?,?,?,?,?,?,?)');
+ const metaHash='a'.repeat(64);
+ const metadata=JSON.stringify({rawRecordHash:metaHash,responseHash:raw.hash,secret:'PRIVATE_METADATA'});
+ const weeks=Array.from({length:20},(_,i)=>
+  new Date(Date.UTC(2026,10,14-7*i)).toISOString().slice(0,10));
+ for(const week of weeks){
+  for(const state of ['CA','NY']){
+   insert.run('STATE_INITIAL_CLAIMS','STATE',state,week,'DOL_ETA',metaHash,
+    '2026-11-18T01:00:00.000Z',null,metadata);
+  }
+ }
+ db.exec("INSERT INTO market_score_employment_r4_shadow_history_v1 "+
+  "SELECT * FROM market_score_employment_r4_shadow_current_v1 "+
+  "WHERE geography_code='CA' AND observation_date='2026-11-14'");
+ insert.run('STATE_INITIAL_CLAIMS','STATE','TX','2026-02-30','DOL_ETA',metaHash,
+  '2026-11-18T01:00:00.000Z',null,metadata);
+ const report=auditFixedR6RawRunSnapshot(db,{checkedAt:AT,includeInvalidLineage:true});
+ const group=report.missingHistoryLineage.groups.find(x=>
+  x.provider==='DOL_ETA'&&x.logicalSeriesId==='STATE_INITIAL_CLAIMS');
+ assert.equal(report.missingHistoryLineage.missingHistoryKeys,40);
+ assert.equal(group.missingHistoryKeys,40);
+ assert.equal(group.observedMissingWeeks,20);
+ assert.equal(group.earliestMissingWeek,weeks.at(-1));
+ assert.equal(group.latestMissingWeek,'2026-11-14');
+ assert.deepEqual(group.latestMissingWeekCounts[0],{week:'2026-11-14',missingKeys:1});
+ assert.equal(group.latestMissingWeekCounts.length,16);
+ assert.equal(group.latestMissingWeekCounts[1].missingKeys,2);
+ assert.equal(group.missingWeekCountsTruncated,true);
+ assert.equal(group.invalidWeekDateKeys,1);
+ assert.equal(group.weekScope,'CURRENT_ONLY_KEYS_NOT_PIT');
+ assert.equal(report.missingHistoryLineage.pitAttested,false);
+ assert.equal(report.missingHistoryLineage.repairAuthorized,false);
+ assert.doesNotMatch(JSON.stringify(group),
+  /PRIVATE_|geography_code|provenance_json|responseHash|snapshotId|body_sha256/);
+ db.close();
+});
