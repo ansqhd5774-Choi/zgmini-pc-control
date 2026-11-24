@@ -23,6 +23,7 @@ const writerBytes=Buffer.from(JSON.stringify({source:actualWriterSha})+'\n');
 function fixture() {
  const approval={...originalJson,sourceSha:'a'.repeat(40),
   schema:'ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V2',
+  proof:{...originalJson.proof},
   previousRecoveryApprovalSha256:hex(original),
   approvedCurrentWriterConfigSha256:hex(writerBytes),
   writerBReceiptSha256:hex(writerReceipt),
@@ -81,7 +82,7 @@ test('historical 3409 protection stays closed unless Writer B bridge proved',()=
  assert.equal(permittedInstalledRecoveryProtection(fixed,changed),false);
  assert.equal(permittedInstalledRecoveryProtection(fixed,changed,false),false);
  assert.equal(permittedInstalledRecoveryProtection(fixed,changed,true),true);
- assert.equal(permittedInstalledRecoveryProtection(fixed,{allowed:false,...changed},true),true===false);
+ assert.equal(permittedInstalledRecoveryProtection(fixed,{...changed,allowed:false},true),false);
  assert.equal(permittedInstalledRecoveryProtection(fixed,{allowed:true,
   code:'RECOVERY_OTHER_PROTECTED_STATE_DRIFT',preservedWriterConfig:false},true),false);
  const unchanged={allowed:true,code:'RECOVERY_ORIGINAL_PROTECTION_UNCHANGED'};
