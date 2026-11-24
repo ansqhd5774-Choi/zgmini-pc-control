@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 import {classifyIssueCompletion} from '../controller/issue-lifecycle-eligibility.mjs';
 
 const good = () => ({
-  issue: {state:'open',number:1299},
+  issue: {state:'open',number:1299,body:JSON.stringify({schema:'ZGMINI_PC_JOB_V1',requestId:'req-1299',operation:'release-calendar-runtime-readonly'})},
   request: {schema:'ZGMINI_PC_JOB_V1',requestId:'req-1299',operation:'release-calendar-runtime-readonly'},
   result: {requestId:'req-1299',operation:'release-calendar-runtime-readonly',jobId:'run-43166235600-1-seat-3',status:'PASS',
-    code:'RELEASE_CALENDAR_SOURCE_INVENTORY_READONLY',firstFail:null,protectedStateUnchanged:true,
+    code:'RELEASE_CALENDAR_SOURCE_INVENTORY_READONLY',firstFail:null,exitCode:0,protectedStateUnchanged:true,
+    result:{status:'PASS',code:'RELEASE_CALENDAR_SOURCE_INVENTORY_READONLY'},
     operationalWrites:0,providerCalls:0,d1Writes:0},
   evidence: {issueNumber:1299,requestId:'req-1299',runId:'43166235600',attempt:1,seat:3,
     jsonVerified:true,txtVerified:true,commentVerified:true,runConcludedSuccessfully:true},
@@ -22,6 +23,12 @@ test('complete and approved diagnostic is only human-review eligible', () => {
 });
 const negatives=[
  ['issue already closed',a=>a.issue.state='closed','ISSUE_NOT_OPEN'],
+ ['missing original issue body',a=>delete a.issue.body,'ISSUE_BODY_UNVERIFIED'],
+ ['forged requestId in original issue',a=>a.issue.body=JSON.stringify({...JSON.parse(a.issue.body),requestId:'other'}),'ISSUE_BODY_UNVERIFIED'],
+ ['nested result status false',a=>a.result.result.status='BLOCKED','NESTED_RESULT_MISMATCH'],
+ ['nested result code mismatched',a=>a.result.result.code='UNVERIFIED','NESTED_RESULT_MISMATCH'],
+ ['nonzero process exit',a=>a.result.exitCode=1,'NESTED_RESULT_MISMATCH'],
+ ['truncated nested inventory',a=>a.result.result.inventoryTruncated=true,'PARTIAL_EVIDENCE'],
  ['unknown objective',a=>a.intent.objectiveSatisfied=false,'OBJECTIVE_UNVERIFIED'],
  ['unapproved intent',a=>a.intent.approvedByIndependentPolicy=false,'OBJECTIVE_UNVERIFIED'],
  ['wrong requestId',a=>a.result.requestId='other','REQUEST_MISMATCH'],
