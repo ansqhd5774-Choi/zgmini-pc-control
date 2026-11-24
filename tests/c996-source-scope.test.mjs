@@ -109,6 +109,30 @@ test('nested new regression is selected without path traversal or duplicate exec
   ()=>false),[]);
 });
 
+test('new regression in registered feature test roots runs exactly once',()=>{
+ const changed=[
+  'writer-b/new-rollback.test.mjs',
+  'writer-b/nested/adapter.test.mjs',
+  'controller/new-source.test.mjs',
+  'inflation-census-api-b/new-coordinator.test.mjs',
+  'writer-b/new-rollback.test.mjs',
+  'writer-b/contract.test.mjs',
+  'other-feature/unregistered.test.mjs',
+  'docs/arbitrary.test.mjs',
+  'writer-b/../secrets.test.mjs',
+  'writer-b/\\\\escape.test.mjs',
+  'writer-b/deleted.test.mjs'
+ ];
+ assert.deepEqual(ungroupedChangedTests(changed,p=>
+   p!=='writer-b/deleted.test.mjs'),[
+  'writer-b/new-rollback.test.mjs',
+  'writer-b/nested/adapter.test.mjs',
+  'controller/new-source.test.mjs',
+  'inflation-census-api-b/new-coordinator.test.mjs'
+ ]);
+ assert.deepEqual(ungroupedChangedTests(['docs/false.test.mjs'],()=>true),[]);
+});
+
 test('011 incomplete PR file retrieval retains full regression coverage',async()=>{
  const env={GITHUB_EVENT_PATH:'not-real-path',GITHUB_REPOSITORY:'ansqhd5774-Choi/zgmini-pc-control',GITHUB_TOKEN:'unit-test'};
  assert.equal(await changedFiles(env),null);

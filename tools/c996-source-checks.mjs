@@ -127,18 +127,21 @@ export function selectGroups(paths){
  }
  return ALL.filter(g=>chosen.has(g));
 }
-// A changed regression under tests/ must execute even if a new nested suite
-// has not yet been added to a static group. Deletions are absent from HEAD.
-// Reject traversal, backslashes and non-test files before passing paths to Node.
+// New regressions in tests/ or an already registered feature-test tree
+// must run even before the static GROUPS list is updated. Never discover
+// scripts in unrelated top-level directories or execute deleted files.
 export function ungroupedChangedTests(paths,exists=fs.existsSync){
  if(!Array.isArray(paths))return [];
  const registered=new Set(Object.values(GROUPS).flat());
+ const permittedRoots=new Set([...registered].map(p=>p.split('/')[0]));
+ permittedRoots.add('tests');
  return [...new Set(paths)].filter(p=>{
-   if(typeof p!=='string'||!p.startsWith('tests/')||
-      !p.endsWith('.test.mjs')||registered.has(p))return false;
-   const segments=p.slice(6).split('/');
-   if(!segments.every(s=>/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(s)&&
-     s!=='.'&&s!=='..'))return false;
+   if(typeof p!=='string'||!p.endsWith('.test.mjs')||
+      registered.has(p))return false;
+   const segments=p.split('/');
+   if(segments.length<2||!permittedRoots.has(segments[0])||
+      !segments.every(s=>/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(s)&&
+        s!=='.'&&s!=='..'))return false;
    return exists(p);
  });
 }
