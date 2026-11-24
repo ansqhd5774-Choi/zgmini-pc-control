@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {authorizeDolManual,performDolManual,runDolManualOnce,DOL_MANUAL_SCHEMA,DOL_MANUAL_PDF_SCHEMA,createApprovedDolManualCollectorOptions,verifyDolEta539StateReadback} from './dol-manual-v1.mjs';
+import {authorizeDolManual,performDolManual,runDolManualOnce,DOL_MANUAL_SCHEMA,DOL_MANUAL_PDF_SCHEMA,createApprovedDolManualCollectorOptions,verifyDolEta539StateReadback,readDolEta539LatestWeekStateCount} from './dol-manual-v1.mjs';
 import {readFileSync} from 'node:fs';
 import {sanitizeR6BResult} from './report.mjs';
 
@@ -306,6 +306,51 @@ test('W04 Controller B event dispatcher accepts only the existing manual workflo
  assert.ok(source.includes("'ZGMINI_R6_DOL_MANUAL_B_APPROVAL_V2'"));
  assert.ok(source.includes('pdfApproved===true'));
  assert.ok(source.includes('verifyInstalledR6DolManualOverlay'));
+});
+
+test('W04 V2 112-week ETA539 readback checks latest 51 regions, not 5712 refreshed rows',async()=>{
+ const since='2026-11-24T16:03:00.000Z';
+ const weeks=Array.from({length:112},(_,i)=>{
+  const d=new Date(Date.UTC(2026,10,7)-i*7*86400000);
+  return d.toISOString().slice(0,10);
+ });
+ const rows=weeks.flatMap(week=>Array.from({length:51},(_,i)=>({
+  week,region:String(i).padStart(2,'0'),retrievedAt:'2026-11-24T16:03:21.818Z',
+ })));
+ const read=async fixture=>{
+  let prepared=false,bound=false;
+  const db={prepare(sql){
+   prepared=true;
+   assert.match(sql,/WITH touched AS/);
+   assert.match(sql,/observation_date=\(SELECT MAX\(observation_date\) FROM touched\)/);
+   assert.match(sql,/retrieved_at>=\?/);
+   assert.match(sql,/geography_type='STATE'/);
+   assert.match(sql,/logical_series_id='STATE_INITIAL_CLAIMS'/);
+   return {bind(value){
+    bound=true;assert.equal(value,since);
+    return {async first(){
+     const touched=fixture.filter(x=>x.retrievedAt>=value);
+     const latest=touched.map(x=>x.week).sort().at(-1);
+     return {n:touched.filter(x=>x.week===latest).length};
+    }};
+   }};
+  }};
+  const n=await readDolEta539LatestWeekStateCount({db,since});
+  assert.equal(prepared,true);assert.equal(bound,true);
+  return n;
+ };
+ assert.equal(rows.length,112*51);
+ const complete=await read(rows);
+ assert.equal(complete,51);
+ assert.equal(verifyDolEta539StateReadback({
+  pdfMode:true,collectorStatus:'SUCCESS',stateRows:complete,
+ }),true);
+ const incomplete=await read(rows.filter(x=>x.week!==weeks[0]||x.region!=='50'));
+ assert.equal(incomplete,50);
+ assert.throws(()=>verifyDolEta539StateReadback({
+  pdfMode:true,collectorStatus:'SUCCESS',stateRows:incomplete,
+ }),/R6_DOL_ETA539_STATE_READBACK_INVALID/);
+ assert.equal(await read([]),0);
 });
 
 test('W04 PDF V2 success only follows all 51 ETA539 state current rows',()=>{
