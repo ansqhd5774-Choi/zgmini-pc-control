@@ -218,3 +218,36 @@
 - [본체 PR #1583](https://github.com/ansqhd5774-Choi/zgmini/pull/1583) → main 병합 `39a7a1146f682ff66d6848600ed291747cce11bf`. 기존 queue/Issue intake 동작은 보존하고, actionlint는 오탐인 정확한 key 진단만 좁게 제외하며 신규 Node 검증기로 유효값 `max`/`single`·들여쓰기 오류를 검사한다.
 - 실제 changed-workflow에 `queue:max`가 포함된 [Node CI #45482394090](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45482394090)에서 Actionlint 단계 SUCCESS 및 신규 경계 회귀시험 3건 PASS; [CodeQL #45482393353](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45482393353)·[Secret #45482393323](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45482393323) SUCCESS. main 파일 재조회 완료.
 - 이는 **#12 구현의 추가 호환성 보정**이며 12종 중 도입 건수에 새 항목으로 중복 산입하지 않는다. 본체 과거 Miniflare 실패 Issue #1582는 원인 미확정으로 OPEN 유지한다.
+
+
+## R2 후속 실제 구현 증거 — #1 Dynamic CI 및 #29 Bundle Size (2026-11-25)
+
+이 항목은 앞서 기록한 #12 및 #19와 **별도 범위의 후속 적용**이다. 분기된 자동화 전문가 브랜치 전체를 main에 병합하지 않고, 본체 최신 main에서 기능별 전용 브랜치를 만들었다.
+
+| 기술 | 실증된 개선 | PR/본체 main merge SHA | 정확 PR HEAD CI | 남은 범위 |
+|---|---|---|---|---|
+| **#1 Dynamic CI** | 기존 Playwright `pull_request.paths`가 실제 브라우저 실행 공통 의존성인 `package.json`, `package-lock.json`, `vite.config.ts`를 놓쳐 변경만으로 UI 검사를 생략할 수 있던 결함 수정. 기존 18개 test·뷰포트·원격 읽기만 유지. 독립 Workflow 0개 | [PR #1584](https://github.com/ansqhd5774-Choi/zgmini/pull/1584) → `0e9e9c7862cfd68813c4faf7bdf9b62444ece123` | [Node #45483436147](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45483436147), [CodeQL #45483436020](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45483436020), [Secret #45483436115](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45483436115), [Playwright #45483436045](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45483436045) 모두 SUCCESS; 새 트리거 테스트 PASS | 세 파일 각각만 바뀐 별도 PR로 트리거되는 운영 실증은 미확보. 브라우저 추가 실행에 따른 비용·대기는 후속 표본 축적 전 미확정 |
+| **#29 Bundle Size CI** | 기존 Vite Build의 `dist/client/assets/*.js,*.css`에서 원본 바이트·파일별 gzip(level6) 추정·SHA256·합계를 측정하고 JSON 7일 보존. 기존 Node CI 재사용, 새 서비스/의존성/Workflow/Runner 0개 | [PR #1585](https://github.com/ansqhd5774-Choi/zgmini/pull/1585) → `696a09ed99cf4d74ae6274d33e14d8d647fd73de` | 수정 HEAD `25f835cfcffa4d04ee28c3d66a754b6e71bff86b`의 [Node #45484138999](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45484138999), [CodeQL #45484138893](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45484138893), [Secret #45484138898](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45484138898) SUCCESS, 신규 시험 6/6 PASS | 정규 main 간 자동 delta gate/지속 기준선 갱신은 **미구현**, 임의 임계치로 통과/실패 판정 금지 |
+
+### #29 최초 실제 원본 기준과 영향 없음 검증
+
+- 기준 main `39a7a1146f682ff66d6848600ed291747cce11bf`: [Node.js CI #45482923440](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45482923440)의 실제 `production-js-assets` 및 `production-css-assets` 아티팩트 다운로드.
+- PR #1585 최초 [Node CI #45483654802](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45483654802)의 신규 `client-bundle-size-report` 다운로드 후 **같은 이름 129개(102 JS/27 CSS)의 SHA256 및 원본 바이트 전부 일치**. 바이트 변경 0건/0B.
+- JS: 1,715,802B 원본 / 563,383B gzip 추정, CSS: 719,954B 원본 / 129,355B gzip 추정. 총 2,435,756B 원본 / 692,738B gzip 추정. 이는 전체 파일 합계, 특정 페이지의 실제 다운로드 바이트나 CDN Brotli 전송량이 아니다.
+- 수정 HEAD #45484138999의 보고서 ZIP도 독립 회수해 최초 보고서와 파일/집계 전체가 동일함을 확인. 실제 Job 단계 시각상 측정 `Measure client...` = 0초(초 단위 반올림/기록 한계), 작은 JSON 아티팩트 업로드 1초. **전체 CI 성능 개선을 뜻하지 않는다.**
+
+### 이번 작업 중 오류·자동 Issue 증거
+
+- #29 최초 PR HEAD `a3459f6111017fa6fb50eb131ae4fa53aa7bc413`의 [Run #45483654802](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45483654802)는 신규 비교 회귀시험 1건 실패. 원인은 코드에서 미정의 `k` 사용, 실제 사용해야 할 `kind` 변수로 **최소 한 줄 수정**. 수정 뒤 Node·보안 CI 성공과 main readback 완료.
+- 해당 실패는 CI 자동 등록 기존 [Issue #1582](https://github.com/ansqhd5774-Choi/zgmini/issues/1582)에 자동 댓글로 연결됐다. 같은 Workflow/Job/Step일 뿐, 최초 Miniflare AssertionError와는 별개 원인이다. 완료 근거를 추가 기록했고 **최초 Miniflare 원인 미확정으로 Issue OPEN 유지**.
+- 기존 [#1576](https://github.com/ansqhd5774-Choi/zgmini/issues/1576), [#1577](https://github.com/ansqhd5774-Choi/zgmini/issues/1577)은 타 범위 브라우저 CI 문제이므로 본 변경으로 임의 종결하지 않음.
+- 현 작업의 실제 코드 변경은 각 변경 PR의 정확 2·3개 파일이며 운영 PC/Writer/Controller/D1/SQLite/Cloudflare 배포·DNS는 손대지 않았다.
+
+### R2 누적 처리와 다음 작업
+
+- #12 Workflow Governance: **기존 Node CI에 실행 적용 및 queue 호환성 보완 완료**.
+- #19 CI Observability: **읽기 전용 Job 지표 CLI·7건 회귀시험·main 병합 완료**. 정기 자동 실행은 없음.
+- #1 Dynamic CI: **확인된 PR 트리거 누락 수정·기존 Playwright까지 실증 완료**. 광범위 위험 기반 최적화는 별도이며 강제 도입하지 않음.
+- #29 Bundle Size CI: **실측 수집·아티팩트·main 반영 완료**, 장기 baseline 기반 자동 비교는 미완료.
+- 따라서 12종 중 **4종에 소스 개선이 반영**, 나머지 8종은 원래 검토·보류 또는 선별 단계 유지. **12/12 전체 개선 완료나 금융 데이터·운영 수집 정상화 100%로 보고하지 않는다.**
+- 다음 단계는 #8/#24의 **실제 Lighthouse 측정 환경·비용·오탐 분리** 검토 또는 #25/#23의 **기존 Playwright 한정 접근성/크로스브라우저 보완**. #29 기준선을 자동 비교할 때에는 기존 실제 main 아티팩트를 읽는 안전한 방법과 권한·계약을 먼저 검증한다.
