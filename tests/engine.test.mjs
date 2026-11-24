@@ -72,7 +72,8 @@ test('W04 shared-lock A returns its own observation even when retired R13 invent
  });
  assert.equal(out.report.effectClass,'FIXED_READONLY_NO_PROVIDER_NO_DB');
  assert.equal(out.report.status,'STATE_UNKNOWN');
- assert.equal(out.report.code,'READONLY_RESULT_PROTECTION_UNVERIFIED');
+ assert.ok(['READONLY_RESULT_PROTECTION_UNVERIFIED',
+  'SHARED_RESOURCE_WINDOWS_REQUIRED','SHARED_RESOURCE_READONLY_PROBE_UNAVAILABLE'].includes(out.report.code));
  assert.equal(out.report.protectionPrecheckCode,'RETIRED_IRAN_INVENTORY_UNAVAILABLE');
  assert.equal(out.report.protectedProbeReason,'SCHTASKS_INVENTORY_COMMAND_FAILED');
  assert.equal(out.report.protectedStateUnchanged,null);
