@@ -175,10 +175,14 @@ export function fixedInstalledRecoveryCase(id){
  if(id===REC2960)return Object.freeze({issueNumber:2960,postIssueNumber:2965,
   targetSha:TARGET2960,postSourceBranch:'main',
   postSourceSha:'2b69dcbc7ade75815e0c152fd0e2112ddaa5b333',
+  proofSourceBranch:'main',
+  proofSourceSha:'2b69dcbc7ade75815e0c152fd0e2112ddaa5b333',
   proof:proof2960,allowUnchangedBaseline:false});
  if(id===REC3409)return Object.freeze({issueNumber:3409,postIssueNumber:3410,
   targetSha:TARGET3409,postSourceBranch:'codex/employment-1y-reader-r1',
   postSourceSha:'50769db23ac6a5f55203855f5231d12dc0595bb4',
+  proofSourceBranch:'main',
+  proofSourceSha:'8410a857d2d8cd47beae811152a676c6eee07a75',
   proof:proof3409,allowUnchangedBaseline:true});
  return null;
 }
@@ -323,10 +327,24 @@ async function reconcileInstalledRecoveryFixed({id,source,g,before}){
  const rcpt=g(['show','HEAD:'+proofCase.resultPath],'INSTALLED_RECOVERY_A_RESULT_MISSING');
  need(digest(rcpt)===fixedProof.resultSha256,'INSTALLED_RECOVERY_A_RESULT_DRIFT');
  const receipt=JSON.parse(rcpt);
+ // Original postcheck (#3410/#2965) and the later successful independent A
+ // are different requests. Pin and verify both; never equate their source SHAs.
+ const evidenceIssue=github('issues/'+proofCase.issueNumber);
+ let evidenceBody;try{evidenceBody=JSON.parse(evidenceIssue.body);}catch{}
+ const proofIssueExact=evidenceIssue.number===proofCase.issueNumber&&
+  evidenceIssue.title==='pc-job'&&
+  evidenceIssue.user?.login==='ansqhd5774-Choi'&&
+  evidenceIssue.labels?.some(l=>l.name==='pc-job')&&
+  evidenceBody?.schema==='ZGMINI_PC_JOB_V1'&&
+  evidenceBody.operation==='core-status'&&
+  evidenceBody.sourceRepository==='ansqhd5774-Choi/zgmini'&&
+  evidenceBody.sourceBranch===fixed.proofSourceBranch&&
+  evidenceBody.sourceSha===fixed.proofSourceSha&&
+  evidenceBody.requestId===receipt.requestId;
  const run=github('actions/runs/'+proofCase.runId);
  const job=github('actions/jobs/'+proofCase.jobId);
  const step=job.steps?.filter(s=>s.name==='Execute fixed host allowlist entry');
- const success=postExact&&run?.id===proofCase.runId&&
+ const success=postExact&&proofIssueExact&&run?.id===proofCase.runId&&
   run.event==='issues'&&run.status==='completed'&&run.conclusion==='success'&&
   job?.id===proofCase.jobId&&job.run_id===run.id&&
   job.runner_name===proofCase.runnerName&&job.name==='approved-pc-job'&&
@@ -335,7 +353,8 @@ async function reconcileInstalledRecoveryFixed({id,source,g,before}){
   receipt.schema==='ZGMINI_PC_RESULT_V1'&&receipt.status==='PASS'&&
   receipt.code==='CORE_READONLY_DIAGNOSIS'&&receipt.operation==='core-status'&&
   receipt.sourceRepository==='ansqhd5774-Choi/zgmini'&&
-  receipt.requestedSourceSha===postBody.sourceSha&&
+  receipt.requestedSourceSha===fixed.proofSourceSha&&
+  receipt.sourceBranch===fixed.proofSourceBranch&&
   receipt.actualExecutionSha===targetSha&&
   receipt.protectedStateUnchanged===true&&receipt.providerCalls===0&&
   receipt.d1Writes===0&&receipt.sqliteOpened===false&&
