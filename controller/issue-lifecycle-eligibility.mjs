@@ -64,6 +64,8 @@ export function classifyIssueCompletion({issue,request,result,evidence,intent} =
       result.result?.runtimeSourceVerified !== true) return deny('RUNTIME_SOURCE_UNVERIFIED');
   if (intent.requiresCoreLockReleased === true &&
       result.result?.core?.lockPresent !== false) return deny('CORE_LOCK_NOT_RELEASED');
-  return {eligible:true,reason:'ELIGIBLE_FOR_HUMAN_REVIEW_ONLY'};
+  // Eligibility is not an authorization token. No automated GitHub state mutation.
+  return Object.freeze({eligible:true,closeAuthorized:false,requiresHumanReview:true,
+    reason:'ELIGIBLE_FOR_HUMAN_REVIEW_ONLY'});
 }
 export const approvedDiagnosticCodes = Object.freeze(Object.keys(APPROVED));
