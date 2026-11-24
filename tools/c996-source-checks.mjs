@@ -27,7 +27,12 @@ export const GROUPS=Object.freeze({
   'writer-b/import-availability.test.mjs',
   'writer-b/w04-r54-preview-scope.test.mjs',
   'writer-b/w04-r54-threefile-candidate.test.mjs',
-  'writer-b/w04-r54-fourfile-import-closure.test.mjs'],
+  'writer-b/w04-r54-fourfile-import-closure.test.mjs',
+  // These tests were previously omitted even when core Writer B changed:
+  // approval label↔mode, extended natural drain, recovery, and Census cap.
+  'writer-b/contract.test.mjs','writer-b/installer.test.mjs',
+  'writer-b/windows-guards.test.mjs','writer-b/core-idle-window.test.mjs',
+  'inflation-census-api-b/coordinator.test.mjs'],
  employment:['tests/employment-r6-collection-evidence-readonly.test.mjs',
   'tests/core-status-employment-r6-readonly.test.mjs'],
  breadth:['tests/us-breadth-r17-runtime-readonly.test.mjs'],
@@ -75,7 +80,7 @@ const MATCH=Object.freeze({
  handoff009:/^(?:tests\/agent-handoff(?:\.|-(?:comment-ledger|result|work-progress|diagnosis|queue-selector|direct-owner|cross-chain))|agent-handoff\/(?:issue-broker|result-|diagnosis-|work-progress-|comment-ledger|queue-selector|contract|route)\b|\.github\/workflows\/agent-handoff\.yml)/,
  fearGreed:/^(?:tests\/fear-greed-archive-status\.test\.mjs|controller\/fear-greed-archive-readonly\.mjs)$/,
  handoff008:/^(?:tests\/(?:agent-handoff-writer-b-|shared-resource-controller-independent)|agent-handoff\/writer-b-|\.github\/workflows\/agent-handoff-writer-b-failure-intake\.yml)/,
- writer:/^(?:direct-writer-b\/|writer-b\/|tests\/direct-writer-b)/,
+ writer:/^(?:direct-writer-b\/|writer-b\/|tests\/direct-writer-b|inflation-census-api-b\/|\.github\/workflows\/pc-writer-b-source-once\.yml$)/,
  employment:/^(?:tests\/(?:employment-r6-|core-status-employment-r6-)|employment-r6\/|controller\/employment-r6-)/,
  breadth:/^(?:tests\/us-breadth-r17-|us-breadth-r17\/|controller\/us-breadth-r17-)/,
  r47:/^(?:tests\/(?:r47-|shared-resource-issue-admission)|controller\/theme-r47-|r47-)/,

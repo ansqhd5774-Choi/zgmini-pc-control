@@ -58,6 +58,16 @@ test('011 direct test changes and shared source preserve relevant tests',()=>{
  assert.deepEqual(selectGroups(['tests/w05-r304-report-recovery.test.mjs']),['w05B']);
  assert.deepEqual(selectGroups(['.github/workflows/pc-approved-runtime-a-once.yml']),['approvedRuntimeA']);
 });
+test('Writer B Core and Census contracts are always included when Writer source or entry workflow changes',()=>{
+ const expected=['writer-b/contract.test.mjs','writer-b/installer.test.mjs',
+  'writer-b/windows-guards.test.mjs','writer-b/core-idle-window.test.mjs',
+  'inflation-census-api-b/coordinator.test.mjs'];
+ for(const file of expected)assert.ok(GROUPS.writer.includes(file),file);
+ assert.deepEqual(selectGroups(['writer-b/windows-adapter.mjs']),['writer']);
+ assert.deepEqual(selectGroups(['writer-b/contract.test.mjs']),['writer']);
+ assert.deepEqual(selectGroups(['.github/workflows/pc-writer-b-source-once.yml']),['writer']);
+ assert.deepEqual(selectGroups(['inflation-census-api-b/coordinator.test.mjs']),['writer']);
+});
 test('011 workflow and selection contract changes always run all original suites',()=>{
  assert.deepEqual(selectGroups(['.github/workflows/c996-r5-readonly-source-checks.yml']),all);
  assert.deepEqual(selectGroups(['tests/c996-source-scope.test.mjs']),all);
