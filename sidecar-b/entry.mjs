@@ -7,6 +7,7 @@ import {fileURLToPath} from 'node:url';
 import {readCommittedSidecarApproval} from './trusted-approval.mjs';
 import {readPinnedSidecarCandidate} from './pinned-candidate.mjs';
 import {createOperatingSidecarProbe} from './operating-probe.mjs';
+import {awaitNaturalSidecarIdle} from './natural-idle-window.mjs';
 import {receiveApprovedSidecarB} from './receiver.mjs';
 import {sha256,TARGET} from './contract.mjs';
 
@@ -24,6 +25,8 @@ export async function executeSidecarB({event,env,controlRoot,candidateRoot}){
   ...proof.request.approvalManifestPath.split('/')));
  need(sha256(rawManifest)===proof.manifestSha256,
   'SIDECAR_B_APPROVAL_READBACK_STOP');
+ // Read-only natural drain occurs before any shared installation lease.
+ await awaitNaturalSidecarIdle();
  const observeProtected=createOperatingSidecarProbe({
   manifest:proof.manifest,requestId:proof.request.requestId,
   sourceApproved:true
