@@ -146,6 +146,24 @@ export function createApprovedDolManualCollectorOptions({auth,db,fetchImpl,provi
 
 // Enforce the exact current SQLite result for the PDF+ETA539 V2 success path.
 // Legacy XML V1 and explicitly partial runs retain their existing semantics.
+// Count only the latest state week touched in this one-shot. ETA539 imports
+// 112 weeks x 51 regions; counting every touched CURRENT week rejects a valid
+// collection with 5,712 state rows as though it had to be exactly 51.
+export async function readDolEta539LatestWeekStateCount({db,since}={}){
+  const row=await db.prepare(`
+    WITH touched AS (
+      SELECT observation_date
+      FROM market_score_employment_r4_shadow_current_v1
+      WHERE provider='DOL_ETA' AND geography_type='STATE'
+       AND logical_series_id='STATE_INITIAL_CLAIMS'
+       AND retrieved_at>=?
+    )
+    SELECT COUNT(*) AS n FROM touched
+    WHERE observation_date=(SELECT MAX(observation_date) FROM touched)`
+  ).bind(since).first();
+  return Number(row?.n??0);
+}
+
 export function verifyDolEta539StateReadback({pdfMode=false,collectorStatus,stateRows}={}){
  if(pdfMode&&collectorStatus==='SUCCESS')
   need(Number.isSafeInteger(stateRows)&&stateRows===51,
@@ -206,14 +224,9 @@ export async function runInstalledDolManual({auth,pcHome=R6_B_HOME,
        AND s.request_key ${pdfMode?"=?":"LIKE 'DOL_NATIONAL:%'"}
        ${pdfMode?"AND s.snapshot_id=json_extract(c.provenance_json,'$.rawSnapshotId')":""}
     )`).bind(start,...(pdfMode?['DOL_ETA538_PDF:'+auth.approval.pdfArchive.releaseDate]:[])).first();
-  const state=await db.prepare(`
-   SELECT COUNT(*) AS n FROM market_score_employment_r4_shadow_current_v1
-   WHERE provider='DOL_ETA' AND geography_type='STATE'
-    AND logical_series_id='STATE_INITIAL_CLAIMS' AND retrieved_at>=?`
-  ).bind(start).first();
+  const stateRows=await readDolEta539LatestWeekStateCount({db,since:start});
   const nationalSeries=Number(core?.n??0);
   const nationalRows=Number(core?.rows??0);
-  const stateRows=Number(state?.n??0);
   need(Number.isSafeInteger(nationalSeries)&&nationalSeries>=0&&nationalSeries<=4&&
    Number.isSafeInteger(nationalRows)&&nationalRows>=0&&
    Number.isSafeInteger(stateRows)&&stateRows>=0&&stateRows<=35000,
