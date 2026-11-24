@@ -68,6 +68,19 @@ test('Writer B Core and Census contracts are always included when Writer source 
  assert.deepEqual(selectGroups(['.github/workflows/pc-writer-b-source-once.yml']),['writer']);
  assert.deepEqual(selectGroups(['inflation-census-api-b/coordinator.test.mjs']),['writer']);
 });
+test('existing integration regressions run when their owning source changes',()=>{
+ const employment='tests/employment-r6-controller-integration.test.mjs';
+ const maintenance='tests/maintenance-route-integration.test.mjs';
+ assert.ok(GROUPS.employment.includes(employment));
+ assert.ok(GROUPS.recovery.includes(maintenance));
+ assert.deepEqual(selectGroups(['controller/employment-r6-d1-readback-readonly.mjs']),
+   ['employment','recovery']);
+ assert.deepEqual(selectGroups(['tools/maintenance-agent.mjs']),all);
+ assert.deepEqual(selectGroups([employment]),['employment']);
+ assert.deepEqual(selectGroups([maintenance]),['recovery']);
+ assert.deepEqual(ungroupedChangedTests([employment,maintenance],()=>true),[]);
+});
+
 test('011 workflow and selection contract changes always run all original suites',()=>{
  assert.deepEqual(selectGroups(['.github/workflows/c996-r5-readonly-source-checks.yml']),all);
  assert.deepEqual(selectGroups(['tests/c996-source-scope.test.mjs']),all);
