@@ -55,6 +55,9 @@ const DELEGATED_EXACT_TITLES=Object.freeze(new Set([
   'w01-census-m3-api-once',
   // Dedicated R47 CMD B receives this exact title via pc-approved-runtime-b-once.
   'pc-r47-cmd-onefile-install',
+  // CNN Sidecar B is owned by cnn-sidecar-b-once.yml and its separate
+  // exact origin, manifest, byte and runtime guards.
+  'cnn-sidecar-onefile-b-install',
 ]));
 const stop=code=>{throw new Error('SHARED_ISSUE_ADMISSION_'+code);};
 const exactKeys=(o,keys)=>o&&typeof o==='object'&&!Array.isArray(o)&&
