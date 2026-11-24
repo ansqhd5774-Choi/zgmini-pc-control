@@ -187,7 +187,7 @@ test('W05 exact selective B pin covers only 3 approved files and the installed C
  assert.equal(m.purpose,'pc-controller-maintenance');
  assert.equal(m.approval.grade,'B');
  assert.equal(m.approval.scope,'PC_CONTROL_CONTROLLER_UPDATE');
- assert.equal(m.approval.ref,'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3247');
+ assert.equal(m.approval.ref,'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3260');
  assert.equal(m.checks.status,'PASS');
  assert.equal(m.checks.targetSha,W05_B_TARGET);
  assert.equal(m.checks.manifestSha256,manifestFingerprint(m.allowFiles).sha256);
@@ -221,4 +221,14 @@ test('W05 selective B cannot substitute another target or change live module byt
  assert.equal(sourceHash,m.allowFiles[2].sha256);
  const policy=JSON.parse(readFileSync(new URL('../config/operations.json',import.meta.url),'utf8'));
  assert.equal(policy.operations[W05_FIVE_OPERATION].timeoutSeconds,90);
+});
+
+// A source PR that only registered the A operation cannot authorize a later
+// selective B pin. The approving PR must carry the exact target pin at its
+// merge commit; changing the pin's provenance without the manifest is denied.
+test('W05 selective B denies approval PR and pin provenance divergence',()=>{
+ const m=W05_B_MANIFEST,p=W05_B_PIN;
+ assert.throws(()=>validateControllerSelectivePin(m,{...p,
+  approvalRef:'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3254'}),
+  /SELECTIVE_PIN_MISMATCH/);
 });
