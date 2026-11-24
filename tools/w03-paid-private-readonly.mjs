@@ -136,6 +136,9 @@ const D05_PINS=Object.freeze({
  'worker/theme-paid-contract.mjs':'a02fc6d6ccddfad2ed3abb33132b44f188e4249c0fdbb6be3e5d0cf7ca08a91b'
 });
 const D05_CANDIDATE=/^theme-([a-f0-9]{64})\.json$/;
+// Bounded archive inventory: the old 10k file ceiling could interrupt a year
+// of normal repeated calculations. The existing 90-second scan deadline remains.
+const D05_MAX_ARCHIVE_CANDIDATES=100_000;
 const d05Unknown=code=>UNKNOWN(code,{scope:'PAID_PUBLIC_FINAL_OUTPUTS_ONLY',
  expectedPublicThemeCount:null,dashboardTargetThemeCount:30,
  publicFinalOutputCoverageVerified:false,full30FinalOutputCoverageVerified:false,
@@ -151,7 +154,7 @@ export function summarizeD05ThemeCandidates(names,readOne,{
  now=Date.now(),deadline=Date.now()+90000,receipt=null,
  publicExpectedIds=null,publicReadyIds=null,confirmedDate=null
 }={}){
- if(!Array.isArray(names)||names.length>10000||
+ if(!Array.isArray(names)||names.length>D05_MAX_ARCHIVE_CANDIDATES||
     names.some(n=>typeof n!=='string'||!D05_CANDIDATE.test(n))||
     new Set(names).size!==names.length)return d05Unknown('D05_THEME_ARCHIVE_INVENTORY_INVALID');
  const days=new Map(),seen=new Map();
@@ -245,7 +248,7 @@ export async function inspectD05PaidThemeFinalOutputsReadonly(){
    rel.startsWith('..'+path.sep)||path.isAbsolute(rel))
    return d05Unknown('D05_THEME_ARCHIVE_PATH_UNSAFE');
   const names=fs.readdirSync(dir).filter(n=>D05_CANDIDATE.test(n));
-  if(names.length>10000)return d05Unknown('D05_THEME_ARCHIVE_INVENTORY_INVALID');
+  if(names.length>D05_MAX_ARCHIVE_CANDIDATES)return d05Unknown('D05_THEME_ARCHIVE_INVENTORY_INVALID');
   const run=read(path.join(dataRoot,'pc-writer','marketparquet-paid','theme-last-run.json'),
    dataRoot,524288);
   let receipt=null,publicExpectedIds=null,publicReadyIds=null,confirmedDate=null;

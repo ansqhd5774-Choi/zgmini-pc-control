@@ -175,6 +175,38 @@ test('D05 public final-output coverage scales with the approved roster, not ten 
  }
 });
 
+test('D05 archive count beyond 10000 remains bounded and verifies the actual dynamic roster',()=>{
+ const at=Date.parse('2026-11-23T16:00:00.000Z');
+ const now=Date.parse('2026-11-24T02:00:00.000Z');
+ const file=i=>'theme-'+i.toString(16).padStart(64,'0')+'.json';
+ const names=Array.from({length:10001},(_,i)=>file(i));
+ const event=i=>({scoreId:'theme:sample-0',score:63.51,phase:'CONFIRMED',
+  asOfDate:'2026-11-20',calculatedAt:new Date(at+i).toISOString(),
+  calculatedDateKst:'2026-11-24',eventId:sha('event-'+i)});
+ const newest=event(names.length-1);
+ const receipt={status:'LOCAL_FINAL_THEME_OUTPUT_VERIFIED',
+  candidateBodySha256:(names.length-1).toString(16).padStart(64,'0'),
+  calculatedAt:newest.calculatedAt,scoreCount:1,
+  outputEventsSha256:sha(JSON.stringify([newest.eventId]))};
+ const out=summarizeD05ThemeCandidates(names,name=>[event(parseInt(name.slice(6,70),16))],{
+  now,deadline:Date.now()+90000,receipt,publicExpectedIds:['sample-0'],
+  publicReadyIds:['sample-0'],confirmedDate:'2026-11-20'
+ });
+ assert.equal(out.status,'PASS');
+ assert.equal(out.candidateFiles,10001);
+ assert.equal(out.scannedCandidateFiles,10001);
+ assert.equal(out.actualOutputEvents,10001);
+ assert.equal(out.dailyFinalScorePoints,1);
+ assert.equal(out.archiveScanComplete,true);
+ assert.equal(out.currentReceiptMatched,true);
+ assert.equal(out.publicFinalOutputCoverageVerified,true);
+ assert.equal(out.oneYearComplete,false);
+ assert.doesNotMatch(JSON.stringify(out),/sample-0|63\.51/);
+ const excess=Array(100001).fill(file(0));
+ assert.equal(summarizeD05ThemeCandidates(excess,()=>{throw Error('READ_MUST_NOT_RUN')}).code,
+  'D05_THEME_ARCHIVE_INVENTORY_INVALID');
+});
+
 test('D05 configured registration file inventory is count-only and preserves private definitions',()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'d05-registered-readonly-'));
  try{
