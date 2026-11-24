@@ -4,7 +4,6 @@
 // No Controller/Writer overwrite, no DB/D1/provider I/O, no lease deletion.
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
@@ -79,9 +78,21 @@ const readStrict=(file,max=131072)=>{
   'OPERATOR_FILE_UNSAFE');
  return fs.readFileSync(file);
 };
-const runExe=(bin,args,{timeout=60000,maxBuffer=8_000_000}={})=>
- execFileSync(bin,args,{encoding:null,windowsHide:true,shell:false,timeout,maxBuffer,
-  env:{...process.env,GIT_OPTIONAL_LOCKS:'0',GIT_TERMINAL_PROMPT:'0'}});
+const runExe=(bin,args,{timeout=60000,maxBuffer=8_000_000}={})=>{
+ try{
+  return execFileSync(bin,args,{encoding:null,windowsHide:true,shell:false,timeout,maxBuffer,
+   env:{...process.env,GIT_OPTIONAL_LOCKS:'0',GIT_TERMINAL_PROMPT:'0'}});
+ }catch(error){
+  // Existing tools return bounded JSON error codes; never print raw child output.
+  for(const raw of [error?.stdout,error?.stderr]){
+   try{
+    const receipt=JSON.parse(String(raw??'').trim());
+    if(/^[A-Z][A-Z0-9_]{1,79}$/.test(receipt?.code??''))error.code=receipt.code;
+   }catch{/* Opaque failures remain unverified; no automatic retry. */}
+  }
+  throw error;
+ }
+};
 const git=(args)=>runExe('git',['--no-optional-locks','-C',FIXED.root,...args]);
 const show=(rev,rel)=>git(['show',rev+':'+rel]);
 
