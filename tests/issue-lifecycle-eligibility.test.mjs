@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {classifyIssueCompletion} from '../controller/issue-lifecycle-eligibility.mjs';
 
 const good = () => ({
-  issue: {state:'open',number:1299,body:JSON.stringify({schema:'ZGMINI_PC_JOB_V1',requestId:'req-1299',operation:'release-calendar-runtime-readonly'})},
-  request: {schema:'ZGMINI_PC_JOB_V1',requestId:'req-1299',operation:'release-calendar-runtime-readonly'},
-  result: {requestId:'req-1299',operation:'release-calendar-runtime-readonly',jobId:'run-43166235600-1-seat-3',status:'PASS',
+  issue: {state:'open',number:1299,body:JSON.stringify({schema:'ZGMINI_PC_JOB_V1',requestId:'req-1299',operation:'release-calendar-runtime-readonly',sourceRepository:'ansqhd5774-Choi/zgmini',sourceBranch:'main',sourceSha:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'})},
+  request: {schema:'ZGMINI_PC_JOB_V1',requestId:'req-1299',operation:'release-calendar-runtime-readonly',sourceRepository:'ansqhd5774-Choi/zgmini',sourceBranch:'main',sourceSha:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'},
+  result: {schema:'ZGMINI_PC_RESULT_V1',controlRepository:'ansqhd5774-Choi/zgmini-pc-control',controlSourceSha:'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',actualExecutionSha:'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',requestedSourceSha:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',sourceRepository:'ansqhd5774-Choi/zgmini',sourceBranch:'main',requestId:'req-1299',operation:'release-calendar-runtime-readonly',jobId:'run-43166235600-1-seat-3',status:'PASS',
     code:'RELEASE_CALENDAR_SOURCE_INVENTORY_READONLY',firstFail:null,exitCode:0,protectedStateUnchanged:true,
     result:{status:'PASS',code:'RELEASE_CALENDAR_SOURCE_INVENTORY_READONLY'},
     operationalWrites:0,providerCalls:0,d1Writes:0},
@@ -24,6 +24,15 @@ test('complete and approved diagnostic is only human-review eligible', () => {
 const negatives=[
  ['issue already closed',a=>a.issue.state='closed','ISSUE_NOT_OPEN'],
  ['missing original issue body',a=>delete a.issue.body,'ISSUE_BODY_UNVERIFIED'],
+ ['source SHA drift',a=>a.result.requestedSourceSha='cccccccccccccccccccccccccccccccccccccccc','SOURCE_IDENTITY_MISMATCH'],
+ ['body source SHA mismatch',a=>a.issue.body=JSON.stringify({...JSON.parse(a.issue.body),sourceSha:'dddddddddddddddddddddddddddddddddddddddd'}),'SOURCE_IDENTITY_MISMATCH'],
+ ['malformed source SHA',a=>{a.request.sourceSha='short';a.issue.body=JSON.stringify(a.request);},'SOURCE_IDENTITY_MISMATCH'],
+ ['source repo changed',a=>a.result.sourceRepository='foreign/other','SOURCE_IDENTITY_MISMATCH'],
+ ['source branch changed',a=>a.result.sourceBranch='unknown','SOURCE_IDENTITY_MISMATCH'],
+ ['wrong controller repository',a=>a.result.controlRepository='foreign/other','RECEIPT_SCHEMA_UNVERIFIED'],
+ ['unexpected receipt schema',a=>a.result.schema='UNKNOWN','RECEIPT_SCHEMA_UNVERIFIED'],
+ ['execution source mismatch',a=>a.result.actualExecutionSha='cccccccccccccccccccccccccccccccccccccccc','EXECUTION_IDENTITY_MISMATCH'],
+ ['missing execution hash',a=>delete a.result.controlSourceSha,'EXECUTION_IDENTITY_MISMATCH'],
  ['forged requestId in original issue',a=>a.issue.body=JSON.stringify({...JSON.parse(a.issue.body),requestId:'other'}),'ISSUE_BODY_UNVERIFIED'],
  ['nested result status false',a=>a.result.result.status='BLOCKED','NESTED_RESULT_MISMATCH'],
  ['nested result code mismatched',a=>a.result.result.code='UNVERIFIED','NESTED_RESULT_MISMATCH'],
