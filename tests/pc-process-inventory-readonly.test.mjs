@@ -7,7 +7,7 @@ import {inspectTask, TASK} from '../tools/marketparquet-task-source-readonly.mjs
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
 import assert from 'node:assert/strict';
 import {classifyInstalledReconciliationProof,main as maintenanceRecoveryMain} from '../tools/maintenance-recovery.mjs';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,project2960MaintenanceStatus,project3409MaintenanceStatus,compact3409ProcessResult,compare2960ProtectedBaseline,classify2960ProtectionDifference,assess2960OriginalLeaseLineage,compact2960ProcessResult,projectD05WriterCheckpoint,compactD05WriterResult,inspectD05PrivateFinalReceiptReadonly,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,project2960MaintenanceStatus,project3409MaintenanceStatus,compact3409ProcessResult,assess3409OriginalLeaseLineage,compare2960ProtectedBaseline,classify2960ProtectionDifference,assess2960OriginalLeaseLineage,compact2960ProcessResult,projectD05WriterCheckpoint,compactD05WriterResult,inspectD05PrivateFinalReceiptReadonly,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 import {inspect3160RecoveryCasReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 import {inspect3160RollbackPreflightReadonly} from '../tools/pc-process-inventory-readonly.mjs';
@@ -75,6 +75,26 @@ test('#3409 original maintenance ledger projection strips secrets and fails clos
  assert.equal(project3409MaintenanceStatus(null).status,'STATE_UNKNOWN');
  assert.equal(compact3409ProcessResult({requestId:'fixed'},
   project3409MaintenanceStatus(null)).status,'PARTIAL');
+});
+test('W04 #3409 lease lineage requires exact request, target, owner and chronology',()=>{
+ const id='pc-update-71ea39dc-7048-4e10-9d11-d4be7f6c3ec0';
+ const target='6b3c9c0ce77354d81babe4c9ea7785663c6c2cb4';
+ const ledger={requestId:id,issueNumber:3409,status:'RECOVERY_REQUIRED',
+  firstFail:'POSTCHECK_PENDING',postIssueNumber:3410,targetSha:target,
+  updatedAt:'2026-11-24T17:15:43.183Z'};
+ const owner={pid:3210,nonce:'11111111-2222-4333-8444-555555555555',
+  at:'2026-11-24T17:08:01.000Z'};
+ const marker={requestOwnerPid:3210,nonce:owner.nonce,
+  at:'2026-11-24T17:15:43.300Z'};
+ assert.equal(assess3409OriginalLeaseLineage(ledger,owner,marker).correlated,true);
+ for(const change of [
+  {requestId:'not-original'},{issueNumber:999},{postIssueNumber:999},
+  {targetSha:'a'.repeat(40)},{status:'PASS'}]){
+  assert.equal(assess3409OriginalLeaseLineage({...ledger,...change},owner,marker).correlated,false);
+ }
+ assert.equal(assess3409OriginalLeaseLineage(ledger,owner,{...marker,nonce:'different'}).correlated,false);
+ assert.equal(assess3409OriginalLeaseLineage(ledger,owner,
+  {...marker,at:'2026-11-24T17:30:00.000Z'}).correlated,false);
 });
 test('#2960 exact recovery probe rejects arbitrary parameters and handoff host',()=>{
  const e=event(),p=JSON.parse(e.issue.body);
