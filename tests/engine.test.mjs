@@ -61,6 +61,30 @@ test('postcheck R13 inventory uncertainty keeps worker result but never authoriz
   path.join(result.workspace,'RESULT.json'),'utf8')).status,'STATE_UNKNOWN');
 });
 
+test('W04 shared-lock A returns its own observation even when retired R13 inventory fails',async()=>{
+ const c=fixture();
+ const out=await executeJob(req('shared-resource-release-readonly','w04-core-lock-r13-inventory-01'),{
+  ...c,runId:'9843',retiredTaskEvidence:()=>{
+   throw Object.assign(new Error('private scheduler inventory error'),{
+    code:'RETIRED_IRAN_INVENTORY_UNAVAILABLE',
+    probeReason:'SCHTASKS_INVENTORY_COMMAND_FAILED'});
+  },
+ });
+ assert.equal(out.report.effectClass,'FIXED_READONLY_NO_PROVIDER_NO_DB');
+ assert.equal(out.report.status,'STATE_UNKNOWN');
+ assert.ok(['READONLY_RESULT_PROTECTION_UNVERIFIED',
+  'SHARED_RESOURCE_WINDOWS_REQUIRED','SHARED_RESOURCE_READONLY_PROBE_UNAVAILABLE'].includes(out.report.code));
+ assert.equal(out.report.protectionPrecheckCode,'RETIRED_IRAN_INVENTORY_UNAVAILABLE');
+ assert.equal(out.report.protectedProbeReason,'SCHTASKS_INVENTORY_COMMAND_FAILED');
+ assert.equal(out.report.protectedStateUnchanged,null);
+ assert.equal(out.report.resultPresent,undefined);
+ assert.equal(typeof out.report.result?.code,'string');
+ assert.equal(out.report.providerCalls,0);
+ assert.equal(out.report.d1Writes,0);
+ assert.equal(out.report.operationalWrites,0);
+ assert.doesNotMatch(JSON.stringify(out.report),/private scheduler inventory error/);
+});
+
 test('missing unrelated inventory preserves a fixed read result without asserting protection PASS',async()=>{
  const c=fixture();
  const result=await executeJob(req('runner-smoke','precheck-r13-denied-01'),
