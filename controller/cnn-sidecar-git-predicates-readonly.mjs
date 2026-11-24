@@ -5,6 +5,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {projectCnnR10ThreeGuardsReadonly} from './cnn-r10-guard-replay-readonly.mjs';
+import {projectPinnedCnnR10Line19FilesReadonly} from './cnn-r10-line19-file-existence-readonly.mjs';
 
 const ARCHIVE_SHA='ce07af0b5e8d17625644e204f2815c1f754aff2468bc5434ac13c0dadcecd907';
 const CHECKOUT='zgmini-earnings-history-pc-release';
@@ -252,6 +253,32 @@ export function inspectCnnGitPredicatesReadonly(dataRoot,{strictPlatform=true,
   }
  }catch{}
  const projected=projectCnnGitEvidence(empty);
- return {...projected,guardReplay:projectCnnR10ThreeGuardsReadonly(
-  initial.toString('utf8'),empty)};
+ // Never use Sidecar arguments as executable code. Stat only a provably
+ // fixed child of the existing approved data/projects roots.
+ const fileStatus=(file,target)=>{
+  const base=target==='DATA_ROOT_CHILD'?root:path.join(path.dirname(root),'projects');
+  let baseReal,parentReal;
+  try{
+   baseReal=fs.realpathSync.native(base);
+   parentReal=fs.realpathSync.native(path.dirname(file));
+  }catch{return null;}
+  if(!inside(baseReal,parentReal)&&
+   path.normalize(baseReal).toLowerCase()!==path.normalize(parentReal).toLowerCase())
+   return null;
+  try{
+   const stat=fs.lstatSync(file);
+   if(stat.isSymbolicLink())return null;
+   const real=fs.realpathSync.native(file);
+   if(!inside(baseReal,real)&&
+    path.normalize(baseReal).toLowerCase()!==path.normalize(real).toLowerCase())
+    return null;
+   return true;
+  }catch(error){return error?.code==='ENOENT'?false:null;}
+ };
+ const sourceText=initial.toString('utf8');
+ return {...projected,guardReplay:projectCnnR10ThreeGuardsReadonly(sourceText,empty),
+  line19FileExistence:projectPinnedCnnR10Line19FilesReadonly(sourceText,{
+   ...empty,dataRoot:root,projectRoot:path.join(path.dirname(root),'projects'),
+   sidecarFile:script},{fileStatus})};
+
 }
