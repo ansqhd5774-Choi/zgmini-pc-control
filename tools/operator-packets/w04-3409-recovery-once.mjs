@@ -80,10 +80,11 @@ const readStrict=(file,max=131072)=>{
 };
 export function sanitizedChildEnvironment(input=process.env){
  const clean={...input};
- // Never inherit Git's environment-level config, executable, hook or helper
- // injection from the launching desktop/session into fetch or recovery.
+ // Never inherit Git/Node environment-level executable, hook, module preload,
+ // custom runtime search or helper injection from the operator desktop.
  for(const k of Object.keys(clean)){
-  if(/^GIT_/i.test(k)||/^GCM_/i.test(k)||/^SSH_ASKPASS$/i.test(k))
+  if(/^GIT_/i.test(k)||/^GCM_/i.test(k)||/^NODE_/i.test(k)||
+    /^NPM_CONFIG_/i.test(k)||/^SSH_ASKPASS$/i.test(k))
    delete clean[k];
  }
  clean.GIT_OPTIONAL_LOCKS='0';
