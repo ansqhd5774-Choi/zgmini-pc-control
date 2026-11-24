@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {sha256,authorizeWriterBIssue,APPROVAL_SCHEMA,SCOPE,SOURCE_REPO,
  REQUEST_SCHEMA,OPERATION,CONTROL_REPO,ISSUE_LABEL,ISSUE_TITLE} from './contract.mjs';
 import {performWriterBInstall,verifyWriterBPreimage,
-  verifyWriterBCandidate,verifyPreparedWriterCommit} from './installer.mjs';
+  verifyWriterBCandidate,verifyPreparedWriterCommit,
+  safeWriterBIdleObservation} from './installer.mjs';
 
 const NEXT='f'.repeat(40),RID='01234567-89ab-4cde-8fab-0123456789ab';
 const H=value=>sha256(Buffer.from(value));
@@ -149,6 +150,25 @@ test('long drain timeout restores source, config and Task without switching file
  assert.equal(state.steps.includes('switch'),false);
  assert.equal(state.retained,false);
 });
+test('sanitized extended timeout evidence distinguishes active Core from uncertain probes',()=>{
+ const counts={windowMs:1200000,samples:800,readySamples:1,
+  activeSamples:797,otherSamples:2,maxReadyStreak:1};
+ const evidence=safeWriterBIdleObservation({
+  code:'WRITER_B_CORE_NATURAL_DRAIN_TIMEOUT_STOP',
+  idleObservation:{...counts,pid:1234,cmd:'private'},
+ });
+ assert.deepEqual(evidence,counts);
+ assert.equal(JSON.stringify(evidence).includes('1234'),false);
+ assert.equal(safeWriterBIdleObservation({
+  code:'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED',
+  idleObservation:counts,
+ }),null);
+ assert.equal(safeWriterBIdleObservation({
+  code:'WRITER_B_CORE_NATURAL_DRAIN_TIMEOUT_STOP',
+  idleObservation:{...counts,windowMs:1200001},
+ }),null);
+});
+
 test('approved maintenance stages before inhibition and drains active Core without natural-idle lottery',async()=>{
  const {io,state}=mockIO({failAt:'window'});
  let active=true;
