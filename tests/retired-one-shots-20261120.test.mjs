@@ -26,6 +26,16 @@ test('three terminal R17 historical Issue-opened entrypoints are retired',()=>{
   'r17-writer-b/entry.mjs'
  ])assert.equal(existsSync(path.join(root,source)),true,source);
 });
+// #265 closed with immutable EIA saved-file readback proof; the reader and
+// original receipt survive, but the consumed event entrypoint must not linger.
+test('completed immutable EIA saved-file one-shot intake is retired',()=>{
+ assert.equal(existsSync(path.join(root,'.github/workflows','pc-inflation-eia-readback-once.yml')),false);
+ assert.equal(existsSync(path.join(root,'inflation-eia-readback-b-once.mjs')),true);
+ assert.equal(existsSync(path.join(root,'inflation-eia-readback-b-once.test.mjs')),true);
+ // Separate fixed EIA collection and shared inflation inventory remain.
+ for(const file of ['pc-inflation-eia-only-approved-once.yml','pc-inflation-19-inventory-b-once.yml'])
+  assert.equal(existsSync(path.join(root,'.github/workflows',file)),true,file);
+});
 test('common A/B and unfinished inflation and R54 readers are preserved',()=>{
  for(const name of kept)assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
 });
