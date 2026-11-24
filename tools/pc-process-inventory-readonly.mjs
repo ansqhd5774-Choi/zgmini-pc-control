@@ -515,6 +515,37 @@ const D05_WRITER_CODES=new Set(['VERIFIED','VERIFIED_WITH_GAPS','FAILED','DRY_RU
 const safeD05Value=v=>typeof v==='string'&&D05_STAGE_STATUSES.has(v)?v:null;
 const safeD05Iso=v=>typeof v==='string'&&/^20\d\d-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/.test(v)&&
  Number.isFinite(Date.parse(v))?new Date(v).toISOString():null;
+const D05_TIMING_SCOPE='ATTEMPT_OUTPUT_CALLBACKS_ONLY_NOT_FULL_CORE_OR_WRITER';
+const d05TimingInt=(n,max)=>Number.isSafeInteger(n)&&n>=0&&n<=max;
+const d05TimingStage=v=>typeof v==='string'&&/^[a-z][a-z0-9-]{0,64}$/.test(v);
+// Existing one-file D05 scope: emit bounded stage timings only, never raw
+// feed keys, source inputs, file paths, credential values or report bodies.
+export function projectD05WriterTiming(raw){
+ if(raw===undefined||raw===null)return {status:'NOT_RECORDED'};
+ const invalid=()=>({status:'UNVERIFIED'});
+ if(!raw||typeof raw!=='object'||Array.isArray(raw)||raw.scope!==D05_TIMING_SCOPE||
+  !d05TimingInt(raw.samples,20000)||!d05TimingInt(raw.totalMeasuredMs,1_728_000_000_000)||
+  !Array.isArray(raw.slowest)||raw.slowest.length>12||
+  !raw.byStage||typeof raw.byStage!=='object'||Array.isArray(raw.byStage))
+  return invalid();
+ const stages=Object.entries(raw.byStage);
+ if(stages.length>33||stages.some(([name,v])=>!d05TimingStage(name)||
+  !v||typeof v!=='object'||Array.isArray(v)||!d05TimingInt(v.samples,20000)||
+  !d05TimingInt(v.totalMs,1_728_000_000_000)||!d05TimingInt(v.failed,20000)||
+  v.failed>v.samples))return invalid();
+ const slowest=raw.slowest.map(v=>v&&d05TimingStage(v.stage)&&
+  d05TimingInt(v.elapsedMs,86_400_000)&&typeof v.success==='boolean'?
+  {stage:v.stage,elapsedMs:v.elapsedMs,success:v.success}:null);
+ if(slowest.includes(null)||slowest.length>raw.samples||
+  stages.reduce((n,[,v])=>n+v.samples,0)!==raw.samples||
+  stages.reduce((n,[,v])=>n+v.totalMs,0)!==raw.totalMeasuredMs)
+  return invalid();
+ return {status:'OBSERVED_LOCAL_CHECKPOINT',scope:D05_TIMING_SCOPE,
+  samples:raw.samples,totalMeasuredMs:raw.totalMeasuredMs,
+  byStage:stages.map(([stage,v])=>({stage,samples:v.samples,
+   totalMs:v.totalMs,failed:v.failed})).sort((a,b)=>b.totalMs-a.totalMs),
+  slowest};
+}
 /** Fixed 1-file read only. Never include raw Writer report, inputs, paths or secrets. */
 export function projectD05WriterCheckpoint(raw){
  if(!raw||typeof raw!=='object'||Array.isArray(raw))return {
@@ -530,6 +561,7 @@ export function projectD05WriterCheckpoint(raw){
   code:dataComplete?'D05_WRITER_CHECKPOINT_OBSERVED':'D05_WRITER_CHECKPOINT_FIELDS_UNVERIFIED',
   writerAt:at,writerMode:mode,writerStatus,writerSource,
   marketStage:market,compositeArchiveStage:archive,d05PrivateLineageStage:lineage,
+  writerStageTiming:projectD05WriterTiming(raw.writerStageTiming),
   // Null means no stage was reported, not that a calculation failed.
   // Market reporting may advance to VERIFIED after publication; archive is the only fixed stage gate here.
   // This does not attest the exclusive Writer witness, output append, or full D05 input lineage.
