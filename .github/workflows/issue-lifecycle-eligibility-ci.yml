@@ -1,0 +1,21 @@
+name: Issue Lifecycle Eligibility (offline)
+on:
+  pull_request:
+    paths:
+      - 'controller/issue-lifecycle-eligibility.mjs'
+      - 'tests/issue-lifecycle-eligibility.test.mjs'
+      - '.github/workflows/issue-lifecycle-eligibility-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  lifecycle-fixtures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Offline classifier fixtures (no GitHub mutations)
+        run: node --test tests/issue-lifecycle-eligibility.test.mjs
