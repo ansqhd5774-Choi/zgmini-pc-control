@@ -10,6 +10,22 @@ test('eleven completed one-shot Issue intakes are retired',()=>{
  assert.equal(retired.length,11);assert.equal(new Set(retired).size,11);
  for(const name of retired)assert.equal(existsSync(path.join(root,'.github/workflows',name)),false,name);
 });
+// R17's fixed 2026-11-06 SIP/probe/preflight requests are now terminal.
+// Retire only their Issue-opened entrypoints, not immutable evidence or code.
+test('three terminal R17 historical Issue-opened entrypoints are retired',()=>{
+ const old=[
+  'pc-r17-sip-historical-probe-once.yml',
+  'pc-r17-writer-b-probe-diagnostic-once.yml',
+  'pc-r17-writer-b-preflight.yml'
+ ];
+ assert.equal(new Set(old).size,3);
+ for(const name of old)assert.equal(existsSync(path.join(root,'.github/workflows',name)),false,name);
+ for(const source of [
+  'r17-sip-probe/historical-probe.mjs',
+  'r17-writer-b/probe-diag/r17-b-probe-diagnostic.mjs',
+  'r17-writer-b/entry.mjs'
+ ])assert.equal(existsSync(path.join(root,source)),true,source);
+});
 test('common A/B and unfinished inflation and R54 readers are preserved',()=>{
  for(const name of kept)assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
 });
