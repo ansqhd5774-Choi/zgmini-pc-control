@@ -1,0 +1,14 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "baseHead": "37f9048705793da5e49c4ff271f90dff444ec44b",
+  "filePath": "scripts/pc-writer/sector-fear-greed-r3-local-cycle.mjs",
+  "beforeSha256": "50a2029fe3568318bb74d74d7131fb52dbd00524cb02365b76d7ad266969ac25",
+  "insertions": [
+    {
+      "anchor": "    report.storedAt=check.storedAt;",
+      "position": "after",
+      "text": "    // D05 verifies only the already calculated 11 final sector scores.\n    // Do not change the existing R3 publication or any source indicators.\n    try{\n     const {readVerifiedSectorFinalOutputs}=await import('../../lib/score-history/d05-final-sector-local-readback-r1.mjs');\n     report.d05FinalOutputReadback=await readVerifiedSectorFinalOutputs(core,{\n      calculatedAtMs:now,now:Date.now(),\n     });\n    }catch{report.d05FinalOutputReadback={status:'UNPROVEN_LOCAL_FINAL_SECTOR_OUTPUT'};}\n"
+    }
+  ]
+}

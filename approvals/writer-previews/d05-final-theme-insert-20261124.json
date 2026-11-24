@@ -1,0 +1,14 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "baseHead": "37f9048705793da5e49c4ff271f90dff444ec44b",
+  "filePath": "scripts/pc-writer/theme-paid-cycle.mjs",
+  "beforeSha256": "e1b11c0a89147303a9661c0d40ad89da6dd7b99c641b65f21f008f88b5e1741a",
+  "insertions": [
+    {
+      "anchor": " const result={...report,status:'PRIVATE_CALCULATED',sourceLatestDate:phases.sourceLatest,confirmedDate:phases.confirmed,provisionalDate:phases.provisional,expectedIds:output.record.dataQuality.expectedPublicIds,readyIds:output.record.dataQuality.readyPublicIds,pendingIds:output.record.dataQuality.pendingPublicIds,privateResults:output.privateResults,privateStored,acquisition:{chunks:acquisition.acquired,proofs:saved.proofs.length},results:output.results};",
+      "position": "after",
+      "text": " // D05 verifies final confirmed theme scores from the existing immutable candidate.\n // This optional readback does not change publication, inputs or D1 writes.\n if(validPaidThemeRecord(output.record)){\n  try{\n   const {readVerifiedPaidThemeFinalOutputs}=await import('../../lib/score-history/d05-final-theme-candidate-readback-r1.mjs');\n   result.d05FinalOutputReadback=readVerifiedPaidThemeFinalOutputs({\n    candidatePath:candidate,calculatedAtMs:now,now:Date.now(),\n   });\n  }catch{result.d05FinalOutputReadback={status:'UNPROVEN_LOCAL_FINAL_THEME_OUTPUT'};}\n }\n"
+    }
+  ]
+}
