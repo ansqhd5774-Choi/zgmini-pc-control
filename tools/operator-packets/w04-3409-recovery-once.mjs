@@ -107,6 +107,13 @@ const runExe=(bin,args,{timeout=60000,maxBuffer=8_000_000}={})=>{
  }
 };
 let isolatedHooksPath=null;
+export function isolatedGitArguments(args,{hooksPath=isolatedHooksPath,root=FIXED.root}={}){
+ need(typeof hooksPath==='string'&&path.isAbsolute(hooksPath),
+   'OPERATOR_HOOK_ISOLATION_UNVERIFIED');
+ need(Array.isArray(args)&&args.every(a=>typeof a==='string'),
+   'OPERATOR_GIT_ARGUMENTS_INVALID');
+ return ['--no-optional-locks','-c','core.hooksPath='+hooksPath,'-C',root,...args];
+}
 const git=(args)=>{
  need(typeof isolatedHooksPath==='string','OPERATOR_HOOK_ISOLATION_UNVERIFIED');
  const st=fs.lstatSync(isolatedHooksPath);
@@ -114,8 +121,7 @@ const git=(args)=>{
    'OPERATOR_HOOK_ISOLATION_DRIFT');
  // Explicit -c is inherited by worktree checkout: repository/default hooks
  // cannot run even if another party changes Git's configured hooksPath.
- return runExe('git',['--no-optional-locks','-c','core.hooksPath='+isolatedHooksPath,
-   '-C',FIXED.root,...args]);
+ return runExe('git',isolatedGitArguments(args));
 };
 const show=(rev,rel)=>git(['show',rev+':'+rel]);
 
