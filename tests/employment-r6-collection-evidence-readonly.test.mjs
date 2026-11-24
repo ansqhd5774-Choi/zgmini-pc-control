@@ -820,17 +820,18 @@ test('W04 ETA538 saved-only audit checks binary PDF, Base64 and all four Nationa
      originalPdfSha256:original,responseHash:textHash,rawRecordHash:sourceHash,
      sourceKind:'ETA538_ADVANCE_RELEASE_PDF'}));
   }
-  const verified=auditStoredEta538PdfRawLinkage(db);
+  const verified=auditStoredEta538PdfRawLinkage(db,{approvedPdfSha256:original});
   assert.equal(verified.status,'PDF_BYTES_AND_FOUR_ROW_HASH_LINKS_VERIFIED_NOT_VALUE_REPARSE');
   assert.equal(verified.verifiedNationalRows,4);
   assert.equal(verified.originalPdfSha256Matched,true);
+  assert.equal(auditStoredEta538PdfRawLinkage(db).status,'PDF_BYTES_OR_HASH_MISMATCH');
   assert.equal(verified.valuesReparsed,false);
   assert.deepEqual(verified.observationWeeks,observationWeeks);
   assert.doesNotMatch(JSON.stringify(verified),/demo-binary-archive|203000|1763000/);
   db.prepare("UPDATE market_score_employment_r4_shadow_current_v1 SET value=999 WHERE logical_series_id='INITIAL_CLAIMS'").run();
-  assert.equal(auditStoredEta538PdfRawLinkage(db).status,'PDF_NATIONAL_ROW_HASH_LINK_INVALID');
+  assert.equal(auditStoredEta538PdfRawLinkage(db,{approvedPdfSha256:original}).status,'PDF_NATIONAL_ROW_HASH_LINK_INVALID');
   db.prepare("UPDATE market_score_employment_r4_shadow_current_v1 SET value=203000 WHERE logical_series_id='INITIAL_CLAIMS'").run();
   db.prepare('UPDATE market_score_employment_r6_raw_snapshot_v1 SET body_chunk=?').run(encoded.slice(0,-3)+'AAA');
-  assert.equal(auditStoredEta538PdfRawLinkage(db).status,'PDF_BYTES_OR_HASH_MISMATCH');
+  assert.equal(auditStoredEta538PdfRawLinkage(db,{approvedPdfSha256:original}).status,'PDF_BYTES_OR_HASH_MISMATCH');
  }finally{db.close();}
 });
