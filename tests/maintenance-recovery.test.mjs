@@ -9,12 +9,17 @@ test('fixed installed reconciliation admits only original #2960 and W04 #3409 id
  assert.equal(a.issueNumber,2960);assert.equal(a.postIssueNumber,2965);
  assert.equal(a.targetSha,'b9a423cf38d0967d6ed336912a66433f79502d3d');
  assert.equal(a.postSourceBranch,'main');assert.equal(a.allowUnchangedBaseline,false);
+ assert.equal(a.proofSourceBranch,'main');
+ assert.equal(a.proofSourceSha,'2b69dcbc7ade75815e0c152fd0e2112ddaa5b333');
  assert.equal(a.proof.issueNumber,2982);assert.equal(a.proof.runId,45186420113);
  const w=fixedInstalledRecoveryCase('pc-update-71ea39dc-7048-4e10-9d11-d4be7f6c3ec0');
  assert.equal(w.issueNumber,3409);assert.equal(w.postIssueNumber,3410);
  assert.equal(w.targetSha,'6b3c9c0ce77354d81babe4c9ea7785663c6c2cb4');
  assert.equal(w.postSourceBranch,'codex/employment-1y-reader-r1');
  assert.equal(w.postSourceSha,'50769db23ac6a5f55203855f5231d12dc0595bb4');
+ assert.equal(w.proofSourceBranch,'main');
+ assert.equal(w.proofSourceSha,'8410a857d2d8cd47beae811152a676c6eee07a75');
+ assert.notEqual(w.postSourceSha,w.proofSourceSha);
  assert.deepEqual(w.proof,{issueNumber:3438,runId:45457196689,jobId:138669741465,
   runnerName:'zgmini-pc-03',resultPath:'results/45457196689-1-seat-3.json'});
  assert.equal(w.allowUnchangedBaseline,true);assert.equal(Object.isFrozen(w),true);
