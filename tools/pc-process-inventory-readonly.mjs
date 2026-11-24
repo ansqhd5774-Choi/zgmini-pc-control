@@ -27,6 +27,7 @@ const PROBE2960='w05-2960-maintenance-status-readonly';
 const D05_WRITER_PROBE='d05-writer-checkpoint-readonly';
 const D05_THEME_PROBE='d05-theme-final-outputs-readonly';
 const D05_REGISTERED_PROBE='d05-configured-registration-readonly';
+const C3160_PROBE='c3160-rollback-cas-readonly';
 const MAX_BYTES=32768;
 const KNOWN_PROCESSES=new Set([
  'runner.listener.exe','runner.worker.exe','node.exe','wscript.exe','cscript.exe',
@@ -91,10 +92,11 @@ export function authenticateProcess(event,env,role){
   const isD05Writer=withW05&&raw.probe===D05_WRITER_PROBE;
   const isD05Theme=withW05&&raw.probe===D05_THEME_PROBE;
   const isD05Registration=withW05&&raw.probe===D05_REGISTERED_PROBE;
+  const is3160=withW05&&raw.probe===C3160_PROBE;
  if(!raw||(!basic&&!withJobs&&!withW05)||
    raw.schema!==SCHEMA||raw.operation!==ROLE_OPERATION||raw.role!==role||
    (withJobs&&role!=='operating')||
-   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!isD05Writer&&!isD05Theme&&!isD05Registration))))
+   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!isD05Writer&&!isD05Theme&&!isD05Registration&&!is3160))))
   fail('REQUEST_SCOPE_INVALID');
  const runnerJobRefs=withJobs?validateRunnerJobRefs(raw.runnerJobRefs):null;
  const normalized=structuredClone(event);
@@ -108,7 +110,8 @@ export function authenticateProcess(event,env,role){
    ...(is2960?{w052960MaintenanceStatus:true}:{}),
    ...(isD05Writer?{d05WriterCheckpoint:true}:{}),
    ...(isD05Theme?{d05ThemeFinalOutputs:true}:{}),
-   ...(isD05Registration?{d05ConfiguredRegistrations:true}:{})};
+   ...(isD05Registration?{d05ConfiguredRegistrations:true}:{}),
+   ...(is3160?{c3160RecoveryCas:true}:{})};
 }
 export function sanitizeProbe(raw){
  if(!raw||raw.schema!=='ZGMINI_PC_PROCESS_PROBE_V1')fail('PROBE_SCHEMA_INVALID');
@@ -1343,6 +1346,101 @@ export function inspectW052821RecoveryCasReadonly({
  }catch{return unknown('W05_2821_RECOVERY_FILES_UNAVAILABLE');}
 }
 
+// One fixed read-only capture for #3160 BACKED_UP. Never asserts rollback authority.
+const C3160_ID='pc-update-56444e31-5488-48df-aea9-474d259cb198';
+export function inspect3160RecoveryCasReadonly({
+ maintenanceRoot='E:/ZGmini/automation/pc-maintenance',
+ controlRoot='E:/ZGmini/automation/pc-control',
+ read=fs.readFileSync,stat=fs.lstatSync,protectedProbe=protectedSnapshot,
+ lock=()=>maintenanceLockStatus(maintenanceRoot,'controller-install'),
+ pidProbe=pid=>{try{process.kill(pid,0);return true;}
+  catch(e){return e?.code==='ESRCH'?false:null;}}
+}={}){
+ const unknown=code=>({requestId:C3160_ID,status:'STATE_UNKNOWN',code,
+  recoveryEligible:false,operationalWrites:0,providerCalls:0,d1Writes:0});
+ const exact=(p,cap=131072)=>{
+  const st=stat(p);
+  if(!st.isFile()||st.isSymbolicLink()||st.size<1||st.size>cap)
+   throw Error('C3160_FILE_UNSAFE');
+  const b=read(p);
+  if(!Buffer.isBuffer(b)||b.length!==st.size)throw Error('C3160_FILE_CHANGED');
+  return b;
+ };
+ const hash=b=>createHash('sha256').update(b).digest('hex');
+ try{
+  const l1=lock();
+  if(l1?.held!==true||l1?.recoveryRequired!==true)
+   return unknown('C3160_INSTALL_LEASE_NOT_VERIFIED');
+  const backup=path.join(controlRoot,'backups','controller-update-'+C3160_ID);
+  const fixed={
+   ledger:path.join(maintenanceRoot,'ledger',C3160_ID+'.json'),
+   owner:path.join(maintenanceRoot,'leases/controller-install/owner.json'),
+   marker:path.join(maintenanceRoot,'leases/controller-install/RECOVERY_REQUIRED.json'),
+   currentHost:path.join(controlRoot,'host.json'),
+   snapshotHost:path.join(backup,'snapshot/host.json'),
+   protection:path.join(backup,'PROTECTED_BEFORE.json'),
+   backlog:path.join(maintenanceRoot,'backlog',C3160_ID+'.json')
+  };
+  const capture=()=>Object.fromEntries(Object.entries(fixed).map(([k,p])=>[k,exact(p)]));
+  const a=capture(),b=capture(),l2=lock();
+  if(l2?.held!==true||l2?.recoveryRequired!==true||
+   Object.keys(a).some(k=>!a[k].equals(b[k])))
+   return unknown('C3160_ORIGINAL_CAS_CHANGED');
+  const ledger=JSON.parse(a.ledger),owner=JSON.parse(a.owner),
+   marker=JSON.parse(a.marker),snapshot=JSON.parse(a.snapshotHost),
+   baseline=JSON.parse(a.protection),backlog=JSON.parse(a.backlog);
+  if(ledger.requestId!==C3160_ID||ledger.issueNumber!==3160||
+   ledger.installedShaBefore!=='4396d2bb326d86b8ce9e27c528519bf0090b8e9e'||
+   ledger.targetSha!=='56a3d9d7420709714a45dac37aeab74d055f4265'||
+   ledger.status!=='RECOVERY_REQUIRED'||ledger.firstFail!=='BACKED_UP')
+   return unknown('C3160_LEDGER_IDENTITY_OR_PHASE_DRIFT');
+  const files=snapshot.controllerFiles;
+  if(snapshot.controllerSourceSha!==ledger.installedShaBefore||!files||
+   typeof files!=='object'||Array.isArray(files)||
+   Object.keys(files).length<1||Object.keys(files).length>160)
+   return unknown('C3160_SNAPSHOT_HOST_INVALID');
+  if(backlog.schema!=='ZGMINI_PC_BACKLOG_V1'||backlog.requestId!==C3160_ID||
+   !Array.isArray(backlog.windows)||backlog.windows.length<1||
+   backlog.windows.length>64||!backlog.replays||
+   typeof backlog.replays!=='object'||Array.isArray(backlog.replays))
+   return unknown('C3160_BACKLOG_INVALID');
+  let backupFilesVerified=true,liveFilesVerified=true;
+  for(const [p,d] of Object.entries(files)){
+   if(!/^(?:controller\/[a-z0-9-]+\.mjs|config\/operations\.json)$/.test(p)||
+    !/^[a-f0-9]{64}$/.test(d))return unknown('C3160_SNAPSHOT_FILES_INVALID');
+   const check=f=>{const x=exact(f,2097152),y=exact(f,2097152);
+    return x.equals(y)&&hash(x)===d;};
+   if(!check(path.join(backup,'snapshot',p)))backupFilesVerified=false;
+   if(!check(path.join(controlRoot,p)))liveFilesVerified=false;
+  }
+  const ownerMarkerMatches=Number.isSafeInteger(owner.pid)&&owner.pid>0&&
+   /^[a-f0-9-]{36}$/i.test(owner.nonce??'')&&
+   marker.requestOwnerPid===owner.pid&&marker.nonce===owner.nonce;
+  let protectionDifference='UNVERIFIED',writerConfigSha256=null;
+  try{const live=protectedProbe();
+   protectionDifference=classify2960ProtectionDifference(baseline,live);
+   const h=live?.files?.['config.json'];
+   writerConfigSha256=/^[a-f0-9]{64}$/.test(h??'')?h:null;
+  }catch{}
+  const pid=ownerMarkerMatches?pidProbe(owner.pid):null;
+  return {requestId:C3160_ID,status:'READ_ONLY_OBSERVED',
+   code:'C3160_EXACT_BACKED_UP_CAS',
+   ledgerStatus:ledger.status,ledgerFirstFail:ledger.firstFail,
+   ownerMarkerMatches,ownerPidObservation:pid===false?'PID_NOT_PRESENT':
+    pid===true?'PID_PRESENT_IDENTITY_UNVERIFIED':'UNKNOWN',
+   snapshotHostSameAsCurrent:a.snapshotHost.equals(a.currentHost),
+   backupFilesVerified,liveFilesVerified,protectionDifference,writerConfigSha256,
+   backlog:{windows:backlog.windows.length,
+    openWindows:backlog.windows.filter(w=>w?.resumedAt===null).length,
+    replayCount:Object.keys(backlog.replays).length},
+   digests:{ledgerSha256:hash(a.ledger),ownerSha256:hash(a.owner),
+    markerSha256:hash(a.marker),snapshotHostSha256:hash(a.snapshotHost),
+    protectionSha256:hash(a.protection),backlogSha256:hash(a.backlog),
+    currentHostSha256:hash(a.currentHost)},
+   recoveryEligible:false,operationalWrites:0,providerCalls:0,d1Writes:0};
+ }catch{return unknown('C3160_ORIGINAL_FILES_UNAVAILABLE');}
+}
+
 // Fixed read-only HTTP request log projection. The source module is the
 // already-tested Controller A adapter, loaded from the exact Git checkout.
 // No caller input, secrets, URLs, query paths, or raw log lines are returned.
@@ -1710,6 +1808,12 @@ export function collect(role,ctx,env=process.env){
  if(identity!=='MATCH'||(role==='operating'&&host!=='PC')){
   return {...base,status:'BLOCKED',code:identity==='MATCH'?'HOST_NOT_CANONICAL':identity};
  }
+ if(ctx.c3160RecoveryCas===true){
+  const result=inspect3160RecoveryCasReadonly();
+  return {...base,status:result.status==='READ_ONLY_OBSERVED'?'PASS':'PARTIAL',
+   code:result.status==='READ_ONLY_OBSERVED'?'C3160_CAS_CAPTURED':'C3160_CAS_UNVERIFIED',
+   c3160RecoveryCas:result,maintenance:collectMaintenanceStatusReadonly()};
+ }
  if(ctx.w052960MaintenanceStatus===true)
   return compact2960ProcessResult(base,inspect2960MaintenanceStatusReadonly());
  if(ctx.d05WriterCheckpoint===true)
@@ -1794,6 +1898,9 @@ export function toText(r){
    'd05ConfiguredRegistry='+r.d05ConfiguredRegistrations.code,
    'd05ConfiguredDefinitionCount='+(r.d05ConfiguredRegistrations.registeredDefinitionCount??'UNKNOWN'),
    'd05ConfiguredInventoryHash='+(r.d05ConfiguredRegistrations.registryManifestSha256??'UNKNOWN')]:[]),
+  ...(r.c3160RecoveryCas?[
+   'c3160RecoveryCas='+r.c3160RecoveryCas.code,
+   'c3160BacklogOpen='+(r.c3160RecoveryCas.backlog?.openWindows??'UNKNOWN')]:[]),
   'maintenanceSourceSha='+(r.maintenance?.maintenanceSourceSha??'UNKNOWN'),
   'installLockHeld='+(r.maintenance?.installLockHeld??'UNKNOWN'),
   'c2094StageEvidence='+(r.c2094StageEvidence?.status??'NOT_APPLICABLE'),

@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import {classifyInstalledReconciliationProof,main as maintenanceRecoveryMain} from '../tools/maintenance-recovery.mjs';
 import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,project2960MaintenanceStatus,compare2960ProtectedBaseline,classify2960ProtectionDifference,assess2960OriginalLeaseLineage,compact2960ProcessResult,projectD05WriterCheckpoint,compactD05WriterResult,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
+import {inspect3160RecoveryCasReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
  const request={schema:SCHEMA,operation:ROLE_OPERATION,role,
@@ -1467,4 +1468,69 @@ test('D05 configured registration probe is fixed scope, operating-only, and coun
   registryManifestSha256:'a'.repeat(64)}});
  assert.match(txt,/d05ConfiguredDefinitionCount=1/);
  assert.match(txt,/d05ConfiguredInventoryHash=/);
+});
+
+
+test('#3160 scoped CAS read-only request accepts only exact operating probe',()=>{
+ const raw=event(),request=JSON.parse(raw.issue.body);
+ const mk=(probe,extra={})=>({...raw,issue:{...raw.issue,
+  body:JSON.stringify({...request,probe,...extra})}});
+ const exact=mk('c3160-rollback-cas-readonly');
+ assert.equal(authenticateProcess(exact,env,'operating').c3160RecoveryCas,true);
+ assert.throws(()=>authenticateProcess(exact,env,'handoff'));
+ assert.throws(()=>authenticateProcess(mk('c3160-rollback-cas-readonly',{path:'E:/other'}),env,'operating'));
+ assert.throws(()=>authenticateProcess(mk('c3160-rollback-cas-readonly;cmd'),env,'operating'));
+});
+
+test('#3160 exact BACKED_UP CAS is bound to immutable bytes and never approves recovery',()=>{
+ const id='pc-update-56444e31-5488-48df-aea9-474d259cb198';
+ const m='E:/ZGmini/automation/pc-maintenance';
+ const c='E:/ZGmini/automation/pc-control';
+ const backup=path.join(c,'backups','controller-update-'+id);
+ const sha=x=>createHash('sha256').update(x).digest('hex');
+ const host={controllerSourceSha:'4396d2bb326d86b8ce9e27c528519bf0090b8e9e',
+  controllerFiles:{'controller/operations.mjs':sha('original controller file')}};
+ const nonce='56444e31-5488-48df-aea9-474d259cb198';
+ const owner={pid:12345,nonce},marker={requestOwnerPid:12345,nonce};
+ const ledger={requestId:id,issueNumber:3160,status:'RECOVERY_REQUIRED',
+  firstFail:'BACKED_UP',installedShaBefore:host.controllerSourceSha,
+  targetSha:'56a3d9d7420709714a45dac37aeab74d055f4265'};
+ const baseline={files:{'config.json':'a'.repeat(64)},tasks:{core:'b'.repeat(64)}};
+ const backlog={schema:'ZGMINI_PC_BACKLOG_V1',requestId:id,
+  windows:[{pausedAt:'2026-11-24T03:15:00Z',resumedAt:null}],replays:{}};
+ const entries=[
+  [path.join(m,'ledger',id+'.json'),ledger],
+  [path.join(m,'leases/controller-install/owner.json'),owner],
+  [path.join(m,'leases/controller-install/RECOVERY_REQUIRED.json'),marker],
+  [path.join(c,'host.json'),host],
+  [path.join(backup,'snapshot/host.json'),host],
+  [path.join(backup,'PROTECTED_BEFORE.json'),baseline],
+  [path.join(m,'backlog',id+'.json'),backlog],
+  [path.join(backup,'snapshot/controller/operations.mjs'),'original controller file'],
+  [path.join(c,'controller/operations.mjs'),'original controller file']
+ ];
+ const bytes=new Map(entries.map(([key,v])=>[key,Buffer.from(
+  typeof v==='string'?v:JSON.stringify(v))]));
+ const read=p=>{if(!bytes.has(p))throw Error('not found');return bytes.get(p);};
+ const stat=p=>{const v=read(p);return{isFile:()=>true,isSymbolicLink:()=>false,size:v.length};};
+ const run=()=>inspect3160RecoveryCasReadonly({
+  maintenanceRoot:m,controlRoot:c,read,stat,protectedProbe:()=>baseline,
+  lock:()=>({held:true,recoveryRequired:true}),pidProbe:()=>false});
+ const result=run();
+ assert.equal(result.status,'READ_ONLY_OBSERVED');
+ assert.equal(result.ownerMarkerMatches,true);
+ assert.equal(result.ownerPidObservation,'PID_NOT_PRESENT');
+ assert.equal(result.snapshotHostSameAsCurrent,true);
+ assert.equal(result.backupFilesVerified,true);
+ assert.equal(result.liveFilesVerified,true);
+ assert.equal(result.protectionDifference,'UNCHANGED');
+ assert.equal(result.backlog.openWindows,1);
+ for(const v of Object.values(result.digests))assert.match(v,/^[a-f0-9]{64}$/);
+ assert.equal(result.recoveryEligible,false);
+ assert.equal(result.operationalWrites,0);
+ assert.doesNotMatch(JSON.stringify(result),/12345|56444e31-5488-48df-aea9-474d259cb198-rawsecret/);
+ bytes.set(path.join(m,'ledger',id+'.json'),Buffer.from(JSON.stringify({...ledger,issueNumber:9999})));
+ assert.equal(run().code,'C3160_LEDGER_IDENTITY_OR_PHASE_DRIFT');
+ bytes.delete(path.join(m,'leases/controller-install/RECOVERY_REQUIRED.json'));
+ assert.equal(run().code,'C3160_ORIGINAL_FILES_UNAVAILABLE');
 });
