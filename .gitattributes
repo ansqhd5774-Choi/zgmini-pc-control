@@ -4,3 +4,4 @@ approval/ER1_PC_OPERATION_APPROVAL.json text eol=lf
 approvals/maintenance-recoveries/*.json text eol=lf
 approvals/w03-r179-guard/*.json text eol=lf
 approvals/source-bundles/manifests/42a1c46c0c973fb859f4050a77d781a026acc6c7.json text eol=lf
+approvals/sidecar-b/*.json text eol=lf
