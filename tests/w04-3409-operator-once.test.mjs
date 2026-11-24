@@ -5,7 +5,7 @@ import fs,{readFileSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
-import {FIXED,assertOperatorScope,assertOrigin,sanitizedChildEnvironment,isolatedGitArguments,
+import {FIXED,assertOperatorScope,assertOrigin,sanitizedChildEnvironment,isolatedGitArguments,chooseTrustedGitExecutable,
  validateSourceReceipt,validateRecoveryResult} from '../tools/operator-packets/w04-3409-recovery-once.mjs';
 
 const read=rel=>readFileSync(new URL('../'+rel,import.meta.url));
@@ -33,6 +33,8 @@ test('the one-click driver authenticates exact committed JS file bytes and rejec
  assert.match(cmd,/if defined GITHUB_ACTIONS goto :no_runner/);
  assert.match(cmd,/if defined RUNNER_NAME goto :no_runner/);
  assert.match(cmd,/--once/);
+ assert.match(cmd,/set "NODE_OPTIONS="/);
+ assert.match(cmd,/set "NODE_PATH="/);
  assert.doesNotMatch(cmd,/--force|reset --hard|git clean|powershell|RUNNER_NAME=|GITHUB_ACTIONS=/i);
 });
 test('only nonrunner independent Windows scope can reach operator preflight',()=>{
@@ -123,6 +125,22 @@ test('actual Git worktree with injected config cannot run active post-checkout h
  assert.equal(fs.readFileSync(path.join(stage,'source.txt'),'utf8'),'fixed source\n');
  assert.equal(fs.existsSync(path.join(stage,'hook-triggered.txt')),false);
  assert.equal(fs.existsSync(path.join(repo,'hook-triggered.txt')),false);
+});
+
+test('trusted system Git selection rejects arbitrary PATH Git executable',()=>{
+ const fixture={isFile:()=>true,isSymbolicLink:()=>false,nlink:1,size:1000};
+ assert.equal(chooseTrustedGitExecutable({readStat:filepath=>{
+  if(filepath==='C:/Program Files/Git/cmd/git.exe')return fixture;
+  throw Object.assign(Error('missing'),{code:'ENOENT'});
+ }}),'C:/Program Files/Git/cmd/git.exe');
+ assert.equal(chooseTrustedGitExecutable({readStat:filepath=>{
+  if(filepath==='C:/Program Files (x86)/Git/cmd/git.exe')return fixture;
+  throw Object.assign(Error('missing'),{code:'ENOENT'});
+ }}),'C:/Program Files (x86)/Git/cmd/git.exe');
+ assert.throws(()=>chooseTrustedGitExecutable({readStat:()=>({
+  ...fixture,isSymbolicLink:()=>true})}),/OPERATOR_TRUSTED_GIT_MISSING/);
+ assert.throws(()=>chooseTrustedGitExecutable({readStat:()=>{throw Error('missing');}}),
+  /OPERATOR_TRUSTED_GIT_MISSING/);
 });
 
 test('official repository origin is exact; credentials, forks and alternative hosts are forbidden',()=>{
