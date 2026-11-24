@@ -33,7 +33,7 @@ test('completed immutable EIA saved-file one-shot intake is retired',()=>{
  assert.equal(existsSync(path.join(root,'inflation-eia-readback-b-once.mjs')),true);
  assert.equal(existsSync(path.join(root,'inflation-eia-readback-b-once.test.mjs')),true);
  // Separate fixed EIA collection and shared inflation inventory remain.
- for(const file of ['pc-inflation-eia-only-approved-once.yml','pc-inflation-19-inventory-b-once.yml'])
+ for(const file of ['pc-inflation-19-inventory-b-once.yml'])
   assert.equal(existsSync(path.join(root,'.github/workflows',file)),true,file);
 });
 // #246 has a terminal PASS/BLS8_SAVED_READBACK receipt for the fixed
@@ -54,6 +54,19 @@ test('terminal SCE31 Issue-opened workflow is retired with source approvals pres
   assert.equal(existsSync(path.join(root,file)),true,file);
  for(const name of ['pc-approved-runtime-a-once.yml','pc-approved-runtime-b-once.yml',
    'pc-job.yml','pc-writer-b-source-once.yml','pc-inflation-19-inventory-b-once.yml'])
+  assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
+});
+// #258 succeeded in the fixed EIA private write/readback despite a stale
+// uploader result. #265 independently proved the saved archive; both closed.
+test('terminal EIA-only B Issue intake is retired while private source and approved paths survive',()=>{
+ const old='pc-inflation-eia-only-approved-once.yml';
+ assert.equal(existsSync(path.join(root,'.github/workflows',old)),false,old);
+ for(const name of ['inflation-eia-only-b-once.mjs','INFLATION_EIA_ONLY_B_APPROVAL.json',
+   'tests/inflation-eia-only-b-once.test.mjs'])
+  assert.equal(existsSync(path.join(root,name)),true,name);
+ for(const name of ['pc-inflation-19-inventory-b-once.yml',
+   'pc-approved-runtime-a-once.yml','pc-approved-runtime-b-once.yml',
+   'pc-job.yml','pc-writer-b-source-once.yml'])
   assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
 });
 test('common A/B and unfinished inflation and R54 readers are preserved',()=>{
