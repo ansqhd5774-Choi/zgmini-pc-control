@@ -2,7 +2,7 @@
 // Official release ZIP and SHA-256 pinned from gitleaks/gitleaks v8.30.1.
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
+import {fileURLToPath} from 'node:url';
 import crypto from 'node:crypto';
 import {execFileSync,spawnSync} from 'node:child_process';
 
@@ -58,6 +58,6 @@ export function scanPr(){
     fs.rmSync(folder,{recursive:true,force:true});
   }
 }
-if(process.argv[1]&&path.resolve(process.argv[1])===path.resolve(new URL(import.meta.url).pathname)){
+if(process.argv[1]&&path.resolve(process.argv[1])===path.resolve(fileURLToPath(import.meta.url))){
   scanPr();
 }
