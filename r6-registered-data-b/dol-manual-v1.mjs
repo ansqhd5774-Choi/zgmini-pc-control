@@ -122,6 +122,8 @@ export function createApprovedDolManualCollectorOptions({auth,db,fetchImpl,provi
   &&auth.approval.maxDolCalls===2&&UUID.test(auth?.request?.requestId??'')
   &&SHA64.test(auth?.request?.approvalManifestSha256??''),
   'R6_DOL_MANUAL_INTENT_STOP');
+ if(isPdfApproval(auth.approval)&&typeof providerFactory!=='function')
+  throw error('R6_DOL_PDF_FACTORY_MISSING');
  return {
   db,env:{DB:db},fetchImpl,mode:'ONE_YEAR',groups:[GROUP],
   executionIntent:'AUTHORIZED_MANUAL',
