@@ -20,7 +20,11 @@ const validSha = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(val
 const validCode = value => typeof value === 'string' && /^[A-Z][A-Z0-9_]{2,79}$/.test(value);
 const same = (value, expected, name) => { if (value !== expected) stop(`${name}_MISMATCH_STOP`); };
 
-function kindFromCode(code) {
+function kindFromCode(code, operation) {
+  // A timeout in the fixed Controller's own core-status diagnostic belongs
+  // to common-process triage, not the unrelated feature that requested it.
+  // Routing does not establish the underlying Windows/Worker delay cause.
+  if (code === 'JOB_EXECUTION_TIMEOUT' && operation === 'core-status') return 'COMMON_CONTROLLER';
   if (/^(?:CONTROLLER_|CONTROL_|CORE_)/.test(code)) return 'COMMON_CONTROLLER';
   if (/^(?:RUNNER_|SEAT_)/.test(code)) return 'COMMON_RUNNER';
   if (/^(?:WRITER_|WRITE_)/.test(code)) return 'COMMON_WRITER';
@@ -98,7 +102,7 @@ export function preparePcFailureHandoff({originIssue, report, resultPath}) {
       requestId: request.requestId, chatId: request.chatId,
       branch: request.sourceBranch, sourceSha: request.sourceSha,
       checkpoint: checkpointFromFirstFail(report.firstFail)},
-    failure: {kind: kindFromCode(report.code), code: report.code,
+    failure: {kind: kindFromCode(report.code, request.operation), code: report.code,
       lastPass: report.lastPass, firstFail: report.firstFail,
       fileRefs: [], evidenceIssueNumber: originIssue.number}}));
   return Object.freeze({state: 'READY_TO_ENQUEUE', incidentId,
