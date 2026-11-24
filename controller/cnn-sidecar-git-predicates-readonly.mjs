@@ -72,10 +72,26 @@ export function classifyPinnedCnnGuardOrigin(source,approved){
  const relation=!expected||!uniques.length?'UNVERIFIED':
   uniques.length!==1?'AMBIGUOUS':
   uniques[0]===expected?'MATCH':'MISMATCH';
+
+ const assigned=[...live.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*(?:source|approved|expected|sha)[\w$]*)\s*=\s*(['"])([0-9a-f]{40})\2/gi)]
+  .filter(m=>uniques.length===1&&m[3].toLowerCase()===uniques[0]);
+ const names=[...new Set(assigned.map(m=>m[1]))];
+ const hits=[];
+ if(names.length>0&&lines.length>=23){
+  for(const index of [18,20,22]){
+   if(!/^\s*(?:if\s*\(|(?:need|check|ensure|assert|stop|fail)\s*\()/i.test(lines[index]))continue;
+   const window=lines.slice(index,index+3).map(line=>line.replace(/\/\/.*$/,'')).join(' ');
+   if(names.some(name=>new RegExp('(^|[^A-Za-z0-9_$])'+name+'(?![A-Za-z0-9_$])').test(window)))
+    hits.push(index+1);
+  }
+ }
+ const fixedShaGuardReference=!expected||uniques.length!==1||names.length===0?'UNVERIFIED':
+  hits.length===0?'NOT_REFERENCED_IN_CANDIDATE_GUARDS':
+  hits.length>1?'MULTIPLE_CANDIDATE_GUARDS':'LINE_'+hits[0];
  return {reasonLine:sites.length===1&&sites[0].line<=10000?sites[0].line:null,
   reasonSiteClass:sites.length===1?sites[0].kind:
    sites.length===0?'NO_DIRECT_LITERAL':'MULTIPLE_LITERAL_SITES',
-  gitBinaryClass:className,fixedShaRelation:relation};
+  gitBinaryClass:className,fixedShaRelation:relation,fixedShaGuardReference};
 }
 
 // Values are derived from independently fixed files/Git reads. No source
@@ -126,7 +142,11 @@ export function projectCnnGitEvidence(raw){
    gitBinaryClass:['PATH_LOOKUP','FIXED_BINARY','MIXED'].includes(
     raw?.guardOrigin?.gitBinaryClass)?raw.guardOrigin.gitBinaryClass:'UNVERIFIED',
    fixedShaRelation:['MATCH','MISMATCH','AMBIGUOUS'].includes(
-    raw?.guardOrigin?.fixedShaRelation)?raw.guardOrigin.fixedShaRelation:'UNVERIFIED'
+    raw?.guardOrigin?.fixedShaRelation)?raw.guardOrigin.fixedShaRelation:'UNVERIFIED',
+   fixedShaGuardReference:['LINE_19','LINE_21','LINE_23',
+    'MULTIPLE_CANDIDATE_GUARDS','NOT_REFERENCED_IN_CANDIDATE_GUARDS'].includes(
+    raw?.guardOrigin?.fixedShaGuardReference)?
+    raw.guardOrigin.fixedShaGuardReference:'UNVERIFIED'
   }:null,
   // A head mismatch / dirty worktree may be relevant, but not necessarily
   // the predicate which generated the ledger's SOURCE SHA reason.
