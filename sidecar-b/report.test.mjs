@@ -45,3 +45,48 @@ test('untrusted status, code or missing result is state unknown',()=>{
   assert.equal(r.status,'SIDECAR_B_STATE_UNKNOWN');
  }
 });
+
+test('reporter emits create-only JSON/TXT and verifies both remote bytes before comment',
+ async()=>{
+ const {publishSidecarBReport}=await import('./report.mjs');
+ const req={schema:'ZGMINI_CNN_SIDECAR_ONEFILE_B_REQUEST_V1',
+  requestId:id,controlHead:head,
+  approvalManifestPath:'approvals/sidecar-b/cnn-r10.json',
+  approvalManifestSha256:mhash};
+ const event={repository:{full_name:'ansqhd5774-Choi/zgmini-pc-control',
+  private:true},sender:{login:'ansqhd5774-Choi'},
+  issue:{number:123,user:{login:'ansqhd5774-Choi'},
+   title:'cnn-sidecar-onefile-b-install',labels:[{name:'pc-writer-b-install'}],
+   body:JSON.stringify(req)}};
+ const e={GITHUB_SHA:head,GITHUB_ACTOR:'ansqhd5774-Choi',
+  GITHUB_REPOSITORY:'ansqhd5774-Choi/zgmini-pc-control',
+  GITHUB_EVENT_NAME:'issues',GITHUB_EVENT_ACTION:'opened',
+  GITHUB_RUN_ATTEMPT:'1',GITHUB_TOKEN:'x'.repeat(30)};
+ const stored=new Map(),comments=[];
+ const fake=async(url,opts={})=>{
+  const base=url.split('?')[0];
+  if(opts.method==='PUT'){
+   if(stored.has(base))return {status:422};
+   const record=JSON.parse(opts.body);
+   stored.set(base,Buffer.from(record.content,'base64'));
+   return {status:201};
+  }
+  if(opts.method==='POST'){
+   comments.push(JSON.parse(opts.body).body);
+   return {status:201};
+  }
+  if(stored.has(base))
+   return {status:200,json:async()=>({
+    encoding:'base64',content:stored.get(base).toString('base64')
+   })};
+  return {status:404};
+ };
+ const result=await publishSidecarBReport({
+  event,env:e,raw:JSON.stringify(success),
+  fetchApi:fake,readCurrent:()=>after
+ });
+ assert.deepEqual({verified:result.verified,created:result.created},{verified:2,created:2});
+ assert.equal(comments.length,1);
+ assert.match(comments[0],/APPLIED_VERIFIED/);
+ assert.equal(stored.size,2);
+});
