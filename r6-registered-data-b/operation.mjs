@@ -196,13 +196,19 @@ export function verifyInstalledR6Overlay(input={}){
  return verifyInstalledR6OverlayCore(input,false);
 }
 export function verifyInstalledR6DolManualOverlay(input={}){
- // The only authorized manual-only caller has independently validated its
- // signed DOL SQLite approval; the exact three source files stay hash-pinned.
+ // Only the exact, independently verified DOL B approval can select the
+ // optional ETA538 seven-file source scope; V1 remains exactly three files.
  const files=input?.overlay?.files;
  const expected=new Set([
   'lib/market-score/employment-r6-provider.mjs',
   'lib/market-score/employment-r6-collector.mjs',
   'lib/market-score/employment-r6-scheduler.mjs',
+  ...(input?.pdfApproved===true?[
+   'lib/market-score/employment-r6-dol-advance-pdf-candidate.mjs',
+   'lib/market-score/employment-r6-dol-advance-store-candidate.mjs',
+   'lib/market-score/employment-r6-dol-pdf-raw-envelope.mjs',
+   'lib/market-score/employment-r6-dol-eta538-provider.mjs',
+  ]:[]),
  ]);
  need(Array.isArray(files)&&files.length===expected.size&&
   files.every(f=>expected.has(f?.path)&&SHA64.test(f?.afterSha256??''))&&
@@ -465,7 +471,7 @@ export async function runR6RegisteredOnce({env=process.env}={}){
  const parsedApproval=JSON.parse(approvalBytes.toString('utf8'));
  // DOL-only manual collection has its own exact source/file/effect approval.
  // This branch never loads BLS overlay, BLS keys, publisher, or a scheduler.
- if(parsedApproval?.schema==='ZGMINI_R6_DOL_MANUAL_B_APPROVAL_V1'){
+ if(['ZGMINI_R6_DOL_MANUAL_B_APPROVAL_V1','ZGMINI_R6_DOL_MANUAL_B_APPROVAL_V2'].includes(parsedApproval?.schema)){
   const {runDolManualOnce}=await import('./dol-manual-v1.mjs');
   return runDolManualOnce({event,env,approvalBytes,
    verify:verifyInstalledR6DolManualOverlay,acquire:acquireCoreLockBounded,
