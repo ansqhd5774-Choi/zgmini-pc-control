@@ -7,7 +7,11 @@ const worker=fileURLToPath(new URL('./worker.mjs',import.meta.url));
 // Only reviewed fixed operations with no provider/DB/operational write effect
 // may return useful reads when an unrelated Scheduler observation is missing.
 // The caller cannot select or expand this class in the Issue payload.
-const ISOLATED_READS=new Set(['runner-smoke','core-status','d05-lineage-readonly','core-runtime-source-readonly','writer-install-preimage-readonly']);
+const ISOLATED_READS=new Set(['runner-smoke','core-status','d05-lineage-readonly','core-runtime-source-readonly','writer-install-preimage-readonly',
+ // Read-only Core/Writer lock snapshot must remain observable when an unrelated
+ // retired Scheduler inventory command fails. An incomplete protection
+ // pre/postcheck still downgrades the final report to STATE_UNKNOWN.
+ 'shared-resource-release-readonly']);
 const unavailableProtection=e=>['RETIRED_IRAN_INVENTORY_UNAVAILABLE',
  'PROTECTED_TASK_XML_QUERY_FAILED'].includes(errorCode(e));
 // Read a tiny private Workspace marker only after a known Worker timeout.
