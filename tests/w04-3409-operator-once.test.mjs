@@ -90,6 +90,9 @@ test('recovery result requires approved seven CAS, archived lease and no protect
 test('packet stages through pinned Git ancestry; runtime path never invokes source reset or install',()=>{
  const src=read('tools/operator-packets/w04-3409-recovery-once.mjs').toString();
  assert.match(src,/git\(\['fetch','--no-tags','origin','main'\]\)/);
+ assert.match(src,/core\.hooksPath='\+isolatedHooksPath/);
+ assert.match(src,/ZGMINI_W04_3409_EMPTY_HOOKS_/);
+ assert.match(src,/OPERATOR_HOOK_ISOLATION_DRIFT/);
  assert.match(src,/git\(\['worktree','add','--detach',FIXED.bootstrap,FIXED.release\]\)/);
  assert.match(src,/git\(\['worktree','add','--detach',FIXED.staged,FIXED.release\]\)/);
  assert.match(src,/module.verifyStagedFiles\(approval,git\)/);
