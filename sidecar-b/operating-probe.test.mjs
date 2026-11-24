@@ -63,3 +63,38 @@ test('CNN B preimage pins return exact bounded SHA only when source and preimage
   assert.equal(denied.taskDefinitionSha256,null);
  }
 });
+
+
+test('CNN B current resource diagnostics report only fixed booleans and no raw process data',async()=>{
+ const {projectSidecarBResourceFlagsReadonly:project}=await import('./operating-probe.mjs');
+ const raw={coreQuiet:true,sidecarActive:false,controllerInstallBusy:false,
+  sharedWriterLockPresent:false,commandLine:'PRIVATE_COMMAND',secret:'PRIVATE_VALUE'};
+ const ready=project(raw);
+ assert.equal(ready.status,'PASS');
+ assert.equal(ready.code,'CNN_B_RESOURCE_SNAPSHOT_COLLECTED');
+ assert.equal(ready.currentPreflightReadyIgnoringLease,true);
+ assert.equal(ready.priorRuntimeFailure,'NOT_OBSERVED_BY_THIS_PROBE');
+ assert.equal(ready.operationalWrites,0);
+ assert.equal(ready.providerCalls,0);
+ assert.equal(ready.d1Writes,0);
+ assert.doesNotMatch(JSON.stringify(ready),/PRIVATE|commandLine|secret/);
+ for(const name of ['coreQuiet','sidecarActive','controllerInstallBusy','sharedWriterLockPresent']){
+  const bad={...raw,[name]:name==='coreQuiet'?false:true};
+  const result=project(bad);
+  assert.equal(result.status,'PASS');
+  assert.equal(result.currentPreflightReadyIgnoringLease,false);
+ }
+});
+
+test('CNN B resource observation never guesses readiness if a predicate is unknown',async()=>{
+ const {projectSidecarBResourceFlagsReadonly:project}=await import('./operating-probe.mjs');
+ const raw={coreQuiet:true,sidecarActive:false,controllerInstallBusy:false,
+  sharedWriterLockPresent:false};
+ for(const name of Object.keys(raw)){
+  const observed=project({...raw,[name]:null});
+  assert.equal(observed.status,'STATE_UNKNOWN');
+  assert.equal(observed.code,'CNN_B_RESOURCE_SNAPSHOT_PARTIAL');
+  assert.equal(observed.currentPreflightReadyIgnoringLease,null);
+ }
+ assert.equal(project(null).status,'STATE_UNKNOWN');
+});
