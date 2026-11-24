@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {FIXED,assertOperatorScope,assertOrigin,sanitizedChildEnvironment,isolatedGitArguments,chooseTrustedGitExecutable,
- validateSourceReceipt,validateRecoveryResult} from '../tools/operator-packets/w04-3409-recovery-once.mjs';
+ validateSourceReceipt,validateRecoveryResult,operatorInstalledFileMaxBytes} from '../tools/operator-packets/w04-3409-recovery-once.mjs';
 
 const read=rel=>readFileSync(new URL('../'+rel,import.meta.url));
 const approval=JSON.parse(read('approvals/maintenance-recoveries/'+
@@ -232,4 +232,19 @@ test('packet stages through pinned Git ancestry; runtime path never invokes sour
  assert.ok(src.indexOf('validateSourceReceipt(prepared)')<
   src.indexOf("'reconcile-installed','--request-id'"));
  assert.doesNotMatch(src,/(\['reset'|\['clean'|fs\.rmSync|fs\.unlinkSync|rm -rf|git checkout|spawn\([^)]*shell:\s*true)/);
+});
+
+test('operating update.mjs size is within exact scoped 256 KiB budget, not old 128 KiB cap',()=>{
+ const installedSource=read('tools/update.mjs');
+ assert.ok(installedSource.length>131072);
+ assert.ok(installedSource.length<=262144);
+ assert.equal(operatorInstalledFileMaxBytes('tools/update.mjs'),262144);
+ for(const rel of ['MAINTENANCE_INSTALL.json','tools/maintenance-contract.mjs',
+  'tools/maintenance-agent.mjs','tools/maintenance-ancestry.vbs',
+  'tools/source-bundle-register.mjs','tools/update.mjs.bak']){
+  assert.equal(operatorInstalledFileMaxBytes(rel),131072,rel);
+ }
+ const packet=read('tools/operator-packets/w04-3409-recovery-once.mjs').toString();
+ assert.match(packet,/readStrict\(path\.join\(FIXED\.maintenance,rel\),\s*operatorInstalledFileMaxBytes\(rel\)\)/);
+ assert.match(packet,/st\.isFile\(\)&&!st\.isSymbolicLink\(\)&&st\.nlink===1/);
 });
