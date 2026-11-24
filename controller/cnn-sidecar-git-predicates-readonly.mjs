@@ -54,6 +54,8 @@ export function projectCnnGitEvidence(raw){
  const configVerified=approved!==null,verified=pin&&stable&&gitVerified&&configVerified;
  const mismatch=gitVerified&&configVerified?head!==approved:null;
  const trackedDirty=gitVerified?!raw.trackedClean:null;
+ const wholeTreeClean=gitVerified&&typeof raw?.wholeTreeClean==='boolean'?
+  raw.wholeTreeClean:null;
  return {
   schema:'ZGMINI_CNN_GIT_PREDICATES_READONLY_V1',
   status:verified?'PASS':'STATE_UNKNOWN',
@@ -65,6 +67,13 @@ export function projectCnnGitEvidence(raw){
   gitCheckoutVerified:gitVerified,configSourceVerified:configVerified,
   gitHeadMatchesConfig:mismatch===null?null:!mismatch,
   trackedTreeClean:gitVerified?raw.trackedClean:null,
+  wholeTreeClean,
+  untrackedOnlyDirty:trackedDirty===false&&wholeTreeClean===false?true:
+   wholeTreeClean===null?null:false,
+  // A bounded lexical clue, not proof the Sidecar executed this branch.
+  sourceStatusGuardClass:pin&&[
+   'TRACKED_ONLY','UNTRACKED_INCLUDED','DEFAULT_OR_UNKNOWN','NOT_FOUND'
+  ].includes(raw?.sourceStatusGuardClass)?raw.sourceStatusGuardClass:'UNVERIFIED',
   gitHeadMatchesCheckpoint:head&&checkpoint?head===checkpoint:null,
   // The pinned script can compute the checkout at runtime; a static source
   // mention is a clue only, not proof of its actual Git cwd.
@@ -82,7 +91,8 @@ export function inspectCnnGitPredicatesReadonly(dataRoot,{strictPlatform=true,
  const root=path.resolve(dataRoot);
  const empty={sourcePin:false,ledgerStable:false,ledgerStatus:null,head:null,
   approved:null,checkpoint:null,gitVerified:false,trackedClean:null,
-  mentionsCheckout:null,guardSites:false};
+  mentionsCheckout:null,guardSites:false,wholeTreeClean:null,
+  sourceStatusGuardClass:'UNVERIFIED'};
  if((strictPlatform&&(process.platform!=='win32'||
       path.normalize(root).toLowerCase()!==path.normalize('E:\\ZGmini\\data').toLowerCase()))
     ||typeof git!=='function')return projectCnnGitEvidence(empty);
@@ -95,6 +105,14 @@ export function inspectCnnGitPredicatesReadonly(dataRoot,{strictPlatform=true,
  empty.guardSites=lines.length>=23&&
   [18,20,22].every(i=>/(?:\bif\b|\bneed\b|\bcheck\b|\bassert\b|\bfail\b|\bstop\b)/i.test(lines[i]));
  empty.mentionsCheckout=initial.toString('utf8').toLowerCase().includes(CHECKOUT);
+ // Only the three pinned candidate guards are relevant. This classifier
+ // returns no private code, options, file names or command arguments.
+ const window=lines.slice(18,27).join(' ');
+ const hasStatus=/\bstatus\b/i.test(window)&&/porcelain/i.test(window);
+ empty.sourceStatusGuardClass=!hasStatus?'NOT_FOUND':
+  /--untracked-files\s*(?:=|[\x27\x22, ]+)\s*no\b/i.test(window)?'TRACKED_ONLY':
+  /--untracked-files\s*(?:=|[\x27\x22, ]+)\s*(?:normal|all)\b/i.test(window)?'UNTRACKED_INCLUDED':
+  'DEFAULT_OR_UNKNOWN';
  const ledgerFile=path.join(sidecar,'last-run.json');
  const ledger1=fixedRead(ledgerFile,root,65536);
  const ledger2=fixedRead(ledgerFile,root,65536);
@@ -125,9 +143,16 @@ export function inspectCnnGitPredicatesReadonly(dataRoot,{strictPlatform=true,
    !sourceFile.isFile()||sourceFile.isSymbolicLink())throw Error('UNVERIFIED_CHECKOUT');
   const head=git(real,['rev-parse','--verify','HEAD']).trim();
   const status=git(real,['status','--porcelain','--untracked-files=no']);
+  // Compare the exact same fixed checkout with untracked content included.
+  // Never return status text or filenames.
+  let wholeTreeStatus=null;
+  try{wholeTreeStatus=git(real,['status','--porcelain','--untracked-files=all']);}
+  catch{}
   if(safeSha(head)&&typeof status==='string'&&status.length<=65536){
    empty.gitVerified=true;empty.head=head;
    empty.trackedClean=status.trim().length===0;
+   if(typeof wholeTreeStatus==='string'&&wholeTreeStatus.length<=65536)
+    empty.wholeTreeClean=wholeTreeStatus.trim().length===0;
   }
  }catch{}
  return projectCnnGitEvidence(empty);
