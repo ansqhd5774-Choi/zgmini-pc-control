@@ -1,0 +1,41 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "a19ce199142d64b0aa6de800f1c2c6d9b07c141c",
+  "targetSha": "f85a0563169a55bbae66fc18164d354be5052237",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "Existing PC_AUTOMATION_STANDARD.md section 5 same-effect maintenance receiver handoff authorization and user's 2026-11-24 continuation instruction. Previously approved independent receiver #2960 source admission/strict byte and manifest validation PR #3034/#3040/#3044, and #2821/#3160 Runner idle-race safety fix PR #3180. No new operation or authority outside those exact already approved capabilities. #2960 is completed and MUST NOT be replayed.",
+  "files": {
+    "tools/maintenance-contract.mjs": "cdaf63cef96d872cccb2a2fc33cab37eba7d1a91301b7f382c338374e2bf335e",
+    "tools/maintenance-apply.mjs": "785f0a5b6b17e83161742566f966a22ab995b69365d88bf303654c0b1bdebd6b",
+    "tools/maintenance-agent.mjs": "059a3db319576d7b9f3d4dbd18d3ca14ce8cfe14d199e81f9c6cda3226b919d7",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "031c108f30e62ef52cc90b553bcf5c8c61971ec1ca65579372478193f15b4896",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "af31ab1f6a159aa1d8467d2585eb16750e8a1a293f9ecfb90b85c388d8640d70",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "445bdf1b321d8e7db0b9b3f62a4b0172e5bc5ea364fd9790f4bd9626d9037563"
+  },
+  "checks": {
+    "sourceCi": "PR #3180 exact target f85a0563169a55bbae66fc18164d354be5052237: C996 45329024734 SUCCESS; Controller Maintenance 45329024733 SUCCESS; Automation Status 45329024741 SUCCESS. Independent agent receiver source PRs #3034/#3040/#3044 merged and C996 validated.",
+    "installedWindowsEvidence": "Operating PC #3189 Run 45330152813 observed 2026-11-24T05:00:47Z PASS/PROCESS_INVENTORY_COLLECTED; source a19ce199142d64b0aa6de800f1c2c6d9b07c141c; maintenanceFilesVerified true; installLockHeld false; receiver LISTENING; pc-job.yml active; no writes. Reverify fresh CAS/lease at handoff.",
+    "exactBytePlan": "Installed approved 9/9 raw sha256 at source a19ce199 matches #a19 approval; target 9/9 source files independently hashed and compared; only tools/update.mjs and tools/maintenance-agent.mjs change; other 7 bytes unchanged.",
+    "targetMainCommit": "f85a0563169a55bbae66fc18164d354be5052237 is proven ancestor of current main. Execution must verify target ancestor of live HEAD and approved 9-file checkout bytes.",
+    "windowsHandoffExecuted": false
+  },
+  "runtimeChangedFiles": [
+    "tools/maintenance-agent.mjs",
+    "tools/update.mjs"
+  ],
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "preserve": [
+    "Existing Controller 4396d2bb326d86b8ce9e27c528519bf0090b8e9e and six registered PC Runner seats",
+    "Current approved Workflow and Core/Writer schedules; no forced termination of active work",
+    "Provider quotas, SQLite raw histories, D1 projection and private data",
+    "Historical #2960 completed original recovery and #3160 ROLLED_BACK; never retry either",
+    "Original maintenance installation ledgers, leases, backups, startup and receiver identities"
+  ],
+  "scopeNote": "One authorized 7-to-7 maintainer Receiver handoff only, with exact 9 raw hashes (2 runtime files changed). Keep existing live controller/DB/Writer and previously approved #2960 receiver handling; no new #2960 request. Independent watchdog/operator must verify exact installed source, full file/startup byte CAS, active lease absence, history/probe guard, receiver identity, immutable backup/rollback and replacement result. Any mismatch is fail-closed; source merge/approval does not equal operating installation."
+}
