@@ -245,7 +245,7 @@ export function validateW043409PostWriterBridge({
   writer.scope==='PC_WRITER_APPROVED_FILE_OVERLAY_ONLY'&&
   writer.configPath==='E:\\ZGmini\\data\\pc-writer\\config.json'&&
   writer.baseConfigSourceSha===writer.baseHead&&
-  receipt.schema==='ZGMINI_PC_WRITER_B_RESULT_V1'&&
+  receipt.schema==='ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1'&&
   receipt.requestId===W04_WRITER_B_ID&&
   receipt.runId===String(W04_WRITER_B_RUN)&&
   receipt.status==='WRITER_B_INSTALLED_VERIFIED'&&
