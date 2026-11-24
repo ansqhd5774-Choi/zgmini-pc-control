@@ -20,7 +20,8 @@ const fields=['schema','jobId','requestId','controlRepository','controlSourceSha
  'protectedBeforeSha256','protectedAfterSha256','actualExecutionSha'];
 const build=()=>({
  issue:{number:1299,state:'open',body:JSON.stringify(request)},
- run:{id:43166235600,status:'completed',conclusion:'success',run_attempt:1},
+ run:{id:43166235600,status:'completed',conclusion:'success',run_attempt:1,
+  event:'issues',name:'ZGMINI PC Job',repository:{full_name:'ansqhd5774-Choi/zgmini-pc-control'}},
  comment:{user:{login:'github-actions[bot]'},body:
    '<!-- zgmini-pc-result:43166235600:1:3 -->\n'+
    'results/43166235600-1-seat-3.json\nresults/43166235600-1-seat-3.txt'},
@@ -40,6 +41,9 @@ test('valid paired GitHub result is a human review candidate only',()=>{
 const cases=[
  ['no trusted snapshot',p=>delete p.comment,'MISSING_TRUSTED_SNAPSHOT'],
  ['cancelled workflow',p=>p.run.conclusion='cancelled','GITHUB_RUN_NOT_SUCCESS'],
+ ['unrelated workflow event',p=>p.run.event='pull_request','RUN_PROVENANCE_UNVERIFIED'],
+ ['unrelated workflow name',p=>p.run.name='Other Workflow','RUN_PROVENANCE_UNVERIFIED'],
+ ['foreign workflow repository',p=>p.run.repository.full_name='unknown/repo','RUN_PROVENANCE_UNVERIFIED'],
  ['wrong attempt',p=>p.run.run_attempt=2,'GITHUB_RUN_NOT_SUCCESS'],
  ['wrong job id',p=>{let x=JSON.parse(p.jsonText);x.jobId='wrong';p.jsonText=JSON.stringify(x);},'REPORT_ID_MISMATCH'],
  ['txt changed',p=>p.txtText=p.txtText.replace('status=PASS','status=BLOCKED'),'PAIR_FIELD_MISMATCH'],
@@ -48,6 +52,8 @@ const cases=[
  ['wrong comment marker',p=>p.comment.body=p.comment.body.replace('43166235600:1:3','43166235600:1:4'),'RESULT_COMMENT_UNVERIFIED'],
  ['missing remote txt URL',p=>p.comment.body=p.comment.body.replace('results/43166235600-1-seat-3.txt','none'),'RESULT_COMMENT_UNVERIFIED'],
  ['different original request',p=>p.issue.body=JSON.stringify({...request,requestId:'other'}),'ISSUE_REQUEST_MISMATCH'],
+ ['different source sha in original',p=>p.issue.body=JSON.stringify({...request,sourceSha:'other'}),'ISSUE_REQUEST_MISMATCH'],
+ ['unexpected receipt schema',p=>{let x=JSON.parse(p.jsonText);x.schema='BAD';p.jsonText=JSON.stringify(x);p.txtText=p.txtText.replace('schema=ZGMINI_PC_RESULT_V1','schema=BAD');},'ISSUE_REQUEST_MISMATCH'],
  ['partial report',p=>{let x=JSON.parse(p.jsonText);x.reportTransfer={status:'SUMMARY_ONLY'};p.jsonText=JSON.stringify(x);},'PARTIAL_REPORT'],
  ['invalid json',p=>p.jsonText='{','INVALID_JSON'],
  ['missing core verification',p=>{let x=JSON.parse(p.jsonText);delete x.code;p.jsonText=JSON.stringify(x);},'PAIR_FIELD_MISMATCH']
