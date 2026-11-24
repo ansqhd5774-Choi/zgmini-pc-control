@@ -171,3 +171,31 @@ test('core-status retains canonical R6 release and retry timestamps without raw-
  assert.equal(actual.providerRequests,0);
  assert.doesNotMatch(JSON.stringify(view),/PRIVATE_RAW_BODY|PRIVATE_TOKEN|LEAK|example\\.com/);
 });
+
+
+test('R6 row-change counter projection retains bounded real zero and positive counts',t=>{
+ const report=fixture(t,{status:'SUCCESS',providerRequests:2,
+  groups:[{groupName:'DOL_UI_WEEKLY_CLAIMS',status:'SUCCESS',providerRequests:2,
+   collectedRows:31000,inserted:0,revised:1,noop:30999,rejected:0,
+   historyRowsAdded:1,rawSnapshots:2,rawSnapshotNoops:1,
+   runId:'DO_NOT_TRANSFER',rawBody:'DO_NOT_TRANSFER'}],
+  plannedGroups:[{groupName:'DOL_UI_WEEKLY_CLAIMS',status:'RELEASE_ALREADY_STORED',
+    due:false,collectedRows:55,inserted:8}]},{}).checkpoints['local-collection-last-run.json'].employmentR6;
+ assert.deepEqual(report.groups,[{groupName:'DOL_UI_WEEKLY_CLAIMS',status:'SUCCESS',providerRequests:2,
+  collectedRows:31000,inserted:0,revised:1,noop:30999,rejected:0,
+  historyRowsAdded:1,rawSnapshots:2,rawSnapshotNoops:1}]);
+ assert.deepEqual(report.plannedGroups,[{groupName:'DOL_UI_WEEKLY_CLAIMS',
+  status:'RELEASE_ALREADY_STORED',due:false}]);
+ assert(!JSON.stringify(report).includes('DO_NOT_TRANSFER'));
+});
+
+test('R6 row-change counter projection refuses missing invalid and unbounded values',t=>{
+ const report=fixture(t,{status:'PARTIAL',providerRequests:0,
+  groups:[{groupName:'DOL_UI_WEEKLY_CLAIMS',status:'PARTIAL',
+   collectedRows:0,inserted:-1,revised:1.5,noop:'0',rejected:NaN,
+   historyRowsAdded:1000001,rawSnapshots:1,rawSnapshotNoops:undefined,
+   extra:'PRIVATE_KEY_NOT_FOR_OUTPUT'}],plannedGroups:[]},{}).checkpoints['local-collection-last-run.json'].employmentR6;
+ assert.deepEqual(report.groups,[{groupName:'DOL_UI_WEEKLY_CLAIMS',
+  status:'PARTIAL',collectedRows:0,rawSnapshots:1}]);
+ assert(!JSON.stringify(report).includes('PRIVATE_KEY_NOT_FOR_OUTPUT'));
+});

@@ -111,6 +111,11 @@ const r6GroupNames=new Set([
 ]);
 const r6Code=value=>typeof value==='string'&&/^[A-Z][A-Z0-9_]{0,99}$/.test(value)?value:null;
 const r6Count=value=>Number.isSafeInteger(value)&&value>=0&&value<=100000?value:null;
+const r6RowCount=value=>Number.isSafeInteger(value)&&value>=0&&value<=1_000_000?value:null;
+const R6_ROW_CHANGE_KEYS=Object.freeze([
+ 'collectedRows','inserted','revised','noop','rejected','historyRowsAdded',
+ 'rawSnapshots','rawSnapshotNoops'
+]);
 const r6Time=value=>typeof value==='string'
  &&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)
  &&Number.isFinite(Date.parse(value))
@@ -124,6 +129,8 @@ function r6CollectionProjection(raw){
   return [{groupName:item.groupName,status,
    ...(r6Code(item.failureCode)?{failureCode:r6Code(item.failureCode)}:{}),
    ...(!planned&&r6Count(item.providerRequests)!==null?{providerRequests:item.providerRequests}:{}),
+   ...(!planned?Object.fromEntries(R6_ROW_CHANGE_KEYS
+    .filter(key=>r6RowCount(item[key])!==null).map(key=>[key,item[key]])):{}),
    ...(planned?{due:item.due===true,
     ...Object.fromEntries(['retryAt','releaseAt','collectAt']
      .map(key=>[key,r6Time(item[key])]).filter(([,value])=>value!==null))
