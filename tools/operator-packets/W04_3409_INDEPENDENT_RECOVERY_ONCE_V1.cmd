@@ -1,12 +1,20 @@
 @echo off
 setlocal EnableExtensions DisableDelayedExpansion
+rem Deny inherited Node preloads before any executable starts.
+set "NODE_OPTIONS="
+set "NODE_PATH="
+set "NODE_EXTRA_CA_CERTS="
+set "NODE_ICU_DATA="
+set "NODE_REPL_HISTORY="
+set "NODE_REDIRECT_WARNINGS="
+set "NODE_TLS_REJECT_UNAUTHORIZED="
 title ZGMINI W04 3409 - independent recovery one-time operator
 rem Exact C-grade interactive Windows operator only. Never run on Actions/Runner.
 rem The fixed JS source is authenticated against its committed Git blob ID.
 rem Do not repeat if an attempt or stage already exists. No reset/clean/rollback.
 set "ZG_NODE=E:\ZGmini\runtime\node.exe"
 set "ZG_SCRIPT=%~dp0w04-3409-recovery-once.mjs"
-set "ZG_JS_BLOB=a5a94a7a6d6e28752649d5d780459658073d95a6"
+set "ZG_JS_BLOB=b45715ea74fc422bc417d891a356fc6ddedc8177"
 if defined GITHUB_ACTIONS goto :no_runner
 if defined RUNNER_NAME goto :no_runner
 if not exist "%ZG_NODE%" goto :no_node
