@@ -20,6 +20,29 @@ const AFTER_SELECTION_JOB='authenticated-readonly-board-after-selection';
 export const BOARD_CRON='7,22,37,52 * * * *';
 const fail=code=>{throw Error('HANDOFF_BOARD_RUNNER_'+code);};
 
+// The exact intake Workflow's successful needs dependency is the admission
+// receipt; validate the original owner event before either follow-up job.
+export function validateDirectIntakeFollowup(event,env,job){
+  const ref=HANDOFF_REPOSITORY+'/.github/workflows/agent-handoff.yml@refs/heads/main';
+  if(env.GITHUB_WORKFLOW_REF!==ref||env.GITHUB_JOB!==job||
+    env.GITHUB_REF!=='refs/heads/main'||env.GITHUB_ACTOR!==HANDOFF_OWNER||
+    env.GITHUB_REPOSITORY!==HANDOFF_REPOSITORY||!env.GITHUB_EVENT_PATH||
+    event?.repository?.full_name!==HANDOFF_REPOSITORY||event.repository.private!==true)
+    fail('DIRECT_INTAKE_SCOPE_STOP');
+  const labels=event.issue?.labels;
+  if(!Array.isArray(labels)||!labels.some(x=>x?.name==='agent-handoff'))
+    fail('DIRECT_INTAKE_EVENT_STOP');
+  if(env.GITHUB_EVENT_NAME==='issues'&&
+    (event.action==='opened'||(event.action==='labeled'&&event.label?.name==='agent-handoff')))return;
+  if(env.GITHUB_EVENT_NAME==='issue_comment'&&event.action==='created'&&
+    event.issue.pull_request==null&&typeof event.comment?.body==='string'&&
+    (event.comment.body.includes('ZGMINI_AGENT_HANDOFF_RESULT_V1')||
+     event.comment.body.includes('ZGMINI_AGENT_HANDOFF_DIAGNOSIS_V1')||
+     (labels.some(x=>x?.name==='handoff-agent-pending')&&
+      event.comment.body.includes('ZGMINI_HANDOFF_WORK_UPDATE_V1'))))return;
+  fail('DIRECT_INTAKE_EVENT_STOP');
+}
+
 export function validateBoardEvent(event,env) {
   if(!event||event.repository?.private!==true||
     event.repository.full_name!==HANDOFF_REPOSITORY||
@@ -28,6 +51,10 @@ export function validateBoardEvent(event,env) {
   // The workflow's needs dependency verifies selection success. Recheck the
   // original event here, with the exact default-branch workflow/job identity.
   if(env.GITHUB_JOB===AFTER_SELECTION_JOB){
+    if(env.GITHUB_WORKFLOW_REF===HANDOFF_REPOSITORY+'/.github/workflows/agent-handoff.yml@refs/heads/main'){
+      validateDirectIntakeFollowup(event,env,AFTER_SELECTION_JOB);
+      return;
+    }
     if(env.GITHUB_WORKFLOW_REF!==SELECTOR_WORKFLOW_REF||env.GITHUB_REF!=='refs/heads/main')
       fail('AFTER_SELECTION_SCOPE_STOP');
     if(env.GITHUB_EVENT_NAME==='workflow_run'){
