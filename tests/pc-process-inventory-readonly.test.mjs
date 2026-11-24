@@ -1942,3 +1942,20 @@ test('CNN pinned source-guard windows do not double count an adjacent guard',asy
  assert.equal(output.providerCalls,0);
  assert.equal(output.d1Writes,0);
 });
+
+
+test('CNN Sidecar B manifest pin read is strictly fixed operating owner A only',()=>{
+ const e=event(),p=JSON.parse(e.issue.body);
+ const q={...e,issue:{...e.issue,body:JSON.stringify({...p,
+  probe:'cnn-sidecar-b-preimage-pins-readonly'})}};
+ const auth=authenticateProcess(q,env,'operating');
+ assert.equal(auth.cnnSidecarBPreimagePins,true);
+ assert.throws(()=>authenticateProcess(q,env,'handoff'));
+ for(const bad of ['cnn-sidecar-b-preimage-pins-readonly;cmd',
+  'cnn-sidecar-b-preimage-pins','cnn-sidecar-b-preimage-pins-readonly ']){
+  assert.throws(()=>authenticateProcess({...e,issue:{...e.issue,
+   body:JSON.stringify({...p,probe:bad})}},env,'operating'));
+ }
+ assert.throws(()=>authenticateProcess({...q,issue:{...q.issue,
+  body:JSON.stringify({...p,probe:'cnn-sidecar-b-preimage-pins-readonly',target:'SECRET'})}},env,'operating'));
+});
