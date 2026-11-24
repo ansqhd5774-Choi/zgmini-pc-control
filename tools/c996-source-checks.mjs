@@ -24,6 +24,7 @@ export const GROUPS=Object.freeze({
   'tests/shared-resource-controller-independent.test.mjs'],
  writer:['direct-writer-b/configured-direct-b.test.mjs',
   'writer-b/preview-transport.test.mjs','writer-b/insert-preview-readonly.test.mjs',
+  'writer-b/import-availability.test.mjs',
   'writer-b/w04-r54-preview-scope.test.mjs',
   'writer-b/w04-r54-threefile-candidate.test.mjs',
   'writer-b/w04-r54-fourfile-import-closure.test.mjs'],
