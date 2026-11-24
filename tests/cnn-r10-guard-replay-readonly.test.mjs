@@ -257,3 +257,27 @@ test('unverified source pin refuses all file lookup',async()=>{
  assert.equal(r.status,'STATE_UNKNOWN');
  assert.deepEqual(r.operands,[]);
 });
+
+
+test('21-line exact operands expose only fixed provenance classes, never SHA bytes',()=>{
+ const lines=script();
+ const r=replay(lines.join('\n'),{...facts(),approved:HEAD});
+ const row=r.guardEvaluation[1];
+ assert.equal(row.comparisonOperator,'STRICT_EQUAL');
+ assert.deepEqual(row.staticOperandOrigins,['GIT_HEAD','PINNED_SHA40_LITERAL']);
+ assert.deepEqual(row.operandMatchesConfig,[true,false]);
+ assert.equal(row.guardPassed,true);
+ assert.doesNotMatch(JSON.stringify(row),/aaaaaaaaaaaaaaaa|bbbbbbbbbbbb|head|APPROVED_SOURCE_SHA/);
+});
+test('source-origin provenance has no invented config comparison on missing approved SHA',()=>{
+ const r=replay(script().join('\n'),facts());
+ assert.deepEqual(r.guardEvaluation[1].operandMatchesConfig,[null,null]);
+ assert.equal(r.firstRuntimeFailure,null);
+});
+test('unrecognized boolean guard never becomes evaluated by provenance annotations',()=>{
+ const lines=script();lines[20]="if (arbitraryCall() && head) throw Error('SECRET');";
+ const r=replay(lines.join('\n'),{...facts(),approved:HEAD});
+ assert.equal(r.guardEvaluation[1].guardPassed,null);
+ assert.equal(r.guardEvaluation[1].comparisonOperator,'UNKNOWN');
+ assert.equal(r.guardEvaluation[1].staticOperandOrigins,null);
+});
