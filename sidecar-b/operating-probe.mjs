@@ -216,3 +216,44 @@ export function inspectSidecarBResourceFlagsReadonly() {
   sharedWriterLockPresent:observe(()=>fs.existsSync(SHARED_LOCK))
  });
 }
+
+
+// Deepen only the observed false Core-idle condition using the same fixed
+// Windows Task COM probe as production B; no Task mutation or raw command lines.
+export function projectSidecarBCoreReadinessReadonly(raw){
+ const empty={schema:'ZGMINI_CNN_B_CORE_READINESS_V1',
+  status:'STATE_UNKNOWN',code:'CNN_B_CORE_READINESS_UNVERIFIED',
+  taskEnabled:null,taskState:null,taskInstanceCount:null,
+  coreProcessCount:null,unknownCoreProcessLines:null,
+  coreCycleLockPresent:null,coreQuiet:null,
+  previousInstallCondition:'NOT_OBSERVED_BY_THIS_PROBE',
+  operationalWrites:0,providerCalls:0,d1Writes:0};
+ const count=x=>Number.isSafeInteger(x)&&x>=0&&x<=10000?x:null;
+ if(!raw||raw.ok!==true)return empty;
+ const taskState=count(raw.state),instances=count(raw.instances),
+  processes=count(raw.relatedProcesses),unknown=count(raw.unknownProcessLines);
+ if(typeof raw.enabled!=='boolean'||taskState===null||taskState>4||
+  instances===null||processes===null||unknown===null||
+  typeof raw.coreCycleLockPresent!=='boolean')return empty;
+ const coreQuiet=coreReadyForMaintenance({
+  enabled:raw.enabled,state:taskState,instances,relatedProcesses:processes,
+  unknownProcessLines:unknown},raw.coreCycleLockPresent);
+ return {...empty,status:'PASS',code:'CNN_B_CORE_READINESS_COLLECTED',
+  taskEnabled:raw.enabled,taskState,taskInstanceCount:instances,
+  coreProcessCount:processes,unknownCoreProcessLines:unknown,
+  coreCycleLockPresent:raw.coreCycleLockPresent,coreQuiet};
+}
+
+export function inspectSidecarBCoreReadinessReadonly(){
+ if(process.platform!=='win32')return projectSidecarBCoreReadinessReadonly(null);
+ try{
+  const exe=path.win32.join(process.env.SystemRoot??'C:\\Windows',
+   'System32','cscript.exe');
+  const script=path.win32.resolve(path.win32.dirname(
+   new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/,'$1')),
+   '..','r17-writer-b','r17-b-windows-probe.js');
+  const result=JSON.parse(exec(exe,['//NoLogo',script],'utf8').trim());
+  return projectSidecarBCoreReadinessReadonly({
+   ...result,coreCycleLockPresent:fs.existsSync(CORE_LOCK)});
+ }catch{return projectSidecarBCoreReadinessReadonly(null);}
+}

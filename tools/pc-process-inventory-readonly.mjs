@@ -12,7 +12,7 @@ import {inspectProviderActivity} from '../controller/provider-activity-runtime-r
 import {inspectHttp32TwoHostCheckpoints} from '../controller/http32-two-host-checkpoints-readonly.mjs';
 import {inspectSidecarSourceGate} from '../controller/fear-greed-archive-readonly.mjs';
 import {inspectCnnGitPredicatesReadonly} from '../controller/cnn-sidecar-git-predicates-readonly.mjs';
-import {inspectSidecarBManifestPreimageReadonly,inspectSidecarBResourceFlagsReadonly} from '../sidecar-b/operating-probe.mjs';
+import {inspectSidecarBManifestPreimageReadonly,inspectSidecarBResourceFlagsReadonly,inspectSidecarBCoreReadinessReadonly} from '../sidecar-b/operating-probe.mjs';
 import {maintenanceLockStatus} from './maintenance-lock.mjs';
 import {readMaintenanceRecoveryStatus,protectedSnapshot} from './update.mjs';
 import {readFixedReadonlyBytes} from '../controller/fixed-readonly-bytes.mjs';
@@ -36,6 +36,7 @@ const CNN_STATIC_GUARD_PROBE='cnn-sidecar-static-guard-readonly';
 const CNN_GIT_PREDICATES_PROBE='cnn-sidecar-git-predicates-readonly';
 const CNN_B_PINS_PROBE='cnn-sidecar-b-preimage-pins-readonly';
 const CNN_B_RESOURCE_PROBE='cnn-sidecar-b-resource-readonly';
+const CNN_B_CORE_PROBE='cnn-sidecar-b-core-readonly';
 const MAX_BYTES=32768;
 const KNOWN_PROCESSES=new Set([
  'runner.listener.exe','runner.worker.exe','node.exe','wscript.exe','cscript.exe',
@@ -106,10 +107,11 @@ export function authenticateProcess(event,env,role){
   const isCnnGitPredicates=withW05&&raw.probe===CNN_GIT_PREDICATES_PROBE;
   const isCnnBPins=withW05&&raw.probe===CNN_B_PINS_PROBE;
   const isCnnBResources=withW05&&raw.probe===CNN_B_RESOURCE_PROBE;
+  const isCnnBCore=withW05&&raw.probe===CNN_B_CORE_PROBE;
  if(!raw||(!basic&&!withJobs&&!withW05)||
    raw.schema!==SCHEMA||raw.operation!==ROLE_OPERATION||raw.role!==role||
    (withJobs&&role!=='operating')||
-   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!isD05Writer&&!isD05PrivateReceipt&&!isD05Theme&&!isD05Registration&&!is3160&&!isCnnStaticGuard&&!isCnnGitPredicates&&!isCnnBPins&&!isCnnBResources))))
+   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!isD05Writer&&!isD05PrivateReceipt&&!isD05Theme&&!isD05Registration&&!is3160&&!isCnnStaticGuard&&!isCnnGitPredicates&&!isCnnBPins&&!isCnnBResources&&!isCnnBCore))))
   fail('REQUEST_SCOPE_INVALID');
  const runnerJobRefs=withJobs?validateRunnerJobRefs(raw.runnerJobRefs):null;
  const normalized=structuredClone(event);
@@ -129,7 +131,8 @@ export function authenticateProcess(event,env,role){
    ...(isCnnStaticGuard?{cnnSidecarStaticGuard:true}:{}),
    ...(isCnnGitPredicates?{cnnSidecarGitPredicates:true}:{}),
    ...(isCnnBPins?{cnnSidecarBPreimagePins:true}:{}),
-   ...(isCnnBResources?{cnnSidecarBResources:true}:{})};
+   ...(isCnnBResources?{cnnSidecarBResources:true}:{}),
+   ...(isCnnBCore?{cnnSidecarBCore:true}:{})};
 }
 export function sanitizeProbe(raw){
  if(!raw||raw.schema!=='ZGMINI_PC_PROCESS_PROBE_V1')fail('PROBE_SCHEMA_INVALID');
@@ -2028,6 +2031,11 @@ export function collect(role,ctx,env=process.env){
   commandLinesCaptured:false,environmentValuesCaptured:false};
  if(identity!=='MATCH'||(role==='operating'&&host!=='PC')){
   return {...base,status:'BLOCKED',code:identity==='MATCH'?'HOST_NOT_CANONICAL':identity};
+ }
+ if(ctx.cnnSidecarBCore===true){
+  const observed=inspectSidecarBCoreReadinessReadonly();
+  return {...base,status:observed.status,code:observed.code,
+   cnnSidecarBCore:observed};
  }
  if(ctx.cnnSidecarBResources===true){
   const observed=inspectSidecarBResourceFlagsReadonly();

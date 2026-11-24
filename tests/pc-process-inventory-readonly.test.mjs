@@ -1977,3 +1977,20 @@ test('CNN Sidecar B resource check is a fixed operating-only A route',()=>{
   body:JSON.stringify({...p,probe:'cnn-sidecar-b-resource-readonly',
    target:'SECRET'})}},env,'operating'));
 });
+
+
+test('CNN B Core readiness probe requires exact operating A owner',()=>{
+ const e=event(),p=JSON.parse(e.issue.body);
+ const q={...e,issue:{...e.issue,body:JSON.stringify({...p,
+  probe:'cnn-sidecar-b-core-readonly'})}};
+ assert.equal(authenticateProcess(q,env,'operating').cnnSidecarBCore,true);
+ assert.throws(()=>authenticateProcess(q,env,'handoff'));
+ for(const name of ['cnn-sidecar-b-core-readonly ','cnn-sidecar-b-core-readonly;cmd',
+  'cnn-sidecar-b-core']){
+  assert.throws(()=>authenticateProcess({...e,issue:{...e.issue,
+   body:JSON.stringify({...p,probe:name})}},env,'operating'));
+ }
+ assert.throws(()=>authenticateProcess({...q,issue:{...q.issue,
+  body:JSON.stringify({...p,probe:'cnn-sidecar-b-core-readonly',
+   command:'PRIVATE'})}},env,'operating'));
+});

@@ -98,3 +98,39 @@ test('CNN B resource observation never guesses readiness if a predicate is unkno
  }
  assert.equal(project(null).status,'STATE_UNKNOWN');
 });
+
+
+test('CNN B Core readiness reports only bounded Task and lock evidence',async()=>{
+ const {projectSidecarBCoreReadinessReadonly:core}=await import('./operating-probe.mjs');
+ const raw={ok:true,enabled:true,state:3,instances:0,
+  relatedProcesses:0,unknownProcessLines:0,coreCycleLockPresent:false,
+  commandLine:'DO_NOT_ECHO',secret:'DO_NOT_ECHO'};
+ const ready=core(raw);
+ assert.equal(ready.status,'PASS');
+ assert.equal(ready.coreQuiet,true);
+ assert.equal(ready.taskState,3);
+ assert.equal(ready.coreCycleLockPresent,false);
+ assert.equal(ready.previousInstallCondition,'NOT_OBSERVED_BY_THIS_PROBE');
+ assert.doesNotMatch(JSON.stringify(ready),/DO_NOT_ECHO|commandLine|secret/);
+ for(const changed of [
+  {enabled:false},{state:4},{instances:1},{relatedProcesses:1},
+  {unknownProcessLines:1},{coreCycleLockPresent:true}]){
+  const blocked=core({...raw,...changed});
+  assert.equal(blocked.status,'PASS');
+  assert.equal(blocked.coreQuiet,false);
+ }
+});
+
+test('CNN B Core readiness fails closed on unknown Task evidence',async()=>{
+ const {projectSidecarBCoreReadinessReadonly:core}=await import('./operating-probe.mjs');
+ const raw={ok:true,enabled:true,state:3,instances:0,
+  relatedProcesses:0,unknownProcessLines:0,coreCycleLockPresent:false};
+ for(const delta of [{ok:false},{state:9},{instances:999999},
+  {unknownProcessLines:null},{relatedProcesses:'0'},
+  {coreCycleLockPresent:undefined},{enabled:null}]){
+  const r=core({...raw,...delta});
+  assert.equal(r.status,'STATE_UNKNOWN');
+  assert.equal(r.coreQuiet,null);
+ }
+ assert.equal(core(null).status,'STATE_UNKNOWN');
+});
