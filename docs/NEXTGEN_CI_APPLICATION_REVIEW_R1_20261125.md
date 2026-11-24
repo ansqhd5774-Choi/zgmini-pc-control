@@ -295,3 +295,18 @@
 **판정 조정:** #24 Performance CI의 **제한된 로컬 격리 측정·아티팩트**는 구현·실제 실행·main 반영 완료. #8 Performance Budget은 동일 브라우저·fixture·viewport·URL을 요구하는 비교 함수와 사전 승인 정책 계약은 구현했으나 실제 임계치 정책/차단은 NOT_CONFIGURED로 보류. 따라서 R2 누적 소스 적용 **기존 4종 + #24 1종 = 5종**, #8 부분 구현으로 집계. 앞선 Lighthouse/preview timeout의 근본 원인을 입증했다고 주장하지 않는다.
 
 **제약:** 단일 로컬 API UNAVAILABLE 회차로 실제 Production 방문자 성능, Lighthouse 점수, Core Web Vitals 현장 데이터, 전후 개선율은 검증 불가. 정책 Gate를 허가 없이 신설하지 않으며 비교 가능한 반복 실측과 승인된 성능 임계치만 후속 검토한다.
+
+
+## R2 #25 접근성 CI 검증·병합 및 #23 교차 브라우저 진행 — 2026-11-25
+
+### #25 Accessibility CI 완료 (지정 범위)
+- 본체 [PR #1592](https://github.com/ansqhd5774-Choi/zgmini/pull/1592) → main 정규 병합 SHA fd0a944b2cfb5e9783ac4fc2e988ebf0697651f4. 기존 #24 성능 측정·Chromium 18개 검사 유지, axe-core 4.14.1을 기존 Playwright test-only 설치에 추가. 새 Workflow/Runner/예약 없음.
+- 원래 HEAD 80b9b16e130f05a8ebe73dfc241331a6d610846f Node CI 실패는 회귀시험이 요구한 artifact retention-days: 7의 실제 Workflow 누락. 테스트 삭제나 실패 무시 대신 성능 측정과 재결합한 merge commit ec05afe315f7cf8fcc40596f917fc936578bbf62에서 추가함.
+- 수정 정확 HEAD [Node #45493027487](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45493027487), [CodeQL #45493027399](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45493027399), [Secret #45493027349](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45493027349), [Playwright #45493027350](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45493027350): 4/4 SUCCESS. 기존 18개 UI 검사, 성능 측정, axe 신규 검사 모두 성공.
+- 실제 CI_AXE_OBSERVED 로컬 /about 화면: 모바일390·PC1440 각각 위반 규칙 0, 위반 노드 0, 미판정 규칙 1. 결과에는 HTML/본문/selector/개인정보 미포함. 전체 사이트의 WCAG 준수나 Production 결과는 미입증.
+- 누적 고도화 소스 반영 기존 5종 + #25 1종 = **6/12**. #8 Budget 승인 임계치·강제 게이트는 계속 미설정. 과거 Lighthouse 실패 증거 유지.
+
+### #23 Cross-browser CI 후보 (아직 main 미병합)
+- 본체 [Draft PR #1594](https://github.com/ansqhd5774-Choi/zgmini/pull/1594), 작업 브랜치 codex/ci-crossbrowser-core-r2-20261125. Firefox/WebKit × 로컬 /·/about/ × 390/1440 = 8조합. 외부 요청 차단, API 503 UNAVAILABLE. HTTP 200·main 존재 검사 및 overflow/JS 오류 건수만 기록.
+- 정확 최신 후보 HEAD f7a0cb80b1037fc954c5ff60bda65ee2a695273d는 #25와 #24 및 기존 18개 Chromium 테스트를 함께 유지하는 비강제 병합 커밋. 최신 CI·브라우저 8조합 결과/Artifact 검증 진행 중.
+- #23의 실제 Run·JSON readback 및 main 병합 전에는 6/12에 산입하지 않는다. 독립 작업 장애 Issue를 이 PR로 묶거나 임의 종결하지 않는다.
