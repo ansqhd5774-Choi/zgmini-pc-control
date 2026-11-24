@@ -13,7 +13,7 @@ import {inspectW05CloudflareActive} from './w05-cloudflare-deployment-readonly.m
 import {inspectInflation7D1Readback} from './inflation7-d1-readback-readonly.mjs';
 import {inspectInflation19D1Readback} from './inflation19-d1-readback-readonly.mjs';
 import {inspectCoreRuntimeSource} from './core-runtime-source-readonly.mjs';
-import {readCompletedCoreLineage} from '../tools/core092-completed-lineage-readonly.mjs';
+import {readCompletedCoreLineage} from './core-completed-lineage-readonly.mjs';
 import {observeInflationCoreLock} from './inflation-core-lock-observation-readonly.mjs';
 import {inspectInflationEvent129Once} from './inflation-event129-evidence-readonly.mjs';
 import {inspectWriterB1063Recovery} from './writer-b-1063-recovery-readonly.mjs';
