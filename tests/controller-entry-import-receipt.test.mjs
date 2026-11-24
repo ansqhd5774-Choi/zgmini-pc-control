@@ -23,14 +23,15 @@ test('missing engine dependency or host manifest yields uploadable BLOCKED point
   const repository='ansqhd5774-Choi/zgmini-pc-control';
   fs.writeFileSync(path.join(root,'config','operations.json'),JSON.stringify({
    controlRepository:repository,sourceRepository:'ansqhd5774-Choi/zgmini',
-   maxReportBytes:32768,allowedActors:['ansqhd5774-Choi'],operations:{'core-status':{grade:'A',resource:'light',timeoutSeconds:60}}
+   maxReportBytes:32768,allowedActors:['ansqhd5774-Choi'],operations:{'core-status':{grade:'A',resource:'light',timeoutSeconds:60},
+    'writer-install-preimage-readonly':{grade:'A',resource:'light',timeoutSeconds:60}}
   }));
   // A valid installed manifest must attest a nonempty, scoped source inventory.
   const paths=['config/operations.json','controller/common.mjs','controller/engine.mjs',
    'controller/entry.mjs','controller/fear-greed-archive-readonly.mjs',
    'controller/operations.mjs','controller/supervisor.mjs',
    'controller/upload.mjs','controller/worker.mjs',
-   'controller/preimage-manifest-contract.mjs'];
+   'controller/preimage-manifest-contract.mjs','controller/preimage-manifest-stager.mjs'];
   // Only the engine import graph executes in this isolated failure fixture.
   for(const rel of paths){
    const file=path.join(root,rel);
@@ -117,8 +118,37 @@ test('missing engine dependency or host manifest yields uploadable BLOCKED point
   assert.equal(receipt.issueNumber,2506);
   assert.equal(receipt.report.status,'BLOCKED');
   assert.equal(receipt.report.code,'CONTROLLER_IMPORT_MISSING');
-  // This is the preimage helper import, not a failure to load the engine.
-  assert.equal(receipt.report.firstFail,'PREIMAGE_STAGE_IMPORT');
+  // Ordinary operations now skip the optional helper entirely. Their missing
+  // engine import retains the existing ENGINE_IMPORT failure stage.
+  assert.equal(receipt.report.firstFail,'ENGINE_IMPORT');
+  assert.equal(receipt.report.operationalWrites,0);
+  assert.equal(receipt.report.providerCalls,0);
+  assert.equal(receipt.report.d1Writes,0);
+  // The same damaged helper must still fail closed at PREIMAGE_STAGE_IMPORT
+  // for a genuinely scoped preimage request. Preserve the original Issue
+  // identity and the previously attested host manifest.
+  const preimageRequest={...request,operation:'writer-install-preimage-readonly',
+   preimageManifestPath:'approvals/writer-preimage/test-scope.json',
+   preimageManifestSha256:'c'.repeat(64)};
+  fs.writeFileSync(event,JSON.stringify({action:'opened',repository:{private:true},
+   issue:{number:2506,user:{login:'ansqhd5774-Choi'},labels:[{name:'pc-job'}],
+    body:JSON.stringify(preimageRequest)}}));
+  fs.rmSync(reportFile,{force:true});
+  const scoped=spawnSync(process.execPath,[path.join(root,'controller','entry.mjs')],
+   {encoding:'utf8',env});
+  assert.equal(scoped.status,1,scoped.stderr);
+  const scopedReceipt=JSON.parse(fs.readFileSync(reportFile,'utf8'));
+  assert.equal(scopedReceipt.issueNumber,2506);
+  assert.equal(scopedReceipt.report.status,'BLOCKED');
+  assert.equal(scopedReceipt.report.code,'CONTROLLER_IMPORT_MISSING');
+  assert.equal(scopedReceipt.report.firstFail,'PREIMAGE_STAGE_IMPORT');
+  assert.equal(scopedReceipt.report.operationalWrites,0);
+  assert.equal(scopedReceipt.report.providerCalls,0);
+  assert.equal(scopedReceipt.report.d1Writes,0);
+  // Restore the normal request for the policy corruption checks below.
+  fs.writeFileSync(event,JSON.stringify({action:'opened',repository:{private:true},
+   issue:{number:2506,user:{login:'ansqhd5774-Choi'},labels:[{name:'pc-job'}],
+    body:JSON.stringify(request)}}));
   assert.equal(receipt.report.operationalWrites,0);
   assert.equal(receipt.report.providerCalls,0);
   assert.equal(receipt.report.d1Writes,0);
