@@ -4,6 +4,7 @@ import {readFileSync,mkdtempSync,mkdirSync,writeFileSync,rmSync,realpathSync} fr
 import path from 'node:path';
 import os from 'node:os';
 import {readFixedReadonlyBytes} from '../controller/fixed-readonly-bytes.mjs';
+import {validatePreimageApproval} from '../controller/preimage-manifest-contract.mjs';
 import {manifestFingerprint,validateControllerSelectivePin,validateControllerConfigTransition} from '../tools/maintenance-contract.mjs';
 import {createHash} from 'node:crypto';
 import {
@@ -244,6 +245,11 @@ test('W05 15-file exact preimage approval covers allowed lib and D1 dependencies
  assert.equal(a.sourceRoot,'projects/zgmini-earnings-history-pc-release');
  assert.equal(a.allowOtherPaths,false);
  assert.equal(a.files.length,15);
+ const manifestPath='approvals/writer-preimage/w05-five-key-lib-closure-20261124.json';
+ const raw=readFileSync(new URL('../'+manifestPath,import.meta.url));
+ const digest=createHash('sha256').update(raw).digest('hex');
+ const checked=validatePreimageApproval(raw,{expectedSha256:digest,manifestPath});
+ assert.deepEqual(checked.files,a.files);
  assert.deepEqual(a.files.slice(0,3).map(x=>x.path),[
   'lib/w05-audit/compare-five-public-readbacks-r1.mjs',
   'lib/w05-audit/five-key-inplace-readback-prework-r12.mjs',
