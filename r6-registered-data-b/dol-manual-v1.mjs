@@ -14,12 +14,23 @@ const R6_B_SOURCE=String.raw`E:\ZGmini\projects\zgmini-earnings-history-pc-relea
 const R6_B_HOME=String.raw`E:\ZGmini\data\pc-writer`;
 
 export const DOL_MANUAL_SCHEMA='ZGMINI_R6_DOL_MANUAL_B_APPROVAL_V1';
+export const DOL_MANUAL_PDF_SCHEMA='ZGMINI_R6_DOL_MANUAL_B_APPROVAL_V2';
 const GROUP='DOL_UI_WEEKLY_CLAIMS';
 const FILES=[
  'lib/market-score/employment-r6-provider.mjs',
  'lib/market-score/employment-r6-collector.mjs',
  'lib/market-score/employment-r6-scheduler.mjs',
 ];
+const PDF_FILES=[...FILES,
+ 'lib/market-score/employment-r6-dol-advance-pdf-candidate.mjs',
+ 'lib/market-score/employment-r6-dol-advance-store-candidate.mjs',
+ 'lib/market-score/employment-r6-dol-pdf-raw-envelope.mjs',
+ 'lib/market-score/employment-r6-dol-eta538-provider.mjs',
+];
+const isPdfApproval=approval=>approval?.schema===DOL_MANUAL_PDF_SCHEMA;
+const scopedFiles=approval=>isPdfApproval(approval)?PDF_FILES:FILES;
+const PDF_DATE=/^\\d{4}-\\d{2}-\\d{2}$/;
+const PDF_ISO=/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/;
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 const SHA40=/^[a-f0-9]{40}$/;
 const SHA64=/^[a-f0-9]{64}$/;
@@ -62,7 +73,8 @@ export function authorizeDolManual({event,env,approvalBytes}={}){
   'R6_DOL_APPROVAL_HASH_STOP');
  const keys=['schema','status','scope','mode','sourceRepository','installedSourceSha',
   'sourceRoot','pcHome','groupName','maxDolCalls','fileHashes','effects'];
- need(exact(approval,keys)&&approval.schema===DOL_MANUAL_SCHEMA&&
+ need(exact(approval,isPdfApproval(approval)?[...keys,'pdfArchive']:keys)&&
+  (approval.schema===DOL_MANUAL_SCHEMA||isPdfApproval(approval))&&
   approval.status==='APPROVED_B'&&
   approval.scope==='EMPLOYMENT_R6_DOL_MANUAL_SQLITE_ONCE'&&
   approval.mode==='ONE_YEAR'&&approval.groupName===GROUP&&
@@ -70,24 +82,41 @@ export function authorizeDolManual({event,env,approvalBytes}={}){
   SHA40.test(approval.installedSourceSha??'')&&
   same(approval.sourceRoot,R6_B_SOURCE)&&same(approval.pcHome,R6_B_HOME)&&
   approval.maxDolCalls===2,'R6_DOL_SCOPE_STOP');
- need(exact(approval.fileHashes,FILES)&&
-  FILES.every(p=>SHA64.test(approval.fileHashes[p]??'')),
+ need(exact(approval.fileHashes,scopedFiles(approval))&&
+  scopedFiles(approval).every(p=>SHA64.test(approval.fileHashes[p]??'')),
   'R6_DOL_FILE_SCOPE_STOP');
- need(exact(approval.effects,['dolProviderCalls','sqliteWrites','rawSnapshotReadback',
-  'blsProviderCalls','d1Writes','taskWrites','sourceWrites'])&&
+ need(exact(approval.effects,isPdfApproval(approval)
+  ?['dolProviderCalls','sqliteWrites','rawSnapshotReadback',
+    'blsProviderCalls','d1Writes','taskWrites','sourceWrites','eta538PdfGet']
+  :['dolProviderCalls','sqliteWrites','rawSnapshotReadback',
+    'blsProviderCalls','d1Writes','taskWrites','sourceWrites'])&&
   approval.effects.dolProviderCalls===true&&
   approval.effects.sqliteWrites===true&&
   approval.effects.rawSnapshotReadback===true&&
   approval.effects.blsProviderCalls===false&&
   approval.effects.d1Writes===false&&approval.effects.taskWrites===false&&
-  approval.effects.sourceWrites===false,'R6_DOL_EFFECT_SCOPE_STOP');
+  approval.effects.sourceWrites===false&&
+  (!isPdfApproval(approval)||approval.effects.eta538PdfGet===true),
+  'R6_DOL_EFFECT_SCOPE_STOP');
+ if(isPdfApproval(approval)){
+  const pdf=approval.pdfArchive;
+  need(exact(pdf,['releaseDate','releaseAt','expectedInitialWeekEnd','originalPdfSha256'])&&
+   PDF_DATE.test(pdf.releaseDate??'')&&
+   PDF_DATE.test(pdf.expectedInitialWeekEnd??'')&&
+   PDF_ISO.test(pdf.releaseAt??'')&&Number.isFinite(Date.parse(pdf.releaseAt))&&
+   new Date(pdf.releaseAt).toISOString()===pdf.releaseAt&&
+   pdf.releaseAt.slice(0,10)===pdf.releaseDate&&
+   Date.parse(pdf.releaseAt)<=Date.now()&&
+   SHA64.test(pdf.originalPdfSha256??''),
+   'R6_DOL_PDF_SOURCE_PIN_STOP');
+ }
  return {request,approval};
 }
 
 // Authorization and manifest bytes are verified by authorizeDolManual before
 // the one-shot claim. Only this dedicated B entrypoint passes manual intent.
-export function createApprovedDolManualCollectorOptions({auth,db,fetchImpl}={}){
- need(auth?.approval?.schema===DOL_MANUAL_SCHEMA&&auth.approval.status==='APPROVED_B'
+export function createApprovedDolManualCollectorOptions({auth,db,fetchImpl,providerFactory}={}){
+ need((auth?.approval?.schema===DOL_MANUAL_SCHEMA||isPdfApproval(auth?.approval))&&auth.approval.status==='APPROVED_B'
   &&auth.approval.scope==='EMPLOYMENT_R6_DOL_MANUAL_SQLITE_ONCE'
   &&auth.approval.mode==='ONE_YEAR'&&auth.approval.groupName===GROUP
   &&auth.approval.maxDolCalls===2&&UUID.test(auth?.request?.requestId??'')
@@ -103,6 +132,7 @@ export function createApprovedDolManualCollectorOptions({auth,db,fetchImpl}={}){
    requestId:auth.request.requestId,
    approvalManifestSha256:auth.request.approvalManifestSha256,
   },
+  ...(isPdfApproval(auth.approval)?{providerFactory}:{}),
  };
 }
 
