@@ -19,6 +19,7 @@ test('W05 lib reader is an immutable one-file selective child of installed Contr
  assert.equal(m.approval.grade,'B');
  assert.equal(m.approval.scope,'PC_CONTROL_CONTROLLER_UPDATE');
  assert.equal(m.approval.ref,p.approvalRef);
+ assert.equal(m.approval.ref,'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3277');
  assert.match(m.approval.ref,/^https:\/\/github\.com\/ansqhd5774-Choi\/zgmini-pc-control\/pull\/[1-9][0-9]*$/);
  assert.equal(m.checks.manifestSha256,manifestFingerprint(m.allowFiles).sha256);
  assert.equal(m.checks.manifestSha256,
