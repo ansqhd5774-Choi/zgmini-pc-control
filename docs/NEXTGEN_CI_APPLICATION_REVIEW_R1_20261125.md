@@ -210,3 +210,11 @@
 4. **#6/#15/#20/#36**: 보안·구조·데이터 무결성·성능 통계의 기존 보호와 중복 제거 후 필요한 것만 추가.
 
 **누적 적용 현황(새 R2 변경 기준):** 12종 중 #12·#19 **2종 소스 구현 및 main 병합**, #12는 실제 새 Workflow 검사 실행 PASS, #19는 기존 C996 fixture 회귀시험 PASS/실행 가능한 CLI 구현(정기 실행·운영 자동 호출 미구성). 나머지 10종은 기존 R1 후보 분류 상태를 유지한다. 속도·품질 개선 수치, 새 예약/운영 설치 및 자동 복구 성공률은 별도 운영 증거가 없으므로 미확정.
+
+
+### #12 actionlint 실제 호환성 보완 — 2026-11-25
+
+- upstream [rhysd/actionlint #746](https://github.com/rhysd/actionlint/issues/746): v1.7.12는 공식 GitHub `concurrency.queue: max`를 잘못된 키로 보고하는 **입증된 오탐 위험**이 있다. ZGMINI의 CI Failure Issue Intake에도 이 키가 사용되므로 초기 #1581 적용만으로 전체 안전성 검증 완료를 주장하지 않는다.
+- [본체 PR #1583](https://github.com/ansqhd5774-Choi/zgmini/pull/1583) → main 병합 `39a7a1146f682ff66d6848600ed291747cce11bf`. 기존 queue/Issue intake 동작은 보존하고, actionlint는 오탐인 정확한 key 진단만 좁게 제외하며 신규 Node 검증기로 유효값 `max`/`single`·들여쓰기 오류를 검사한다.
+- 실제 changed-workflow에 `queue:max`가 포함된 [Node CI #45482394090](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45482394090)에서 Actionlint 단계 SUCCESS 및 신규 경계 회귀시험 3건 PASS; [CodeQL #45482393353](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45482393353)·[Secret #45482393323](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45482393323) SUCCESS. main 파일 재조회 완료.
+- 이는 **#12 구현의 추가 호환성 보정**이며 12종 중 도입 건수에 새 항목으로 중복 산입하지 않는다. 본체 과거 Miniflare 실패 Issue #1582는 원인 미확정으로 OPEN 유지한다.
