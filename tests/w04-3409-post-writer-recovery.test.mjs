@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
@@ -8,14 +9,15 @@ import {validateW043409PostWriterBridge,
  permittedInstalledRecoveryProtection,fixedInstalledRecoveryCase} from '../tools/maintenance-recovery.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-const read=rel=>fs.readFileSync(path.join(root,rel));
+const committed=rel=>execFileSync('git',['show','HEAD:'+rel],
+ {cwd:root,windowsHide:true,maxBuffer:1_000_000});
 const hex=buffer=>createHash('sha256').update(buffer).digest('hex');
 const ID='pc-update-71ea39dc-7048-4e10-9d11-d4be7f6c3ec0';
 const R_ID='821f15bd-9709-45bf-b7e3-8b2ce33ae978';
 const M='approvals/writer-updates/w04-eta538-scheduled-release-safe-drain-pending-20261125.json';
-const original=read('approvals/maintenance-recoveries/'+ID+'.installed.json');
-const writerManifest=read(M);
-const writerReceipt=read('results/writer-b-source-install-'+R_ID+'.json');
+const original=committed('approvals/maintenance-recoveries/'+ID+'.installed.json');
+const writerManifest=committed(M);
+const writerReceipt=committed('results/writer-b-source-install-'+R_ID+'.json');
 const originalJson=JSON.parse(original);
 const actualWriterSha='d8ac245003e7b8e006c2345382d5c639c6d5f18b';
 const writerBytes=Buffer.from(JSON.stringify({source:actualWriterSha})+'\n');
@@ -90,4 +92,13 @@ test('historical 3409 protection stays closed unless Writer B bridge proved',()=
  const w05={allowUnchangedBaseline:false};
  assert.equal(permittedInstalledRecoveryProtection(w05,changed),true);
  assert.equal(permittedInstalledRecoveryProtection(w05,unchanged),false);
+});
+
+test('canonical Git evidence hashes must not accept CRLF-converted checkout bytes',()=>{
+ assert.equal(hex(writerManifest),
+  '4102978f3c365d43bf0126f5eae6b885bec0ff523b8558a97345c5bcadb5eea0');
+ const transformed=Buffer.from(writerManifest.toString('utf8').replace(/\n/g,'\r\n'));
+ assert.notEqual(hex(transformed),hex(writerManifest));
+ const a=fixture();a.writerManifestRaw=transformed;
+ assert.throws(()=>validateW043409PostWriterBridge(a),/W04_POSTWRITER_B_AUTHORIZATION_UNVERIFIED/);
 });
