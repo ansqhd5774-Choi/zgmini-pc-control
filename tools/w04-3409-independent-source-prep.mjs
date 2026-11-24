@@ -9,12 +9,15 @@ import {fileURLToPath} from 'node:url';
 import {verifyRecoveryOperator} from './update.mjs';
 
 export const REQUEST_ID='pc-update-71ea39dc-7048-4e10-9d11-d4be7f6c3ec0';
-export const SOURCE_SHA='fcb098d20fb9a6c48f371786c69f7f1fdf5bc34a';
+export const SOURCE_SHA='23d04ff8e4687b46e93aa7dd80cca58520816fed';
 export const REPO='E:/ZGmini/projects/zgmini-pc-control';
 export const MAINT='E:/ZGmini/automation/pc-maintenance';
 export const CONTROL='E:/ZGmini/automation/pc-control';
 export const STAGE=MAINT+'/recovery-source/w04-3409';
-export const APPROVAL='approvals/maintenance-recoveries/'+REQUEST_ID+'.installed.json';
+export const APPROVAL='approvals/maintenance-recoveries/'+REQUEST_ID+'.post-writer.json';
+const HISTORICAL_APPROVAL='approvals/maintenance-recoveries/'+REQUEST_ID+'.installed.json';
+const HISTORICAL_APPROVAL_SHA='e9707741bb4a39cc933b2cb8b5e04ec27242992aa7d974d0fb1af89d21fd9005';
+const WRITER_B_RESULT_SHA='5ab2953c95e7d86939f18e621c0ced8db92eaba7ab4ce0690b77564198b176f0';
 const TARGET='6b3c9c0ce77354d81babe4c9ea7785663c6c2cb4';
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const fail=code=>{throw Object.assign(new Error(code),{code});};
@@ -30,10 +33,12 @@ export const CAS_PATHS={
 };
 const max={ledger:131072,owner:4096,marker:4096,backlog:131072,snapshot:65536,protection:65536,writer:131072};
 export function validateApproval(approval) {
- check(approval?.schema==='ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V1' &&
+ check(approval?.schema==='ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V2' &&
   approval.approved===true && approval.requestId===REQUEST_ID &&
   approval.issueNumber===3409 && approval.operation==='RECONCILE_INSTALLED' &&
-  approval.sourceSha===SOURCE_SHA && approval.targetControllerSha===TARGET,
+  approval.sourceSha===SOURCE_SHA && approval.targetControllerSha===TARGET &&
+  approval.previousRecoveryApprovalSha256===HISTORICAL_APPROVAL_SHA &&
+  approval.writerBReceiptSha256===WRITER_B_RESULT_SHA,
   'PREP_APPROVAL_IDENTITY_MISMATCH');
  check(approval.casDigests&&Object.keys(approval.casDigests).length===7 &&
   Object.keys(CAS_PATHS).every(k=>/^[a-f0-9]{64}$/.test(approval.casDigests[k+'Sha256']??'')) &&
@@ -91,18 +96,31 @@ export function run({git,read=fs.readFileSync,stat=fs.lstatSync,exists=fs.exists
  g(['fetch','--no-tags','origin','main']);
  check(g(['rev-parse','HEAD']).toString().trim()===oldHead,'PREP_HEAD_MOVED');
  g(['merge-base','--is-ancestor',SOURCE_SHA,'refs/remotes/origin/main']);
- const approval=JSON.parse(g(['show',SOURCE_SHA+':'+APPROVAL]).toString());
+ const originHead=g(['rev-parse','refs/remotes/origin/main']).toString().trim();
+ check(/^[a-f0-9]{40}$/.test(originHead),'PREP_ORIGIN_MAIN_UNVERIFIED');
+ const approvalRaw=g(['show','refs/remotes/origin/main:'+APPROVAL]);
+ const originalRaw=g(['show','refs/remotes/origin/main:'+HISTORICAL_APPROVAL]);
+ check(sha(originalRaw)===HISTORICAL_APPROVAL_SHA,'PREP_ORIGINAL_APPROVAL_DRIFT');
+ const approval=JSON.parse(approvalRaw.toString());
  validateApproval(approval);
+ const old=JSON.parse(originalRaw.toString());
+ check(Object.keys(old.casDigests??{}).length===7&&
+  Object.keys(old.casDigests).filter(k=>k!=='writerSha256').every(k=>
+   approval.casDigests[k]===old.casDigests[k])&&
+  old.casDigests.writerSha256!==approval.casDigests.writerSha256,
+  'PREP_ORIGINAL_SIX_CAS_DRIFT');
  verifyCas(approval,read,stat);
  check(!exists(STAGE),'PREP_STAGE_ALREADY_EXISTS');
  mkdir(path.dirname(STAGE),{recursive:true});
- g(['worktree','add','--detach',STAGE,SOURCE_SHA]);
- check(g(['-C',STAGE,'rev-parse','HEAD']).toString().trim()===SOURCE_SHA,
+ g(['worktree','add','--detach',STAGE,originHead]);
+ check(g(['-C',STAGE,'rev-parse','HEAD']).toString().trim()===originHead,
   'PREP_STAGED_HEAD_MISMATCH');
+ check(sha(read(path.join(STAGE,APPROVAL)))===sha(approvalRaw),
+  'PREP_STAGED_APPROVAL_DRIFT');
  verifyStagedFiles(approval,g,read);
  verifyCas(approval,read,stat);
  return {status:'SOURCE_PREPARED_ONLY',code:'PINNED_ISOLATED_WORKTREE_VERIFIED',
-  requestId:REQUEST_ID,sourceSha:SOURCE_SHA,controllerWrites:0,leaseWrites:0,
+  requestId:REQUEST_ID,sourceSha:SOURCE_SHA,stagedHead:originHead,controllerWrites:0,leaseWrites:0,
   recoveryExecuted:false,next:'INDEPENDENT_OPERATOR_RECONCILE_INSTALLED_WITH_FRESH_CAS'};
 }
 if(process.argv[1]&&fileURLToPath(import.meta.url)===path.resolve(process.argv[1])) {

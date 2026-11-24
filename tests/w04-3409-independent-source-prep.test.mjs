@@ -5,7 +5,9 @@ import {validateApproval,verifyCas,verifyStagedFiles,REQUEST_ID,SOURCE_SHA,STAGE
 const digest=b=>createHash('sha256').update(b).digest('hex');
 const keys=['ledger','owner','marker','backlog','snapshot','protection','writer'];
 const files=['tools/maintenance-recovery.mjs','tools/update.mjs','tools/maintenance-contract.mjs','controller/fixed-readonly-bytes.mjs'];
-const approval=()=>({schema:'ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V1',approved:true,
+const approval=()=>({schema:'ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V2',approved:true,
+  previousRecoveryApprovalSha256:'e9707741bb4a39cc933b2cb8b5e04ec27242992aa7d974d0fb1af89d21fd9005',
+  writerBReceiptSha256:'5ab2953c95e7d86939f18e621c0ced8db92eaba7ab4ce0690b77564198b176f0',
   operation:'RECONCILE_INSTALLED',requestId:REQUEST_ID,issueNumber:3409,
   sourceSha:SOURCE_SHA,targetControllerSha:'6b3c9c0ce77354d81babe4c9ea7785663c6c2cb4',
   casDigests:Object.fromEntries(keys.map(k=>[k+'Sha256',digest(Buffer.from(k))])),
@@ -48,4 +50,11 @@ test('source preparation demands the installed independent Windows operator proo
  assert.equal(attestations,1);
  assert.equal(assertIndependentOperator({platform:'win32',env:{},attest:()=>{attestations++;}}),true);
  assert.equal(attestations,2);
+});
+
+test('source preparation rejects unpinned historical recovery or Writer B result approval',()=>{
+ for(const key of ['previousRecoveryApprovalSha256','writerBReceiptSha256']) {
+  const a=approval();a[key]='0'.repeat(64);
+  assert.throws(()=>validateApproval(a),/PREP_APPROVAL_IDENTITY_MISMATCH/);
+ }
 });
