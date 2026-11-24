@@ -36,6 +36,15 @@ test('completed immutable EIA saved-file one-shot intake is retired',()=>{
  for(const file of ['pc-inflation-eia-only-approved-once.yml','pc-inflation-19-inventory-b-once.yml'])
   assert.equal(existsSync(path.join(root,'.github/workflows',file)),true,file);
 });
+// #246 has a terminal PASS/BLS8_SAVED_READBACK receipt for the fixed
+// 2026-11-04 batch. Only its Issue-opened trigger is retired.
+test('completed fixed BLS PPI8 Issue intake is retired while approved paths survive',()=>{
+ assert.equal(existsSync(path.join(root,'.github/workflows','pc-inflation-bls8-approved-once.yml')),false);
+ assert.equal(existsSync(path.join(root,'inflation-bls8-b-once.mjs')),true);
+ for(const name of ['pc-inflation-19-inventory-b-once.yml','pc-approved-runtime-a-once.yml',
+   'pc-approved-runtime-b-once.yml','pc-job.yml','pc-writer-b-source-once.yml'])
+  assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
+});
 test('common A/B and unfinished inflation and R54 readers are preserved',()=>{
  for(const name of kept)assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
 });
