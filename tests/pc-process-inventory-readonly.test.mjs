@@ -1,3 +1,4 @@
+import './w04-3409-source-preflight-readonly.test.mjs';
 import test from 'node:test';
 import {createHash} from 'node:crypto';
 import fs from 'node:fs';
