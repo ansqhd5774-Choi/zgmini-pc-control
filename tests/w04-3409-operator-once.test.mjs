@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
-import {FIXED,assertOperatorScope,assertOrigin,
+import {FIXED,assertOperatorScope,assertOrigin,sanitizedChildEnvironment,
  validateSourceReceipt,validateRecoveryResult} from '../tools/operator-packets/w04-3409-recovery-once.mjs';
 
 const read=rel=>readFileSync(new URL('../'+rel,import.meta.url));
@@ -43,6 +43,31 @@ test('only nonrunner independent Windows scope can reach operator preflight',()=
  assert.throws(()=>assertOperatorScope({platform:'win32',env:{TEMP:'relative'}}),
   /OPERATOR_TEMP_UNAVAILABLE/);
 });
+test('operator child environment rejects Git executable, config, hooks and helper injection',()=>{
+ const env={
+  GIT_CONFIG_COUNT:'1',GIT_CONFIG_KEY_0:'core.hooksPath',
+  GIT_CONFIG_VALUE_0:'C:/untrusted-hooks',
+  GIT_CONFIG_PARAMETERS:'core.hooksPath=C:/untrusted-hooks',
+  GIT_CONFIG_GLOBAL:'C:/untrusted-config',
+  GIT_EXEC_PATH:'C:/untrusted-exec',GIT_TEMPLATE_DIR:'C:/untrusted-templates',
+  GIT_SSH_COMMAND:'C:/untrusted-ssh',GIT_ASKPASS:'C:/untrusted-askpass',
+  GIT_DIR:'C:/other-repo',GCM_INTERACTIVE:'always',
+  SSH_ASKPASS:'C:/untrusted-askpass',
+  APPDATA:'C:/Users/Operator/AppData/Roaming',USERPROFILE:'C:/Users/Operator',
+  PATH:'C:/Windows/System32',GH_TOKEN:'test-placeholder-not-a-token'
+ };
+ const clean=sanitizedChildEnvironment(env);
+ for(const k of Object.keys(env).filter(k=>/^GIT_|^GCM_|^SSH_ASKPASS$/.test(k)))
+  assert.equal(Object.hasOwn(clean,k),k==='GIT_TERMINAL_PROMPT'||k==='GIT_OPTIONAL_LOCKS'||k==='GCM_INTERACTIVE',k);
+ assert.equal(clean.GIT_TERMINAL_PROMPT,'0');
+ assert.equal(clean.GIT_OPTIONAL_LOCKS,'0');
+ assert.equal(clean.GCM_INTERACTIVE,'never');
+ assert.equal(clean.APPDATA,env.APPDATA);
+ assert.equal(clean.USERPROFILE,env.USERPROFILE);
+ assert.equal(clean.PATH,env.PATH);
+ assert.equal(clean.GH_TOKEN,env.GH_TOKEN);
+});
+
 test('official repository origin is exact; credentials, forks and alternative hosts are forbidden',()=>{
  assert.equal(assertOrigin('https://github.com/ansqhd5774-Choi/zgmini-pc-control.git'),true);
  assert.equal(assertOrigin('git@github.com:ansqhd5774-Choi/zgmini-pc-control'),true);
