@@ -107,3 +107,9 @@ test('installed operation uses fixed A/light allowlist, never accepts request UR
  assert.match(ops,/inspectW05CloudflareActive\(dataRoot\)/);
  assert.doesNotMatch(ops,/request\.cloudflare|request\.url/);
 });
+
+test('W05 Cloudflare B candidate remains source-only until exact approved CAS install',()=>{
+ const config=JSON.parse(readFileSync(new URL('../config/operations.json',import.meta.url)));
+ assert.equal(config.operations['w05-cloudflare-deployment-readonly'].grade,'A');
+ assert.equal(config.mutationsEnabled,false);
+});
