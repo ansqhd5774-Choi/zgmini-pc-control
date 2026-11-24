@@ -64,6 +64,25 @@ test('#3409 original maintenance ledger projection strips secrets and fails clos
  assert.equal(result.status,'READ_ONLY_OBSERVED');
  assert.equal(result.historicalRequest.postIssueNumber,3410);
  assert.equal(result.recoveryEvidence.recoveryRequired,true);
+ assert.equal(result.recoveryEvidence.backlog.pauseWindow,null);
+ const timestampFixture={...fixture,recoveryEvidence:{...fixture.recoveryEvidence,
+  backlog:{...fixture.recoveryEvidence.backlog,pauseWindow:{
+   pausedAt:'2026-11-24T17:05:00.000Z',resumedAt:'2026-11-24T17:08:00.000Z'}}}};
+ assert.deepEqual(project3409MaintenanceStatus(timestampFixture).recoveryEvidence.backlog.pauseWindow,
+  {pausedAt:'2026-11-24T17:05:00.000Z',resumedAt:'2026-11-24T17:08:00.000Z'});
+ for(const bad of [
+  {pausedAt:'SECRET',resumedAt:'2026-11-24T17:08:00.000Z'},
+  {pausedAt:'2026-11-24T17:09:00.000Z',resumedAt:'2026-11-24T17:08:00.000Z'},
+  {pausedAt:'2026-11-24T17:05:00.000Z',resumedAt:null},
+  {pausedAt:'2026-11-24T17:05:00.000Z',resumedAt:'2026-11-24T17:08:00Z PRIVATE'},
+ ]){
+  const changed={...timestampFixture,recoveryEvidence:{...timestampFixture.recoveryEvidence,
+   backlog:{...timestampFixture.recoveryEvidence.backlog,pauseWindow:bad}}};
+  assert.equal(project3409MaintenanceStatus(changed).recoveryEvidence.backlog.pauseWindow,null);
+ }
+ assert.equal(project3409MaintenanceStatus({...timestampFixture,recoveryEvidence:{
+  ...timestampFixture.recoveryEvidence,backlog:{...timestampFixture.recoveryEvidence.backlog,
+   windows:2}}}).recoveryEvidence.backlog.pauseWindow,null);
  assert.equal(result.recoveryEligible,false);
  assert.equal(result.protectedStateUnchanged,null);
  assert.doesNotMatch(JSON.stringify(result),/SECRET|nonce|ownerPid|token/i);
