@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {awaitNaturalCoreIdle,MAX_CORE_IDLE_WAIT_MS,
- MAX_POST_PREPARE_IDLE_WAIT_MS} from './core-idle-window.mjs';
+ MAX_POST_PREPARE_IDLE_WAIT_MS,isReservedCoreMaintenance,coreDrainWaitMs,
+ EXTENDED_CORE_DRAIN_MS} from './core-idle-window.mjs';
 import {coreReadyForMaintenance,coreMaintenanceWindowBlockCode} from './windows-guards.mjs';
 
 const ready={enabled:true,state:3,instances:0,
@@ -86,6 +87,24 @@ test('safe timeout evidence counts intermittent READY and ACTIVE without exposin
   assert.equal(JSON.stringify(error).includes('relatedProcesses'),false);
   return true;
  });
+});
+
+test('extended reserve never promotes legacy mode and leaves time for restore',()=>{
+ assert.equal(coreDrainWaitMs(undefined),90000);
+ assert.equal(coreDrainWaitMs('PAUSE_NEW_STARTS_DRAIN_360S_V1'),360000);
+ assert.equal(coreDrainWaitMs('PAUSE_NEW_STARTS_DRAIN_1200S_V1'),1200000);
+ assert.equal(EXTENDED_CORE_DRAIN_MS,1200000);
+ assert.equal(isReservedCoreMaintenance(undefined),false);
+ assert.equal(isReservedCoreMaintenance('PAUSE_NEW_STARTS_DRAIN_360S_V1'),true);
+ assert.equal(isReservedCoreMaintenance('PAUSE_NEW_STARTS_DRAIN_1200S_V1'),true);
+ for(const mode of [null,'PAUSE_NEW_STARTS_DRAIN_1800S_V1',
+  'PAUSE_NEW_STARTS_DRAIN_999S_V1']){
+  assert.equal(isReservedCoreMaintenance(mode),false);
+  assert.throws(()=>coreDrainWaitMs(mode),
+   {code:'WRITER_B_MAINTENANCE_APPROVAL_STOP'});
+ }
+ // The 30-minute Actions job retains 10 minutes for staging and cleanup.
+ assert.ok(EXTENDED_CORE_DRAIN_MS+10*60000<=30*60000);
 });
 
 test('post-prepare natural idle is bounded to 90 seconds inside 12-minute job',async()=>{
