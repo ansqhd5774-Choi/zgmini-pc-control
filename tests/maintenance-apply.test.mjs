@@ -10,7 +10,7 @@ import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {applyApprovedUpdate,maintenanceFailureCode,reconcileInterruptedRollback} from '../tools/maintenance-apply.mjs';
-import {isolatedControllerStage,recoveryOperatorProofStatus} from '../tools/update.mjs';
+import {isolatedControllerStage,recoveryOperatorProofStatus,waitForSupervisorStopIdle} from '../tools/update.mjs';
 
 test('independent recovery proof keeps strict identity and returns exact sanitized failure categories',()=>{
  assert.deepEqual(recoveryOperatorProofStatus({exitCode:0,stdout:'INDEPENDENT_OPERATOR\r\n'}),{verified:true,code:'RECOVERY_OPERATOR_VERIFIED'});
@@ -889,4 +889,66 @@ test('restored intake can accept normal busy jobs without invalidating rollback'
  f.port.postcheck=async()=>({status:'FAIL'});
  const out=await applyApprovedUpdate(request,f.port);
  assert.equal(out.status,'ROLLED_BACK');assert.equal(last.requireIdle,false);
+});
+
+const idleRaceSeats=()=>Array.from({length:6},(_,i)=>({
+ name:`zgmini-pc-0${i+1}`,status:'online',busy:false
+}));
+
+test('drain and final stop both require Online seats before Supervisor mutation',()=>{
+ const source=fs.readFileSync(new URL('../tools/update.mjs',import.meta.url),'utf8');
+ const drain=source.split('  waitForDrain:async()=>{')[1]?.split('  backup:async()=>{')[0];
+ const stop=source.split('  stopOwnSupervisor:async()=>{')[1]?.split('  switchVersion:async()=>{')[0];
+ assert.match(drain??'',/need\(seats\.every\(x=>x\.status==='online'\),'RUNNERS_NOT_ONLINE'\)/);
+ assert.ok(stop?.includes('await waitForSupervisorStopIdle('));
+ assert.ok(stop.indexOf('await waitForSupervisorStopIdle(')<stop.indexOf("execFileSync('taskkill.exe'"));
+ assert.ok(stop.includes('process.kill(oldOwner.owner.pid,0)'));
+ assert.ok(!stop.includes('process.kill(current.owner.pid,0)'));
+});
+
+test('a briefly Busy runner can settle after backup without an unguarded stop',async()=>{
+ let clock=0,reads=0,checks=0;
+ await waitForSupervisorStopIdle({
+  readRunners:()=>{const rows=idleRaceSeats();if(++reads<3)rows[2].busy=true;return rows;},
+  verifySafety:()=>{checks++;},now:()=>clock,pause:async ms=>{clock+=ms;}
+ });
+ assert.equal(clock,6000);
+ assert.equal(reads,3);
+ assert.equal(checks,3);
+});
+
+test('a persistently Busy runner is refused after at most 30 seconds',async()=>{
+ let clock=0,reads=0;
+ await assert.rejects(waitForSupervisorStopIdle({
+  readRunners:()=>{const rows=idleRaceSeats();reads++;rows[0].busy=true;return rows;},
+  verifySafety:()=>{},now:()=>clock,pause:async ms=>{clock+=ms;}
+ }),{code:'RUNNERS_NOT_IDLE'});
+ assert.equal(clock,30000);
+ assert.equal(reads,11);
+});
+
+test('Offline or missing Runner prevents stop without waiting',async()=>{
+ for(const inventory of [
+  ()=>{const rows=idleRaceSeats();rows[4].status='offline';return rows;},
+  ()=>idleRaceSeats().slice(1)
+ ]){
+  let waits=0;
+  await assert.rejects(waitForSupervisorStopIdle({
+   readRunners:inventory,verifySafety:()=>{},now:()=>0,pause:async()=>{waits++;}
+  }),{code:'RUNNERS_NOT_ONLINE'});
+  assert.equal(waits,0);
+ }
+});
+
+test('owner or protection drift aborts next idle retry before readback or stop',async()=>{
+ for(const kind of ['SUPERVISOR_OWNER_CHANGED','PROTECTED_STATE_DRIFT']){
+  let clock=0,reads=0,checks=0;
+  await assert.rejects(waitForSupervisorStopIdle({
+   readRunners:()=>{const rows=idleRaceSeats();reads++;rows[1].busy=true;return rows;},
+   verifySafety:()=>{if(++checks===2){const e=Error(kind);e.code=kind;throw e;}},
+   now:()=>clock,pause:async ms=>{clock+=ms;}
+  }),{code:kind});
+  assert.equal(clock,3000);
+  assert.equal(reads,1);
+ }
 });

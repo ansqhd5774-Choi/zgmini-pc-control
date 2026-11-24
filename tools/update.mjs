@@ -109,6 +109,22 @@ export function classifyBacklogOriginal(text){
 }
 
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
+// Runner state can change after draining and backup. Retry only Busy seats,
+// while rechecking the original owner and protection before each sample.
+export async function waitForSupervisorStopIdle({
+ readRunners,verifySafety,pause=wait,now=()=>Date.now()
+}){
+ const deadline=now()+30000;
+ for(;;){
+  verifySafety();
+  const seats=dedicatedPcRunnerRows(readRunners(),{requireOnline:true});
+  need(seats!==null,'RUNNERS_NOT_ONLINE');
+  if(seats.every(seat=>seat.busy===false))return;
+  const remaining=deadline-now();
+  need(remaining>0,'RUNNERS_NOT_IDLE');
+  await pause(Math.min(3000,remaining));
+ }
+}
 // GitHub workflow disable/enable states can be eventually consistent.
 // A bounded, read-only observation never substitutes for an exact state
 // confirmation; unknown states and exhausted readbacks remain fail-closed.
@@ -1402,6 +1418,7 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
    for(let n=0;n<180;n++){
     const rows=apiRunners(),seats=dedicatedPcRunnerRows(rows);
     need(seats!==null,'RUNNER_SET_DRIFT');
+    need(seats.every(x=>x.status==='online'),'RUNNERS_NOT_ONLINE');
     const busy=seats.some(x=>x.busy),leases=fs.readdirSync(path.join(controlRoot,'leases')).filter(x=>x!=='supervisor');
     const pending=['in_progress','queued','waiting'].map(status=>github(`actions/workflows/pc-job.yml/runs?status=${status}&per_page=1`).total_count||0).reduce((a,b)=>a+b,0);
     if(!busy&&!leases.length&&!pending){
@@ -1428,12 +1445,18 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
    writeJson(path.join(backupRoot,'PROTECTED_BEFORE.json'),protectedBefore);
   },
   stopOwnSupervisor:async()=>{
-   const current=readOwner();need(current.owner.pid===oldOwner.owner.pid&&current.owner.nonce===oldOwner.owner.nonce,'SUPERVISOR_OWNER_CHANGED');
-   verifyIndependent(current.owner.pid);
-   // Read-only controls are checked again just before stopping the dedicated tree.
-   need(available(apiRunners()),'RUNNERS_NOT_IDLE');
-   execFileSync('taskkill.exe',['/PID',String(current.owner.pid),'/T','/F'],{windowsHide:true,stdio:'ignore',timeout:15000});
-   for(let n=0;n<30;n++){let running=true;try{process.kill(current.owner.pid,0);}catch{running=false;}if(!running)return;await wait(500);}
+   const verifyStopSafety=()=>{
+    const current=readOwner();
+    need(current.owner.pid===oldOwner.owner.pid&&current.owner.nonce===oldOwner.owner.nonce,'SUPERVISOR_OWNER_CHANGED');
+    verifyIndependent(current.owner.pid);
+    need(JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore),'PROTECTED_STATE_DRIFT');
+   };
+   // Online and Idle remain required. Busy alone may settle during the bounded
+   // 30-second retry; never stop a changed or unverified Supervisor.
+   await waitForSupervisorStopIdle({readRunners:apiRunners,verifySafety:verifyStopSafety});
+   verifyStopSafety();
+   execFileSync('taskkill.exe',['/PID',String(oldOwner.owner.pid),'/T','/F'],{windowsHide:true,stdio:'ignore',timeout:15000});
+   for(let n=0;n<30;n++){let running=true;try{process.kill(oldOwner.owner.pid,0);}catch{running=false;}if(!running)return;await wait(500);}
    throw Object.assign(Error('SUPERVISOR_STILL_PRESENT'),{code:'SUPERVISOR_STILL_PRESENT'});
   },
   switchVersion:async()=>{
