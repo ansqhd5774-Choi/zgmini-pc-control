@@ -272,19 +272,19 @@ export function inspectSidecarSourceGate(dataRoot, {
     const lines=source.split(/\r?\n/);
     // A literal ledger filename paired with a write API in the same pinned file
     // identifies a *possible* last-run writer, not the process that wrote it.
-    if(lines.some(line=>/last-run\\.json/i.test(line)) &&
-       lines.some(line=>/\\b(?:writeFileSync|writeFile|appendFileSync|appendFile)\\s*\\(/.test(line)))
+    if(lines.some(line=>/last-run\.json/i.test(line)) &&
+       lines.some(line=>/\b(?:writeFileSync|writeFile|appendFileSync|appendFile)\s*\(/.test(line)))
       ledgerOrigins.push(name);
     for(let index=0;index<lines.length;index++){
       const line=lines[index];
       // No raw code, paths, SHA literals, or ledger reason is returned.
       // These are source guard *candidates*, not a diagnosis of the failure.
-      if(!/^\\s*(?:\\/\\/|\\/\\*|\\*|['"])/.test(line) &&
-         /(?:^\\s*if\\s*\\(|\\b(?:need|check|ensure|assert|stop|fail)\\s*\\()/i.test(line)){
+      if(!/^\s*(?:\/\/|\/\*|\*|['"])/.test(line) &&
+         /(?:^\s*if\s*\(|\b(?:need|check|ensure|assert|stop|fail)\s*\()/i.test(line)){
         const window=lines.slice(index,Math.min(index+3,lines.length)).join(' ');
-        const kind=/(?:config\\.source|approvedSourceSha|sourceSha)/i.test(window)?
-          'SOURCE_APPROVAL_REFERENCE':/(?:rev-parse|git\\.exe|execFileSync\\s*\\(\\s*['"]git)/i.test(window)?
-          'GIT_REFERENCE':/(?:diff\\s+--quiet|status\\s+--porcelain|dirty)/i.test(window)?
+        const kind=/(?:config\.source|approvedSourceSha|sourceSha)/i.test(window)?
+          'SOURCE_APPROVAL_REFERENCE':/(?:rev-parse|git\.exe|execFileSync\s*\(\s*['"]git)/i.test(window)?
+          'GIT_REFERENCE':/(?:diff\s+--quiet|status\s+--porcelain|dirty)/i.test(window)?
           'CLEAN_TREE_REFERENCE':null;
         if(kind && sourceGuards.length<16)sourceGuards.push({file:name,line:index+1,kind});
       }
