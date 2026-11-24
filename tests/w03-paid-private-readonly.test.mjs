@@ -144,6 +144,37 @@ test('D05 public-only archive checks the approved registered roster, not the 30-
  }
 });
 
+test('D05 public final-output coverage scales with the approved roster, not ten or thirty UI cards',()=>{
+ const now=Date.parse('2026-11-24T02:00:00.000Z');
+ const candidate='theme-'+'a'.repeat(64)+'.json';
+ for(const count of [11,31]){
+  const rows=Array.from({length:count},(_,i)=>({
+   scoreId:'theme:future-'+i,score:63.51,phase:'CONFIRMED',
+   asOfDate:'2026-11-20',calculatedAt:'2026-11-23T16:00:00.000Z',
+   calculatedDateKst:'2026-11-24',
+   eventId:sha('future-'+i)
+  }));
+  const roster=rows.map(x=>x.scoreId.slice('theme:'.length));
+  const receipt={status:'LOCAL_FINAL_THEME_OUTPUT_VERIFIED',
+   candidateBodySha256:'a'.repeat(64),calculatedAt:rows[0].calculatedAt,
+   scoreCount:count,outputEventsSha256:sha(JSON.stringify(rows.map(x=>x.eventId).sort()))};
+  const result=summarizeD05ThemeCandidates([candidate],()=>rows,{
+   now,receipt,publicExpectedIds:roster,publicReadyIds:roster,
+   confirmedDate:'2026-11-20'
+  });
+  assert.equal(result.status,'PASS');
+  assert.equal(result.code,'D05_PAID_PUBLIC_FINAL_OUTPUTS_READBACK_VERIFIED');
+  assert.equal(result.expectedPublicThemeCount,count);
+  assert.equal(result.distinctThemeCount,count);
+  assert.equal(result.latestDateThemeCount,count);
+  assert.equal(result.completePublicDates,1);
+  assert.equal(result.dailyFinalScorePoints,count);
+  assert.equal(result.currentReceiptMatched,true);
+  assert.equal(result.publicFinalOutputCoverageVerified,true);
+  assert.doesNotMatch(JSON.stringify(result),/future-|63\\.51/);
+ }
+});
+
 test('D05 configured registration file inventory is count-only and preserves private definitions',()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'d05-registered-readonly-'));
  try{
