@@ -202,3 +202,58 @@ test('line19 cannot classify unverified source inputs',async()=>{
  assert.deepEqual(result.atomSemantics,[]);
  assert.equal(result.status,'STATE_UNKNOWN');
 });
+
+
+test('two missing fixed-root files make only current static line19 TRUE',async()=>{
+ const {projectPinnedCnnR10Line19FilesReadonly:probe}=await import('../controller/cnn-r10-line19-file-existence-readonly.mjs');
+ const lines=script();
+ lines[2]="const ROOT='E:\\\\ZGmini\\\\data';";
+ lines[3]="const ONE=path.join(ROOT,'pc-writer','first.json');";
+ lines[4]="const TWO=path.join(ROOT,'pc-writer','second.json');";
+ lines[18]="if (!fs.existsSync(ONE) && !fs.existsSync(TWO)) throw Error('PRIVATE');";
+ let reads=0;
+ const r=probe(lines.join('\n'),{...facts(),dataRoot:'E:\\ZGmini\\data',
+  projectRoot:'E:\\ZGmini\\projects',sidecarFile:'E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\archive-run.mjs'},
+  {fileStatus:()=>{reads++;return false;}});
+ assert.equal(r.status,'CURRENT_FS_CHECK_ONLY');
+ assert.equal(r.currentStaticCondition,'TRUE');
+ assert.equal(reads,2);
+ assert.deepEqual(r.operands.map(o=>o.target),['DATA_ROOT_CHILD','DATA_ROOT_CHILD']);
+ assert.doesNotMatch(JSON.stringify(r),/first\.json|second\.json|PRIVATE|E:\\/i);
+ assert.equal(r.firstRuntimeFailure,null);
+});
+test('one present file suppresses two-negated-exists guard at snapshot time',async()=>{
+ const {projectPinnedCnnR10Line19FilesReadonly:probe}=await import('../controller/cnn-r10-line19-file-existence-readonly.mjs');
+ const lines=script();
+ lines[0]="const ONE='E:\\\\ZGmini\\\\data\\\\pc-writer\\\\first.json';";
+ lines[1]="const TWO='E:\\\\ZGmini\\\\data\\\\pc-writer\\\\second.json';";
+ lines[18]="if (!fs.existsSync(ONE) && !fs.existsSync(TWO)) throw Error('SECRET');";
+ const r=probe(lines.join('\n'),{...facts(),dataRoot:'E:\\ZGmini\\data',
+  projectRoot:'E:\\ZGmini\\projects',sidecarFile:'E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\archive-run.mjs'},
+  {fileStatus:(p)=>p.toLowerCase().includes('first.json')});
+ assert.equal(r.currentStaticCondition,'FALSE');
+ assert.deepEqual(r.operands.map(o=>o.exists),[true,false]);
+ assert.equal(r.runtimeCondition,'NOT_OBSERVED');
+});
+test('dynamic or outside approved roots never reaches file probe',async()=>{
+ const {projectPinnedCnnR10Line19FilesReadonly:probe}=await import('../controller/cnn-r10-line19-file-existence-readonly.mjs');
+ const lines=script();
+ lines[18]="if (!fs.existsSync(process.env.SECRET) && !fs.existsSync('C:\\\\Other\\\\secret')) throw Error('X');";
+ let calls=0;
+ const r=probe(lines.join('\n'),{...facts(),dataRoot:'E:\\ZGmini\\data',
+  projectRoot:'E:\\ZGmini\\projects',sidecarFile:'E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\archive-run.mjs'},
+  {fileStatus:()=>{calls++;return false;}});
+ assert.equal(calls,0);
+ assert.equal(r.currentStaticCondition,'UNVERIFIED');
+ assert.deepEqual(r.operands.map(o=>o.target),['UNRESOLVED','UNRESOLVED']);
+ assert.doesNotMatch(JSON.stringify(r),/SECRET|Other|secret|C:\\/i);
+});
+test('unverified source pin refuses all file lookup',async()=>{
+ const {projectPinnedCnnR10Line19FilesReadonly:probe}=await import('../controller/cnn-r10-line19-file-existence-readonly.mjs');
+ const r=probe(script().join('\n'),{...facts(),sourcePin:false,
+  dataRoot:'E:\\ZGmini\\data',projectRoot:'E:\\ZGmini\\projects',
+  sidecarFile:'E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\archive-run.mjs'},
+  {fileStatus:()=>{throw Error('SHOULD_NOT_RUN')}});
+ assert.equal(r.status,'STATE_UNKNOWN');
+ assert.deepEqual(r.operands,[]);
+});
