@@ -4,7 +4,8 @@ import {readFileSync,mkdtempSync,mkdirSync,writeFileSync,rmSync,realpathSync} fr
 import path from 'node:path';
 import os from 'node:os';
 import {readFixedReadonlyBytes} from '../controller/fixed-readonly-bytes.mjs';
-import {validateControllerConfigTransition} from '../tools/maintenance-contract.mjs';
+import {manifestFingerprint,validateControllerSelectivePin,validateControllerConfigTransition} from '../tools/maintenance-contract.mjs';
+import {createHash} from 'node:crypto';
 import {
  W05_FIVE_OPERATION,W05_SOURCE_FILES,
  summarizeW05FiveKeyEvidence,compareW05FiveKeyWithApprovedReaders,
@@ -169,4 +170,55 @@ test('invalid data root and missing config fail closed without touching provider
   assert.equal(absentSource.deploymentIdentityVerified,false);
   assert.equal(absentSource.liveD1ApiCompared,false);
  }finally{rmSync(dir,{recursive:true,force:true});}
+});
+
+const W05_B_TARGET='03fdedc58e0aadf207f04bc66cb08580dc3d113f';
+const W05_B_INSTALLED='7c6cecfd9f5e81759d90dc927265c9442acd4237';
+const W05_B_MANIFEST=JSON.parse(readFileSync(new URL(
+ '../approvals/controller-updates/'+W05_B_TARGET+'.json',import.meta.url),'utf8'));
+const W05_B_PIN=JSON.parse(readFileSync(new URL(
+ '../approvals/controller-selective-targets/'+W05_B_TARGET+'.json',import.meta.url),'utf8'));
+test('W05 exact selective B pin covers only 3 approved files and the installed CAS',()=>{
+ const m=W05_B_MANIFEST,p=W05_B_PIN;
+ assert.equal(m.schema,'ZGMINI_PC_UPDATE_V1');
+ assert.equal(m.installedSha,W05_B_INSTALLED);
+ assert.equal(m.targetSha,W05_B_TARGET);
+ assert.equal(m.controllerOnlyInstall,true);
+ assert.equal(m.purpose,'pc-controller-maintenance');
+ assert.equal(m.approval.grade,'B');
+ assert.equal(m.approval.scope,'PC_CONTROL_CONTROLLER_UPDATE');
+ assert.equal(m.approval.ref,'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3247');
+ assert.equal(m.checks.status,'PASS');
+ assert.equal(m.checks.targetSha,W05_B_TARGET);
+ assert.equal(m.checks.manifestSha256,manifestFingerprint(m.allowFiles).sha256);
+ assert.equal(m.checks.manifestSha256,
+  'f1787d0798de190e454c0b37120db69e55f53af7fe83ca35b1617a29a2b9fc88');
+ assert.deepEqual(m.allowFiles.map(f=>f.path),[
+  'config/operations.json','controller/operations.mjs',
+  'controller/w05-five-key-d1-api-readback-readonly.mjs']);
+ assert.deepEqual(m.backup,{
+  strategy:'VERSIONED_SNAPSHOT',
+  rollback:{kind:'RESTORE_INSTALLED_SHA',sha:W05_B_INSTALLED}});
+ assert.equal(m.postOperation,'core-status');
+ assert.equal(m.postSourceBranch,'main');
+ assert.equal(m.postSourceSha,'a24067b26bb21b57abe4075e67dfcda63c7f4010');
+ assert.equal(m.selectiveSource.branch,
+  'codex/w05-five-key-controller-singleparent-7c6c-20261124');
+ assert.deepEqual(m.selectiveSource.customPaths,
+  ['config/operations.json','controller/operations.mjs']);
+ assert.equal(validateControllerSelectivePin(m,p),true);
+});
+test('W05 selective B cannot substitute another target or change live module bytes',()=>{
+ const m=W05_B_MANIFEST,p=W05_B_PIN;
+ assert.throws(()=>validateControllerSelectivePin(m,{...p,installedSha:'a'.repeat(40)}),
+  /SELECTIVE_PIN_MISMATCH/);
+ assert.throws(()=>validateControllerSelectivePin(m,{...p,allowFiles:[
+  ...p.allowFiles,{path:'controller/worker.mjs',sha256:'b'.repeat(64)}
+ ]}),/SELECTIVE_PIN_MISMATCH/);
+ const current=readFileSync(new URL(
+  '../controller/w05-five-key-d1-api-readback-readonly.mjs',import.meta.url));
+ const sourceHash=createHash('sha256').update(current).digest('hex');
+ assert.equal(sourceHash,m.allowFiles[2].sha256);
+ const policy=JSON.parse(readFileSync(new URL('../config/operations.json',import.meta.url),'utf8'));
+ assert.equal(policy.operations[W05_FIVE_OPERATION].timeoutSeconds,90);
 });
