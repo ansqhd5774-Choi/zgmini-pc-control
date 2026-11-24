@@ -1437,3 +1437,18 @@ test('#2960 B reconciliation is not callable inside any Actions or isolated runn
   'pc-update-e8767e20-6bad-4418-97c6-561cf79a8213',
   '--source-sha','a'.repeat(40)]),/RECOVERY_OPERATOR_WINDOWS_REQUIRED/);
 });
+
+test('D05 theme final-output probe admits only the fixed operating scope',()=>{
+ const e=event(),p=JSON.parse(e.issue.body);
+ const request=(probe,extra={})=>({...e,issue:{...e.issue,body:JSON.stringify({...p,probe,...extra})}});
+ const exact=request('d05-theme-final-outputs-readonly');
+ assert.equal(authenticateProcess(exact,env,'operating').d05ThemeFinalOutputs,true);
+ assert.throws(()=>authenticateProcess(exact,env,'handoff'));
+ assert.throws(()=>authenticateProcess(request('d05-theme-final-outputs-readonly',{path:'E:/outside'}),env,'operating'));
+ assert.throws(()=>authenticateProcess(request('d05-theme-final-outputs-readonly --other'),env,'operating'));
+ const txt=toText({schema:'ZGMINI_PC_PROCESS_INVENTORY_RESULT_V1',d05ThemeFinalOutputs:{
+  code:'D05_THEME_FINAL_OUTPUTS_INCOMPLETE',distinctThemeCount:12,dailyFinalScorePoints:45,
+  currentReceiptMatched:false,archiveScanComplete:true}});
+ assert.match(txt,/d05ThemeCount=12/);
+ assert.match(txt,/d05DailyPoints=45/);
+});

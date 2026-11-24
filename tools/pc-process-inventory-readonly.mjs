@@ -15,7 +15,7 @@ import {readMaintenanceRecoveryStatus,protectedSnapshot} from './update.mjs';
 import {readFixedReadonlyBytes} from '../controller/fixed-readonly-bytes.mjs';
 import {createHash} from 'node:crypto';
 import {inspectTask as inspectMarketParquetTask} from './marketparquet-task-source-readonly.mjs';
-import {inspectW03PaidPrivateReadonly} from './w03-paid-private-readonly.mjs';
+import {inspectW03PaidPrivateReadonly,inspectD05PaidThemeFinalOutputsReadonly} from './w03-paid-private-readonly.mjs';
 import {validateRunnerJobRefs,inspectRunnerJobHistory} from './runner-job-history-readonly.mjs';
 
 export const TITLE='pc-process-inventory-readonly';
@@ -25,6 +25,7 @@ const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const TARGET2960='pc-update-e8767e20-6bad-4418-97c6-561cf79a8213';
 const PROBE2960='w05-2960-maintenance-status-readonly';
 const D05_WRITER_PROBE='d05-writer-checkpoint-readonly';
+const D05_THEME_PROBE='d05-theme-final-outputs-readonly';
 const MAX_BYTES=32768;
 const KNOWN_PROCESSES=new Set([
  'runner.listener.exe','runner.worker.exe','node.exe','wscript.exe','cscript.exe',
@@ -87,10 +88,11 @@ export function authenticateProcess(event,env,role){
   const isOperator=withW05&&raw.probe==='w05-operator-topology-readonly';
   const is2960=withW05&&raw.probe===PROBE2960;
   const isD05Writer=withW05&&raw.probe===D05_WRITER_PROBE;
+  const isD05Theme=withW05&&raw.probe===D05_THEME_PROBE;
  if(!raw||(!basic&&!withJobs&&!withW05)||
    raw.schema!==SCHEMA||raw.operation!==ROLE_OPERATION||raw.role!==role||
    (withJobs&&role!=='operating')||
-   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!isD05Writer))))
+   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!isD05Writer&&!isD05Theme))))
   fail('REQUEST_SCOPE_INVALID');
  const runnerJobRefs=withJobs?validateRunnerJobRefs(raw.runnerJobRefs):null;
  const normalized=structuredClone(event);
@@ -102,7 +104,8 @@ export function authenticateProcess(event,env,role){
  return {...verified,...(runnerJobRefs?{runnerJobRefs}:{}),
   ...(isOperator?{w05OperatorTopology:true}:{}),
    ...(is2960?{w052960MaintenanceStatus:true}:{}),
-   ...(isD05Writer?{d05WriterCheckpoint:true}:{})};
+   ...(isD05Writer?{d05WriterCheckpoint:true}:{}),
+   ...(isD05Theme?{d05ThemeFinalOutputs:true}:{})};
 }
 export function sanitizeProbe(raw){
  if(!raw||raw.schema!=='ZGMINI_PC_PROCESS_PROBE_V1')fail('PROBE_SCHEMA_INVALID');
@@ -1662,6 +1665,9 @@ export function collect(role,ctx,env=process.env){
   return compact2960ProcessResult(base,inspect2960MaintenanceStatusReadonly());
  if(ctx.d05WriterCheckpoint===true)
   return compactD05WriterResult(base,inspectD05WriterCheckpointReadonly());
+ if(ctx.d05ThemeFinalOutputs===true)
+  return inspectD05PaidThemeFinalOutputsReadonly().then(result=>({...base,
+   status:result.status,code:result.code,d05ThemeFinalOutputs:result}));
  const withMaintenance=role==='operating'?{...base,
   maintenance:collectMaintenanceStatusReadonly(),
   ...(ctx.w052960MaintenanceStatus?{
@@ -1723,6 +1729,13 @@ export function toText(r){
   'w03PaidPrivateStatus='+(r.w03PaidPrivate?.status??'NOT_APPLICABLE'),
   'w03PaidPrivateCode='+(r.w03PaidPrivate?.code??'NOT_APPLICABLE'),
   'w03PaidPrivatePoints='+(r.w03PaidPrivate?.historyPoints??'UNKNOWN'),
+  ...(r.d05ThemeFinalOutputs?[
+   'd05ThemeFinalOutputs='+r.d05ThemeFinalOutputs.code,
+   'd05ThemeCount='+(r.d05ThemeFinalOutputs.distinctThemeCount??'UNKNOWN'),
+   'd05DailyPoints='+(r.d05ThemeFinalOutputs.dailyFinalScorePoints??'UNKNOWN'),
+   'd05LatestCalculatedAt='+(r.d05ThemeFinalOutputs.latestCalculatedAt??'UNKNOWN'),
+   'd05CurrentReceiptMatched='+(r.d05ThemeFinalOutputs.currentReceiptMatched??'UNKNOWN'),
+   'd05ArchiveScanComplete='+(r.d05ThemeFinalOutputs.archiveScanComplete??'UNKNOWN')]:[]),
   'maintenanceSourceSha='+(r.maintenance?.maintenanceSourceSha??'UNKNOWN'),
   'installLockHeld='+(r.maintenance?.installLockHeld??'UNKNOWN'),
   'c2094StageEvidence='+(r.c2094StageEvidence?.status??'NOT_APPLICABLE'),
@@ -1743,7 +1756,7 @@ async function main(){
  const event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
  const ctx=authenticateProcess(event,env,role);
  const targeted=ctx.w05OperatorTopology===true;
- const result=targeted?collectW05OperatorTopology(ctx,env):collect(role,ctx,env);
+ const result=await (targeted?collectW05OperatorTopology(ctx,env):collect(role,ctx,env));
  const stem=targeted?'results/w05-operator-topology-'+ctx.runId+'-'+ctx.attempt+'-'+role:
   'results/pc-process-inventory-'+ctx.runId+'-'+ctx.attempt+'-'+role;
  const outputs=[[stem+'.json',serializeProcessResult(result)],

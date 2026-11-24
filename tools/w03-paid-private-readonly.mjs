@@ -3,6 +3,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import {pathToFileURL} from 'node:url';
+import {readFixedReadonlyBytes} from '../controller/fixed-readonly-bytes.mjs';
 import {inspectW03PaidSourceCoverage} from './w03-paid-source-coverage-readonly.mjs';
 
 const ROOT='E:\\ZGmini\\data';
@@ -121,4 +123,137 @@ export function inspectW03PaidPrivateReadonly({root=ROOT,fileSystem=fs}={}){
   sourceVersion:record.sourceVersion,registrySha256:record.registrySha256,
   ...(sourceCoverage?{sourceCoverage}:{}),
   operationalWrites:0,providerCalls:0,d1Writes:0};
+}
+
+ 
+// D05: reuse the exact already-approved final-output Reader, not the scorer.
+// Fixed PC paths only; no request-supplied file, import, command or time range.
+// Candidate data and scores never leave the PC; only counts, dates and digests.
+const D05_SOURCE_ROOT='E:/ZGmini/projects/zgmini-earnings-history-pc-release';
+const D05_PINS=Object.freeze({
+ 'lib/score-history/d05-final-theme-candidate-readback-r1.mjs':'1eab44663396b43aa29d25d0c9618b5bf1cce5850199fa36251b6f43aaaa6267',
+ 'lib/score-history/d05-final-score-output-events-r1.mjs':'07283b49b13914f86f41ae54dbf88f95f5ea9f92db3e2276871ef3a6e80793b0',
+ 'worker/theme-paid-contract.mjs':'a02fc6d6ccddfad2ed3abb33132b44f188e4249c0fdbb6be3e5d0cf7ca08a91b'
+});
+const D05_CANDIDATE=/^theme-([a-f0-9]{64})\.json$/;
+const d05Unknown=code=>UNKNOWN(code,{scope:'PAID_PUBLIC_FINAL_OUTPUTS_ONLY',
+ expectedThemeCount:30,actualFinalOutputCoverageVerified:false,
+ oneYearComplete:false});
+const d05Iso=x=>typeof x==='string'&&Number.isFinite(Date.parse(x))&&
+ new Date(x).toISOString()===x;
+const kstDay=ms=>new Date(ms+32400000).toISOString().slice(0,10);
+
+export function summarizeD05ThemeCandidates(names,readOne,{
+ now=Date.now(),deadline=Date.now()+90000,receipt=null
+}={}){
+ if(!Array.isArray(names)||names.length>10000||
+    names.some(n=>typeof n!=='string'||!D05_CANDIDATE.test(n))||
+    new Set(names).size!==names.length)return d05Unknown('D05_THEME_ARCHIVE_INVENTORY_INVALID');
+ const days=new Map(),seen=new Map();
+ let scanned=0,valid=0,rejected=0,conflicts=0,actualEvents=0,receiptMatch=false;
+ let latest=null;
+ for(const name of [...names].sort()){
+  if(Date.now()>deadline)break;
+  scanned++;
+  let rows;
+  try{rows=readOne(name);}catch{rejected++;continue;}
+  if(!Array.isArray(rows)||rows.some(e=>!e||
+   !/^theme:[a-z][a-z0-9-]{0,119}$/.test(e.scoreId??'')||
+   e.phase!=='CONFIRMED'||!d05Iso(e.calculatedAt)||
+   Date.parse(e.calculatedAt)>now||e.calculatedDateKst!==kstDay(Date.parse(e.calculatedAt))||
+   !safeDate(e.asOfDate)||!SHA.test(e.eventId??'')||
+   !Number.isFinite(e.score)||e.score<0||e.score>100)){rejected++;continue;}
+  valid++;
+  actualEvents+=rows.length;
+  if(receipt?.status==='LOCAL_FINAL_THEME_OUTPUT_VERIFIED'&&
+   receipt.candidateBodySha256===D05_CANDIDATE.exec(name)[1]&&
+   Number.isInteger(receipt.scoreCount)&&receipt.scoreCount===rows.length&&rows.length>0&&
+   rows.every(e=>e.calculatedAt===receipt.calculatedAt)&&
+   SHA.test(receipt.outputEventsSha256??'')&&
+   digest(Buffer.from(JSON.stringify(rows.map(e=>e.eventId).sort())))===receipt.outputEventsSha256)
+   receiptMatch=true;
+  for(const e of rows){
+   const clock=e.scoreId+'|'+e.calculatedAt;
+   const prior=seen.get(clock);
+   if(prior&&prior!==e.eventId){conflicts++;continue;}
+   seen.set(clock,e.eventId);
+   const key=e.scoreId+'|'+e.calculatedDateKst;
+   const old=days.get(key);
+   if(!old||old.calculatedAt<e.calculatedAt)days.set(key,e);
+   if(latest===null||e.calculatedAt>latest)latest=e.calculatedAt;
+  }
+ }
+ const dates=new Map(),themes=new Set();
+ for(const e of days.values()){
+  themes.add(e.scoreId);
+  if(!dates.has(e.calculatedDateKst))dates.set(e.calculatedDateKst,new Set());
+  dates.get(e.calculatedDateKst).add(e.scoreId);
+ }
+ const sorted=[...dates.keys()].sort();
+ const lastDay=sorted.at(-1)??null,lastCount=dates.get(lastDay)?.size??0;
+ const completeScan=scanned===names.length&&rejected===0&&conflicts===0;
+ const coverage=completeScan&&themes.size===30&&lastCount===30;
+ return {status:coverage?'PASS':'PARTIAL',
+  code:coverage?'D05_THEME_FINAL_OUTPUTS_READBACK_VERIFIED':'D05_THEME_FINAL_OUTPUTS_INCOMPLETE',
+  scope:'PAID_PUBLIC_FINAL_OUTPUTS_ONLY',expectedThemeCount:30,
+  candidateFiles:names.length,scannedCandidateFiles:scanned,
+  validCandidateFiles:valid,rejectedCandidateFiles:rejected,clockConflicts:conflicts,
+  archiveScanComplete:completeScan,actualOutputEvents:actualEvents,
+  dailyFinalScorePoints:days.size,distinctThemeCount:themes.size,distinctCalculationDates:dates.size,
+  complete30Dates:[...dates.values()].filter(x=>x.size===30).length,
+  earliestCalculatedDate:sorted[0]??null,latestCalculatedDate:lastDay,
+  latestCalculatedAt:latest,latestDateThemeCount:lastCount,
+  currentReceiptMatched:receiptMatch,
+  dailyEventsSha256:digest(Buffer.from(JSON.stringify([...days.values()].map(e=>e.eventId).sort()))),
+  actualFinalOutputCoverageVerified:coverage,oneYearComplete:false,
+  operationalWrites:0,providerCalls:0,d1Writes:0};
+}
+
+export async function inspectD05PaidThemeFinalOutputsReadonly(){
+ try{
+  const sourceRoot=fs.realpathSync.native(D05_SOURCE_ROOT);
+  const dataRoot=fs.realpathSync.native(ROOT);
+  const read=(filename,root,maxBytes)=>readFixedReadonlyBytes(filename,
+   {verifiedRoot:root,minBytes:2,maxBytes});
+  const pinsMatch=()=>Object.entries(D05_PINS).every(([rel,expected])=>{
+   const v=read(path.join(sourceRoot,rel),sourceRoot,256*1024);
+   return v.ok&&digest(v.bytes)===expected;
+  });
+  if(!pinsMatch())return d05Unknown('D05_THEME_READER_SOURCE_HASH_MISMATCH');
+  const dir=path.join(dataRoot,'pc-writer','marketparquet-paid','derived');
+  const leaf=fs.lstatSync(dir);
+  const resolved=fs.realpathSync.native(dir),rel=path.relative(dataRoot,resolved);
+  if(!leaf.isDirectory()||leaf.isSymbolicLink()||!rel||rel==='..'||
+   rel.startsWith('..'+path.sep)||path.isAbsolute(rel))
+   return d05Unknown('D05_THEME_ARCHIVE_PATH_UNSAFE');
+  const names=fs.readdirSync(dir).filter(n=>D05_CANDIDATE.test(n));
+  if(names.length>10000)return d05Unknown('D05_THEME_ARCHIVE_INVENTORY_INVALID');
+  const run=read(path.join(dataRoot,'pc-writer','marketparquet-paid','theme-last-run.json'),
+   dataRoot,524288);
+  let receipt=null;
+  if(run.ok)try{receipt=JSON.parse(run.bytes.toString('utf8')).d05FinalOutputReadback??null;}catch{}
+  // Three exact immutable approved modules, no caller-supplied code.
+  const {readStoredPaidThemeFinalScoreDays}=await import(pathToFileURL(
+   path.join(sourceRoot,'lib/score-history/d05-final-theme-candidate-readback-r1.mjs')).href);
+  const now=Date.now(),fromDay=kstDay(now-365*86400000),toDay=kstDay(now);
+  const result=summarizeD05ThemeCandidates(names,name=>{
+   const expected=path.join(dir,name);
+   const bytes=read(expected,dataRoot,1800000);
+   if(!bytes.ok)throw Error('D05_THEME_CANDIDATE_READ_UNVERIFIED');
+   // Feed only this bounded, safely opened immutable candidate to the existing
+   // Reader; it validates filename SHA, contract, clock and final scores.
+   const fileSystem={readdirSync:d=>{
+    if(d!==dir)throw Error('D05_THEME_DIRECTORY_SCOPE');return [name];
+   },readFileSync:f=>{
+    if(f!==expected)throw Error('D05_THEME_FILE_SCOPE');return bytes.bytes;
+   }};
+   return readStoredPaidThemeFinalScoreDays({directory:dir,fromDay,toDay,now,fileSystem}).points;
+  },{now,receipt,deadline:now+90000});
+  if(!pinsMatch())return d05Unknown('D05_THEME_READER_SOURCE_CHANGED');
+  const after=fs.readdirSync(dir).filter(n=>D05_CANDIDATE.test(n)).sort();
+  if(JSON.stringify([...names].sort())!==JSON.stringify(after))
+   return {...result,status:'PARTIAL',code:'D05_THEME_ARCHIVE_CHANGED_DURING_READ',
+    archiveScanComplete:false,actualFinalOutputCoverageVerified:false};
+  return result;
+ }catch{return d05Unknown('D05_THEME_ARCHIVE_READ_UNVERIFIED');}
 }
