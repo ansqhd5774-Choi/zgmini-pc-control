@@ -1,4 +1,6 @@
 name: ZGMINI PC Job
+# Refresh GitHub's registration of the existing issues trigger after the
+# approved maintenance disable/enable interval. No policy or command changes.
 on:
   issues:
     types: [opened, labeled]
