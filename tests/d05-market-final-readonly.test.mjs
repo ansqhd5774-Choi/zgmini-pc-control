@@ -20,7 +20,8 @@ test('D05 exactly 13 saved outputs and identical current/day evidence',()=>{
  assert.deepEqual(r.localCurrent.outputs.map(x=>x.id),['overall',...IDS]);
  assert.equal(r.localCurrent.calculatedAt,null);
  assert.equal(r.localCurrent.calculationReceiptVerified,false);
- assert.equal(r.sameEventVerified,true);
+ assert.equal(r.localStoredSnapshotMatched,false);
+ assert.equal(r.localStoredSnapshotMatched,true);
  assert.equal(r.d1Readback,'NOT_PERFORMED');
  assert.equal(r.apiReadback,'NOT_PERFORMED');
  assert.equal(r.oneYearPitVerified,false);
@@ -30,7 +31,7 @@ test('different same-date storage rows are not marked as matched',()=>{
  const other=makeBody();other.domains[2].score=99;
  const r=compareD05MarketStored(row(),row(other),{dayKey:'2026-11-24'});
  assert.equal(r.status,'BLOCKED');
- assert.equal(r.sameEventVerified,false);
+ assert.equal(r.localStoredSnapshotMatched,false);
 });
 test('missing domain, unexpected id, invalid score, invalid body and wrong timestamp fail closed',()=>{
  const missing=makeBody();missing.domains.pop();
