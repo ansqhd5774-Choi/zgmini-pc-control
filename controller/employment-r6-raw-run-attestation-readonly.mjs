@@ -17,6 +17,8 @@ const MAX_CHUNKS=4096;
 const MAX_BODY_BYTES=32*1024*1024;
 const MAX_TOTAL_BYTES=512*1024*1024;
 const MAX_RUNS=20000;
+const MAX_MISSING_WEEK_BINS=700;
+const MAX_PUBLIC_MISSING_WEEKS=16;
 const noWrite=()=>({operationalWrites:0,providerCalls:0,d1Writes:0});
 const safeJson=value=>{
  if(typeof value!=='string'||Buffer.byteLength(value)>40000)return null;
@@ -245,7 +247,7 @@ function auditMissingHistoryLineage(db,verified,certified,checkedAt){
  const links=new Map();
  for(const id of certified){const v=verified.get(id),key=v.provider+'|'+v.body_sha256;
   const times=links.get(key)??[];times.push(Date.parse(v.retrieved_at));links.set(key,times);}
- const groups=new Map();let total=0;
+ const groups=new Map(),missingWeeks=new Map();let total=0,invalidClaimWeeks=0;
  const query='SELECT c.* FROM '+current+' c WHERE c.observation_date<=? AND NOT EXISTS (SELECT 1 FROM '+history+
   ' h WHERE '+keys.map(k=>'h.'+k+'=c.'+k).join(' AND ')+')';
  for(const row of db.prepare(query).iterate(checkedAt.slice(0,10))){
@@ -257,6 +259,20 @@ function auditMissingHistoryLineage(db,verified,certified,checkedAt){
    rawRunLinked:0,metadataInvalid:0,rawRunLinkMissing:0,
    availableTimeMissing:0,availableTimeAfterRetrieval:0};
   g.missingHistoryKeys++;
+  // Expose bounded week counts for the known W04 Current-only claims gap;
+  // do not claim historic availability or PIT completeness.
+  if(provider==='DOL_ETA'&&series==='STATE_INITIAL_CLAIMS'){
+   const week=String(row.observation_date??'');
+   const ms=/^20\d{2}-\d{2}-\d{2}$/.test(week)
+    ?Date.parse(week+'T00:00:00.000Z'):NaN;
+   if(Number.isFinite(ms)&&new Date(ms).toISOString().slice(0,10)===week){
+    const bins=missingWeeks.get(key)??new Map();
+    if(!bins.has(week)&&bins.size>=MAX_MISSING_WEEK_BINS)
+     throw Error('R6_MISSING_WEEK_BIN_CAP');
+    bins.set(week,(bins.get(week)??0)+1);
+    missingWeeks.set(key,bins);
+   }else invalidClaimWeeks++;
+  }
   const p=safeJson(row.provenance_json),rt=Date.parse(row.retrieved_at??'');
   if(!p||!HASH.test(String(row.source_hash??''))||p.rawRecordHash!==row.source_hash
    ||!HASH.test(String(p.responseHash??''))||!Number.isFinite(rt)||rt>Date.parse(checkedAt))g.metadataInvalid++;
@@ -268,9 +284,25 @@ function auditMissingHistoryLineage(db,verified,certified,checkedAt){
   groups.set(key,g);
  }
  if(groups.size>64)throw Error('R6_HISTORY_LINEAGE_GROUP_CAP');
+ const outputGroups=[...groups.values()].sort((a,b)=>
+  (a.provider+'|'+a.logicalSeriesId).localeCompare(b.provider+'|'+b.logicalSeriesId));
+ for(const group of outputGroups){
+  if(group.provider!=='DOL_ETA'||group.logicalSeriesId!=='STATE_INITIAL_CLAIMS')continue;
+  const ordered=[...(missingWeeks.get('DOL_ETA|STATE_INITIAL_CLAIMS')??new Map())]
+   .sort(([a],[b])=>a.localeCompare(b));
+  Object.assign(group,{
+   observedMissingWeeks:ordered.length,
+   earliestMissingWeek:ordered[0]?.[0]??null,
+   latestMissingWeek:ordered.at(-1)?.[0]??null,
+   latestMissingWeekCounts:ordered.slice(-MAX_PUBLIC_MISSING_WEEKS).reverse()
+    .map(([week,missingKeys])=>({week,missingKeys})),
+   missingWeekCountsTruncated:ordered.length>MAX_PUBLIC_MISSING_WEEKS,
+   invalidWeekDateKeys:invalidClaimWeeks,
+   weekScope:'CURRENT_ONLY_KEYS_NOT_PIT',
+  });
+ }
  return {status:'OBSERVED',scope:'MISSING_HISTORY_KEY_SOURCE_LINKS_NOT_PIT',
-  missingHistoryKeys:total,groups:[...groups.values()].sort((a,b)=>
-   (a.provider+'|'+a.logicalSeriesId).localeCompare(b.provider+'|'+b.logicalSeriesId)),
+  missingHistoryKeys:total,groups:outputGroups,
   rawRecordValuesReparsed:false,pitAttested:false,repairAuthorized:false};
 }
 
