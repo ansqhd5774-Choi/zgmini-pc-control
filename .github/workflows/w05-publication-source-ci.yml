@@ -6,7 +6,7 @@ on:
       - 'tools/publication-*.mjs'
       - 'tests/publication-*.test.mjs'
       - 'tests/w05-qfr-publication-draft.test.mjs'
-      - 'approvals/publications/pc-publication-34db72af-680c-4129-b6ee-8a7f31e5c40a.json'
+      - 'approvals/publications/**'
       - '.github/workflows/w05-publication-source-ci.yml'
       - 'w05-r304-service-b/**'
       - 'approvals/w05-r304-service-b/**'
