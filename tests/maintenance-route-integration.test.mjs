@@ -71,7 +71,7 @@ test('common B issue goes through pinned approval read + source-bundle-status/ap
  assert.equal(result.status,'SUCCEEDED');
  const commands=f.calls.filter(args=>['source-bundle-status','source-bundle-apply'].includes(args[0]));
  assert.deepEqual(commands.map(args=>args[0]),['source-bundle-status','source-bundle-apply']);
- const packagePath=commands[1][3];
+ const packagePath=commands[1][4];
  assert.equal(fs.existsSync(packagePath),true);
  const registered=JSON.parse(fs.readFileSync(packagePath));
  assert.equal(registered.issue.approvalManifestSha256,sha(f.bytes));
