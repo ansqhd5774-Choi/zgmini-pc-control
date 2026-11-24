@@ -318,3 +318,21 @@
 - 정확 브라우저 Job 138800520577에서 기존 Chromium 18개 테스트, #24 Performance Lab, #25 axe 접근성, #23 Firefox/WebKit 모두 SUCCESS. CI_CROSS_BROWSER_OBSERVED: Firefox·WebKit × 모바일390/PC1440 × 로컬 홈/소개 8/8에서 overflowPx=0, javascriptErrors=0. CI_AXE_OBSERVED는 두 viewport 각각 위반 규칙 0/미판정 규칙 1. 실제 아티팩트 community-chat-browser-r1 / id 14966389707 생성 확인.
 - 본체 main 재조회 SHA 6d965f47d34e5ce5bb1544d2be2dc04cedf79472. main Workflow에 기존 Chromium 18 검사·성능·axe·Firefox/WebKit·7일 아티팩트 보존 모두 남고 cross-browser 구현 및 테스트 2파일도 실제 readback 확인. 신규 Workflow/Runner/예약/운영 PC/DB/D1/Cloudflare 직접 변경 없음.
 - **R2 소스 고도화 누적 7/12종(약 58.3%)**: 기존 4종 (#12/#19/#1/#29) + #24 성능 실측 + #25 접근성 + #23 교차 브라우저. **#8 Performance Budget은 비교·승인 계약만 존재하고 실제 정책 임계치/PR gate는 NOT_CONFIGURED**, Lighthouse 점수와 Production 실제 사용자 체감/전후 개선율은 여전히 미확인. 기존 검토 목록 나머지 선정 항목의 구현은 별도 미완료, 본 기록으로 완료를 주장하지 않는다.
+
+
+## R2 #6 아키텍처 및 #15 공급망 CI 실제 병합 — 2026-11-25
+
+### #6 Architecture Testing (완료, 지정 범위)
+- 본체 [PR #1595](https://github.com/ansqhd5774-Choi/zgmini/pull/1595) main 병합 SHA: 589e82bb1350b8076ee9c7c760d4f6cb6039d00e. TypeScript AST 재사용, app/components/hooks/worker에서 PC Writer/Controller로 직접 향하는 static import/export/dynamic string import/require 금지. 신규 회귀시험 7건. 신규 런너/워크플로/예약 없음.
+- [Node CI #45496166533](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45496166533) 실측: 463파일 검사, 금지 직접 import 0건. Node Attempt 1 기존 SEC quota fixture peak=9(허용 8)로 실패. 동일 소스의 failed Job 단회 재실행 Attempt 2는 SUCCESS. [CodeQL #45496166585](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45496166585), [Secret #45496166415](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45496166415) SUCCESS. 최초 SEC 실패는 유지, 시각 경계/실제 SEC 호출 안전성 원인은 미확정. SEC 운영 로직/threshold는 이번 작업에서 수정하지 않음.
+
+### #15 Supply Chain Security (완료, 로컬 의존성 증거 범위)
+- 공식 pinned actions/dependency-review-action v5.0.1은 최초 [Node #45496284409](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45496284409)에서 dependency-review API HTTP 403 Forbidden. warn-only로 인증 거부 해결 불가. API 권한 확대·토큰 우회 없이 공식 Action 후보 철회, 실패 기록은 보존.
+- 대체 소스: Node CI에서 PR merge-base와 현재 package-lock.json v3을 로컬에서 비교. 패키지 추가/변경/삭제·registry 종류·SRI 확인 상태·설치 스크립트 관측. 같은 버전의 tarball/SRI 값 바뀜도 탐지하되 원문 URL/credential/SRI는 보고서에 저장하지 않음. advisory-only이며 CVE·라이선스 조회와 동등하지 않음. 기존 production npm audit high/critical gate는 유지. 신규 회귀시험 7건.
+- [PR #1596](https://github.com/ansqhd5774-Choi/zgmini/pull/1596) HEAD 7a853109419d024e2b847f5ced9736f3806465b9에 #6 main 변경을 통합. [Node #45497441630](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45497441630), [CodeQL #45497441324](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45497441324), [Secret #45497441525](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45497441525) **3/3 SUCCESS**. 같은 Node Run에서 architecture 463파일/위반 0, supply changedPackages 0(이번 PR의 dependency 수정 없음), 아티팩트 ci-supply-chain-review id 14970715399 업로드, 기존 npm audit SUCCESS.
+- 본체 main 병합 SHA: 4c442a880a7edffaa4c71963342bb03a78c95659. main readback에서 두 신규 검사 단계, 관련 4개 소스/시험, 기존 타입/빌드/회귀/보안 검증 보존 확인.
+
+### R2 누적 판정과 다음 실행
+- 이전 7종 + #6 + #15 = **9/12종(75%)** main 소스 적용·정확 HEAD CI 증거. 실제 운영 수집·게시·데이터 복구가 75% 완료라는 의미 아님.
+- 남음: #8 Performance Budget 실제 승인 임계치 NOT_CONFIGURED; #20 Data CI 기존 SQLite/Writer/게시 읽기 계약과 중복 점검 후 최소 검증; #36 Continuous Benchmarking 기존 Actions Job 메타데이터의 read-only 기간별 추세 미구현.
+- 다음 실행은 #20 데이터 계보의 기존 안전 readback과 중복 없는 결손 검사를 우선하며, 후속 #36은 별도 유료 관측 플랫폼/예약 없이 GitHub API 기존 실행 자료를 사용. #8 임의 임계치/Production 성능 주장 금지.
