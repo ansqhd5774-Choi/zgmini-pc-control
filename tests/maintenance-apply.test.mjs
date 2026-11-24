@@ -902,6 +902,8 @@ test('drain and final stop both require Online seats before Supervisor mutation'
  assert.match(drain??'',/need\(seats\.every\(x=>x\.status==='online'\),'RUNNERS_NOT_ONLINE'\)/);
  assert.ok(stop?.includes('await waitForSupervisorStopIdle('));
  assert.ok(stop.indexOf('await waitForSupervisorStopIdle(')<stop.indexOf("execFileSync('taskkill.exe'"));
+ assert.ok(stop.includes('process.kill(oldOwner.owner.pid,0)'));
+ assert.ok(!stop.includes('process.kill(current.owner.pid,0)'));
 });
 
 test('a briefly Busy runner can settle after backup without an unguarded stop',async()=>{
