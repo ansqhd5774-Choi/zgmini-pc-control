@@ -14,12 +14,23 @@ const R6_B_SOURCE=String.raw`E:\ZGmini\projects\zgmini-earnings-history-pc-relea
 const R6_B_HOME=String.raw`E:\ZGmini\data\pc-writer`;
 
 export const DOL_MANUAL_SCHEMA='ZGMINI_R6_DOL_MANUAL_B_APPROVAL_V1';
+export const DOL_MANUAL_PDF_SCHEMA='ZGMINI_R6_DOL_MANUAL_B_APPROVAL_V2';
 const GROUP='DOL_UI_WEEKLY_CLAIMS';
 const FILES=[
  'lib/market-score/employment-r6-provider.mjs',
  'lib/market-score/employment-r6-collector.mjs',
  'lib/market-score/employment-r6-scheduler.mjs',
 ];
+const PDF_FILES=[...FILES,
+ 'lib/market-score/employment-r6-dol-advance-pdf-candidate.mjs',
+ 'lib/market-score/employment-r6-dol-advance-store-candidate.mjs',
+ 'lib/market-score/employment-r6-dol-pdf-raw-envelope.mjs',
+ 'lib/market-score/employment-r6-dol-eta538-provider.mjs',
+];
+const isPdfApproval=approval=>approval?.schema===DOL_MANUAL_PDF_SCHEMA;
+const scopedFiles=approval=>isPdfApproval(approval)?PDF_FILES:FILES;
+const PDF_DATE=/^\d{4}-\d{2}-\d{2}$/;
+const PDF_ISO=/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 const SHA40=/^[a-f0-9]{40}$/;
 const SHA64=/^[a-f0-9]{64}$/;
@@ -62,7 +73,8 @@ export function authorizeDolManual({event,env,approvalBytes}={}){
   'R6_DOL_APPROVAL_HASH_STOP');
  const keys=['schema','status','scope','mode','sourceRepository','installedSourceSha',
   'sourceRoot','pcHome','groupName','maxDolCalls','fileHashes','effects'];
- need(exact(approval,keys)&&approval.schema===DOL_MANUAL_SCHEMA&&
+ need(exact(approval,isPdfApproval(approval)?[...keys,'pdfArchive']:keys)&&
+  (approval.schema===DOL_MANUAL_SCHEMA||isPdfApproval(approval))&&
   approval.status==='APPROVED_B'&&
   approval.scope==='EMPLOYMENT_R6_DOL_MANUAL_SQLITE_ONCE'&&
   approval.mode==='ONE_YEAR'&&approval.groupName===GROUP&&
@@ -70,29 +82,48 @@ export function authorizeDolManual({event,env,approvalBytes}={}){
   SHA40.test(approval.installedSourceSha??'')&&
   same(approval.sourceRoot,R6_B_SOURCE)&&same(approval.pcHome,R6_B_HOME)&&
   approval.maxDolCalls===2,'R6_DOL_SCOPE_STOP');
- need(exact(approval.fileHashes,FILES)&&
-  FILES.every(p=>SHA64.test(approval.fileHashes[p]??'')),
+ need(exact(approval.fileHashes,scopedFiles(approval))&&
+  scopedFiles(approval).every(p=>SHA64.test(approval.fileHashes[p]??'')),
   'R6_DOL_FILE_SCOPE_STOP');
- need(exact(approval.effects,['dolProviderCalls','sqliteWrites','rawSnapshotReadback',
-  'blsProviderCalls','d1Writes','taskWrites','sourceWrites'])&&
+ need(exact(approval.effects,isPdfApproval(approval)
+  ?['dolProviderCalls','sqliteWrites','rawSnapshotReadback',
+    'blsProviderCalls','d1Writes','taskWrites','sourceWrites','eta538PdfGet']
+  :['dolProviderCalls','sqliteWrites','rawSnapshotReadback',
+    'blsProviderCalls','d1Writes','taskWrites','sourceWrites'])&&
   approval.effects.dolProviderCalls===true&&
   approval.effects.sqliteWrites===true&&
   approval.effects.rawSnapshotReadback===true&&
   approval.effects.blsProviderCalls===false&&
   approval.effects.d1Writes===false&&approval.effects.taskWrites===false&&
-  approval.effects.sourceWrites===false,'R6_DOL_EFFECT_SCOPE_STOP');
+  approval.effects.sourceWrites===false&&
+  (!isPdfApproval(approval)||approval.effects.eta538PdfGet===true),
+  'R6_DOL_EFFECT_SCOPE_STOP');
+ if(isPdfApproval(approval)){
+  const pdf=approval.pdfArchive;
+  need(exact(pdf,['releaseDate','releaseAt','expectedInitialWeekEnd','originalPdfSha256'])&&
+   PDF_DATE.test(pdf.releaseDate??'')&&
+   PDF_DATE.test(pdf.expectedInitialWeekEnd??'')&&
+   PDF_ISO.test(pdf.releaseAt??'')&&Number.isFinite(Date.parse(pdf.releaseAt))&&
+   new Date(pdf.releaseAt).toISOString()===pdf.releaseAt&&
+   pdf.releaseAt.slice(0,10)===pdf.releaseDate&&
+   Date.parse(pdf.releaseAt)<=Date.now()&&
+   SHA64.test(pdf.originalPdfSha256??''),
+   'R6_DOL_PDF_SOURCE_PIN_STOP');
+ }
  return {request,approval};
 }
 
 // Authorization and manifest bytes are verified by authorizeDolManual before
 // the one-shot claim. Only this dedicated B entrypoint passes manual intent.
-export function createApprovedDolManualCollectorOptions({auth,db,fetchImpl}={}){
- need(auth?.approval?.schema===DOL_MANUAL_SCHEMA&&auth.approval.status==='APPROVED_B'
+export function createApprovedDolManualCollectorOptions({auth,db,fetchImpl,providerFactory}={}){
+ need((auth?.approval?.schema===DOL_MANUAL_SCHEMA||isPdfApproval(auth?.approval))&&auth.approval.status==='APPROVED_B'
   &&auth.approval.scope==='EMPLOYMENT_R6_DOL_MANUAL_SQLITE_ONCE'
   &&auth.approval.mode==='ONE_YEAR'&&auth.approval.groupName===GROUP
   &&auth.approval.maxDolCalls===2&&UUID.test(auth?.request?.requestId??'')
   &&SHA64.test(auth?.request?.approvalManifestSha256??''),
   'R6_DOL_MANUAL_INTENT_STOP');
+ if(isPdfApproval(auth.approval)&&typeof providerFactory!=='function')
+  throw error('R6_DOL_PDF_FACTORY_MISSING');
  return {
   db,env:{DB:db},fetchImpl,mode:'ONE_YEAR',groups:[GROUP],
   executionIntent:'AUTHORIZED_MANUAL',
@@ -102,7 +133,12 @@ export function createApprovedDolManualCollectorOptions({auth,db,fetchImpl}={}){
    groupName:auth.approval.groupName,maxDolCalls:auth.approval.maxDolCalls,
    requestId:auth.request.requestId,
    approvalManifestSha256:auth.request.approvalManifestSha256,
+   ...(isPdfApproval(auth.approval)?{
+    nationalSource:'ETA538_ARCHIVED_PDF',
+    originalPdfSha256:auth.approval.pdfArchive.originalPdfSha256,
+   }:{}),
   },
+  ...(isPdfApproval(auth.approval)?{providerFactory}:{}),
  };
 }
 
@@ -117,6 +153,15 @@ export async function runInstalledDolManual({auth,pcHome=R6_B_HOME,
  const {installLocalRuntime}=await mod('local-env.mjs');
  const {runEmploymentR6CollectionStep}=await import(pathToFileURL(path.join(
   sourceRoot,'lib','market-score','employment-r6-collector.mjs')).href);
+ const pdfMode=isPdfApproval(auth.approval);
+ let providerFactory=null;
+ if(pdfMode){
+  const providerModule=await import(pathToFileURL(path.join(sourceRoot,
+   'lib','market-score','employment-r6-dol-eta538-provider.mjs')).href);
+  providerFactory=({fetchImpl,now})=>providerModule.createEmploymentR6DolEta538Provider({
+   fetchImpl,now,sourceConfig:auth.approval.pdfArchive,
+  });
+ }
  onStage('LOCAL_RUNTIME_SETUP');
  const originalFetch=globalThis.fetch;
  const quota=createQuotaFetch({base:pcHome,originalFetch,mode:'enforce'});
@@ -127,7 +172,7 @@ export async function runInstalledDolManual({auth,pcHome=R6_B_HOME,
  try{
   onStage('COLLECTOR_EXECUTION');
   output=await runEmploymentR6CollectionStep(createApprovedDolManualCollectorOptions({
-   auth,db,fetchImpl:(url,init)=>quota.fetch(url,init),
+   auth,db,fetchImpl:(url,init)=>quota.fetch(url,init),providerFactory,
   }));
   need(lock.held(),'R6_DOL_CORE_LOCK_LOST');
   const groups=output.groupResults??[];
@@ -147,8 +192,9 @@ export async function runInstalledDolManual({auth,pcHome=R6_B_HOME,
       SELECT 1 FROM market_score_employment_r6_raw_snapshot_v1 s
       WHERE s.body_sha256=json_extract(c.provenance_json,'$.responseHash')
        AND s.release_group='DOL_UI_WEEKLY_CLAIMS'
-       AND s.request_key LIKE 'DOL_NATIONAL:%'
-    )`).bind(start).first();
+       AND s.request_key ${pdfMode?"=?":"LIKE 'DOL_NATIONAL:%'"}
+       ${pdfMode?"AND s.snapshot_id=json_extract(c.provenance_json,'$.rawSnapshotId')":""}
+    )`).bind(start,...(pdfMode?['DOL_ETA538_PDF:'+auth.approval.pdfArchive.releaseDate]:[])).first();
   const state=await db.prepare(`
    SELECT COUNT(*) AS n FROM market_score_employment_r4_shadow_current_v1
    WHERE provider='DOL_ETA' AND geography_type='STATE'
@@ -161,6 +207,30 @@ export async function runInstalledDolManual({auth,pcHome=R6_B_HOME,
    Number.isSafeInteger(nationalRows)&&nationalRows>=0&&
    Number.isSafeInteger(stateRows)&&stateRows>=0&&stateRows<=35000,
    'R6_DOL_READBACK_INVALID');
+  if(pdfMode&&output.status==='SUCCESS'){
+   // Full PDF bytes and four National observations must read back as linked.
+   const found=await db.prepare(`
+    SELECT json_extract(c.provenance_json,'$.rawSnapshotId') AS id
+    FROM market_score_employment_r4_shadow_current_v1 c
+    WHERE c.provider='DOL_ETA' AND c.geography_type='NATIONAL'
+     AND c.retrieved_at>=?
+     AND json_extract(c.provenance_json,'$.rawSnapshotId') IS NOT NULL
+     AND json_extract(c.provenance_json,'$.originalPdfSha256')=?
+    LIMIT 1`).bind(start,auth.approval.pdfArchive.originalPdfSha256).first();
+   const chunks=found?.id?(await db.prepare(`
+     SELECT * FROM market_score_employment_r6_raw_snapshot_v1
+     WHERE snapshot_id=? ORDER BY chunk_index`).bind(found.id).all()).results??[]:[];
+   const {verifyStoredDolAdvancePdfRawSnapshot}=await import(pathToFileURL(
+    path.join(sourceRoot,'lib','market-score','employment-r6-dol-pdf-raw-envelope.mjs')).href);
+   const attested=verifyStoredDolAdvancePdfRawSnapshot(chunks,{
+    releaseDate:auth.approval.pdfArchive.releaseDate,
+    expectedInitialWeekEnd:auth.approval.pdfArchive.expectedInitialWeekEnd,
+   });
+   need(nationalSeries===4&&nationalRows===4&&
+    attested.status==='CANDIDATE_ONLY'&&
+    attested.evidence?.originalBodySha256===auth.approval.pdfArchive.originalPdfSha256,
+    'R6_DOL_PDF_READBACK_INVALID');
+  }
   const safeGroups=groups.map(x=>({
    groupName:GROUP,status:x.status,providerRequests:x.providerRequests,
    ...(CODE.test(x.failureCode??'')?{failureCode:x.failureCode}:{}),
@@ -203,8 +273,11 @@ export async function performDolManual({auth,sourceRoot=R6_B_SOURCE,
  let lock=null,claimed=false,claimAttempted=false,lastPass='SOURCE_UNVERIFIED',outcome;
  let failureStage='PREFLIGHT';
  try{
-  const overlay={files:FILES.map(p=>({path:p,afterSha256:auth.approval.fileHashes[p]}))};
-  verify({sourceRoot,pcHome,approvedSha:auth.approval.installedSourceSha,overlay});
+  const overlay={files:scopedFiles(auth.approval).map(p=>({
+   path:p,afterSha256:auth.approval.fileHashes[p],
+  }))};
+  verify({sourceRoot,pcHome,approvedSha:auth.approval.installedSourceSha,overlay,
+   pdfApproved:isPdfApproval(auth.approval)});
   lastPass='SOURCE_VERIFIED';
   lock=await acquire(pcHome,auth.request.requestId);
   need(lock.held(),'R6_DOL_CORE_LOCK_LOST');

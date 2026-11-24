@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {authorizeDolManual,performDolManual,runDolManualOnce,DOL_MANUAL_SCHEMA,createApprovedDolManualCollectorOptions} from './dol-manual-v1.mjs';
+import {authorizeDolManual,performDolManual,runDolManualOnce,DOL_MANUAL_SCHEMA,DOL_MANUAL_PDF_SCHEMA,createApprovedDolManualCollectorOptions} from './dol-manual-v1.mjs';
 import {readFileSync} from 'node:fs';
 import {sanitizeR6BResult} from './report.mjs';
 
@@ -212,4 +212,96 @@ test('sealed DOL B authorization supplies manual intent only for scoped ONE_YEAR
   {request:{...auth.request,approvalManifestSha256:'bad'}},
  ]) assert.throws(()=>createApprovedDolManualCollectorOptions({auth:{...auth,...changed},db,fetchImpl}),
   /R6_DOL_MANUAL_INTENT_STOP/);
+});
+
+const pdfFiles=[
+ 'lib/market-score/employment-r6-dol-advance-pdf-candidate.mjs',
+ 'lib/market-score/employment-r6-dol-advance-store-candidate.mjs',
+ 'lib/market-score/employment-r6-dol-pdf-raw-envelope.mjs',
+ 'lib/market-score/employment-r6-dol-eta538-provider.mjs',
+];
+function approvedPdfV2(){
+ return {...structuredClone(approval),
+  schema:DOL_MANUAL_PDF_SCHEMA,
+  fileHashes:{...fileHashes,...Object.fromEntries(pdfFiles.map((p,i)=>[p,String(i+4).repeat(64)]))},
+  effects:{...approval.effects,eta538PdfGet:true},
+  pdfArchive:{
+   releaseDate:'2026-11-19',releaseAt:'2026-11-19T13:30:00.000Z',
+   expectedInitialWeekEnd:'2026-11-14',
+   originalPdfSha256:'a11a33cbd30081e869f2cad4cc4a6ccb6b19feeb20731d233ef83d29d15995ec',
+  },
+ };
+}
+test('W04 ETA538 V2 extends same existing DOL one-shot only with exact pinned archive',()=>{
+ const auth=authorizeDolManual(fixture(approvedPdfV2()));
+ assert.equal(auth.approval.schema,DOL_MANUAL_PDF_SCHEMA);
+ assert.equal(auth.approval.maxDolCalls,2);
+ assert.equal(Object.keys(auth.approval.fileHashes).length,7);
+ assert.equal(auth.approval.effects.blsProviderCalls,false);
+ assert.equal(auth.approval.effects.d1Writes,false);
+ assert.equal(auth.approval.effects.eta538PdfGet,true);
+ const factory=()=>({fetchGroup:async()=>({})});
+ const options=createApprovedDolManualCollectorOptions({auth,db:{prepare(){}},
+  fetchImpl:async()=>{},providerFactory:factory});
+ assert.equal(options.providerFactory,factory);
+ assert.equal(options.executionIntent,'AUTHORIZED_MANUAL');
+ assert.equal(options.mode,'ONE_YEAR');
+ assert.deepEqual(options.groups,['DOL_UI_WEEKLY_CLAIMS']);
+ assert.equal(options.manualApprovalEvidence.maxDolCalls,2);
+ assert.throws(()=>createApprovedDolManualCollectorOptions({auth,db:{prepare(){}},
+  fetchImpl:async()=>{}}),/R6_DOL_PDF_FACTORY_MISSING/);
+});
+test('W04 V2 wrong source/date/effect/file hashes reject before the PC lock or provider',()=>{
+ const changes=[
+  [x=>{x.pdfArchive.originalPdfSha256='not-hash'},'R6_DOL_PDF_SOURCE_PIN_STOP'],
+  [x=>{x.pdfArchive.releaseDate='2026-11-20'},'R6_DOL_PDF_SOURCE_PIN_STOP'],
+  [x=>{x.pdfArchive.releaseAt='2030-11-19T13:30:00.000Z'},'R6_DOL_PDF_SOURCE_PIN_STOP'],
+  [x=>{x.pdfArchive.expectedInitialWeekEnd='invalid'},'R6_DOL_PDF_SOURCE_PIN_STOP'],
+  [x=>{x.effects.eta538PdfGet=false},'R6_DOL_EFFECT_SCOPE_STOP'],
+  [x=>{x.effects.blsProviderCalls=true},'R6_DOL_EFFECT_SCOPE_STOP'],
+  [x=>{x.effects.d1Writes=true},'R6_DOL_EFFECT_SCOPE_STOP'],
+  [x=>{delete x.fileHashes[pdfFiles[0]]},'R6_DOL_FILE_SCOPE_STOP'],
+  [x=>{x.fileHashes['scripts/pc-writer/arbitrary.mjs']='b'.repeat(64)},'R6_DOL_FILE_SCOPE_STOP'],
+  [x=>{x.maxDolCalls=3},'R6_DOL_SCOPE_STOP'],
+ ];
+ for(const [change,reason] of changes){
+  const variant=approvedPdfV2();change(variant);
+  assert.throws(()=>authorizeDolManual(fixture(variant)),
+   error=>error?.message===reason,reason);
+ }
+ const bad=structuredClone(approval);bad.effects.eta538PdfGet=true;
+ assert.throws(()=>authorizeDolManual(fixture(bad)),/R6_DOL_EFFECT_SCOPE_STOP/);
+});
+test('W04 V2 reuses same preflight, Core lock and durable one-shot claim order',async()=>{
+ const auth=authorizeDolManual(fixture(approvedPdfV2())),o=inject();
+ const verify=options=>{
+  o.calls.push('VERIFY');
+  assert.equal(options.pdfApproved,true);
+  assert.equal(options.overlay.files.length,7);
+  assert.deepEqual(new Set(options.overlay.files.map(x=>x.path)),
+    new Set([...Object.keys(fileHashes),...pdfFiles]));
+ };
+ const result=await performDolManual({auth,...o,verify});
+ assert.deepEqual(o.calls,['VERIFY','LOCK','CLAIM','RUN','UNLOCK']);
+ assert.equal(result.status,'PARTIAL');
+ assert.equal(result.publication,'NOT_ATTEMPTED');
+ assert.equal(result.dolRequests,2);
+});
+test('W04 legacy V1 still verifies only 3 files and has no PDF providerFactory',async()=>{
+ const auth=authorizeDolManual(fixture()),o=inject();
+ const verify=options=>{
+  o.calls.push('VERIFY');
+  assert.equal(options.pdfApproved,false);
+  assert.equal(options.overlay.files.length,3);
+ };
+ await performDolManual({auth,...o,verify});
+ assert.deepEqual(o.calls,['VERIFY','LOCK','CLAIM','RUN','UNLOCK']);
+ const options=createApprovedDolManualCollectorOptions({auth,providerFactory:()=>({})});
+ assert.equal(Object.hasOwn(options,'providerFactory'),false);
+});
+test('W04 Controller B event dispatcher accepts only the existing manual workflow V1/V2',()=>{
+ const source=readFileSync(new URL('./operation.mjs',import.meta.url),'utf8');
+ assert.ok(source.includes("'ZGMINI_R6_DOL_MANUAL_B_APPROVAL_V2'"));
+ assert.ok(source.includes('pdfApproved===true'));
+ assert.ok(source.includes('verifyInstalledR6DolManualOverlay'));
 });
