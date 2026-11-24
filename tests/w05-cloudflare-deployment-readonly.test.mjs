@@ -113,3 +113,44 @@ test('W05 Cloudflare B candidate remains source-only until exact approved CAS in
  assert.equal(config.operations['w05-cloudflare-deployment-readonly'].grade,'A');
  assert.equal(config.mutationsEnabled,false);
 });
+
+
+import {createHash} from 'node:crypto';
+import {manifestFingerprint,validateControllerSelectivePin,
+ validateControllerOnlyInstallDelta} from '../tools/maintenance-contract.mjs';
+const CM=JSON.parse(readFileSync(new URL('../approvals/controller-updates/c5c7ee4d9554beeedf1572752e7e90aafa260730.json',import.meta.url),'utf8'));
+const CP=JSON.parse(readFileSync(new URL('../approvals/controller-selective-targets/c5c7ee4d9554beeedf1572752e7e90aafa260730.json',import.meta.url),'utf8'));
+test('Cloudflare B single-parent three-file approval is fixed and reversible',()=>{
+ assert.equal(CM.installedSha,'ff105611be1bd67bb12e6ecc4abdd93d27464338');
+ assert.equal(CM.targetSha,'c5c7ee4d9554beeedf1572752e7e90aafa260730');
+ assert.equal(CM.approval.ref,'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3293');
+ assert.equal(CM.approval.grade,'B');
+ assert.equal(CM.approval.scope,'PC_CONTROL_CONTROLLER_UPDATE');
+ assert.equal(CM.checks.status,'PASS');
+ assert.equal(CM.checks.manifestSha256,'ac77659e063c036bbdb99a7bb833fe383558f426c4c05cdd6529051d1f5600df');
+ assert.equal(manifestFingerprint(CM.allowFiles).sha256,CM.checks.manifestSha256);
+ assert.equal(validateControllerSelectivePin(CM,CP),true);
+ assert.equal(validateControllerOnlyInstallDelta(CM.allowFiles.map(f=>f.path),CM.allowFiles),true);
+ assert.deepEqual(CM.backup,{strategy:'VERSIONED_SNAPSHOT',
+  rollback:{kind:'RESTORE_INSTALLED_SHA',sha:CM.installedSha}});
+ assert.deepEqual(CM.selectiveSource.customPaths,[]);
+ assert.equal(CM.postOperation,'core-status');
+ assert.equal(CM.postSourceSha,'a0735cac4a4dc56f0da0d3d0f82a93fd5b4486c7');
+});
+test('approved three paths and module bytes match exact B candidate',()=>{
+ assert.deepEqual(CM.allowFiles.map(f=>f.path),[
+  'config/operations.json','controller/operations.mjs',
+  'controller/w05-cloudflare-deployment-readonly.mjs'
+ ]);
+ const source=readFileSync(new URL('../controller/w05-cloudflare-deployment-readonly.mjs',import.meta.url));
+ assert.equal(createHash('sha256').update(source).digest('hex'),
+  CM.allowFiles[2].sha256);
+ assert.equal(CM.allowFiles[0].sha256,'74002d9c2ff42072179f2f4bbc5d43eee99a0a7bf9cf10d7ebb9bde59c0674f2');
+ assert.equal(CM.allowFiles[1].sha256,'4b51b958e79efc2737c21548216bb0ccfbb394c5ab1a2f4fd32b01c6cf636271');
+});
+test('Cloudflare B approval rejects changed target, extra paths or stale PR ref',()=>{
+ assert.throws(()=>validateControllerSelectivePin(CM,{...CP,targetSha:'0'.repeat(40)}),/SELECTIVE_PIN_MISMATCH/);
+ assert.throws(()=>validateControllerSelectivePin(CM,{...CP,approvalRef:'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3289'}),/SELECTIVE_PIN_MISMATCH/);
+ assert.throws(()=>validateControllerSelectivePin(CM,{...CP,allowFiles:[...CP.allowFiles,
+ {path:'controller/worker.mjs',sha256:'0'.repeat(64)}]}),/SELECTIVE_PIN_MISMATCH/);
+});
