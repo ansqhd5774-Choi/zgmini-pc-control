@@ -14,13 +14,13 @@ const digest=file=>sha256(fs.readFileSync(file));
 const event=(file,status)=>{const fd=fs.openSync(file,'a');
  try{fs.writeSync(fd,JSON.stringify({status,at:new Date().toISOString()})+'\n');
  fs.fsyncSync(fd);}finally{fs.closeSync(fd);}};
-function targetCheck(){
- const stat=fs.lstatSync(TARGET);
+function targetCheck(target){
+ const stat=fs.lstatSync(target);
  need(stat.isFile()&&!stat.isSymbolicLink()&&stat.size<=131072,
   'SIDECAR_B_TARGET_TYPE_STOP');
- const real=fs.realpathSync.native(TARGET);
+ const real=fs.realpathSync.native(target);
  need(path.win32.normalize(real).toLowerCase()===
-  path.win32.normalize(TARGET).toLowerCase(),'SIDECAR_B_REALPATH_STOP');
+  path.win32.normalize(target).toLowerCase(),'SIDECAR_B_REALPATH_STOP');
 }
 function durableWrite(file,bytes){
  const fd=fs.openSync(file,'wx',0o600);
@@ -34,8 +34,8 @@ function atomicSwap(file,bytes,requestId){
   stop('SIDECAR_B_ATOMIC_REPLACE_STOP');
  }
 }
-export function createWindowsSidecarIO({
- requestId,observeProtected,sharedLock=SHARED_LOCK,journalRoot=JOURNALS
+function createFileIO({
+ requestId,observeProtected,target,sharedLock,journalRoot
 }){
  need(process.platform==='win32','SIDECAR_B_WINDOWS_ONLY_STOP');
  need(typeof observeProtected==='function','SIDECAR_B_TRUSTED_PROBE_STOP');
@@ -50,12 +50,12 @@ export function createWindowsSidecarIO({
    lock=acquireInstallLock({journalRoot,requestId,sharedLock});
   },
   async observe(){
-   requireLock();targetCheck();
+   requireLock();targetCheck(target);
    const protectedState=await observeProtected();
    need(protectedState&&typeof protectedState==='object'&&
     !Array.isArray(protectedState),'SIDECAR_B_PROTECTED_PROBE_STOP');
    return {...protectedState,target:TARGET,regularFile:true,
-    realPathMatches:true,beforeSha256:digest(TARGET),
+    realPathMatches:true,beforeSha256:digest(target),
     leaseOwned:protectedState.leaseOwned===true,
     sharedInstallLockOwned:true};
   },
@@ -64,34 +64,36 @@ export function createWindowsSidecarIO({
    journal=createInstallJournal({journalRoot,requestId,sharedLock,fd:lock.fd});
   },
   async backup(expected){
-   requireLock();targetCheck();
-   need(digest(TARGET)===expected,'SIDECAR_B_PREIMAGE_STOP');
+   requireLock();targetCheck(target);
+   need(digest(target)===expected,'SIDECAR_B_PREIMAGE_STOP');
    backup=path.join(journal.journalDir,'archive-run.original');
-   durableWrite(backup,fs.readFileSync(TARGET));
+   durableWrite(backup,fs.readFileSync(target));
    need(digest(backup)===expected,'SIDECAR_B_BACKUP_STOP');
    log('BACKUP_VERIFIED');
   },
   async atomicReplace(bytes,before,after){
    requireLock();need(backup&&digest(backup)===before,
     'SIDECAR_B_BACKUP_STOP');
-   targetCheck();need(digest(TARGET)===before,'SIDECAR_B_CAS_STOP');
+   targetCheck(target);need(digest(target)===before,'SIDECAR_B_CAS_STOP');
    need(sha256(bytes)===after,'SIDECAR_B_CANDIDATE_HASH_STOP');
    log('REPLACEMENT_STARTED');retain=true;
-   atomicSwap(TARGET,bytes,requestId);
-   need(digest(TARGET)===after,'SIDECAR_B_READBACK_STOP');
+   atomicSwap(target,bytes,requestId);
+   need(digest(target)===after,'SIDECAR_B_READBACK_STOP');
    log('REPLACEMENT_READBACK_VERIFIED');
    retain=false;
   },
-  async readbackSha256(){requireLock();targetCheck();return digest(TARGET);},
+  async readbackSha256(){requireLock();targetCheck(target);return digest(target);},
   async restoreBackup(expected){
+   // Recovery failure must retain the shared owner lock, including when the
+   // backup itself is missing or corrupt (before restoration starts).
+   retain=true;
    requireLock();need(backup&&digest(backup)===expected,
     'SIDECAR_B_BACKUP_STOP');
    // Preserve evidence of any unknown replacement bytes in the journal.
-   const temp=TARGET+'.sidecar-b-restore-'+requestId+'.tmp';
+   const temp=target+'.sidecar-b-restore-'+requestId+'.tmp';
    durableWrite(temp,fs.readFileSync(backup));
-   retain=true;
-   fs.renameSync(temp,TARGET);
-   need(digest(TARGET)===expected,'SIDECAR_B_ROLLBACK_READBACK_STOP');
+   fs.renameSync(temp,target);
+   need(digest(target)===expected,'SIDECAR_B_ROLLBACK_READBACK_STOP');
    log('ORIGINAL_RESTORED_VERIFIED');retain=false;
   },
   async release(id){
@@ -103,4 +105,35 @@ export function createWindowsSidecarIO({
    lock=null;
   }
  };
+
+}
+
+// Production receiver is hard-bound to the approved exact operational file,
+// shared Writer lock and durable journal. No caller-selectable target paths.
+export function createWindowsSidecarIO({requestId,observeProtected}){
+ return createFileIO({requestId,observeProtected,target:TARGET,
+  sharedLock:SHARED_LOCK,journalRoot:JOURNALS});
+}
+
+// Only the existing isolated Windows CI runner may use a real temporary file.
+// This is NOT a receiver operation; the production receiver calls the fixed
+// factory above, and manifest validation always binds TARGET.
+export function createIsolatedWindowsSidecarIO({
+ requestId,observeProtected,fixtureDir
+}){
+ need(process.platform==='win32'&&
+  process.env.CI==='true'&&
+  process.env.COMPUTERNAME?.toUpperCase()==='DESKTOP-N62L0NG',
+  'SIDECAR_B_ISOLATION_HOST_STOP');
+ need(typeof fixtureDir==='string'&&typeof process.env.RUNNER_TEMP==='string',
+  'SIDECAR_B_ISOLATION_ROOT_STOP');
+ const base=fs.realpathSync.native(process.env.RUNNER_TEMP);
+ const root=fs.realpathSync.native(fixtureDir);
+ const rel=path.win32.relative(base,root);
+ need(rel.length>0&&rel!=='..'&&!rel.startsWith('..'+path.win32.sep)&&
+  !path.win32.isAbsolute(rel),'SIDECAR_B_ISOLATION_ROOT_STOP');
+ const target=path.join(root,'archive-run.mjs');
+ const sharedLock=path.join(root,'writer-source-install.lock');
+ const journalRoot=path.join(root,'writer-b-install-once');
+ return createFileIO({requestId,observeProtected,target,sharedLock,journalRoot});
 }
