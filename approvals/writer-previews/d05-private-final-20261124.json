@@ -1,0 +1,14 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "baseHead": "acf8ef23e6400a9a07e9897f48005c95bbbc6416",
+  "filePath": "scripts/pc-writer/theme-paid-cycle.mjs",
+  "beforeSha256": "53aeb6ef708d31421e0cf01bcafca3914460dfe496a78e778f44b61addd600b3",
+  "insertions": [
+    {
+      "anchor": " if(publish&&validPaidThemeRecord(output.record)){",
+      "position": "before",
+      "text": " // D05 private: record only actual calculated final outputs. The original\n // content-addressed private snapshot may be reused for many clocked cycles.\n // A missing/invalid private receipt must never block the existing public lane.\n if(privateStored?.status==='PRIVATE_STORED_READBACK_VERIFIED'){\n  try{\n   const {storeVerifiedPrivateThemeFinalEvents}=await import(\n    '../../lib/score-history/d05-private-theme-final-events-r1.mjs');\n   result.d05PrivateFinalOutputReadback=storeVerifiedPrivateThemeFinalEvents({\n    directory:dir,privateStored,sourceVersion,\n    registrySha256:context.registrySha256,confirmedDate:phases.confirmed,\n    calculatedAtMs:now,now:Date.now()\n   });\n  }catch{result.d05PrivateFinalOutputReadback={status:'UNPROVEN_PRIVATE_FINAL_OUTPUT'};}\n }else{result.d05PrivateFinalOutputReadback={status:'NO_VERIFIED_PRIVATE_FINAL_OUTPUT'};}\n"
+    }
+  ]
+}
