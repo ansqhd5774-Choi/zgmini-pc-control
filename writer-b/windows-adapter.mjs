@@ -332,14 +332,27 @@ export function makeWindowsBAdapter(auth,{candidateRoot,controlRoot}){
    },{reserved:isReservedCoreMaintenance(m.coreMaintenance)});
   },
   async waitForCoreDrain(){
-   let consecutive=0;const until=Date.now()+
-    coreDrainWaitMs(m.coreMaintenance);
+   const windowMs=coreDrainWaitMs(m.coreMaintenance),until=Date.now()+windowMs;
+   let consecutive=0,samples=0,readySamples=0,activeSamples=0;
+   let otherSamples=0,maxReadyStreak=0;
    while(Date.now()<until){
-    consecutive=taskQuiet(taskProbe())?consecutive+1:0;
+    const probe=taskProbe(),lock=fs.existsSync(CORE_CYCLE_LOCK);
+    const quiet=coreQuietFromProbe(probe,lock);
+    samples++;
+    consecutive=quiet?consecutive+1:0;
+    if(quiet){readySamples++;maxReadyStreak=Math.max(maxReadyStreak,consecutive);}
+    else if(lock||probe.instances>0||probe.relatedProcesses>0||probe.state===4)
+     activeSamples++;
+    else otherSamples++;
     if(consecutive>=2){journal('CORE_DRAINED');return;}
     await delay(1500);
    }
-   stop('WRITER_B_CORE_NATURAL_DRAIN_TIMEOUT_STOP');
+   // Only aggregate safe counters survive the installer's result sanitizer.
+   throw Object.assign(new Error('WRITER_B_CORE_NATURAL_DRAIN_TIMEOUT_STOP'),{
+    code:'WRITER_B_CORE_NATURAL_DRAIN_TIMEOUT_STOP',
+    idleObservation:{windowMs,samples,readySamples,activeSamples,
+     otherSamples,maxReadyStreak},
+   });
   },
   async assertCoreQuiet(){
    need(taskQuiet(taskProbe())&&
