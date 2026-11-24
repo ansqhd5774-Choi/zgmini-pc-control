@@ -126,6 +126,8 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
+      - name: Verify core-status precheck reuse, fixed timeout stages, and protected-state invariants
+        run: node --test --test-concurrency=1 tests/core-status-timeout-stage.test.mjs
       - name: Verify exact HTTP host roster and connection evidence, no provider I/O
         run: node --test --test-concurrency=1 tests/provider-activity-runtime-readonly.test.mjs
       - name: Verify fixed Alpaca and Census checkpoints without provider or operational I/O
