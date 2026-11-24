@@ -154,3 +154,5 @@ test('Cloudflare B approval rejects changed target, extra paths or stale PR ref'
  assert.throws(()=>validateControllerSelectivePin(CM,{...CP,allowFiles:[...CP.allowFiles,
  {path:'controller/worker.mjs',sha256:'0'.repeat(64)}]}),/SELECTIVE_PIN_MISMATCH/);
 });
+
+// R2 selective provenance: validated independently against the immutable source main.
