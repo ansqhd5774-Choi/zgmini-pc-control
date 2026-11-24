@@ -74,6 +74,49 @@ test('malformed remote 200 response cannot pass or be replaced',async()=>{
  assert.equal(calls.length,1);
 });
 
+test('GitHub line-wrapped canonical base64 is accepted for exact result files',async()=>{
+ const f=fixture();
+ const wrap=bytes=>bytes.toString('base64').replace(/(.{4})/g,'$1\r\n');
+ const api=async(route,method='GET',body)=>{
+  if(method==='PUT')throw Error('NO_WRITE_EXPECTED');
+  const extension=route.endsWith('.json')?'json':'txt';
+  return {status:200,data:{type:'file',encoding:'base64',content:wrap(Buffer.from(f.texts[extension]))}};
+ };
+ assert.equal((await uploadVerifiedReportPair({...params,api})).length,2);
+});
+
+test('malformed base64 that decodes to identical bytes cannot certify a remote report',async()=>{
+ const canonical=Buffer.from(params.json).toString('base64');
+ for(const malformed of [
+  canonical+'#', // Node Buffer.from(base64) silently ignores this character
+  '#'+canonical,
+  canonical+'=',
+  canonical.replace(/(.{4})/,'$1 '),
+  canonical.replace(/(.{4})/,'$1_'),
+ ]){
+  const calls=[];
+  const api=async(route,method='GET')=>{
+   calls.push({route,method});
+   return {status:200,data:{type:'file',encoding:'base64',content:malformed}};
+  };
+  await assert.rejects(uploadVerifiedReportPair({...params,api}),{code:'REPORT_REMOTE_INVALID'});
+  assert.equal(calls.length,1);
+  assert.equal(calls[0].method,'GET');
+ }
+});
+
+test('noncanonical pad bits cannot certify the same decoded bytes',async()=>{
+ const calls=[];
+ // Node decodes AR== to the same 0x01 byte as canonical AQ==.
+ assert.deepEqual(Buffer.from('AR==','base64'),Buffer.from('AQ==','base64'));
+ const api=async(route,method='GET')=>{
+  calls.push(method);return {status:200,data:{type:'file',encoding:'base64',content:'AR=='}};
+ };
+ await assert.rejects(uploadVerifiedReportPair({...params,json:'\x01',api}),
+  {code:'REPORT_REMOTE_INVALID'});
+ assert.deepEqual(calls,['GET']);
+});
+
 test('GitHub lookup access failure cannot be treated as upload success',async()=>{
  const calls=[];const api=async(route,method='GET')=>{
   calls.push({route,method});return {status:403,data:{message:'forbidden'}};
