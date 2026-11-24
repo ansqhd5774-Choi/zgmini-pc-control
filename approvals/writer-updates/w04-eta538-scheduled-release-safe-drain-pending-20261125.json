@@ -1,0 +1,88 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "PENDING_APPROVAL",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "codex/employment-1y-reader-r1",
+  "candidateSourceSha": "4b592fe1dc421c53f9400486c0c15b136ecda64e",
+  "baseHead": "aa4da58cf84f231142f7797b88fa747822ff1cd7",
+  "baseConfigSourceSha": "aa4da58cf84f231142f7797b88fa747822ff1cd7",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "lib/market-score/employment-r6-collector.mjs",
+      "change": "M",
+      "beforeSha256": "580fefcbf6b592208fd6a9f98aaf56b89dcd3bb665ad0f8a215fececc5d386df",
+      "afterSha256": "af37fe5991936579a0fd372c7bc31cbcef766ae4a0948bc61cda1776fef97432"
+    },
+    {
+      "path": "lib/market-score/employment-r6-store.mjs",
+      "change": "M",
+      "beforeSha256": "a6c2938bae56147ab4bf3fcb9ba3046355360a538e58f6d34de021ea1d586851",
+      "afterSha256": "5158b67a2cf8742cc70172a07b878e941cbf013b85c8cd8f331b7950bb7d3799"
+    },
+    {
+      "path": "lib/market-score/employment-r6-dol-eta538-provider.mjs",
+      "change": "M",
+      "beforeSha256": "a0be157d46312fa12d63dcc70d7fd6f3accddd4b3f06a387bc3840ce69f0f5a2",
+      "afterSha256": "626a8544c76c755d270a31b6e981f62005ff0f11eae8291f17f52d6d2c5fbd6a"
+    },
+    {
+      "path": "scripts/pc-writer/employment-r6-auto-collection.mjs",
+      "change": "M",
+      "beforeSha256": "1aeb5a004560ddef0e17a4ff532e277d76ea2ff098da6b802a9e452ca55cbb49",
+      "afterSha256": "4c3840ea88de2c7ad6ba1ee09813ad1f51fdd981dd4db71e40f13857228c7b3a"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "lib/market-score/employment-r6-scheduler.mjs",
+      "sha256": "7f33c6f3920317cdfd362bb04b570f7af8a5c3322e5924edb4c0cfaf31c16a88"
+    },
+    {
+      "path": "lib/market-score/employment-r6-provider.mjs",
+      "sha256": "b94cd97208bc5ea19be4068a170e3c45b051639c5ee3d1ec2156c1ed18c587d6"
+    },
+    {
+      "path": "lib/market-score/employment-r6-dol-advance-pdf-candidate.mjs",
+      "sha256": "5d3527fc4e6b63aecbd3ef92d4fd95cebeeabb7596ce0ca7957e0d15235ec9ad"
+    },
+    {
+      "path": "lib/market-score/employment-r6-dol-advance-store-candidate.mjs",
+      "sha256": "009cba88a7519e0ef1fa1e70812e0e69b58beb8abe92b75567ee27cca58137af"
+    },
+    {
+      "path": "lib/market-score/employment-r6-dol-pdf-raw-envelope.mjs",
+      "sha256": "46efc126157714af3123866c8790fadf3d588734cd03c499270537d0fefd3b31"
+    },
+    {
+      "path": "lib/market-score/employment-r6-dol-advance-row-readback.mjs",
+      "sha256": "215c24516469ff29834418dfbaf01c1f2e3381c72dc109b00c86cd35518e8394"
+    },
+    {
+      "path": "lib/market-score/employment-r6-dol-release-text.mjs",
+      "sha256": "b849c77c1afebb0dfb7dc9ec673c7d4390e2469a06f77b7e70451a955a52871b"
+    },
+    {
+      "path": "lib/market-score/employment-r4-shadow-provider.mjs",
+      "sha256": "01b37fae6aa24556eea8c01f58836f59311f238058a4797057048e133bdb2f29"
+    },
+    {
+      "path": "lib/market-score/employment-r4-shadow-contract.mjs",
+      "sha256": "1efdd95e7d840502c672690374991d97ddd14ba511b5eddf22a25c21abb7c177"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false,
+  "coreMaintenance": "PAUSE_NEW_STARTS_DRAIN_2400S_V1"
+}
