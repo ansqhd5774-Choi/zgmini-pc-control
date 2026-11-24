@@ -216,6 +216,8 @@ export function projectCnnR10ThreeGuardsReadonly(source,raw={}){
  const head=typeof raw.head==='string'&&SHA40.test(raw.head)?
   raw.head.toLowerCase():null;
  const values=new Map(pins);
+ const gitHeadVariables=new Set();
+ const configSha=typeof raw.approved==='string'&&SHA40.test(raw.approved)?raw.approved.toLowerCase():null;
  // A name is mapped only when its assignment unambiguously reads git rev-parse.
  const prefix=lines.slice(0,23).join('\n');
  for(const m of prefix.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([^;\n]{1,240})/g)){
@@ -230,7 +232,17 @@ export function projectCnnR10ThreeGuardsReadonly(source,raw={}){
   const statement=lines.slice(line-1,next).join(' ').replace(/\/\/.*$/,'');
   const m=statement.match(/^\s*if\s*\(\s*([A-Za-z_$][\w$]*)\s*(===|!==|==|!=)\s*([A-Za-z_$][\w$]*)\s*\)/);
   const out={order:order+1,line,condition:UNKNOWN,
-   guardPassed:null,inputProvenance:'UNKNOWN'};
+   guardPassed:null,inputProvenance:'UNKNOWN',comparisonOperator:'UNKNOWN',
+   staticOperandOrigins:null,operandMatchesConfig:null};
+  if(m){
+   const origin=name=>gitHeadVariables.has(name)?'GIT_HEAD':
+    pins.has(name)?'PINNED_SHA40_LITERAL':'UNVERIFIED';
+   out.comparisonOperator=({'===':'STRICT_EQUAL','!==':'STRICT_NOT_EQUAL',
+    '==':'LOOSE_EQUAL','!=':'LOOSE_NOT_EQUAL'})[m[2]]??'UNKNOWN';
+   out.staticOperandOrigins=[origin(m[1]),origin(m[3])];
+   out.operandMatchesConfig=[m[1],m[3]].map(name=>
+    configSha&&values.has(name)?values.get(name)===configSha:null);
+  }
   if(!m||!SAFE_NAME.test(m[1])||!SAFE_NAME.test(m[3])||
     !values.has(m[1])||!values.has(m[3])||!/(?:throw|\bneed\s*\(\s*false|\bfail\s*\()/i.test(statement))
    return out;
