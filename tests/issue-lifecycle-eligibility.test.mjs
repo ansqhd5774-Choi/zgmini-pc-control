@@ -19,7 +19,7 @@ test('off by default', () => {
   assert.equal(classifyIssueCompletion(a).reason,'DEFAULT_OFF');
 });
 test('complete and approved diagnostic is only human-review eligible', () => {
-  assert.deepEqual(classifyIssueCompletion(good()),{eligible:true,reason:'ELIGIBLE_FOR_HUMAN_REVIEW_ONLY'});
+  assert.deepEqual(classifyIssueCompletion(good()),{eligible:true,closeAuthorized:false,requiresHumanReview:true,reason:'ELIGIBLE_FOR_HUMAN_REVIEW_ONLY'});
 });
 const negatives=[
  ['issue already closed',a=>a.issue.state='closed','ISSUE_NOT_OPEN'],
@@ -53,3 +53,10 @@ const negatives=[
 for(const [name,mutate,reason] of negatives){
  test(name,()=>{const a=good();mutate(a);assert.equal(classifyIssueCompletion(a).reason,reason);});
 }
+
+test('eligibility decision never grants automatic closure authority',()=>{
+ const answer=classifyIssueCompletion(good());
+ assert.equal(answer.closeAuthorized,false);
+ assert.equal(answer.requiresHumanReview,true);
+ assert.equal(Object.isFrozen(answer),true);
+});
