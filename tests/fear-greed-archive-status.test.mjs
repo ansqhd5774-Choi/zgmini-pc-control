@@ -482,8 +482,8 @@ test('fixed R10 child source can localize an exact reason without leaking source
 test('pinned static last-run writer and guard candidate are exposed without source or secrets',()=>{
   const f=fixture(),dir=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(dir);
   const secret='GH_PAT_NEVER_RETURN_SIDE_CAR_CONTENT';
-  const js="const ledger=path.join(dir,'last-run.json');\\nif (actualSourceSha !== config.source) stop('SOURCE_SHA');\\nfs.writeFileSync(ledger, JSON.stringify({secret}));\\n";
-  const vbs='WScript.Echo "archive-run.mjs"\\n';
+  const js="const ledger=path.join(dir,'last-run.json');\nif (actualSourceSha !== config.source) stop('SOURCE_SHA');\nfs.writeFileSync(ledger, JSON.stringify({secret}));\n";
+  const vbs='WScript.Echo "archive-run.mjs"\n';
   fs.writeFileSync(path.join(dir,'archive-run.mjs'),js);
   fs.writeFileSync(path.join(dir,'run-original-then-archive.vbs'),vbs);
   const earlier=new Date(Date.now()-30000);
@@ -498,7 +498,7 @@ test('pinned static last-run writer and guard candidate are exposed without sour
   assert.equal(r.matchingErrorSite,'NONE');
   assert.equal(r.operationalWrites,0);assert.equal(r.providerCalls,0);assert.equal(r.d1Writes,0);
   assert.equal(digest(fs.readFileSync(f.dbFile)),before);
-  assert.doesNotMatch(JSON.stringify(r),/GH_PAT_NEVER_RETURN_SIDE_CAR_CONTENT|actualSourceSha|config\\.source|SOURCE_SHA/);
+  assert.doesNotMatch(JSON.stringify(r),/GH_PAT_NEVER_RETURN_SIDE_CAR_CONTENT|actualSourceSha|config\.source|SOURCE_SHA/);
 });
 
 test('changed script cannot contribute static last-run attribution',()=>{
