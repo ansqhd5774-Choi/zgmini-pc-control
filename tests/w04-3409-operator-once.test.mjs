@@ -1,8 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {readFileSync} from 'node:fs';
-import {FIXED,assertOperatorScope,assertOrigin,sanitizedChildEnvironment,
+import fs,{readFileSync} from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {execFileSync} from 'node:child_process';
+import {FIXED,assertOperatorScope,assertOrigin,sanitizedChildEnvironment,isolatedGitArguments,
  validateSourceReceipt,validateRecoveryResult} from '../tools/operator-packets/w04-3409-recovery-once.mjs';
 
 const read=rel=>readFileSync(new URL('../'+rel,import.meta.url));
@@ -66,6 +69,40 @@ test('operator child environment rejects Git executable, config, hooks and helpe
  assert.equal(clean.USERPROFILE,env.USERPROFILE);
  assert.equal(clean.PATH,env.PATH);
  assert.equal(clean.GH_TOKEN,env.GH_TOKEN);
+});
+
+test('actual Git worktree with injected config cannot run active post-checkout hooks',t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'w04-3409-operator-argv-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const repo=path.join(root,'fixture-repo'),safe=path.join(root,'nohooks'),
+  malicious=path.join(root,'malicious-hooks'),stage=path.join(root,'stage');
+ fs.mkdirSync(repo);fs.mkdirSync(safe);fs.mkdirSync(malicious);
+ const injected={...process.env,HOME:root,
+  GIT_CONFIG_COUNT:'1',GIT_CONFIG_KEY_0:'core.hooksPath',
+  GIT_CONFIG_VALUE_0:malicious,GIT_CONFIG_PARAMETERS:'core.hooksPath='+malicious,
+  GIT_EXEC_PATH:path.join(root,'untrusted-git-exec'),
+  GIT_TEMPLATE_DIR:malicious,GIT_ASKPASS:path.join(root,'untrusted-helper')};
+ const env=sanitizedChildEnvironment(injected);
+ const git=(args)=>execFileSync('git',args,{
+  cwd:repo,env,stdio:'pipe',timeout:15000,windowsHide:true});
+ git(['init','-q']);git(['config','user.name','ZGMINI Operator Test']);
+ git(['config','user.email','test@example.invalid']);
+ fs.writeFileSync(path.join(repo,'source.txt'),'fixed source\n');
+ git(['add','source.txt']);git(['commit','-qm','fixture']);
+ const defaultHooks=path.join(repo,'.git','hooks');
+ const script='#!/bin/sh\nprintf executed > hook-triggered.txt\n';
+ for(const d of [defaultHooks,malicious]){
+  fs.writeFileSync(path.join(d,'post-checkout'),script,{mode:0o755});
+  fs.chmodSync(path.join(d,'post-checkout'),0o755);
+ }
+ const args=isolatedGitArguments(['worktree','add','--detach',stage,'HEAD'],
+   {hooksPath:safe,root:repo});
+ assert.deepEqual(args.slice(0,5),['--no-optional-locks','-c',
+  'core.hooksPath='+safe,'-C',repo]);
+ git(args);
+ assert.equal(fs.readFileSync(path.join(stage,'source.txt'),'utf8'),'fixed source\n');
+ assert.equal(fs.existsSync(path.join(stage,'hook-triggered.txt')),false);
+ assert.equal(fs.existsSync(path.join(repo,'hook-triggered.txt')),false);
 });
 
 test('official repository origin is exact; credentials, forks and alternative hosts are forbidden',()=>{
