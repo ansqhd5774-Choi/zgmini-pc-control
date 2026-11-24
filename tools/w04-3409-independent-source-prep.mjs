@@ -9,7 +9,7 @@ import {fileURLToPath} from 'node:url';
 import {verifyRecoveryOperator} from './update.mjs';
 
 export const REQUEST_ID='pc-update-71ea39dc-7048-4e10-9d11-d4be7f6c3ec0';
-export const SOURCE_SHA='e30ba8babfdc0f09a5ea05c018f3695e5469180e';
+export const SOURCE_SHA='23d04ff8e4687b46e93aa7dd80cca58520816fed';
 export const REPO='E:/ZGmini/projects/zgmini-pc-control';
 export const MAINT='E:/ZGmini/automation/pc-maintenance';
 export const CONTROL='E:/ZGmini/automation/pc-control';
