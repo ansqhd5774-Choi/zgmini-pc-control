@@ -78,10 +78,23 @@ const readStrict=(file,max=131072)=>{
   'OPERATOR_FILE_UNSAFE');
  return fs.readFileSync(file);
 };
+export function sanitizedChildEnvironment(input=process.env){
+ const clean={...input};
+ // Never inherit Git's environment-level config, executable, hook or helper
+ // injection from the launching desktop/session into fetch or recovery.
+ for(const k of Object.keys(clean)){
+  if(/^GIT_/i.test(k)||/^GCM_/i.test(k)||/^SSH_ASKPASS$/i.test(k))
+   delete clean[k];
+ }
+ clean.GIT_OPTIONAL_LOCKS='0';
+ clean.GIT_TERMINAL_PROMPT='0';
+ clean.GCM_INTERACTIVE='never';
+ return clean;
+}
 const runExe=(bin,args,{timeout=60000,maxBuffer=8_000_000}={})=>{
  try{
   return execFileSync(bin,args,{encoding:null,windowsHide:true,shell:false,timeout,maxBuffer,
-   env:{...process.env,GIT_OPTIONAL_LOCKS:'0',GIT_TERMINAL_PROMPT:'0'}});
+   env:sanitizedChildEnvironment()});
  }catch(error){
   // Existing tools return bounded JSON error codes; never print raw child output.
   for(const raw of [error?.stdout,error?.stderr]){
