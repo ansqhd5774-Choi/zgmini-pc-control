@@ -21,6 +21,7 @@
     "employment-r6-d1-readback-readonly": {"grade":"A","timeoutSeconds":90,"resource":"light"},
     "market-r54-d1-api-readback-readonly": {"grade":"A","timeoutSeconds":90,"resource":"light"},
     "w05-five-key-d1-api-readback-readonly": {"grade":"A","timeoutSeconds":90,"resource":"light"},
+    "w05-cloudflare-deployment-readonly": {"grade":"A","timeoutSeconds":90,"resource":"light"},
     "inflation7-d1-readback-readonly": {"grade":"A","timeoutSeconds":90,"resource":"light"},
     "inflation19-d1-readback-readonly": {"grade":"A","timeoutSeconds":90,"resource":"light"},
     "us-breadth-r17-preflight": {"grade":"A","timeoutSeconds":60,"resource":"light"},
