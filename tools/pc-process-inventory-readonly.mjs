@@ -451,12 +451,13 @@ function inspect2960ProtectedBaselineReadonly(){
 // #2960's install owner does not store a requestId. Correlate the existing
 // recovery marker with the exact original journal and its timestamp; this is
 // not a release decision, nor proof of a completed original postcheck.
-export function assess2960OriginalLeaseLineage(ledger,owner,marker){
+function assessFixedOriginalLeaseLineage(ledger,owner,marker,{requestId,issueNumber,postIssueNumber,targetSha=null}){
  const validOwner=Number.isSafeInteger(owner?.pid)&&owner.pid>0&&
   /^[a-f0-9-]{36}$/.test(owner?.nonce??'');
- const originalLedger=ledger?.requestId===TARGET2960&&ledger.issueNumber===2960&&
+ const originalLedger=ledger?.requestId===requestId&&ledger.issueNumber===issueNumber&&
   ledger.status==='RECOVERY_REQUIRED'&&
-  ledger.firstFail==='POSTCHECK_PENDING'&&ledger.postIssueNumber===2965;
+  ledger.firstFail==='POSTCHECK_PENDING'&&ledger.postIssueNumber===postIssueNumber&&
+  (targetSha===null||ledger.targetSha===targetSha);
  const ownerMarker=Boolean(validOwner&&marker?.requestOwnerPid===owner.pid&&
   marker?.nonce===owner.nonce);
  const changed=Date.parse(ledger?.updatedAt??'');
@@ -469,21 +470,30 @@ export function assess2960OriginalLeaseLineage(ledger,owner,marker){
   recoveryTimelineMatches:chronology,
   correlated:originalLedger&&ownerMarker&&chronology};
 }
+export function assess2960OriginalLeaseLineage(ledger,owner,marker){
+ return assessFixedOriginalLeaseLineage(ledger,owner,marker,{
+  requestId:TARGET2960,issueNumber:2960,postIssueNumber:2965});
+}
+export function assess3409OriginalLeaseLineage(ledger,owner,marker){
+ return assessFixedOriginalLeaseLineage(ledger,owner,marker,{
+  requestId:TARGET3409,issueNumber:3409,postIssueNumber:3410,
+  targetSha:'6b3c9c0ce77354d81babe4c9ea7785663c6c2cb4'});
+}
 // CAS digests are for a separately approved independent recovery manifest.
 // Only hashes/booleans leave the Windows host; neither lease identity values
 // nor raw Writer configuration, snapshots, keys or Task XML are published.
-function inspect2960RecoveryCasReadonly(){
+function inspectFixedRecoveryCasReadonly(requestId,assessLineage,expectedBeforeSha=null){
  const unknown=code=>({status:'UNVERIFIED',code,leaseLineageCorrelated:null,
   ownerAlive:null,casDigests:null,recoveryEligible:false});
  const maintenance='E:/ZGmini/automation/pc-maintenance';
  const control='E:/ZGmini/automation/pc-control';
  const data='E:/ZGmini/data';
- const backup=path.join(control,'backups','controller-update-'+TARGET2960);
+ const backup=path.join(control,'backups','controller-update-'+requestId);
  const specs={
-  ledger:[path.join(maintenance,'ledger',TARGET2960+'.json'),maintenance,131072],
+  ledger:[path.join(maintenance,'ledger',requestId+'.json'),maintenance,131072],
   owner:[path.join(maintenance,'leases/controller-install/owner.json'),maintenance,4096],
   marker:[path.join(maintenance,'leases/controller-install/RECOVERY_REQUIRED.json'),maintenance,4096],
-  backlog:[path.join(maintenance,'backlog',TARGET2960+'.json'),maintenance,131072],
+  backlog:[path.join(maintenance,'backlog',requestId+'.json'),maintenance,131072],
   snapshot:[path.join(backup,'snapshot/host.json'),control,65536],
   protection:[path.join(backup,'PROTECTED_BEFORE.json'),control,65536],
   writer:[path.join(data,'pc-writer/config.json'),data,131072]
@@ -501,9 +511,14 @@ function inspect2960RecoveryCasReadonly(){
   marker=JSON.parse(bytes.marker.toString('utf8'));
   backlog=JSON.parse(bytes.backlog.toString('utf8'));
  }catch{return unknown('RECOVERY_JSON_UNVERIFIED');}
- if(backlog?.requestId!==TARGET2960||backlog?.schema!=='ZGMINI_PC_BACKLOG_V1')
+ if(backlog?.requestId!==requestId||backlog?.schema!=='ZGMINI_PC_BACKLOG_V1')
   return unknown('RECOVERY_BACKLOG_IDENTITY_UNVERIFIED');
- const lineage=assess2960OriginalLeaseLineage(ledger,owner,marker);
+ if(expectedBeforeSha!==null){
+   let savedHost;
+   try{savedHost=JSON.parse(bytes.snapshot.toString('utf8'));}catch{return unknown('FIXED_SNAPSHOT_JSON_UNVERIFIED');}
+   if(savedHost?.controllerSourceSha!==expectedBeforeSha)return unknown('FIXED_SNAPSHOT_SHA_UNVERIFIED');
+  }
+  const lineage=assessLineage(ledger,owner,marker);
  let ownerAlive=null;
  if(Number.isSafeInteger(owner?.pid)&&owner.pid>0){
   try{process.kill(owner.pid,0);ownerAlive=true;}
@@ -520,6 +535,14 @@ function inspect2960RecoveryCasReadonly(){
   ownerMarkerMatches:lineage.ownerMarkerMatches,
   recoveryTimelineMatches:lineage.recoveryTimelineMatches,
   ownerAlive,casDigests,recoveryEligible:false};
+}
+
+function inspect2960RecoveryCasReadonly(){
+ return inspectFixedRecoveryCasReadonly(TARGET2960,assess2960OriginalLeaseLineage);
+}
+function inspect3409RecoveryCasReadonly(){
+ return inspectFixedRecoveryCasReadonly(TARGET3409,assess3409OriginalLeaseLineage,
+  '3c20e036ffa56a9a9670916d68c30451d6a699bc');
 }
 
 /** Exact #2960 receipt only: skip 32-KiB general inventory payload. */
@@ -550,10 +573,29 @@ export function compact3409ProcessResult(base,status){
   code:status?.code??'W04_3409_EVIDENCE_INCOMPLETE',
   w043409MaintenanceStatus:status??project3409MaintenanceStatus(null)};
 }
+function inspect3409ProtectedBaselineReadonly(){
+ const unknown={unchanged:null,differenceClass:'UNVERIFIED'};
+ const control='E:/ZGmini/automation/pc-control';
+ const file=path.join(control,'backups','controller-update-'+TARGET3409,'PROTECTED_BEFORE.json');
+ try{
+  const saved=readFixedReadonlyBytes(file,{verifiedRoot:control,minBytes:1,maxBytes:65536});
+  if(saved.ok!==true)return unknown;
+  const baseline=JSON.parse(saved.bytes.toString('utf8'));
+  const current=protectedSnapshot();
+  return {unchanged:compare2960ProtectedBaseline(baseline,current),
+   differenceClass:classify2960ProtectionDifference(baseline,current)};
+ }catch{return unknown;}
+}
 function inspect3409MaintenanceStatusReadonly(){
- try{return project3409MaintenanceStatus(
-  collectAutomationStatus(['--request-id',TARGET3409]));}
- catch{return project3409MaintenanceStatus(null);}
+ try{
+  const result=project3409MaintenanceStatus(
+   collectAutomationStatus(['--request-id',TARGET3409]));
+  if(result.status!=='READ_ONLY_OBSERVED')return result;
+  const protectedCheck=inspect3409ProtectedBaselineReadonly();
+  return {...result,protectedStateUnchanged:protectedCheck.unchanged,
+   protectedDifferenceClass:protectedCheck.differenceClass,
+   recoveryCas:inspect3409RecoveryCasReadonly()};
+ }catch{return project3409MaintenanceStatus(null);}
 }
 
 const D05_STAGE_STATUSES=new Set(['LOCAL_STORED','UNCHANGED','PREVIOUS_RELEASE_PRESERVED',
@@ -2166,7 +2208,9 @@ export function toText(r){
    'w043409Status='+r.w043409MaintenanceStatus.status,
    'w043409HistoricalPhase='+(r.w043409MaintenanceStatus.historicalRequest?.phase??'UNKNOWN'),
    'w043409LeaseHeld='+(r.w043409MaintenanceStatus.recoveryEvidence?.leaseHeld??'UNKNOWN'),
-   'w043409RecoveryRequired='+(r.w043409MaintenanceStatus.recoveryEvidence?.recoveryRequired??'UNKNOWN')]:[]),
+   'w043409RecoveryRequired='+(r.w043409MaintenanceStatus.recoveryEvidence?.recoveryRequired??'UNKNOWN'),
+   'w043409Protection='+(r.w043409MaintenanceStatus.protectedDifferenceClass??'UNVERIFIED'),
+   'w043409LeaseCorrelation='+(r.w043409MaintenanceStatus.recoveryCas?.status??'UNVERIFIED')]:[]),
   'c2505Recovery='+(r.c2505RecoveryCheckpoint?.status??'NOT_APPLICABLE'),
   'c2505RecoveryCode='+(r.c2505RecoveryCheckpoint?.code??'NOT_APPLICABLE'),
   'c2505ByteProof='+(r.c2505ByteProof?.status??'NOT_APPLICABLE'),
