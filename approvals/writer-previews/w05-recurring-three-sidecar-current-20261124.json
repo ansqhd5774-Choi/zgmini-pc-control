@@ -1,0 +1,14 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "baseHead": "a163c4f34e4e1c50987feaea0f3a7ef00442afaf",
+  "filePath": "scripts/pc-writer/run-local.mjs",
+  "beforeSha256": "58e2b08153a7ece51071122f565973f2c6b45f0013c650b924cf90c57126bc77",
+  "insertions": [
+    {
+      "anchor": "  await attemptOutput(report,'rate-sentiment-publication',async()=>{report.rateSentiment.publication=(await publishPublicRateSentiment(remote,config.core,rateSentiment)).status;});",
+      "position": "before",
+      "text": "  {\n   const W05_SAVED_SIDECARS_AUTO_PUBLICATION_APPROVED=true;\n  // W05 saved-only informational sidecars. Activation candidate for the\n  // three-key recurring D1 scope; install only through exact Writer B CAS.\n  // Reuse the existing run-local Writer lane and its attemptOutput isolation;\n  // never create a second Task, scheduler, provider call or DB writer.\n  if(W05_SAVED_SIDECARS_AUTO_PUBLICATION_APPROVED){\n   const {W05_SAVED_IDS,publishW05StoredSidecar}=await import(\n    './w05-stored-sidecar-publication-r1.mjs');\n   report.w05SavedSidecars={};\n   for(const id of W05_SAVED_IDS){\n    await attemptOutput(report,'w05-saved-sidecar:'+id,async()=>{\n     report.w05SavedSidecars[id]=await publishW05StoredSidecar({\n      id,pcHome:base,remote,coreDb:config.core,now,\n     });\n    });\n   }\n  }\n  }\n"
+    }
+  ]
+}
