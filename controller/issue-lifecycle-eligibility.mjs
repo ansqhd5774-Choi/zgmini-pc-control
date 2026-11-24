@@ -5,14 +5,6 @@
  * Fail closed on ambiguous evidence. This module does not close issues.
  */
 const APPROVED = Object.freeze({
-  'process-inventory-readonly': new Set([
-    'PROCESS_INVENTORY_COLLECTED',
-    'CNN_B_RESOURCE_SNAPSHOT_COLLECTED',
-    'CNN_B_CORE_READINESS_COLLECTED',
-    'CNN_B_PREIMAGE_PINS_COLLECTED',
-    'CNN_GIT_PREDICATE_EVIDENCE_COLLECTED',
-    'D05_WRITER_CHECKPOINT_OBSERVED'
-  ]),
   'core-runtime-source-readonly': new Set(['CORE_RUNTIME_SOURCE_VERIFIED']),
   'fear-greed-archive-status': new Set(['FEAR_GREED_ARCHIVE_READONLY_DIAGNOSIS']),
   'release-calendar-runtime-readonly': new Set(['RELEASE_CALENDAR_SOURCE_INVENTORY_READONLY'])
@@ -34,12 +26,13 @@ export function classifyIssueCompletion({issue,request,result,evidence,intent} =
   if (intent.autoCloseEnabled !== true) return deny('DEFAULT_OFF');
   if (intent.kind !== 'SINGLE_READONLY_DIAGNOSTIC' || intent.objectiveSatisfied !== true ||
       intent.approvedByIndependentPolicy !== true) return deny('OBJECTIVE_UNVERIFIED');
-  if (request.schema !== 'ZGMINI_PC_JOB_V1' &&
-      request.schema !== 'ZGMINI_PC_PROCESS_INVENTORY_REQUEST_V1') return deny('SCHEMA_NOT_APPROVED');
+  // process-inventory uses a different receipt schema; do not auto-admit it here.
+  if (request.schema !== 'ZGMINI_PC_JOB_V1') return deny('SCHEMA_NOT_APPROVED');
   if (!validText(request.requestId) || !validText(request.operation) ||
       request.requestId !== result.requestId || request.operation !== result.operation ||
       intent.requestId !== request.requestId) return deny('REQUEST_MISMATCH');
-  if (!APPROVED[request.operation]?.has(result.code)) return deny('OPERATION_CODE_NOT_APPROVED');
+  if (!Object.hasOwn(APPROVED, request.operation) || !APPROVED[request.operation].has(result.code))
+    return deny('OPERATION_CODE_NOT_APPROVED');
   if (result.status !== 'PASS' || result.firstFail != null ||
       result.protectedStateUnchanged !== true) return deny('RESULT_NOT_SAFE_PASS');
   if (result.operationalWrites !== 0 || result.providerCalls !== 0 || result.d1Writes !== 0)
@@ -56,6 +49,8 @@ export function classifyIssueCompletion({issue,request,result,evidence,intent} =
   if (evidence.jsonVerified !== true || evidence.txtVerified !== true ||
       evidence.commentVerified !== true || evidence.runConcludedSuccessfully !== true)
     return deny('RECEIPT_NOT_VERIFIED');
+  if (request.operation === 'core-runtime-source-readonly' &&
+      result.result?.runtimeSourceVerified !== true) return deny('RUNTIME_SOURCE_UNVERIFIED');
   if (intent.requiresRuntimeSourceVerified === true &&
       result.result?.runtimeSourceVerified !== true) return deny('RUNTIME_SOURCE_UNVERIFIED');
   if (intent.requiresCoreLockReleased === true &&
