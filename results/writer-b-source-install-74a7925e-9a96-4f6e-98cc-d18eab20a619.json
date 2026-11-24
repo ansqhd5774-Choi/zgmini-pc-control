@@ -1,0 +1,22 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "74a7925e-9a96-4f6e-98cc-d18eab20a619",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "e4b768530335182f422ebd51d163a6f5b754361c",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "24077edc2fb4196e83ba202fdd9681b1fe841447",
+  "candidateSourceSha": "a0735cac4a4dc56f0da0d3d0f82a93fd5b4486c7",
+  "manifestSha256": "7baf8befd29b0741d36397855da56aeff447c2d13862019e4c9f4bd1b43fa008",
+  "baseTreeOid": "5d7a7f98f7a4f8c7fea02b4f0168faa402bc781b",
+  "preparedTreeOid": "411588863fcfe6d37883e7c70b621e8f14a5fd96",
+  "provenanceSha256": "238719bbf075f4686c1bff692c09cab70de537031845dee91dc860d70e4dcc2d",
+  "runId": "45362631022",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "lib/w05-audit/compare-five-public-readbacks-r1.mjs",
+    "lib/w05-audit/five-key-inplace-readback-prework-r12.mjs",
+    "lib/w05-audit/five-key-public-api-reader-r1.mjs"
+  ]
+}
