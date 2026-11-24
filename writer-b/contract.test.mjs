@@ -59,7 +59,10 @@ test('3-file Inflation19 manifest validates without hard-coded filename values',
 test('reserved maintenance is exact opt-in bound to approved original Task XML',()=>{
  const m={...manifest(),coreMaintenance:'PAUSE_NEW_STARTS_DRAIN_360S_V1'};
  assert.equal(validateWriterBManifest(m),m);
- for(const coreMaintenance of [true,'DISABLE','PAUSE_NEW_STARTS_DRAIN_999S_V1',null])
+ const longer={...m,coreMaintenance:'PAUSE_NEW_STARTS_DRAIN_1200S_V1'};
+ assert.equal(validateWriterBManifest(longer),longer);
+ for(const coreMaintenance of [true,'DISABLE','PAUSE_NEW_STARTS_DRAIN_999S_V1',
+  'PAUSE_NEW_STARTS_DRAIN_1800S_V1',null])
   assert.throws(()=>validateWriterBManifest({...m,coreMaintenance}),
    {code:'WRITER_B_MAINTENANCE_APPROVAL_STOP'});
  assert.throws(()=>validateWriterBManifest({...m,runtimeDependencies:{
