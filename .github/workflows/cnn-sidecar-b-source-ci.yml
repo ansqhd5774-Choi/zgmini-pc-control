@@ -39,4 +39,5 @@ jobs:
       - name: Validate fixed target, fail-closed install and rollback source tests
         run: |
           node --check sidecar-b/windows-file-adapter.mjs
-          node --test sidecar-b/contract.test.mjs sidecar-b/windows-file-adapter.test.mjs
+          node --check sidecar-b/admission.mjs
+          node --test sidecar-b/*.test.mjs
