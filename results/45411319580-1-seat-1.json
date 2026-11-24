@@ -1,0 +1,133 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-45411319580-1-seat-1",
+  "requestId": "pc-9bb3c04e-70b8-4a95-90e5-0e7a7d66d084",
+  "startedAt": "2026-11-24T14:11:34.588Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "3c20e036ffa56a9a9670916d68c30451d6a699bc",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "48034ae3481192a519e6c472aac40f9a7272451f",
+  "sourceBranch": "main",
+  "operation": "core-status",
+  "seat": 1,
+  "status": "PASS",
+  "code": "CORE_READONLY_DIAGNOSIS",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-w04-reporter-controller-time-postcheck-20261124",
+  "effectClass": "FIXED_READONLY_NO_PROVIDER_NO_DB",
+  "pcOperationalApprovedSha": "4cdf4727e59a0667d641354bb5b3e7ede761daf7",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "CORE_READONLY_DIAGNOSIS",
+    "core": {
+      "lockPresent": false,
+      "checkpoints": {
+        "local-cycle-last-run.json": {
+          "exists": true,
+          "modifiedAt": "2026-11-24T14:11:34.289Z",
+          "bytes": 3143,
+          "status": "COMPLETE"
+        },
+        "local-collection-last-run.json": {
+          "exists": true,
+          "modifiedAt": "2026-11-24T14:05:37.673Z",
+          "bytes": 4330,
+          "status": "COMPLETE",
+          "employmentR6": {
+            "status": "NOOP",
+            "code": null,
+            "providerRequests": 0,
+            "groups": [],
+            "plannedGroups": [
+              {
+                "groupName": "DOL_UI_WEEKLY_CLAIMS",
+                "status": "CIRCUIT_OPEN",
+                "failureCode": "DOL_RELEASE_OBSERVATION_STALE",
+                "due": false,
+                "retryAt": "2026-11-24T14:10:44.047Z"
+              },
+              {
+                "groupName": "BLS_EMPLOYMENT_SITUATION",
+                "status": "RELEASE_ALREADY_STORED",
+                "due": false,
+                "releaseAt": "2026-11-06T13:30:00.000Z",
+                "collectAt": "2026-11-07T15:30:00.000Z"
+              },
+              {
+                "groupName": "BLS_JOLTS",
+                "status": "RELEASE_ALREADY_STORED",
+                "due": false,
+                "releaseAt": "2026-11-03T15:00:00.000Z",
+                "collectAt": "2026-11-04T17:00:00.000Z"
+              },
+              {
+                "groupName": "BLS_ECI",
+                "status": "RELEASE_ALREADY_STORED",
+                "due": false,
+                "releaseAt": "2026-10-30T12:30:00.000Z",
+                "collectAt": "2026-10-31T14:30:00.000Z"
+              },
+              {
+                "groupName": "BLS_STATE_MSA",
+                "status": "RELEASE_ALREADY_STORED",
+                "due": false,
+                "releaseAt": "2026-11-20T15:00:00.000Z",
+                "collectAt": "2026-11-21T17:00:00.000Z"
+              },
+              {
+                "groupName": "BLS_BED",
+                "status": "RELEASE_ALREADY_STORED",
+                "due": false,
+                "releaseAt": "2026-10-28T14:00:00.000Z",
+                "collectAt": "2026-10-29T16:00:00.000Z"
+              }
+            ]
+          }
+        },
+        "local-writer-last-run.json": {
+          "exists": true,
+          "modifiedAt": "2026-11-24T14:08:01.590Z",
+          "bytes": 8414,
+          "status": "VERIFIED",
+          "employmentR6": {
+            "status": "UNCHANGED",
+            "failureCode": null,
+            "asOfDate": "2026-11-24",
+            "sourceStoredAt": 1795307425460,
+            "sourceFeatures": 29,
+            "chartReadyFeatures": 22,
+            "recentlyObservedFeatures": 22,
+            "localResultHash": "52c2c15f66e42a50bfad91d00e09cb3434fb040b4907964c73a015ad4ca12f31",
+            "localResultStored": false,
+            "localResultReadback": "VERIFIED",
+            "methodologyVersion": "EMP-R6-FORMULA-R2-CPS-2025-10",
+            "formulaHash": "sha256:04486846cd6063452d1c764116d3a31209f074d23a8764bf5b6ec8467095210e"
+          }
+        }
+      },
+      "taskXmlHashes": {
+        "ZGMINI-PC-Local-Core": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+        "ZGMINI-PC-Local-Korea": "1797e5def9fc92551132ca69f60bb5320bb346c687988be3e4ff3eb76ef5fdc1",
+        "ZGMINI-PC-Iran-Progress-R13": "APPROVED_RETIRED_ABSENT"
+      },
+      "approvedSourceSha": "4cdf4727e59a0667d641354bb5b3e7ede761daf7"
+    },
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "sqliteOpened": false
+  },
+  "protectedBeforeSha256": "89b58fb88ff0d373a3da105b2c5b022d3d983dc2bdd383303222a5519562a12b",
+  "protectedAfterSha256": "89b58fb88ff0d373a3da105b2c5b022d3d983dc2bdd383303222a5519562a12b",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "3c20e036ffa56a9a9670916d68c30451d6a699bc",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-24T14:11:40.177Z",
+  "durationMs": 5589
+}
