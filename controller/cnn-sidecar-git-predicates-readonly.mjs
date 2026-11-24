@@ -81,7 +81,11 @@ export function classifyPinnedCnnGuardOrigin(source,approved){
  if(names.length>0&&lines.length>=23){
   for(const index of [18,20,22]){
    if(!/^\s*(?:if\s*\(|(?:need|check|ensure|assert|stop|fail)\s*\()/i.test(lines[index]))continue;
-   const window=lines.slice(index,index+3).map(line=>line.replace(/\/\/.*$/,'')).join(' ');
+   // Guard windows must be disjoint: a reference on line 21 must not be
+   // attributed to the candidate starting on line 19 (or 23 to 21).
+   // Include at most one continuation line before the next candidate.
+   const next=index===18?20:index===20?22:index+3;
+   const window=lines.slice(index,next).map(line=>line.replace(/\/\/.*$/,'')).join(' ');
    if(names.some(name=>new RegExp('(^|[^A-Za-z0-9_])'+name+'(?![A-Za-z0-9_])').test(window)))
     hits.push(index+1);
   }
