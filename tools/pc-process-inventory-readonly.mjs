@@ -12,6 +12,7 @@ import {inspectProviderActivity} from '../controller/provider-activity-runtime-r
 import {inspectHttp32TwoHostCheckpoints} from '../controller/http32-two-host-checkpoints-readonly.mjs';
 import {inspectSidecarSourceGate} from '../controller/fear-greed-archive-readonly.mjs';
 import {inspectCnnGitPredicatesReadonly} from '../controller/cnn-sidecar-git-predicates-readonly.mjs';
+import {inspectSidecarBManifestPreimageReadonly} from '../sidecar-b/operating-probe.mjs';
 import {maintenanceLockStatus} from './maintenance-lock.mjs';
 import {readMaintenanceRecoveryStatus,protectedSnapshot} from './update.mjs';
 import {readFixedReadonlyBytes} from '../controller/fixed-readonly-bytes.mjs';
@@ -33,6 +34,7 @@ const D05_REGISTERED_PROBE='d05-configured-registration-readonly';
 const C3160_PROBE='c3160-rollback-cas-readonly';
 const CNN_STATIC_GUARD_PROBE='cnn-sidecar-static-guard-readonly';
 const CNN_GIT_PREDICATES_PROBE='cnn-sidecar-git-predicates-readonly';
+const CNN_B_PINS_PROBE='cnn-sidecar-b-preimage-pins-readonly';
 const MAX_BYTES=32768;
 const KNOWN_PROCESSES=new Set([
  'runner.listener.exe','runner.worker.exe','node.exe','wscript.exe','cscript.exe',
@@ -101,10 +103,11 @@ export function authenticateProcess(event,env,role){
   const is3160=withW05&&raw.probe===C3160_PROBE;
    const isCnnStaticGuard=withW05&&raw.probe===CNN_STATIC_GUARD_PROBE;
   const isCnnGitPredicates=withW05&&raw.probe===CNN_GIT_PREDICATES_PROBE;
+  const isCnnBPins=withW05&&raw.probe===CNN_B_PINS_PROBE;
  if(!raw||(!basic&&!withJobs&&!withW05)||
    raw.schema!==SCHEMA||raw.operation!==ROLE_OPERATION||raw.role!==role||
    (withJobs&&role!=='operating')||
-   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!isD05Writer&&!isD05PrivateReceipt&&!isD05Theme&&!isD05Registration&&!is3160&&!isCnnStaticGuard&&!isCnnGitPredicates))))
+   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!isD05Writer&&!isD05PrivateReceipt&&!isD05Theme&&!isD05Registration&&!is3160&&!isCnnStaticGuard&&!isCnnGitPredicates&&!isCnnBPins))))
   fail('REQUEST_SCOPE_INVALID');
  const runnerJobRefs=withJobs?validateRunnerJobRefs(raw.runnerJobRefs):null;
  const normalized=structuredClone(event);
@@ -122,7 +125,8 @@ export function authenticateProcess(event,env,role){
    ...(isD05Registration?{d05ConfiguredRegistrations:true}:{}),
    ...(is3160?{c3160RecoveryCas:true}:{}),
    ...(isCnnStaticGuard?{cnnSidecarStaticGuard:true}:{}),
-   ...(isCnnGitPredicates?{cnnSidecarGitPredicates:true}:{})};
+   ...(isCnnGitPredicates?{cnnSidecarGitPredicates:true}:{}),
+   ...(isCnnBPins?{cnnSidecarBPreimagePins:true}:{})};
 }
 export function sanitizeProbe(raw){
  if(!raw||raw.schema!=='ZGMINI_PC_PROCESS_PROBE_V1')fail('PROBE_SCHEMA_INVALID');
@@ -2021,6 +2025,11 @@ export function collect(role,ctx,env=process.env){
   commandLinesCaptured:false,environmentValuesCaptured:false};
  if(identity!=='MATCH'||(role==='operating'&&host!=='PC')){
   return {...base,status:'BLOCKED',code:identity==='MATCH'?'HOST_NOT_CANONICAL':identity};
+ }
+ if(ctx.cnnSidecarBPreimagePins===true){
+  const observed=inspectSidecarBManifestPreimageReadonly();
+  return {...base,status:observed.status,code:observed.code,
+   cnnSidecarBPreimagePins:observed};
  }
  if(ctx.cnnSidecarGitPredicates===true){
   const observed=inspectCnnGitPredicatesReadonly(CNN_SIDECAR_DATA_ROOT);
