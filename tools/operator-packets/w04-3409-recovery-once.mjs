@@ -93,7 +93,17 @@ const runExe=(bin,args,{timeout=60000,maxBuffer=8_000_000}={})=>{
   throw error;
  }
 };
-const git=(args)=>runExe('git',['--no-optional-locks','-C',FIXED.root,...args]);
+let isolatedHooksPath=null;
+const git=(args)=>{
+ need(typeof isolatedHooksPath==='string','OPERATOR_HOOK_ISOLATION_UNVERIFIED');
+ const st=fs.lstatSync(isolatedHooksPath);
+ need(st.isDirectory()&&!st.isSymbolicLink()&&fs.readdirSync(isolatedHooksPath).length===0,
+   'OPERATOR_HOOK_ISOLATION_DRIFT');
+ // Explicit -c is inherited by worktree checkout: repository/default hooks
+ // cannot run even if another party changes Git's configured hooksPath.
+ return runExe('git',['--no-optional-locks','-c','core.hooksPath='+isolatedHooksPath,
+   '-C',FIXED.root,...args]);
+};
 const show=(rev,rel)=>git(['show',rev+':'+rel]);
 
 function verifyInstalledOperator(){
@@ -123,18 +133,7 @@ function verifyGitCheckout(){
  const root=git(['rev-parse','--show-toplevel']).toString().trim();
  need(normalized(root)===normalized(FIXED.root),'OPERATOR_GIT_ROOT_MISMATCH');
  assertOrigin(git(['remote','get-url','origin']).toString().trim());
- const customHooks=(()=>{
-  try{return git(['config','--get','core.hooksPath']).toString().trim();}
-  catch(e){if(e?.status===1)return '';fail('OPERATOR_GIT_HOOKS_UNVERIFIED');}
- })();
- need(!customHooks,'OPERATOR_GIT_CUSTOM_HOOKS_FORBIDDEN');
- const hookRoot=git(['rev-parse','--git-path','hooks']).toString().trim();
- const dir=path.isAbsolute(hookRoot)?hookRoot:path.resolve(FIXED.root,hookRoot);
- if(fs.existsSync(dir)){
-  need(fs.lstatSync(dir).isDirectory(),'OPERATOR_GIT_HOOKS_UNVERIFIED');
-  need(fs.readdirSync(dir).every(n=>n.endsWith('.sample')),
-    'OPERATOR_GIT_ACTIVE_HOOKS_FORBIDDEN');
- }
+ // Git commands use a private empty hooksPath; existing repository hooks are inert.
  const head=git(['rev-parse','HEAD']).toString().trim();
  need(/^[a-f0-9]{40}$/.test(head),'OPERATOR_HEAD_UNVERIFIED');
  return head;
@@ -178,6 +177,7 @@ export async function runOnce({platform=process.platform,env=process.env}={}){
  need(!fs.existsSync(FIXED.bootstrap)&&!fs.existsSync(FIXED.staged),
   'OPERATOR_PREVIOUS_SOURCE_STAGE_RECONCILE_FIRST');
  verifyInstalledOperator();
+ isolatedHooksPath=fs.mkdtempSync(path.join(env.TEMP,'ZGMINI_W04_3409_EMPTY_HOOKS_'));
  const oldHead=verifyGitCheckout();
  const report=reportPath(env);
  need(!fs.existsSync(report),'OPERATOR_PREVIOUS_ATTEMPT_RECONCILE_FIRST');
@@ -190,6 +190,7 @@ export async function runOnce({platform=process.platform,env=process.env}={}){
   'RELEASE='+FIXED.release,
   'CHECKOUT_BEFORE='+oldHead,
   'OPERATOR_ORIGIN=INDEPENDENT_VERIFIED',
+  'GIT_HOOKS_PATH=ISOLATED_EMPTY',
   'PHASE=SOURCE_DELIVERY_STARTED',
   'CONTROLLER_WRITES_BY_PACKET=0',
   'WRITER_WRITES_BY_PACKET=0'].join('\n')+'\n',{flag:'wx',mode:0o600});
