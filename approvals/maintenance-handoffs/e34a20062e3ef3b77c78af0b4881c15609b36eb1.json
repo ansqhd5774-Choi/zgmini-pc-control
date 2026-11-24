@@ -1,0 +1,41 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "dcfc8908866c6cef24ab173bab16095895d77ac9",
+  "targetSha": "e34a20062e3ef3b77c78af0b4881c15609b36eb1",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "Existing same-effect independent Windows receiver 7-to-7 handoff approval and user's continued work instruction. Previous verified #3369/#3372/#3373 installed source dcfc8908866c6cef24ab173bab16095895d77ac9. PR #3374's failure-only Busy refusal telemetry is a safety-neutral observation enhancement to prior approved #3357/#3180 behavior, without any new operation, privilege, schedule, Controller, Core, Writer, SQLite, D1 or publication effects. Source approval does not bypass fresh live installed CAS/lease/Startup/receiver checks.",
+  "files": {
+    "tools/maintenance-contract.mjs": "cdaf63cef96d872cccb2a2fc33cab37eba7d1a91301b7f382c338374e2bf335e",
+    "tools/maintenance-apply.mjs": "a99c6a51a024deaf4e3c6aa806182e73aeb4049604636db7dbd65614a40eb51e",
+    "tools/maintenance-agent.mjs": "6feab04dceb368563d85eee495fba385ef7beb595ed045298bb7e3ef2fc0dc23",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "387e52424819904d8a500b94bbfed7d7980baf5dadfc68f211eaffda4d246191",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "af31ab1f6a159aa1d8467d2585eb16750e8a1a293f9ecfb90b85c388d8640d70",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "445bdf1b321d8e7db0b9b3f62a4b0172e5bc5ea364fd9790f4bd9626d9037563"
+  },
+  "checks": {
+    "sourceCi": "PR #3374 head 20808db9c56db8dcfee977bf9266f5358d9e9bb0: C996 Run 45426997699 SUCCESS; Automation Status Run 45426997918 SUCCESS; Controller Maintenance Run 45426997837 SUCCESS (67 steps).",
+    "installedWindowsEvidence": "#3372 independent Watchdog Windows handoff PASS and #3373 operating read-only Run 45425777363 observed 2026-11-24T15:28:45.703Z verified installed maintainer source dcfc8908866c6cef24ab173bab16095895d77ac9 and raw files, receiver LISTENING/HEALTHY, installLockHeld=false, workflow active; historical proof only, fresh CAS/lease required.",
+    "exactBytePlan": "Installed old main source 9/9 raw SHA256 independently recomputed and matched approval #3369. New target 9/9 raw SHA256 independently computed. Only tools/maintenance-apply.mjs, tools/maintenance-agent.mjs and tools/update.mjs change. Other six bytes unchanged.",
+    "targetMainCommit": "e34a20062e3ef3b77c78af0b4881c15609b36eb1 from merged source PR #3374. Operator must confirm exact target is ancestor of live main.",
+    "windowsHandoffExecuted": false
+  },
+  "runtimeChangedFiles": [
+    "tools/maintenance-apply.mjs",
+    "tools/maintenance-agent.mjs",
+    "tools/update.mjs"
+  ],
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "preserve": [
+    "Existing installed Controller and six dedicated Runner seats",
+    "Current Workflow, Core/Writer task schedules, original data, DB/D1 and DNS",
+    "All previous maintenance request ledgers, owner markers, leases and backups",
+    "Do not rerun #3372 or original failed Controller tasks"
+  ],
+  "scopeNote": "Nine-file source-approved maintainer-only 7-to-7 handoff, three actual byte changes. On-machine watchdog must check raw manifest SHA, exact live installed/source CAS, active lease and receiver identity/probe guard, backup and rollback before any mutation. Failure/unknown is not success. Future real Busy events are required for performance validation."
+}
