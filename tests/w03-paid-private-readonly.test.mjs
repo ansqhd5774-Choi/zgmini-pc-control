@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
-import {inspectW03PaidPrivateReadonly,summarizeD05ThemeCandidates} from '../tools/w03-paid-private-readonly.mjs';
+import {inspectW03PaidPrivateReadonly,summarizeD05ThemeCandidates,inspectD05ConfiguredRegistrationReadonly} from '../tools/w03-paid-private-readonly.mjs';
 
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const H='a'.repeat(64),Q='b'.repeat(64);
@@ -142,4 +142,45 @@ test('D05 public-only archive checks the approved registered roster, not the 30-
   const result=summarizeD05ThemeCandidates([n('a')],()=>rows,{...options,...change});
   assert.equal(result.status,'PARTIAL');assert.equal(result.publicFinalOutputCoverageVerified,false);
  }
+});
+
+test('D05 configured registration file inventory is count-only and preserves private definitions',()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'d05-registered-readonly-'));
+ try{
+  const dir=path.join(root,'theme-config','definitions');
+  fs.mkdirSync(dir,{recursive:true});
+  const d={schema:'ZGMINI_THEME_CONFIG_V2',id:'quantum-computing',
+   label:'양자컴퓨팅',provider:'getmarkethistory',
+   profile:'ETF_ONLY_T40_R20_V40_ADAPTIVE_R2_DATED_ISSUER_AUM_R32',
+   etfs:['QTUM'],benchmark:'SPY',startDate:'2026-01-01',
+   selectionEvidence:{path:'secret/one.json',sha256:'a'.repeat(64)},
+   aumEvidence:{path:'secret/two.json',sha256:'b'.repeat(64)},
+   provisionalPolicy:'GMH_CONFIRMED_MARKETPARQUET_PROVISIONAL_R8_OVERLAP_GUARD'};
+  const file=path.join(dir,'quantum-computing.json');
+  fs.writeFileSync(file,JSON.stringify(d));
+  const probe=()=>inspectD05ConfiguredRegistrationReadonly({root});
+  const a=probe();
+  assert.equal(a.status,'PASS');
+  assert.equal(a.code,'D05_CONFIGURED_REGISTRATIONS_READONLY');
+  assert.equal(a.registeredDefinitionCount,1);
+  assert.equal(a.validDefinitionCount,1);
+  assert.equal(a.dashboard30CoverageVerified,false);
+  assert.equal(a.registeredThemesCalculated,false);
+  assert.equal(a.publicPublicationAuthorized,false);
+  assert.equal(a.operationalWrites,0);
+  assert.match(a.registryManifestSha256,/^[a-f0-9]{64}$/);
+  assert.doesNotMatch(JSON.stringify(a),/quantum-computing|양자컴퓨팅|QTUM|secret/);
+  assert.deepEqual(probe(),a);
+  fs.writeFileSync(file,'{}');
+  assert.equal(probe().status,'STATE_UNKNOWN');
+  fs.unlinkSync(file);
+  assert.equal(probe().registeredDefinitionCount,0);
+  fs.writeFileSync(path.join(dir,'../escape.json'),'{}');
+  assert.equal(probe().registeredDefinitionCount,0);
+  fs.writeFileSync(path.join(dir,'not@allowed.json'),'{}');
+  assert.equal(probe().code,'D05_CONFIGURED_DEFINITIONS_INVENTORY_INVALID');
+  fs.unlinkSync(path.join(dir,'not@allowed.json'));
+  fs.rmdirSync(dir);
+  assert.equal(probe().code,'D05_CONFIGURED_DEFINITIONS_DIRECTORY_ABSENT');
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
