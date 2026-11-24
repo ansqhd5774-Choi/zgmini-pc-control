@@ -1739,3 +1739,35 @@ test('CNN Git evidence differentiates mismatch, dirty, unknown and verified boun
  assert.equal(wrongRoot.status,'STATE_UNKNOWN');
  assert.equal(wrongRoot.operationalWrites,0);
 });
+
+test('CNN tracks untracked-only dirt separately from tracked status with safe classification',async()=>{
+ const {projectCnnGitEvidence}=await import('../controller/cnn-sidecar-git-predicates-readonly.mjs');
+ const base={sourcePin:true,ledgerStable:true,ledgerStatus:'BLOCKED',
+  head:'a'.repeat(40),approved:'a'.repeat(40),checkpoint:'a'.repeat(40),
+  gitVerified:true,trackedClean:true,wholeTreeClean:false,
+  mentionsCheckout:true,guardSites:true,
+  sourceStatusGuardClass:'DEFAULT_OR_UNKNOWN',
+  sourceText:'PRIVATE_SOURCE_DO_NOT_LOG',
+  untrackedStatus:'?? SECRET_CREDENTIALS.txt'};
+ const x=projectCnnGitEvidence(base);
+ assert.equal(x.status,'PASS');
+ assert.equal(x.gitHeadMatchesConfig,true);
+ assert.equal(x.trackedTreeClean,true);
+ assert.equal(x.wholeTreeClean,false);
+ assert.equal(x.untrackedOnlyDirty,true);
+ assert.equal(x.sourceStatusGuardClass,'DEFAULT_OR_UNKNOWN');
+ assert.equal(x.failurePredicateResolved,false);
+ assert.equal(x.sidecarFailureResolved,false);
+ assert.equal(x.operationalWrites,0);
+ assert.doesNotMatch(JSON.stringify(x),/PRIVATE_SOURCE_DO_NOT_LOG|SECRET_CREDENTIALS/);
+ const clean=projectCnnGitEvidence({...base,wholeTreeClean:true});
+ assert.equal(clean.untrackedOnlyDirty,false);
+ const unknown=projectCnnGitEvidence({...base,wholeTreeClean:null});
+ assert.equal(unknown.wholeTreeClean,null);
+ assert.equal(unknown.untrackedOnlyDirty,null);
+ const invalid=projectCnnGitEvidence({...base,sourceStatusGuardClass:'SECRET_VALUE'});
+ assert.equal(invalid.sourceStatusGuardClass,'UNVERIFIED');
+ const withoutPin=projectCnnGitEvidence({...base,sourcePin:false});
+ assert.equal(withoutPin.sourceStatusGuardClass,'UNVERIFIED');
+ assert.equal(withoutPin.status,'STATE_UNKNOWN');
+});
