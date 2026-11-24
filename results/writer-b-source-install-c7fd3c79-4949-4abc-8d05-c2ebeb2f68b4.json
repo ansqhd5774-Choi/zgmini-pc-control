@@ -1,0 +1,17 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "c7fd3c79-4949-4abc-8d05-c2ebeb2f68b4",
+  "status": "WRITER_B_PREFLIGHT_STOP",
+  "code": "WRITER_B_IMPORT_SOURCE_SYNTAX_STOP",
+  "sourceSha": null,
+  "mode": null,
+  "localOnly": null,
+  "baseHead": null,
+  "candidateSourceSha": null,
+  "manifestSha256": null,
+  "baseTreeOid": null,
+  "preparedTreeOid": null,
+  "provenanceSha256": null,
+  "runId": "45310436641",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE"
+}
