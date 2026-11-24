@@ -13,6 +13,7 @@ import {inspectW05CloudflareActive} from './w05-cloudflare-deployment-readonly.m
 import {inspectInflation7D1Readback} from './inflation7-d1-readback-readonly.mjs';
 import {inspectInflation19D1Readback} from './inflation19-d1-readback-readonly.mjs';
 import {inspectCoreRuntimeSource} from './core-runtime-source-readonly.mjs';
+import {readCompletedCoreLineage} from '../tools/core092-completed-lineage-readonly.mjs';
 import {observeInflationCoreLock} from './inflation-core-lock-observation-readonly.mjs';
 import {inspectInflationEvent129Once} from './inflation-event129-evidence-readonly.mjs';
 import {inspectWriterB1063Recovery} from './writer-b-1063-recovery-readonly.mjs';
@@ -229,6 +230,7 @@ export async function runOperation(request,context){
  if(request.operation==='sector-r3-dated-ledger-readonly')return inspectSectorR3DatedLedger(dataRoot);
  if(request.operation==='sector-r3-d1-api-readback-readonly')return inspectSectorR3D1ApiReadback(dataRoot);
  if(request.operation==='core-runtime-source-readonly')return inspectCoreRuntimeSource();
+ if(request.operation==='core-completed-lineage-readonly')return readCompletedCoreLineage();
  if(request.operation==='inflation-core-lock-observation-readonly')
   return observeInflationCoreLock({queryTask});
  if(request.operation==='inflation-event129-evidence-readonly')
