@@ -820,6 +820,11 @@ test('W04 ETA538 saved-only audit checks binary PDF, Base64 and all four Nationa
      originalPdfSha256:original,responseHash:textHash,rawRecordHash:sourceHash,
      sourceKind:'ETA538_ADVANCE_RELEASE_PDF'}));
   }
+  // Invalid release/hash pins must fail before any persisted-byte claim.
+  assert.equal(auditStoredEta538PdfRawLinkage(db,{releaseDate:'invalid',
+   approvedPdfSha256:original}).status,'PIN_INVALID');
+  assert.equal(auditStoredEta538PdfRawLinkage(db,{approvedPdfSha256:'0'}).status,
+   'PIN_INVALID');
   const verified=auditStoredEta538PdfRawLinkage(db,{approvedPdfSha256:original});
   assert.equal(verified.status,'PDF_BYTES_AND_FOUR_ROW_HASH_LINKS_VERIFIED_NOT_VALUE_REPARSE');
   assert.equal(verified.verifiedNationalRows,4);
