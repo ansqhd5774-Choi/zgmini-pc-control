@@ -39,7 +39,7 @@ test('D05 private actual score event B manifest validates and reuses exact reado
 test('D05 B manifest refuses invalid source/protection/side-effect changes',()=>{
  for(const modified of [
   {...manifest,allowD1Writes:true},
-  {...manifest,sourceRoot:'E:\\ZGmini\\projects\\unknown'},
+  {...manifest,sourceRoot:'F:\\ZGmini\\projects\\unknown'},
   {...manifest,coreMaintenance:'PAUSE_NEW_STARTS_DRAIN_999S_V1'},
   {...manifest,files:[{...manifest.files[0],beforeSha256:'f'.repeat(64)},manifest.files[1],
    manifest.files[0]]}
