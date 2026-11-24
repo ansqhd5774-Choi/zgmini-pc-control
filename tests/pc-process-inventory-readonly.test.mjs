@@ -1875,3 +1875,24 @@ test('CNN fixed SHA guard reference only reports candidate line categories',asyn
  assert.equal(output.d1Writes,0);
  assert.equal(projectCnnGitEvidence({...output,sourcePin:false}).guardOrigin,null);
 });
+
+test('CNN guard classifier includes exact source and approved names rather than returning false unknown',async()=>{
+ const {classifyPinnedCnnGuardOrigin}=await import('../controller/cnn-sidecar-git-predicates-readonly.mjs');
+ const make=name=>{
+  const rows=Array.from({length:25},()=>'const noop=0;');
+  rows[0]='const '+name+'="'+('a'.repeat(40))+'";';
+  rows[18]="if(head !== "+name+") need(false,'SOURCE SHA');";
+  rows[20]="if(config !== head) need(false,'OTHER');";
+  rows[22]="if(dirty) need(false,'DIRTY');";
+  return rows.join('\n');
+ };
+ for(const name of ['source','approved','SOURCE','APPROVED_SOURCE_SHA']){
+  const v=classifyPinnedCnnGuardOrigin(make(name),'b'.repeat(40));
+  assert.equal(v.fixedShaRelation,'MISMATCH');
+  assert.equal(v.fixedShaGuardReference,'LINE_19');
+  assert.equal(v.reasonSiteClass,'CHECK_HELPER');
+  assert.doesNotMatch(JSON.stringify(v),/aaaaaaaaaaaaaaaa|APPROVED_SOURCE_SHA/);
+ }
+ const d=classifyPinnedCnnGuardOrigin(make('irrelevant'),'b'.repeat(40));
+ assert.equal(d.fixedShaGuardReference,'UNVERIFIED');
+});
