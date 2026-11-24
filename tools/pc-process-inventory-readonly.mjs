@@ -2004,6 +2004,63 @@ export function projectCnnSidecarStaticGuard(raw){
   operationalWrites:0,providerCalls:0,d1Writes:0};
 }
 
+// #1521: fixed W05 checkout readback, not Sidecar execution provenance.
+// No dynamic paths, source text, credentials, mutable Git operations or raw output.
+const CNN_FIXED_GIT_ROOT='E:/ZGmini/projects/zgmini-earnings-history-pc-release';
+const CNN_FIXED_GIT_CONFIG='E:/ZGmini/data/pc-writer/config.json';
+const CNN_SHA40=/^[0-9a-f]{40}$/i;
+function cnnGitReadOnly(args){
+ const p=spawnSync('git',['--no-optional-locks','-C',CNN_FIXED_GIT_ROOT,
+  '-c','core.fsmonitor=false',...args],{
+  encoding:'utf8',windowsHide:true,shell:false,timeout:6000,maxBuffer:65536,
+  env:{...process.env,GIT_OPTIONAL_LOCKS:'0',GIT_TERMINAL_PROMPT:'0'}});
+ return p.status===0&&!p.error&&typeof p.stdout==='string'?p.stdout.trim():null;
+}
+function cnnApprovedConfigSource(){
+ try{
+  const info=fs.lstatSync(CNN_FIXED_GIT_CONFIG);
+  if(!info.isFile()||info.isSymbolicLink()||info.size<2||info.size>8192)return null;
+  const real=path.win32.normalize(fs.realpathSync.native(CNN_FIXED_GIT_CONFIG)).toLowerCase();
+  if(real!==path.win32.normalize(CNN_FIXED_GIT_CONFIG).toLowerCase())return null;
+  const data=JSON.parse(fs.readFileSync(CNN_FIXED_GIT_CONFIG,'utf8'));
+  return CNN_SHA40.test(data?.source)?data.source.toLowerCase():null;
+ }catch{return null;}
+}
+// Values are projected to fixed enums; no SHA, path, diff or Git stdout escapes.
+export function classifyCnnFixedCheckoutReadback(raw={}){
+ const sha=x=>typeof x==='string'&&CNN_SHA40.test(x);
+ const stable=raw.rootVerified===true&&sha(raw.headBefore)&&
+  sha(raw.headAfter)&&sha(raw.approvedBefore)&&sha(raw.approvedAfter)&&
+  raw.headBefore.toLowerCase()===raw.headAfter.toLowerCase()&&
+  raw.approvedBefore.toLowerCase()===raw.approvedAfter.toLowerCase()&&
+  typeof raw.cleanBefore==='boolean'&&raw.cleanBefore===raw.cleanAfter;
+ return {schema:'ZGMINI_CNN_FIXED_CHECKOUT_READONLY_V1',
+  status:stable?'PASS':'STATE_UNKNOWN',
+  code:stable?'CNN_FIXED_CHECKOUT_GIT_OBSERVED':'CNN_FIXED_CHECKOUT_NOT_ATTESTED',
+  evidence:'FIXED_W05_CHECKOUT_NOT_SIDECAR_RUNTIME_OR_GUARD_PROOF',
+  headVsApproved:stable?(raw.headBefore.toLowerCase()===raw.approvedBefore.toLowerCase()?'MATCH':'MISMATCH'):'UNKNOWN',
+  trackedClean:stable?raw.cleanBefore:null,
+  actualSidecarGitRootVerified:false,actualFailingSidecarPredicate:'UNKNOWN',
+  operationalWrites:0,providerCalls:0,d1Writes:0};
+}
+function inspectCnnFixedCheckoutReadonly(){
+ const top=cnnGitReadOnly(['rev-parse','--show-toplevel']);
+ const rootVerified=top!==null&&
+  path.win32.normalize(top.replaceAll('/','\\')).toLowerCase()===
+  path.win32.normalize(CNN_FIXED_GIT_ROOT).toLowerCase();
+ if(!rootVerified)return classifyCnnFixedCheckoutReadback();
+ const headBefore=cnnGitReadOnly(['rev-parse','--verify','HEAD']);
+ const approvedBefore=cnnApprovedConfigSource();
+ const cleanOne=cnnGitReadOnly(['status','--porcelain=v1','--untracked-files=no']);
+ const cleanTwo=cnnGitReadOnly(['status','--porcelain=v1','--untracked-files=no']);
+ const approvedAfter=cnnApprovedConfigSource();
+ const headAfter=cnnGitReadOnly(['rev-parse','--verify','HEAD']);
+ return classifyCnnFixedCheckoutReadback({rootVerified,
+  headBefore,headAfter,approvedBefore,approvedAfter,
+  cleanBefore:cleanOne===null?null:cleanOne.length===0,
+  cleanAfter:cleanTwo===null?null:cleanTwo.length===0});
+}
+
 export function collect(role,ctx,env=process.env){
  const host=os.hostname().toUpperCase();
  const runnerName=String(env.RUNNER_NAME||'');
@@ -2021,8 +2078,10 @@ export function collect(role,ctx,env=process.env){
  if(ctx.cnnSidecarStaticGuard===true){
    const observed=projectCnnSidecarStaticGuard(
     inspectSidecarSourceGate(CNN_SIDECAR_DATA_ROOT));
+   const checkout=observed.status==='PASS'?
+    inspectCnnFixedCheckoutReadonly():classifyCnnFixedCheckoutReadback();
    return {...base,status:observed.status,code:observed.code,
-    cnnSidecarStaticGuard:observed};
+    cnnSidecarStaticGuard:observed,cnnFixedCheckoutReadback:checkout};
   }
   if(ctx.c3160RecoveryCas===true){
   const result=inspect3160RecoveryCasReadonly();
@@ -2125,6 +2184,9 @@ export function toText(r){
    'd05ConfiguredRegistry='+r.d05ConfiguredRegistrations.code,
    'd05ConfiguredDefinitionCount='+(r.d05ConfiguredRegistrations.registeredDefinitionCount??'UNKNOWN'),
    'd05ConfiguredInventoryHash='+(r.d05ConfiguredRegistrations.registryManifestSha256??'UNKNOWN')]:[]),
+  ...(r.cnnFixedCheckoutReadback?[
+   'cnnFixedCheckoutReadback='+r.cnnFixedCheckoutReadback.code,
+   'cnnSidecarRootVerified=false']:[]),
   ...(r.cnnSidecarStaticGuard?[
     'cnnSidecarStaticGuard='+r.cnnSidecarStaticGuard.code,
     'cnnSourceGuardCandidates='+r.cnnSidecarStaticGuard.sourceGuardCandidates.length,
