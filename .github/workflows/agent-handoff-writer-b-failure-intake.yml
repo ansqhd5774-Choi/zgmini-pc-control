@@ -24,6 +24,8 @@ jobs:
       github.event.workflow_run.run_attempt == 1
     runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
     timeout-minutes: 5
+    outputs:
+      selection_reused: ${{ steps.selection-noop.outcome == 'success' && steps.selection-noop.outputs.reusable == 'true' && 'true' || 'false' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -37,11 +39,25 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         shell: cmd
         run: node agent-handoff/writer-b-failure-producer.mjs
+      # Optional read-only proof; failure or uncertainty retains the normal selection Job.
+      - name: Verify all pending selection receipts without writing
+        id: selection-noop
+        if: >-
+          github.event_name == 'workflow_run' &&
+          vars.ZGMINI_AGENT_HANDOFF_ENABLED == 'true' &&
+          github.ref == 'refs/heads/main' &&
+          github.actor == 'ansqhd5774-Choi'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: cmd
+        run: node agent-handoff/queue-dispatcher.mjs --verify-noop
   # Keep original intake independent; avoid a second completion-triggered Run.
   verify-and-select-after-failure-intake:
     needs: enqueue-verified-writer-b-failures
     if: >-
       needs.enqueue-verified-writer-b-failures.result == 'success' &&
+      needs.enqueue-verified-writer-b-failures.outputs.selection_reused != 'true' &&
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
       github.event.repository.private == true &&
       vars.ZGMINI_AGENT_HANDOFF_ENABLED == 'true' &&
@@ -72,9 +88,17 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: node agent-handoff/queue-dispatcher.mjs
   authenticated-readonly-board-after-selection:
-    needs: verify-and-select-after-failure-intake
+    needs: [enqueue-verified-writer-b-failures, verify-and-select-after-failure-intake]
     if: >-
-      needs.verify-and-select-after-failure-intake.result == 'success' &&
+      !cancelled() && !failure() &&
+      needs.enqueue-verified-writer-b-failures.result == 'success' &&
+      (needs.verify-and-select-after-failure-intake.result == 'success' ||
+       (needs.verify-and-select-after-failure-intake.result == 'skipped' &&
+        needs.enqueue-verified-writer-b-failures.outputs.selection_reused == 'true')) &&
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      vars.ZGMINI_AGENT_HANDOFF_ENABLED == 'true' &&
+      github.actor == 'ansqhd5774-Choi' &&
       github.ref == 'refs/heads/main'
     permissions:
       contents: read
