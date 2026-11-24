@@ -273,7 +273,8 @@ test('board GitHub workflow is isolated, origin-guarded, read-only, and has a bo
   assert.match(flow,/workflow_dispatch:/);
   assert.match(flow,/schedule:\s*\n\s*- cron: '7,22,37,52 \* \* \* \*'/);
   assert.match(flow,/github\.event_name == 'schedule'/);
-  assert.match(flow,/ZGMINI Handoff Queue Candidate Selector/);
+  assert.doesNotMatch(flow,/^  workflow_run:/m);
+  assert.doesNotMatch(flow,/github\.event\.workflow_run/);
   assert.doesNotMatch(flow,/ZGMINI Agent Handoff Intake/);
   assert.doesNotMatch(flow,/contents: write|issues: write|zgmini-pc-control\]/);
   assert.match(flow,/ZGMINI_AGENT_HANDOFF_ENABLED/);
@@ -415,4 +416,34 @@ test('adding review references never changes selector execution plan or grants m
  const after=compileQueueBoard([{issue:f.issue,comments:f.comments}],now);
  assert.deepEqual(ownerExecutionPlan(after),ownerExecutionPlan(before));
  assert.equal(after.operationalWrites,0);assert.equal(after.aiCalls,0);assert.equal(after.automaticPcRetries,0);
+});
+
+
+test('after-selection board accepts only the reviewed main job and authorized selector origins',()=>{
+  const repository={full_name:HANDOFF_REPOSITORY,private:true};
+  const env={GITHUB_REPOSITORY:HANDOFF_REPOSITORY,GITHUB_EVENT_PATH:'event.json',
+    GITHUB_JOB:'authenticated-readonly-board-after-selection',
+    GITHUB_WORKFLOW_REF:HANDOFF_REPOSITORY+'/.github/workflows/agent-handoff-candidate-selector.yml@refs/heads/main',
+    GITHUB_REF:'refs/heads/main',GITHUB_EVENT_NAME:'workflow_run'};
+  const run={repository,action:'completed',workflow_run:{name:'ZGMINI Agent Handoff Intake',
+    conclusion:'success',actor:{login:HANDOFF_OWNER}}};
+  for(const name of ['ZGMINI Agent Handoff Intake','ZGMINI Agent Handoff PC Failure Intake','ZGMINI Agent Handoff Writer B Failure Intake'])
+    assert.doesNotThrow(()=>validateBoardEvent({...run,workflow_run:{...run.workflow_run,name}},env));
+  for(const conclusion of ['skipped','failure','cancelled'])
+    assert.throws(()=>validateBoardEvent({...run,workflow_run:{...run.workflow_run,conclusion}},env),/AFTER_SELECTION_RUN_STOP/);
+  assert.throws(()=>validateBoardEvent({...run,workflow_run:{...run.workflow_run,name:'Other'}},env),/AFTER_SELECTION_RUN_STOP/);
+  assert.throws(()=>validateBoardEvent({...run,workflow_run:{...run.workflow_run,actor:{login:'other'}}},env),/AFTER_SELECTION_RUN_STOP/);
+  assert.throws(()=>validateBoardEvent(run,{...env,GITHUB_REF:'refs/heads/dev'}),/AFTER_SELECTION_SCOPE_STOP/);
+  assert.throws(()=>validateBoardEvent(run,{...env,GITHUB_WORKFLOW_REF:env.GITHUB_WORKFLOW_REF.replace('candidate-selector','queue-board')}),/AFTER_SELECTION_SCOPE_STOP/);
+  assert.throws(()=>validateBoardEvent(run,{...env,GITHUB_JOB:'unrelated-job'}),/RUN_PROVENANCE_STOP/);
+  const manual={repository,sender:{login:HANDOFF_OWNER}};
+  const manualEnv={...env,GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_ACTOR:HANDOFF_OWNER};
+  assert.doesNotThrow(()=>validateBoardEvent(manual,manualEnv));
+  assert.throws(()=>validateBoardEvent({...manual,sender:{login:'other'}},manualEnv),/DISPATCH_OWNER_STOP/);
+  const push={repository,ref:'refs/heads/main',deleted:false};
+  const pushEnv={...env,GITHUB_EVENT_NAME:'push',GITHUB_ACTOR:HANDOFF_OWNER};
+  assert.doesNotThrow(()=>validateBoardEvent(push,pushEnv));
+  assert.throws(()=>validateBoardEvent({...push,deleted:true},pushEnv),/AFTER_SELECTION_PUSH_STOP/);
+  assert.throws(()=>validateBoardEvent(push,{...pushEnv,GITHUB_ACTOR:'other'}),/AFTER_SELECTION_PUSH_STOP/);
+  assert.throws(()=>validateBoardEvent({...run,repository:{...repository,private:false}},env),/EVENT_SCOPE_STOP/);
 });

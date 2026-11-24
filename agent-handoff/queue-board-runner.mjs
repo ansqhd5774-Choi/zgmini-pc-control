@@ -8,7 +8,15 @@ import {DIRECT_OWNER_REVIEWS,compileDirectOwnerBoard,renderDirectOwnerMarkdown}
   from './direct-owner-reviews.mjs';
 
 const API='https://api.github.com/repos/'+HANDOFF_REPOSITORY+'/';
+// Keep the legacy completion validator for already-created pre-change Runs.
 const WORKFLOWS=new Set(['ZGMINI Handoff Queue Candidate Selector']);
+const SELECTOR_WORKFLOW_REF=HANDOFF_REPOSITORY+'/.github/workflows/agent-handoff-candidate-selector.yml@refs/heads/main';
+const SELECTOR_INTAKES=new Set([
+  'ZGMINI Agent Handoff Intake',
+  'ZGMINI Agent Handoff PC Failure Intake',
+  'ZGMINI Agent Handoff Writer B Failure Intake'
+]);
+const AFTER_SELECTION_JOB='authenticated-readonly-board-after-selection';
 export const BOARD_CRON='7,22,37,52 * * * *';
 const fail=code=>{throw Error('HANDOFF_BOARD_RUNNER_'+code);};
 
@@ -17,6 +25,25 @@ export function validateBoardEvent(event,env) {
     event.repository.full_name!==HANDOFF_REPOSITORY||
     env.GITHUB_REPOSITORY!==HANDOFF_REPOSITORY||!env.GITHUB_EVENT_PATH)
     fail('EVENT_SCOPE_STOP');
+  // The workflow's needs dependency verifies selection success. Recheck the
+  // original event here, with the exact default-branch workflow/job identity.
+  if(env.GITHUB_JOB===AFTER_SELECTION_JOB){
+    if(env.GITHUB_WORKFLOW_REF!==SELECTOR_WORKFLOW_REF||env.GITHUB_REF!=='refs/heads/main')
+      fail('AFTER_SELECTION_SCOPE_STOP');
+    if(env.GITHUB_EVENT_NAME==='workflow_run'){
+      if(event.action!=='completed'||event.workflow_run?.conclusion!=='success'||
+        !SELECTOR_INTAKES.has(event.workflow_run.name)||
+        event.workflow_run.actor?.login!==HANDOFF_OWNER)
+        fail('AFTER_SELECTION_RUN_STOP');
+    }else if(env.GITHUB_EVENT_NAME==='workflow_dispatch'){
+      if(event.sender?.login!==HANDOFF_OWNER||env.GITHUB_ACTOR!==HANDOFF_OWNER)
+        fail('DISPATCH_OWNER_STOP');
+    }else if(env.GITHUB_EVENT_NAME==='push'){
+      if(event.ref!=='refs/heads/main'||event.deleted===true||env.GITHUB_ACTOR!==HANDOFF_OWNER)
+        fail('AFTER_SELECTION_PUSH_STOP');
+    }else fail('EVENT_TYPE_STOP');
+    return;
+  }
   if(env.GITHUB_EVENT_NAME==='workflow_dispatch'){
     if(event.sender?.login!==HANDOFF_OWNER||env.GITHUB_ACTOR!==HANDOFF_OWNER)
       fail('DISPATCH_OWNER_STOP');

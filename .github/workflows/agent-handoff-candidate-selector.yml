@@ -51,3 +51,34 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node agent-handoff/queue-dispatcher.mjs
+  # Preserve full board readback without another completed-event Workflow Run.
+  authenticated-readonly-board-after-selection:
+    needs: verify-and-select-candidates
+    if: >-
+      needs.verify-and-select-candidates.result == 'success' &&
+      github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    concurrency:
+      group: zgmini-handoff-control-board
+      cancel-in-progress: false
+      queue: max
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 6
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Classify authenticated backlog, priority, owner receipts and review age
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node agent-handoff/queue-board-runner.mjs
