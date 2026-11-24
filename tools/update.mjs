@@ -1456,7 +1456,7 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
    await waitForSupervisorStopIdle({readRunners:apiRunners,verifySafety:verifyStopSafety});
    verifyStopSafety();
    execFileSync('taskkill.exe',['/PID',String(oldOwner.owner.pid),'/T','/F'],{windowsHide:true,stdio:'ignore',timeout:15000});
-   for(let n=0;n<30;n++){let running=true;try{process.kill(current.owner.pid,0);}catch{running=false;}if(!running)return;await wait(500);}
+   for(let n=0;n<30;n++){let running=true;try{process.kill(oldOwner.owner.pid,0);}catch{running=false;}if(!running)return;await wait(500);}
    throw Object.assign(Error('SUPERVISOR_STILL_PRESENT'),{code:'SUPERVISOR_STILL_PRESENT'});
   },
   switchVersion:async()=>{
