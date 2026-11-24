@@ -124,7 +124,13 @@ export async function waitForSupervisorStopIdle({
    return {retryCount,elapsedMs:Math.max(0,now()-started),observedBusy};
   observedBusy=true;
   const remaining=deadline-now();
-  need(remaining>0,'RUNNERS_NOT_IDLE');
+  // Exhaustion is an observed Busy refusal, not a successful stop.
+  // Preserve only bounded non-sensitive counters on the exact failure.
+  if(remaining<=0)throw Object.assign(Error('RUNNERS_NOT_IDLE'),{
+   code:'RUNNERS_NOT_IDLE',supervisorIdleWait:{
+    retryCount,elapsedMs:Math.max(0,now()-started),observedBusy:true
+   }
+  });
   await pause(Math.min(3000,remaining));
   retryCount++;
  }
