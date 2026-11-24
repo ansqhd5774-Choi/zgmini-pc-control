@@ -7,7 +7,7 @@ import {
   validateRequest,validateChildResult,summarizePartialResult,configuredProviderKeys,
   verifyApproval,verifySource,isPinnedSourceCommit,
   TITLE,SOURCE_SHA,SOURCE_REPO,SOURCE_FILE_HASHES,WRITER,APPROVAL,CONTROL_REPO,
-} from './inflation-gas-electric-b-once.mjs';
+} from '../inflation-gas-electric-b-once.mjs';
 
 const uuid='123e4567-e89b-42d3-a456-426614174000';
 const valid=()=>({
@@ -114,4 +114,19 @@ test('partial output returns one safe completed source and exact other failure',
     /PARTIAL_CONTRACT_DENIED/);
   assert.throws(()=>summarizePartialResult({...partial,providerCalls:4}),
     /PARTIAL_CONTRACT_DENIED/);
+});
+
+test('retired fixed gas-electric intake preserves immutable B-grade source and approval',()=>{
+ assert.equal(fs.existsSync(new URL('../.github/workflows/pc-inflation-gas-electric-approved-once.yml',import.meta.url)),false);
+ assert.equal(fs.existsSync(new URL('../inflation-gas-electric-b-once.mjs',import.meta.url)),true);
+ assert.equal(fs.existsSync(new URL('../INFLATION_GAS_ELECTRIC_B_APPROVAL.json',import.meta.url)),true);
+ const approval=JSON.parse(fs.readFileSync(new URL('../INFLATION_GAS_ELECTRIC_B_APPROVAL.json',import.meta.url)));
+ assert.equal(approval.sourceSha,SOURCE_SHA);
+ assert.equal(approval.maxProviderRequests,3);
+ assert.equal(approval.maxAutomaticRetries,0);
+ assert.equal(approval.allowCoreWrites,false);
+ assert.equal(approval.allowDbWrites,false);
+ assert.equal(approval.allowD1Writes,false);
+ assert.equal(approval.allowSchedulerChanges,false);
+ assert.equal(approval.allowPublicRawData,false);
 });
