@@ -55,6 +55,108 @@ export function classifyPinnedCnnR10Line19Readonly(source) {
  return {...unknown,form,comparison,gitInput,blockAction};
 }
 
+
+// Bounded lexical replay of current line-19 SHA comparisons only. This cannot
+// establish what an earlier Sidecar invocation executed.
+export function projectCnnR10Line19OperandsReadonly(source,raw={}) {
+ const empty={schema:'ZGMINI_CNN_R10_LINE19_OPERANDS_V1',
+  status:'STATE_UNKNOWN',connective:'UNKNOWN',atomClasses:[],
+  currentStaticCondition:'UNKNOWN',runtimeCondition:'NOT_OBSERVED',
+  firstRuntimeFailure:null,operationalWrites:0,providerCalls:0,d1Writes:0};
+ if(!raw.sourcePin||!raw.ledgerStable||!raw.gitVerified||
+    typeof source!=='string'||source.length>131072)return empty;
+ const lines=source.split(/\r?\n/);
+ if(lines.length<23)return empty;
+ const line=lines.slice(18,20).join(' ').slice(0,1200);
+ const start=/^\s*if\s*\(/.exec(line);
+ if(!start)return empty;
+ let level=1,quote=null,escape=false,finish=-1;
+ for(let i=start[0].length;i<line.length;i++){
+  const c=line[i];
+  if(quote){if(escape){escape=false;continue;}if(c==='\\'){escape=true;continue;}
+   if(c===quote)quote=null;continue;}
+  if(c==="'"||c==='"'||c==='\x60'){quote=c;continue;}
+  if(c==='(')level++;
+  if(c===')'&&--level===0){finish=i;break;}
+ }
+ if(finish<start[0].length||quote)return empty;
+ const expression=line.slice(start[0].length,finish);
+ const pins=new Map();
+ for(const l of lines.slice(0,18)){
+  const m=l.match(/^\s*(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(['"])([a-f0-9]{40})\2\s*;?\s*$/i);
+  if(m)pins.set(m[1],m[3].toLowerCase());
+ }
+ const head=typeof raw.head==='string'&&SHA40.test(raw.head)?raw.head.toLowerCase():null;
+ const values=new Map(pins);
+ for(const m of lines.slice(0,23).join('\n').matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([^;\n]{1,240})/g)){
+  if(head&&/\brev-parse\b/.test(m[2])&&/\bHEAD\b/.test(m[2])&&
+     /(?:execFileSync|spawnSync|execSync)/.test(m[2]))values.set(m[1],head);
+ }
+ const split=(s,op)=>{
+  const parts=[];let from=0,depth=0,q=null,esc=false;
+  for(let i=0;i<s.length;i++){
+   const c=s[i];
+   if(q){if(esc){esc=false;continue;}if(c==='\\'){esc=true;continue;}
+    if(c===q)q=null;continue;}
+   if(c==="'"||c==='"'||c==='\x60'){q=c;continue;}
+   if(c==='('||c==='['||c==='{'){depth++;continue;}
+   if(c===')'||c===']'||c==='}'){if(--depth<0)return null;continue;}
+   if(depth===0&&s.startsWith(op,i)){parts.push(s.slice(from,i));i+=op.length-1;from=i+1;}
+  }
+  if(depth!==0||q)return null;
+  parts.push(s.slice(from));return parts;
+ };
+ const strip=(input)=>{
+  let s=input.trim();
+  for(let k=0;k<8&&s[0]==='('&&s[s.length-1]===')';k++){
+   let d=0,close=-1,q=null,esc=false;
+   for(let i=0;i<s.length;i++){
+    const c=s[i];
+    if(q){if(esc){esc=false;continue;}if(c==='\\'){esc=true;continue;}
+     if(c===q)q=null;continue;}
+    if(c==="'"||c==='"'||c==='\x60'){q=c;continue;}
+    if(c==='(')d++;
+    if(c===')'&&--d===0){close=i;break;}
+   }
+   if(close!==s.length-1)break;
+   s=s.slice(1,-1).trim();
+  }
+  return s;
+ };
+ const types=[],ops=new Set();
+ const classify=(s)=>{
+  if(types.length>=8)return null;
+  const m=/^\s*([A-Za-z_$][\w$]*)\s*(===|!==|==|!=)\s*([A-Za-z_$][\w$]*)\s*$/.exec(s);
+  if(!m){types.push(/[.(\[]/.test(s)?'CALL_OR_MEMBER_OR_GROUP':'UNSUPPORTED');return null;}
+  const known=values.has(m[1])&&values.has(m[3]);
+  types.push(known?'PINNED_SHA40_COMPARE':'UNVERIFIED_COMPARE');
+  if(!known)return null;
+  const eq=values.get(m[1])===values.get(m[3]);
+  return m[2]==='==='||m[2]==='=='?eq:!eq;
+ };
+ const evaluate=(input,n=0)=>{
+  if(n>=10)return null;
+  const s=strip(input);
+  if(!s)return null;
+  const or=split(s,'||');if(!or)return null;
+  if(or.length>1){ops.add('OR');let v=false;
+   for(const part of or){const next=evaluate(part,n+1);v=v===true?true:v===false?next:null;}
+   return v;
+  }
+  const and=split(s,'&&');if(!and)return null;
+  if(and.length>1){ops.add('AND');let v=true;
+   for(const part of and){const next=evaluate(part,n+1);v=v===false?false:v===true?next:null;}
+   return v;
+  }
+  return classify(s);
+ };
+ const value=evaluate(expression);
+ return {...empty,status:'STATIC_CLASSIFIED',
+  connective:ops.size>1?'MIXED':ops.has('AND')?'AND_ONLY':ops.has('OR')?'OR_ONLY':'NONE',
+  atomClasses:types,
+  currentStaticCondition:value===true?'TRUE':value===false?'FALSE':'UNKNOWN'};
+}
+
 const classifiedExit=value=>Number.isSafeInteger(value)&&value>=0&&value<=255?
  value:null;
 const safeExit=raw=>({
@@ -68,7 +170,7 @@ export function projectCnnR10ThreeGuardsReadonly(source,raw={}){
   gitInputProvenance:'FIXED_CHECKOUT_READ_ONLY',
   guardEvaluation:GUARDS.map((line,order)=>({order:order+1,line,
    condition:UNKNOWN,guardPassed:null,inputProvenance:'UNKNOWN'})),
-  firstReplayFailure:null,firstRuntimeFailure:null,line19Structure:null,
+  firstReplayFailure:null,firstRuntimeFailure:null,line19Structure:null,line19OperandEvidence:null,
   operationalWrites:0,providerCalls:0,d1Writes:0};
  if(!raw.sourcePin||!raw.ledgerStable||!raw.gitVerified||
     typeof source!=='string'||source.length>131072)return empty;
@@ -116,5 +218,6 @@ export function projectCnnR10ThreeGuardsReadonly(source,raw={}){
  }
  return {...empty,status:rows.every(r=>r.guardPassed!==null)?'REPLAY_EVALUATED':'PARTIAL_REPLAY',
   guardEvaluation:rows,firstReplayFailure:first,
-  line19Structure:classifyPinnedCnnR10Line19Readonly(source)};
+  line19Structure:classifyPinnedCnnR10Line19Readonly(source),
+  line19OperandEvidence:projectCnnR10Line19OperandsReadonly(source,raw)};
 }

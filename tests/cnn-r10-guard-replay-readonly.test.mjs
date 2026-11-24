@@ -114,3 +114,54 @@ test('short or malformed pinned sources stay unverified',async()=>{
  const r=replay(lines.join('\n'),{...facts(),sourcePin:false});
  assert.equal(r.line19Structure,null);
 });
+
+
+test('line19 current SHA replay makes false AND unsupported safely false',async()=>{
+ const {projectCnnR10Line19OperandsReadonly:probe}=await import('../controller/cnn-r10-guard-replay-readonly.mjs');
+ const lines=script();
+ lines[18]="if ((head === APPROVED_SOURCE_SHA) && unknownFunction('PRIVATE')) throw Error('NOPE');";
+ const r=probe(lines.join('\n'),facts());
+ assert.equal(r.connective,'AND_ONLY');
+ assert.deepEqual(r.atomClasses,['PINNED_SHA40_COMPARE','CALL_OR_MEMBER_OR_GROUP']);
+ assert.equal(r.currentStaticCondition,'FALSE');
+ assert.equal(r.runtimeCondition,'NOT_OBSERVED');
+ assert.doesNotMatch(JSON.stringify(r),/PRIVATE|APPROVED_SOURCE_SHA|unknownFunction|bbbbbb/);
+});
+test('line19 unsupported earlier operand never becomes proven false',async()=>{
+ const {projectCnnR10Line19OperandsReadonly:probe}=await import('../controller/cnn-r10-guard-replay-readonly.mjs');
+ const lines=script();
+ lines[18]="if (privateCall() && head === APPROVED_SOURCE_SHA) throw Error('SECRET');";
+ const r=probe(lines.join('\n'),facts());
+ assert.equal(r.connective,'AND_ONLY');
+ assert.equal(r.currentStaticCondition,'UNKNOWN');
+ assert.equal(r.atomClasses.length,2);
+});
+test('line19 nested AND OR follows precedence without importing Sidecar',async()=>{
+ const {projectCnnR10Line19OperandsReadonly:probe}=await import('../controller/cnn-r10-guard-replay-readonly.mjs');
+ const lines=script();
+ lines[18]="if ((head !== APPROVED_SOURCE_SHA) || (head === APPROVED_SOURCE_SHA && privateCall())) throw Error('SECRET');";
+ const r=probe(lines.join('\n'),facts());
+ assert.equal(r.currentStaticCondition,'TRUE');
+ assert.equal(r.connective,'MIXED');
+ assert.equal(r.runtimeCondition,'NOT_OBSERVED');
+ assert.equal(r.operationalWrites,0);
+});
+test('line19 source pin ledger and git preconditions fail closed',async()=>{
+ const {projectCnnR10Line19OperandsReadonly:probe}=await import('../controller/cnn-r10-guard-replay-readonly.mjs');
+ const lines=script();
+ lines[18]="if (head !== APPROVED_SOURCE_SHA && privateCall()) throw Error('X');";
+ for(const delta of [{sourcePin:false},{ledgerStable:false},{gitVerified:false}]){
+  const r=probe(lines.join('\n'),{...facts(),...delta});
+  assert.equal(r.status,'STATE_UNKNOWN');
+  assert.deepEqual(r.atomClasses,[]);
+ }
+});
+test('line19 static operands never get promoted to previous runtime branch',()=>{
+ const lines=script();
+ lines[18]="if (head !== APPROVED_SOURCE_SHA || arbitraryCall()) throw Error('SECRET');";
+ const r=replay(lines.join('\n'),facts());
+ assert.equal(r.line19OperandEvidence.currentStaticCondition,'TRUE');
+ assert.equal(r.guardEvaluation[0].guardPassed,null);
+ assert.equal(r.firstReplayFailure,null);
+ assert.equal(r.firstRuntimeFailure,null);
+});
