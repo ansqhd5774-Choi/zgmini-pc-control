@@ -72,6 +72,8 @@ export function validateRecoveryResult(r,approved){
    'OPERATOR_RECOVERY_RESULT_UNVERIFIED');
  return true;
 }
+export const operatorInstalledFileMaxBytes=rel=>
+ rel==='tools/update.mjs'?262144:131072;
 const readStrict=(file,max=131072)=>{
  const st=fs.lstatSync(file);
  need(st.isFile()&&!st.isSymbolicLink()&&st.nlink===1&&st.size>0&&st.size<=max,
@@ -159,7 +161,8 @@ function verifyInstalledOperator(){
    'OPERATOR_OPERATOR_PROOF_NOT_INSTALLED');
  for(const [rel,expected] of Object.entries(manifest.files)){
   need(/^tools\/[a-z0-9.-]+$/.test(rel)&&/^[a-f0-9]{64}$/.test(expected)&&
-    sha(readStrict(path.join(FIXED.maintenance,rel)))===expected,
+    sha(readStrict(path.join(FIXED.maintenance,rel),
+      operatorInstalledFileMaxBytes(rel)))===expected,
     'OPERATOR_MAINTENANCE_SELF_DRIFT');
  }
  const whoami=String(runExe('C:/Windows/System32/whoami.exe',['/groups'],
