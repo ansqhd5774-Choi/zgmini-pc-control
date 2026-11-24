@@ -25,6 +25,8 @@ export const GROUPS=Object.freeze({
  writer:['direct-writer-b/configured-direct-b.test.mjs',
   'writer-b/preview-transport.test.mjs','writer-b/insert-preview-readonly.test.mjs',
   'writer-b/import-availability.test.mjs',
+  'writer-b/contract.test.mjs','writer-b/installer.test.mjs',
+  'writer-b/core-idle-window.test.mjs','writer-b/windows-guards.test.mjs',
   'writer-b/w04-r54-preview-scope.test.mjs',
   'writer-b/w04-r54-threefile-candidate.test.mjs',
   'writer-b/w04-r54-fourfile-import-closure.test.mjs'],
