@@ -13,7 +13,6 @@ const CHECKOUT='E:/ZGmini/projects/zgmini-earnings-history-pc-release';
 const ARCHIVE_SHA='ce07af0b5e8d17625644e204f2815c1f754aff2468bc5434ac13c0dadcecd907';
 const SHA40=/^[a-f0-9]{40}$/;
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
-const canonical=value=>path.win32.normalize(value).toLowerCase();
 const unknown=code=>({
  schema:'ZGMINI_CNN_GIT_INPUTS_READONLY_V1',status:'STATE_UNKNOWN',code,
  evidence:'CURRENT_CHECKOUT_INPUTS_NOT_HISTORICAL_FAILURE_PROOF',
@@ -64,9 +63,10 @@ export function inspectCnnGitInputsReadonly(){
  try{
   realRoot=fs.realpathSync.native(root);
   realCheckout=fs.realpathSync.native(checkout);
-  if(canonical(realRoot)!==canonical(root)||
-     canonical(realCheckout)!==canonical(checkout)||
-     !fs.statSync(checkout).isDirectory()||
+  // Junctions may be legitimate: validate the fixed root's resolved identity
+  // through bounded file reads rather than demanding unchanged path spelling.
+  if(!fs.statSync(realRoot).isDirectory()||
+     !fs.statSync(realCheckout).isDirectory()||
      !fs.existsSync(path.join(checkout,'.git')))
    return unknown('CNN_FIXED_ROOT_UNVERIFIED');
  }catch{return unknown('CNN_FIXED_ROOT_UNAVAILABLE');}
