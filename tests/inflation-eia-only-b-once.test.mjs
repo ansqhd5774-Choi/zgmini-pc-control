@@ -7,7 +7,7 @@ import {
   CONTROL_REPO,SOURCE_REPO,SOURCE_SHA,TITLE,APPROVAL,WRITER,FILE_HASHES,
   isPinnedSourceCommit,validateRequest,verifyApproval,verifySource,
   configuredEiaKey,validateChildResult,
-} from './inflation-eia-only-b-once.mjs';
+} from '../inflation-eia-only-b-once.mjs';
 
 const uuid='123e4567-e89b-42d3-a456-426614174000';
 function validRequest(){
@@ -88,4 +88,12 @@ test('configured EIA key aliases recognized without revealing secret',()=>{
   assert.equal(configuredEiaKey({EIA_KEY:'secret'}),true);
   assert.equal(configuredEiaKey({FRED_API_KEY:'secret'}),false);
   assert.equal(configuredEiaKey({}),false);
+});
+
+test('completed 2026-11-04 EIA fixed one-shot event intake is absent, source and approval preserved',()=>{
+ const fixed=new URL('../.github/workflows/pc-inflation-eia-only-approved-once.yml',import.meta.url);
+ assert.equal(fs.existsSync(fixed),false);
+ assert.equal(fs.existsSync(new URL('../inflation-eia-only-b-once.mjs',import.meta.url)),true);
+ assert.equal(fs.existsSync(new URL('../INFLATION_EIA_ONLY_B_APPROVAL.json',import.meta.url)),true);
+ assert.equal(SOURCE_SHA,'ff04b60fec5d6ece19cd3842eadcbf04965d230b');
 });
