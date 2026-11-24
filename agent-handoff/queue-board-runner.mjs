@@ -43,6 +43,36 @@ export function validateDirectIntakeFollowup(event,env,job){
   fail('DIRECT_INTAKE_EVENT_STOP');
 }
 
+// Both independently authenticated failure producers keep their original
+// trigger and evidence readback. Their successful needs result admits this
+// same-workflow followup; the selector never executes a production PC action.
+const FAILURE_INTAKE_REFS=new Map([
+  [HANDOFF_REPOSITORY+'/.github/workflows/agent-handoff-pc-failure-intake.yml@refs/heads/main','ZGMINI PC Job'],
+  [HANDOFF_REPOSITORY+'/.github/workflows/agent-handoff-writer-b-failure-intake.yml@refs/heads/main','ZGMINI Approved Writer B Source Overlay Once']
+]);
+export function validateFailureIntakeFollowup(event,env,job){
+  const source=FAILURE_INTAKE_REFS.get(env.GITHUB_WORKFLOW_REF);
+  if(!source||env.GITHUB_JOB!==job||env.GITHUB_REF!=='refs/heads/main'||
+    env.GITHUB_ACTOR!==HANDOFF_OWNER||env.GITHUB_REPOSITORY!==HANDOFF_REPOSITORY||
+    !env.GITHUB_EVENT_PATH||event?.repository?.full_name!==HANDOFF_REPOSITORY||
+    event.repository.private!==true)fail('FAILURE_INTAKE_SCOPE_STOP');
+  if(env.GITHUB_EVENT_NAME==='workflow_dispatch'&&source==='ZGMINI PC Job'){
+    if(event.sender?.login===HANDOFF_OWNER&&
+      event.inputs?.confirmation==='reconcile-2307-resource-wait'&&
+      ['preview','apply'].includes(event.inputs.mode))return;
+    fail('FAILURE_INTAKE_EVENT_STOP');
+  }
+  const run=event?.workflow_run;
+  if(env.GITHUB_EVENT_NAME!=='workflow_run'||event.action!=='completed'||
+    run?.name!==source||run.event!=='issues'||run.actor?.login!==HANDOFF_OWNER||
+    run.head_repository?.full_name!==HANDOFF_REPOSITORY||run.conclusion==='skipped'||
+    !Number.isSafeInteger(run.id)||run.id<1||!Number.isSafeInteger(run.run_attempt)||
+    run.run_attempt<1||run.run_attempt>999||!Number.isFinite(Date.parse(run.created_at))||
+    (source==='ZGMINI Approved Writer B Source Overlay Once'&&
+      (run.run_attempt!==1||run.head_branch!=='main'||!/^[a-f0-9]{40}$/.test(run.head_sha??''))))
+    fail('FAILURE_INTAKE_EVENT_STOP');
+}
+
 export function validateBoardEvent(event,env) {
   if(!event||event.repository?.private!==true||
     event.repository.full_name!==HANDOFF_REPOSITORY||
@@ -51,6 +81,10 @@ export function validateBoardEvent(event,env) {
   // The workflow's needs dependency verifies selection success. Recheck the
   // original event here, with the exact default-branch workflow/job identity.
   if(env.GITHUB_JOB===AFTER_SELECTION_JOB){
+    if(FAILURE_INTAKE_REFS.has(env.GITHUB_WORKFLOW_REF)){
+      validateFailureIntakeFollowup(event,env,AFTER_SELECTION_JOB);
+      return;
+    }
     if(env.GITHUB_WORKFLOW_REF===HANDOFF_REPOSITORY+'/.github/workflows/agent-handoff.yml@refs/heads/main'){
       validateDirectIntakeFollowup(event,env,AFTER_SELECTION_JOB);
       return;

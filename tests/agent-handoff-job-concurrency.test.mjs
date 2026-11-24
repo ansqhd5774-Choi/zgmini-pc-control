@@ -73,15 +73,17 @@ test('no new triggers, runner, provider operations or permissions are introduced
   }
 });
 
-test('completed-run fanout ends at selector; full board is a success-dependent read-only job',()=>{
+test('independent selector and board have no completion trigger; full board follows selection success',()=>{
   const intake=read('agent-handoff.yml');
   const selector=read('agent-handoff-candidate-selector.yml');
   const board=read('agent-handoff-queue-board.yml');
   assert.match(intake,/^  issue_comment:/m);
-  assert.match(selector,/^  workflow_run:/m);
-  assert.doesNotMatch(selector,/- ZGMINI Agent Handoff Intake\s*$/m);
-  assert.match(selector,/- ZGMINI Agent Handoff PC Failure Intake/);
-  assert.match(selector,/- ZGMINI Agent Handoff Writer B Failure Intake/);
+  assert.doesNotMatch(selector,/^  workflow_run:/m);
+  assert.doesNotMatch(selector,/github\.event\.workflow_run/);
+  assert.match(selector,/^  workflow_dispatch:/m);
+  assert.match(selector,/^  push:/m);
+  assert.match(read('agent-handoff-pc-failure-intake.yml'),/workflows: \[ZGMINI PC Job\]/);
+  assert.match(read('agent-handoff-writer-b-failure-intake.yml'),/workflows: \[ZGMINI Approved Writer B Source Overlay Once\]/);
   assert.doesNotMatch(board,/^  workflow_run:/m);
   assert.doesNotMatch(board,/github\.event\.workflow_run/);
   assert.match(board,/^  schedule:/m);
@@ -106,11 +108,8 @@ test('completed-run fanout ends at selector; full board is a success-dependent r
     assert.match(yaml,/^  issues:/m);
     assert.match(yaml,/types: \[labeled\]/);
   }
-  const oldFanout=1+1+2+3;
-  const newFanout=1+1;
-  assert.equal(oldFanout,7);
-  assert.equal(newFanout,2);
-  assert.equal(oldFanout-newFanout,5);
+  // Source completion remains independently observed by the two producers.
+  // All candidate/board followups are now jobs rather than completion Runs.
 });
 
 test('009 admits only relevant events and serializes actual issue writers without dropping queued events',()=>{
@@ -148,4 +147,30 @@ test('direct intake selection requires a successful original job, not merely a c
  const sourceSelection=source.slice(source.indexOf('    runs-on:'),source.indexOf('  # Preserve full board readback'));
  assert.equal(selection.slice(selection.indexOf('    runs-on:')),sourceSelection);
  assert.equal(board.slice(board.indexOf('    runs-on:')),read('agent-handoff-queue-board.yml').slice(read('agent-handoff-queue-board.yml').indexOf('    runs-on:')));
+});
+
+
+test('PC and Writer B followups require successful independent intake and preserve isolated read/write scopes',()=>{
+ const source=read('agent-handoff-candidate-selector.yml');
+ const selectionSteps=source.slice(source.indexOf('    runs-on:'),source.indexOf('  # Preserve full board readback'));
+ const boardSteps=read('agent-handoff-queue-board.yml').slice(read('agent-handoff-queue-board.yml').indexOf('    runs-on:'));
+ for(const [file,job] of [['agent-handoff-pc-failure-intake.yml','enqueue-confirmed-failures'],['agent-handoff-writer-b-failure-intake.yml','enqueue-verified-writer-b-failures']]){
+   const yaml=read(file),follow=yaml.slice(yaml.indexOf('  verify-and-select-after-failure-intake:'));
+   const selection=follow.slice(0,follow.indexOf('  authenticated-readonly-board-after-selection:'));
+   const board=follow.slice(follow.indexOf('  authenticated-readonly-board-after-selection:'));
+   assert.ok(selection.includes('needs: '+job));
+   assert.ok(selection.includes("needs."+job+".result == 'success'"));
+   assert.match(selection,/vars\.ZGMINI_AGENT_HANDOFF_ENABLED == 'true'/);
+   assert.match(selection,/github\.actor == 'ansqhd5774-Choi'/);
+   assert.match(selection,/github\.ref == 'refs\/heads\/main'/);
+   assert.match(selection,/group: zgmini-handoff-candidate-selector/);
+   assert.match(selection,/permissions:\s*\n\s*contents: read\s*\n\s*issues: write/);
+   assert.match(board,/needs: verify-and-select-after-failure-intake/);
+   assert.match(board,/needs\.verify-and-select-after-failure-intake\.result == 'success'/);
+   assert.match(board,/permissions:\s*\n\s*contents: read\s*\n\s*issues: read\s*\n\s*pull-requests: read/);
+   assert.doesNotMatch(board,/issues: write|contents: write|continue-on-error|always\(\)/);
+   assert.match(board,/group: zgmini-handoff-control-board/);
+   assert.equal(selection.slice(selection.indexOf('    runs-on:')),selectionSteps);
+   assert.equal(board.slice(board.indexOf('    runs-on:')),boardSteps);
+ }
 });
