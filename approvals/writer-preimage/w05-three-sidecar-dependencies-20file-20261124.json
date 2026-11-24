@@ -1,0 +1,89 @@
+{
+  "schema": "ZGMINI_WRITER_PREIMAGE_SCOPE_APPROVAL_V1",
+  "status": "APPROVED_A_READONLY",
+  "scope": "PC_WRITER_APPROVED_SOURCE_PREIMAGE",
+  "sourceRoot": "projects/zgmini-earnings-history-pc-release",
+  "files": [
+    {
+      "path": "scripts/pc-writer/run-local.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/w05-stored-sidecar-publication-r1.mjs",
+      "change": "A"
+    },
+    {
+      "path": "worker/earnings-companion-c-r4.mjs",
+      "change": "M"
+    },
+    {
+      "path": "worker/earnings-companion-c-qfr-r1.mjs",
+      "change": "M"
+    },
+    {
+      "path": "worker/earnings-bea-unit-profit-r1.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/EARNINGS_R4_C_READ_MODEL_PREVIEW_READONLY.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/EARNINGS_CENSUS_QFR_R3_STORED_PREVIEW_READONLY.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/EARNINGS_CENSUS_QFR_R4_D1_ONCE.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/EARNINGS_BEA_UNIT_NIPA_ARCHIVE_R1.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/EARNINGS_BEA_UNIT_NIPA_PUBLIC_PROJECTION_R1.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/EARNINGS_R3D_STORED_BLS_CALC_READONLY.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/EARNINGS_CENSUS_QFR_R1_READONLY.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/EARNINGS_CENSUS_QFR_R2_SQLITE_APPEND.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/EARNINGS_CENSUS_QFR_R4_PROJECTION_DRAFT_READONLY.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/EARNINGS_R4_C_D1_DUAL_SOURCE_GATES.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/d1.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/EARNINGS_BEA_UNIT_NIPA_EQUIVALENCE_R1.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/d1-transient.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/d1-diagnostics.mjs",
+      "change": "M"
+    },
+    {
+      "path": "lib/market-score/earnings-bea-unit-profit-source-r1.mjs",
+      "change": "M"
+    }
+  ],
+  "allowOtherPaths": false
+}
