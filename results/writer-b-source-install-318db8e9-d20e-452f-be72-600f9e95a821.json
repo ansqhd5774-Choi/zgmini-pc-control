@@ -1,0 +1,26 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "318db8e9-d20e-452f-be72-600f9e95a821",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "aa4da58cf84f231142f7797b88fa747822ff1cd7",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "4cdf4727e59a0667d641354bb5b3e7ede761daf7",
+  "candidateSourceSha": "50769db23ac6a5f55203855f5231d12dc0595bb4",
+  "manifestSha256": "c306736ff2aab4c4e8f4f2aa3b750f918c449062ec6e4c6d0a1b6d685b6fb231",
+  "baseTreeOid": "7173f5ad44877b75b96483b200f64605a7c1736b",
+  "preparedTreeOid": "70c893798023d6e500e7ecf965d1e4e477bbe657",
+  "provenanceSha256": "dd12f909c4c3440ec6e97132ebd825b8b1f7d4edb76893e8bdd164711a98a6ab",
+  "runId": "45429862111",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "lib/market-score/employment-r6-collector.mjs",
+    "lib/market-score/employment-r6-dol-advance-pdf-candidate.mjs",
+    "lib/market-score/employment-r6-dol-advance-store-candidate.mjs",
+    "lib/market-score/employment-r6-dol-pdf-raw-envelope.mjs",
+    "lib/market-score/employment-r6-dol-eta538-provider.mjs",
+    "lib/market-score/employment-r6-dol-advance-row-readback.mjs",
+    "lib/market-score/employment-r6-dol-release-text.mjs"
+  ]
+}
