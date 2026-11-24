@@ -106,6 +106,17 @@ export function renderBoundedReport(report,maxReportBytes){
  return {json,txt};
 }
 
+// A quoted marker or another account's comment is not this run's receipt.
+// An existing bot receipt with the same exact first-line identity but different
+// content is ambiguous: never overwrite or silently accept conflicting evidence.
+export function hasVerifiedReportComment(comments,{marker,body}){
+ const tagged=comments.filter(comment=>
+  comment?.user?.login==='github-actions[bot]'&&
+  typeof comment.body==='string'&&comment.body.startsWith(marker+'\n'));
+ if(tagged.some(comment=>comment.body!==body))fail('REPORT_COMMENT_CONTENT_CHANGED');
+ return tagged.length>0;
+}
+
 function verifyRemoteFile(response,bytes){
  if(response.status!==200)return false;
  const data=response.data;
