@@ -111,6 +111,11 @@ const r6GroupNames=new Set([
 ]);
 const r6Code=value=>typeof value==='string'&&/^[A-Z][A-Z0-9_]{0,99}$/.test(value)?value:null;
 const r6Count=value=>Number.isSafeInteger(value)&&value>=0&&value<=100000?value:null;
+const r6RowCount=value=>Number.isSafeInteger(value)&&value>=0&&value<=1_000_000?value:null;
+const R6_ROW_CHANGE_KEYS=Object.freeze([
+ 'collectedRows','inserted','revised','noop','rejected','historyRowsAdded',
+ 'rawSnapshots','rawSnapshotNoops'
+]);
 const r6Time=value=>typeof value==='string'
  &&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)
  &&Number.isFinite(Date.parse(value))
@@ -124,14 +129,24 @@ function r6CollectionProjection(raw){
   return [{groupName:item.groupName,status,
    ...(r6Code(item.failureCode)?{failureCode:r6Code(item.failureCode)}:{}),
    ...(!planned&&r6Count(item.providerRequests)!==null?{providerRequests:item.providerRequests}:{}),
+   ...(!planned?Object.fromEntries(R6_ROW_CHANGE_KEYS
+    .filter(key=>r6RowCount(item[key])!==null).map(key=>[key,item[key]])):{}),
    ...(planned?{due:item.due===true,
     ...Object.fromEntries(['retryAt','releaseAt','collectAt']
      .map(key=>[key,r6Time(item[key])]).filter(([,value])=>value!==null))
    }: {})}];
  }).slice(0,6):[];
+ const stored=raw.lastStoredDolRelease;
+ const storedRelease=stored&&typeof stored==='object'&&!Array.isArray(stored)
+  &&['SUCCESS','PARTIAL','FAIL'].includes(stored.status)
+  &&r6Time(stored.completedAt)!==null
+  ?{status:stored.status,completedAt:stored.completedAt,
+    ...Object.fromEntries(R6_ROW_CHANGE_KEYS.filter(key=>r6RowCount(stored[key])!==null)
+      .map(key=>[key,stored[key]]))}:null;
  return {status:r6Code(raw.status),code:r6Code(raw.code),
   providerRequests:r6Count(raw.providerRequests),
-  groups:rows(raw.groups,false),plannedGroups:rows(raw.plannedGroups,true)};
+  groups:rows(raw.groups,false),plannedGroups:rows(raw.plannedGroups,true),
+  ...(storedRelease?{lastStoredDolRelease:storedRelease}:{})};
 }
 function r6LocalResultReadback(root,checksum,asOfDate,sourceStoredAt){
  if(!/^[a-f0-9]{64}$/.test(checksum??''))return 'NO_HASH';
