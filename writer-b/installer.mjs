@@ -51,13 +51,15 @@ export function safeWriterBPreimageCheck(error){
 // Expose bounded aggregate counts only; never expose Task probes/PIDs/paths.
 export function safeWriterBIdleObservation(error){
  if(!['WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED',
-  'WRITER_B_CORE_WINDOW_UNVERIFIED_DEFERRED'].includes(error?.code))return null;
+  'WRITER_B_CORE_WINDOW_UNVERIFIED_DEFERRED',
+  'WRITER_B_CORE_NATURAL_DRAIN_TIMEOUT_STOP'].includes(error?.code))return null;
  const x=error?.idleObservation;
  if(!x||typeof x!=='object'||Array.isArray(x))return null;
  const keys=['windowMs','samples','readySamples','activeSamples',
   'otherSamples','maxReadyStreak'];
  if(keys.some(k=>!Number.isSafeInteger(x[k])))return null;
- if(x.windowMs<1||x.windowMs>360000||
+ const maximum=error.code==='WRITER_B_CORE_NATURAL_DRAIN_TIMEOUT_STOP'?1200000:360000;
+ if(x.windowMs<1||x.windowMs>maximum||
   x.samples<1||x.samples>Math.ceil(x.windowMs/1500)+2||
   [x.readySamples,x.activeSamples,x.otherSamples].some(n=>n<0||n>x.samples)||
   x.readySamples+x.activeSamples+x.otherSamples!==x.samples||
