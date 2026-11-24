@@ -336,3 +336,13 @@
 - 이전 7종 + #6 + #15 = **9/12종(75%)** main 소스 적용·정확 HEAD CI 증거. 실제 운영 수집·게시·데이터 복구가 75% 완료라는 의미 아님.
 - 남음: #8 Performance Budget 실제 승인 임계치 NOT_CONFIGURED; #20 Data CI 기존 SQLite/Writer/게시 읽기 계약과 중복 점검 후 최소 검증; #36 Continuous Benchmarking 기존 Actions Job 메타데이터의 read-only 기간별 추세 미구현.
 - 다음 실행은 #20 데이터 계보의 기존 안전 readback과 중복 없는 결손 검사를 우선하며, 후속 #36은 별도 유료 관측 플랫폼/예약 없이 GitHub API 기존 실행 자료를 사용. #8 임의 임계치/Production 성능 주장 금지.
+
+
+## R2 #20 Data CI 검증·main 반영 — 2026-11-25
+
+- 본체 [PR #1600](https://github.com/ansqhd5774-Choi/zgmini/pull/1600) main 병합 SHA 1a54bbe6613644340b2ae83b5da08f543e2b9649.
+- 변경: 기존 Node CI 안에 scripts/ci-data-contract-r2.mjs + tests/ci-data-contract-r2.test.mjs, synthetic read-only 결과 JSON 업로드 추가. 신규 Runner/예약/실제 원자료·SQLite·D1 읽기/쓰기/Provider/API 수집 없음.
+- 실제 [Node CI #45498514914](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45498514914) SUCCESS. CI_DATA_CONTRACT 실로그: 9 공개 projection × 7가지 상태 = **63/63**; providerCalls=0, writeStatements=0. READY의 값 0/null 보존, stored pending/stale/version/future, POST 405 거부를 정확하게 구분. 신규 회귀시험 7개 포함. 기존 #6 아키텍처 재검증 463파일 금지 참조 0건, Node 전체 회귀 PASS.
+- [CodeQL #45498514820](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45498514820) 및 [Secret #45498514831](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45498514831) SUCCESS. 아티팩트 ci-data-contract id 14969962274 생성.
+- 이 검증은 합성 D1 계약이고 실제 운영 DB 원자료의 완전성·진짜 PIT·D1 게시/readback·Production 최신성을 인증하지 않음. 기존 기능 담당 승인·설치 경로를 대체하지 않는다.
+- **R2 누적 소스 검증·main 반영 10/12종(83.3%)**. #36 GitHub Actions Continuous Benchmarking은 별도 PR #1601 CI 진행 중. #8 Performance Budget 자동 임계치는 승인되지 않아 NOT_CONFIGURED 유지.
