@@ -55,12 +55,15 @@ test('operator child environment rejects Git executable, config, hooks and helpe
   GIT_EXEC_PATH:'C:/untrusted-exec',GIT_TEMPLATE_DIR:'C:/untrusted-templates',
   GIT_SSH_COMMAND:'C:/untrusted-ssh',GIT_ASKPASS:'C:/untrusted-askpass',
   GIT_DIR:'C:/other-repo',GCM_INTERACTIVE:'always',
+  NODE_OPTIONS:'--require C:/untrusted/preload.cjs',
+  NODE_PATH:'C:/untrusted/modules',NODE_EXTRA_CA_CERTS:'C:/untrusted/ca.crt',
+  NPM_CONFIG_USERCONFIG:'C:/untrusted/.npmrc',
   SSH_ASKPASS:'C:/untrusted-askpass',
   APPDATA:'C:/Users/Operator/AppData/Roaming',USERPROFILE:'C:/Users/Operator',
   PATH:'C:/Windows/System32',GH_TOKEN:'test-placeholder-not-a-token'
  };
  const clean=sanitizedChildEnvironment(env);
- for(const k of Object.keys(env).filter(k=>/^GIT_|^GCM_|^SSH_ASKPASS$/.test(k)))
+ for(const k of Object.keys(env).filter(k=>/^GIT_|^GCM_|^NODE_|^NPM_CONFIG_|^SSH_ASKPASS$/.test(k)))
   assert.equal(Object.hasOwn(clean,k),k==='GIT_TERMINAL_PROMPT'||k==='GIT_OPTIONAL_LOCKS'||k==='GCM_INTERACTIVE',k);
  assert.equal(clean.GIT_TERMINAL_PROMPT,'0');
  assert.equal(clean.GIT_OPTIONAL_LOCKS,'0');
@@ -69,6 +72,23 @@ test('operator child environment rejects Git executable, config, hooks and helpe
  assert.equal(clean.USERPROFILE,env.USERPROFILE);
  assert.equal(clean.PATH,env.PATH);
  assert.equal(clean.GH_TOKEN,env.GH_TOKEN);
+});
+
+test('actual child Node cannot preload inherited NODE_OPTIONS or custom module path',t=>{
+ const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'w04-3409-node-env-'));
+ t.after(()=>fs.rmSync(tmp,{recursive:true,force:true}));
+ const preload=path.join(tmp,'preload.cjs'),marker=path.join(tmp,'preloaded-marker');
+ fs.writeFileSync(preload,"require('node:fs').writeFileSync("+JSON.stringify(marker)+",'loaded');\n");
+ const polluted={...process.env,NODE_OPTIONS:'--require='+preload,
+  NODE_PATH:tmp,NODE_EXTRA_CA_CERTS:path.join(tmp,'fake-ca.pem')};
+ const clean=sanitizedChildEnvironment(polluted);
+ assert.equal(Object.hasOwn(clean,'NODE_OPTIONS'),false);
+ assert.equal(Object.hasOwn(clean,'NODE_PATH'),false);
+ assert.equal(Object.hasOwn(clean,'NODE_EXTRA_CA_CERTS'),false);
+ const out=execFileSync(process.execPath,['-e',"process.stdout.write('child-ok')"],{
+  env:clean,windowsHide:true,encoding:'utf8',timeout:12000,stdio:'pipe'});
+ assert.equal(out,'child-ok');
+ assert.equal(fs.existsSync(marker),false);
 });
 
 test('actual Git worktree with injected config cannot run active post-checkout hooks',t=>{
