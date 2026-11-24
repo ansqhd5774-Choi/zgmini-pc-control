@@ -171,7 +171,7 @@ test('D05 public final-output coverage scales with the approved roster, not ten 
   assert.equal(result.dailyFinalScorePoints,count);
   assert.equal(result.currentReceiptMatched,true);
   assert.equal(result.publicFinalOutputCoverageVerified,true);
-  assert.doesNotMatch(JSON.stringify(result),/future-|63\\.51/);
+  assert.doesNotMatch(JSON.stringify(result),/future-|63\.51/);
  }
 });
 
