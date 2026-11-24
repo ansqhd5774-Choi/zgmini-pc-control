@@ -1,0 +1,41 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "f85a0563169a55bbae66fc18164d354be5052237",
+  "targetSha": "dcfc8908866c6cef24ab173bab16095895d77ac9",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "Same-effect existing independent maintainer handoff under docs/PC_AUTOMATION_STANDARD.md and the user's 2026-11-25 continue-work instruction. #3192/#3194 applied the same exact nine-file contract; #3357 was validated by three source-only CI runs and merged. No new operation, privilege, Runner reservation, Controller replacement or database/publication authority is requested. This source approval does not itself authorize bypassing fresh installation/CAS/lease checks.",
+  "files": {
+    "tools/maintenance-contract.mjs": "cdaf63cef96d872cccb2a2fc33cab37eba7d1a91301b7f382c338374e2bf335e",
+    "tools/maintenance-apply.mjs": "c62fb486925695433c3fe2fc2c4d907c0334744cf318e753336646ea2c4dba53",
+    "tools/maintenance-agent.mjs": "73eb4781a2fa0a6f7d451283ee260762ac452c49283eaaa043862519bc234dbc",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "3dcb023a6bba9f0fdd52f5bfc6b3ad5780605c95b7d395cc0b07ae9027883b93",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "af31ab1f6a159aa1d8467d2585eb16750e8a1a293f9ecfb90b85c388d8640d70",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "445bdf1b321d8e7db0b9b3f62a4b0172e5bc5ea364fd9790f4bd9626d9037563"
+  },
+  "checks": {
+    "sourceCi": "PR #3357 source HEAD f981bb1ad908aeab063a91756a5da1fdf64d109d: Controller Maintenance Run 45422401363 SUCCESS (67 steps); Automation Status 45422401728 SUCCESS; C996 45422401936 SUCCESS.",
+    "installedWindowsEvidence": "#3195 Run 45331333481 observed 2026-11-24T05:10:55.332Z: maintenanceSourceSha=f85a0563169a55bbae66fc18164d354be5052237; nine maintenanceFilesVerified=true; installLockHeld=false; Receiver LISTENING; pc-job workflow active. Historical observation only; fresh CAS/lease/receiver verification is mandatory at handoff.",
+    "exactBytePlan": "Nine installed prior raw SHA-256 compared with previously approved #3192 manifest and immutable source f85a0563: 9/9 match. Nine target raw SHA-256 from merged #3357 commit dcfc8908; exactly three runtime files changed (maintenance-agent, maintenance-apply, update), six unchanged.",
+    "targetMainCommit": "dcfc8908866c6cef24ab173bab16095895d77ac9 merged PR #3357 and main ancestor; execution shall independently verify ancestor and exact checkout bytes.",
+    "windowsHandoffExecuted": false
+  },
+  "runtimeChangedFiles": [
+    "tools/maintenance-apply.mjs",
+    "tools/maintenance-agent.mjs",
+    "tools/update.mjs"
+  ],
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "preserve": [
+    "Current Controller/source/config, six Runner registrations, active Core/Writer tasks and workflow except independently bounded approved receiver handoff",
+    "Prior maintenance ledgers, installed source/owner/lease, backup and receiver identity",
+    "No repeat of completed #2960/#3194 or earlier Controller update requests",
+    "No provider, SQLite, D1, DNS, or public deployment effects"
+  ],
+  "scopeNote": "Source-only fixed 9-file handoff proposal; exact three approved runtime changes, 6 unchanged. Before any actual operating change independently observe installedSha, nine raw file hashes, Startup and receiver provenance/stop state, lease/lock and exact new manifest hash; retain rollback and stop on mismatch. Source PR merge is NOT runtime installation or Busy effect verification."
+}
