@@ -186,12 +186,90 @@ export function fixedInstalledRecoveryCase(id){
   proof:proof3409,allowUnchangedBaseline:true});
  return null;
 }
-// Preserve #2960's approved Writer-only delta; #3409 is attested as
-// unchanged, so reject even a separately valid Writer-only deviation.
-export function permittedInstalledRecoveryProtection(fixed,choice){
+// #3409's original recovery approval and its Writer preimage remain immutable.
+const W04_3409_ORIGINAL_SOURCE='fcb098d20fb9a6c48f371786c69f7f1fdf5bc34a';
+const W04_3409_POST_WRITER_APPROVAL='approvals/maintenance-recoveries/'+REC3409+'.post-writer.json';
+const W04_3409_ORIGINAL_APPROVAL='approvals/maintenance-recoveries/'+REC3409+'.installed.json';
+const W04_WRITER_B_APPROVAL='approvals/writer-updates/w04-eta538-scheduled-release-safe-drain-pending-20261125.json';
+const W04_WRITER_B_RECEIPT='results/writer-b-source-install-821f15bd-9709-45bf-b7e3-8b2ce33ae978.json';
+const W04_WRITER_B_ID='821f15bd-9709-45bf-b7e3-8b2ce33ae978';
+const W04_WRITER_B_SHA='d8ac245003e7b8e006c2345382d5c639c6d5f18b';
+const W04_WRITER_B_MANIFEST_SHA='4102978f3c365d43bf0126f5eae6b885bec0ff523b8558a97345c5bcadb5eea0';
+const W04_WRITER_B_RUN=45467625998;
+
+// The earlier, immutable V1 approval must remain binding for 6/7 CAS files.
+// Only the already approved W04 Writer B config.source transition may differ.
+export function validateW043409PostWriterBridge({
+ approval,oldApprovalRaw,writerManifestRaw,writerReceiptRaw,writerIssue,writerBytes
+}) {
+ const old=JSON.parse(oldApprovalRaw), writer=JSON.parse(writerManifestRaw);
+ const receipt=JSON.parse(writerReceiptRaw), current=JSON.parse(writerBytes);
+ const expectedKeys=['ledgerSha256','ownerSha256','markerSha256','backlogSha256',
+  'snapshotSha256','protectionSha256','writerSha256'];
+ need(approval?.schema==='ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V2'&&
+  approval.approved===true&&approval.operation==='RECONCILE_INSTALLED'&&
+  approval.requestId===REC3409&&approval.issueNumber===3409&&
+  /^[a-f0-9]{40}$/.test(approval.sourceSha??'')&&
+  approval.sourceSha!==W04_3409_ORIGINAL_SOURCE&&
+  approval.targetControllerSha===TARGET3409&&
+  old?.schema==='ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V1'&&
+  old.approved===true&&old.operation==='RECONCILE_INSTALLED'&&
+  old.requestId===REC3409&&old.sourceSha===W04_3409_ORIGINAL_SOURCE&&
+  old.targetControllerSha===TARGET3409&&
+  approval.previousRecoveryApprovalSha256===digest(oldApprovalRaw)&&
+  JSON.stringify(approval.proof)===JSON.stringify(old.proof),
+  'W04_POSTWRITER_ORIGINAL_APPROVAL_DRIFT');
+ need(approval.casDigests&&old.casDigests&&
+  Object.keys(approval.casDigests).length===7&&
+  expectedKeys.every(k=>/^[a-f0-9]{64}$/.test(approval.casDigests[k]??''))&&
+  expectedKeys.filter(k=>k!=='writerSha256').every(k=>
+   approval.casDigests[k]===old.casDigests[k])&&
+  approval.casDigests.writerSha256!==old.casDigests.writerSha256&&
+  old.approvedCurrentWriterConfigSha256===old.casDigests.writerSha256&&
+  approval.approvedCurrentWriterConfigSha256===approval.casDigests.writerSha256&&
+  approval.casDigests.writerSha256===digest(writerBytes),
+  'W04_POSTWRITER_CAS_SCOPE_CHANGED');
+ let issueBody;try{issueBody=JSON.parse(writerIssue?.body);}catch{}
+ need(writerIssue?.number===3461&&writerIssue?.title==='pc-writer-source-install'&&
+  writerIssue?.user?.login==='ansqhd5774-Choi'&&
+  writerIssue?.labels?.some(l=>l.name==='pc-writer-b-install')&&
+  issueBody?.schema==='ZGMINI_PC_WRITER_SOURCE_B_REQUEST_V1'&&
+  issueBody.requestId===W04_WRITER_B_ID&&
+  issueBody.operation==='pc-writer-source-install'&&
+  issueBody.controlRepository===repository&&
+  issueBody.approvalManifestPath===W04_WRITER_B_APPROVAL&&
+  issueBody.approvalManifestSha256===W04_WRITER_B_MANIFEST_SHA&&
+  digest(writerManifestRaw)===W04_WRITER_B_MANIFEST_SHA&&
+  writer.schema==='ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1'&&
+  writer.status==='APPROVED_B'&&
+  writer.scope==='PC_WRITER_APPROVED_FILE_OVERLAY_ONLY'&&
+  writer.configPath==='E:\\ZGmini\\data\\pc-writer\\config.json'&&
+  writer.baseConfigSourceSha===writer.baseHead&&
+  receipt.schema==='ZGMINI_PC_WRITER_B_RESULT_V1'&&
+  receipt.requestId===W04_WRITER_B_ID&&
+  receipt.runId===String(W04_WRITER_B_RUN)&&
+  receipt.status==='WRITER_B_INSTALLED_VERIFIED'&&
+  receipt.code==='WRITER_B_INSTALL_VERIFIED'&&
+  receipt.mode==='LOCAL_OVERLAY'&&receipt.localOnly===true&&
+  receipt.candidateSourceSha===writer.candidateSourceSha&&
+  receipt.manifestSha256===W04_WRITER_B_MANIFEST_SHA&&
+  receipt.sourceSha===W04_WRITER_B_SHA&&
+  current?.source===W04_WRITER_B_SHA&&
+  Array.isArray(receipt.changedPaths)&&
+  receipt.changedPaths.length===writer.files.length&&
+  writer.files.every(f=>receipt.changedPaths.includes(f.path))&&
+  approval.writerBReceiptSha256===digest(writerReceiptRaw),
+  'W04_POSTWRITER_B_AUTHORIZATION_UNVERIFIED');
+ return true;
+}
+
+// #2960 remains unchanged. #3409 may preserve an independently approved
+// Writer-only transition ONLY after verifying the original B installation.
+export function permittedInstalledRecoveryProtection(fixed,choice,writerBVerified=false){
  return choice?.allowed===true&&(
   fixed?.allowUnchangedBaseline===true?
-   choice.code==='RECOVERY_ORIGINAL_PROTECTION_UNCHANGED':
+   choice.code==='RECOVERY_ORIGINAL_PROTECTION_UNCHANGED'||
+    (writerBVerified===true&&choice.preservedWriterConfig===true):
    fixed?.allowUnchangedBaseline===false&&choice.preservedWriterConfig===true);
 }
 export function classifyInstalledReconciliationProof(proof){
@@ -233,14 +311,18 @@ async function reconcileInstalledRecoveryFixed({id,source,g,before}){
  const {verifyRecoveryOperator,protectedSnapshot,loadApprovedPackage}=await import('./update.mjs');
  const {selectPreservedRecoveryProtection}=await import('./maintenance-contract.mjs');
  const {readFixedReadonlyBytes}=await import('../controller/fixed-readonly-bytes.mjs');
- const rel='approvals/maintenance-recoveries/'+id+'.installed.json';
+ const postWriterRequested=id===REC3409&&source!==W04_3409_ORIGINAL_SOURCE;
+ const rel=postWriterRequested?W04_3409_POST_WRITER_APPROVAL:
+  'approvals/maintenance-recoveries/'+id+'.installed.json';
  const raw=inspectStep('INSTALLED_RECOVERY_APPROVAL_MISSING',()=>fs.readFileSync(path.join(repo,rel)));
  need(digest(raw)===digest(g(['show','HEAD:'+rel],'INSTALLED_RECOVERY_APPROVAL_NOT_COMMITTED')),
   'INSTALLED_RECOVERY_APPROVAL_DRIFT');
  let approval;try{approval=JSON.parse(raw);}catch{need(false,'INSTALLED_RECOVERY_APPROVAL_INVALID');}
  const exactPaths=['tools/maintenance-recovery.mjs','tools/update.mjs',
   'tools/maintenance-contract.mjs','controller/fixed-readonly-bytes.mjs'];
- need(approval?.schema==='ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V1'&&
+ need(approval?.schema===(postWriterRequested?
+  'ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V2':
+  'ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V1')&&
   approval.approved===true&&approval.operation==='RECONCILE_INSTALLED'&&
   approval.requestId===id&&approval.issueNumber===fixed.issueNumber&&
   approval.sourceSha===source&&approval.targetControllerSha===targetSha&&
@@ -279,6 +361,26 @@ async function reconcileInstalledRecoveryFixed({id,source,g,before}){
   Object.keys(cas).every(k=>approval.casDigests[k]===cas[k])&&
   approval.approvedCurrentWriterConfigSha256===cas.writerSha256,
   'INSTALLED_RECOVERY_CAS_CHANGED');
+ let postWriterVerified=false;
+ if(postWriterRequested){
+  const readPinned=rel=>{
+   const bytes=inspectStep('W04_POSTWRITER_EVIDENCE_MISSING',
+    ()=>fs.readFileSync(path.join(repo,rel)));
+   need(digest(bytes)===digest(g(['show','HEAD:'+rel],
+    'W04_POSTWRITER_EVIDENCE_NOT_COMMITTED')),
+    'W04_POSTWRITER_EVIDENCE_DRIFT');
+   return bytes;
+  };
+  postWriterVerified=validateW043409PostWriterBridge({
+   approval,
+   oldApprovalRaw:readPinned(W04_3409_ORIGINAL_APPROVAL),
+   writerManifestRaw:readPinned(W04_WRITER_B_APPROVAL),
+   writerReceiptRaw:readPinned(W04_WRITER_B_RECEIPT),
+   writerIssue:github('issues/3461'),
+   writerBytes:bytes.writer
+  });
+ }
+
  // The prior B scope and its original postcheck source are authoritative;
  // a successful independent A result cannot redefine that approved contract.
  const originalPackage=loadApprovedPackage(id,path.join(root,'approved',id+'.json'),
@@ -383,7 +485,7 @@ async function reconcileInstalledRecoveryFixed({id,source,g,before}){
   workflowActive:before.state.workflow==='active',
   backlogReconciled:pending,
   supervisorVerified:verifyInstalledRecoverySupervisor(targetSha),
-  protectedWriterPreserved:permittedInstalledRecoveryProtection(fixed,protectedChoice),
+  protectedWriterPreserved:permittedInstalledRecoveryProtection(fixed,protectedChoice,postWriterVerified),
   sourceAndCasVerified:true,currentAReceiptVerified:success,
   operatorVerified:true
  };
@@ -420,7 +522,8 @@ async function reconcileInstalledRecoveryFixed({id,source,g,before}){
    verifyInstalledRecoverySupervisor(targetSha)&&
    permittedInstalledRecoveryProtection(fixed,
     selectPreservedRecoveryProtection(baseline,protectedSnapshot(),
-     {approvedCurrentWriterConfigSha256:approval.approvedCurrentWriterConfigSha256})),
+     {approvedCurrentWriterConfigSha256:approval.approvedCurrentWriterConfigSha256}),
+    postWriterVerified),
    'INSTALLED_RECOVERY_PREARCHIVE_CAS_DRIFT');
   // A fresh independent runtime+workflow readback is required at the exact
   // archive boundary. The seven-file CAS alone cannot prove live Controller
