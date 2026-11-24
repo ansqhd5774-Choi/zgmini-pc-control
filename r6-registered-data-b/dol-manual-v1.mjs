@@ -133,6 +133,10 @@ export function createApprovedDolManualCollectorOptions({auth,db,fetchImpl,provi
    groupName:auth.approval.groupName,maxDolCalls:auth.approval.maxDolCalls,
    requestId:auth.request.requestId,
    approvalManifestSha256:auth.request.approvalManifestSha256,
+   ...(isPdfApproval(auth.approval)?{
+    nationalSource:'ETA538_ARCHIVED_PDF',
+    originalPdfSha256:auth.approval.pdfArchive.originalPdfSha256,
+   }:{}),
   },
   ...(isPdfApproval(auth.approval)?{providerFactory}:{}),
  };
