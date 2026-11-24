@@ -39,7 +39,7 @@ const negatives=[
  ['Core lock remains (#1010)',a=>{a.intent.requiresCoreLockReleased=true;a.result.result={core:{lockPresent:true}};},'CORE_LOCK_NOT_RELEASED'],
  ['runtime source unknown (#936)',a=>{a.intent.requiresRuntimeSourceVerified=true;a.result.result={runtimeSourceVerified:false};},'RUNTIME_SOURCE_UNVERIFIED'],
  ['failure flow not proved (#1033)',a=>a.intent.objectiveSatisfied=false,'OBJECTIVE_UNVERIFIED'],
- ['D1 readback unverified (#930)',a=>a.intent.objectiveSatisfied=false,'OBJECTIVE_UNVERIFIED']
+ ['D1 readback unverified (#930)',a=>a.intent.objectiveSatisfied=false,'OBJECTIVE_UNVERIFIED'],
  ['unsupported inventory schema',a=>{a.request.schema='ZGMINI_PC_PROCESS_INVENTORY_REQUEST_V1';a.request.operation='process-inventory-readonly';a.result.operation='process-inventory-readonly';a.result.code='PROCESS_INVENTORY_COLLECTED';},'SCHEMA_NOT_APPROVED'],
  ['runtime source not verified even with permissive intent',a=>{a.request.operation='core-runtime-source-readonly';a.result.operation='core-runtime-source-readonly';a.result.code='CORE_RUNTIME_SOURCE_VERIFIED';a.result.result={runtimeSourceVerified:false};},'RUNTIME_SOURCE_UNVERIFIED']
 ];
