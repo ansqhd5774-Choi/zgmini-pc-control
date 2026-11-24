@@ -44,3 +44,22 @@ test('production probe cannot be constructed without independent approval',()=>{
   manifest,requestId:ID,sourceApproved:false
  }),e=>e.code==='SIDECAR_B_PROBE_APPROVAL_STOP');
 });
+
+
+test('CNN B preimage pins return exact bounded SHA only when source and preimage agree',async()=>{
+ const {projectSidecarBManifestPreimageReadonly:project}=await import('./operating-probe.mjs');
+ const raw={head:HEAD,configSource:HEAD,taskDefinitionSha256:HASH,
+  wrapperSha256:HASH,targetSha256:PREIMAGE,secret:'DO_NOT_LEAK'};
+ const out=project(raw);
+ assert.deepEqual({status:out.status,code:out.code,head:out.head,beforeSha256:out.beforeSha256},
+  {status:'PASS',code:'CNN_B_PREIMAGE_PINS_COLLECTED',head:HEAD,beforeSha256:PREIMAGE});
+ assert.equal(Object.hasOwn(out,'secret'),false);
+ assert.equal(out.operationalWrites,0);
+ for(const delta of [{head:'c'.repeat(40)},{configSource:'c'.repeat(40)},
+  {taskDefinitionSha256:null},{wrapperSha256:null},
+  {targetSha256:'f'.repeat(64)}]){
+  const denied=project({...raw,...delta});
+  assert.equal(denied.status,'STATE_UNKNOWN');
+  assert.equal(denied.taskDefinitionSha256,null);
+ }
+});
