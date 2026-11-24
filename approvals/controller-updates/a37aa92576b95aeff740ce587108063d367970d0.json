@@ -1,0 +1,41 @@
+{
+  "schema": "ZGMINI_PC_UPDATE_V1",
+  "installedSha": "3c20e036ffa56a9a9670916d68c30451d6a699bc",
+  "targetSha": "a37aa92576b95aeff740ce587108063d367970d0",
+  "allowFiles": [
+    {
+      "path": "controller/employment-r6-collection-evidence-readonly.mjs",
+      "sha256": "9dcf8f1e143688c1e0658b3908fe1ee3c72eda943b02241af97eb70adeae5848"
+    }
+  ],
+  "purpose": "pc-controller-maintenance",
+  "controllerOnlyInstall": true,
+  "approval": {
+    "grade": "B",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3394",
+    "scope": "PC_CONTROL_CONTROLLER_UPDATE"
+  },
+  "checks": {
+    "targetSha": "a37aa92576b95aeff740ce587108063d367970d0",
+    "status": "PASS",
+    "manifestSha256": "19f78cb3f71aad008b9187546c0f51ad3d8daaba0395305e0524c3bc0f6b0b76"
+  },
+  "backup": {
+    "strategy": "VERSIONED_SNAPSHOT",
+    "rollback": {
+      "kind": "RESTORE_INSTALLED_SHA",
+      "sha": "3c20e036ffa56a9a9670916d68c30451d6a699bc"
+    }
+  },
+  "postOperation": "core-status",
+  "postSourceBranch": "codex/employment-1y-reader-r1",
+  "postSourceSha": "50769db23ac6a5f55203855f5231d12dc0595bb4",
+  "selectiveSource": {
+    "schema": "ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1",
+    "branch": "codex/w04-eta538-pdf-audit-controller-overlay-20261125",
+    "mainSha": "72034dc28ec7c57e8366e0f39f95c25867aa810f",
+    "customPaths": [
+      "controller/employment-r6-collection-evidence-readonly.mjs"
+    ]
+  }
+}
