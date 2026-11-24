@@ -25,6 +25,7 @@ const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const TARGET2960='pc-update-e8767e20-6bad-4418-97c6-561cf79a8213';
 const PROBE2960='w05-2960-maintenance-status-readonly';
 const D05_WRITER_PROBE='d05-writer-checkpoint-readonly';
+const D05_PRIVATE_RECEIPT_PROBE='d05-private-final-events-readonly';
 const D05_THEME_PROBE='d05-theme-final-outputs-readonly';
 const D05_REGISTERED_PROBE='d05-configured-registration-readonly';
 const C3160_PROBE='c3160-rollback-cas-readonly';
@@ -90,13 +91,14 @@ export function authenticateProcess(event,env,role){
   const isOperator=withW05&&raw.probe==='w05-operator-topology-readonly';
   const is2960=withW05&&raw.probe===PROBE2960;
   const isD05Writer=withW05&&raw.probe===D05_WRITER_PROBE;
+  const isD05PrivateReceipt=withW05&&raw.probe===D05_PRIVATE_RECEIPT_PROBE;
   const isD05Theme=withW05&&raw.probe===D05_THEME_PROBE;
   const isD05Registration=withW05&&raw.probe===D05_REGISTERED_PROBE;
   const is3160=withW05&&raw.probe===C3160_PROBE;
  if(!raw||(!basic&&!withJobs&&!withW05)||
    raw.schema!==SCHEMA||raw.operation!==ROLE_OPERATION||raw.role!==role||
    (withJobs&&role!=='operating')||
-   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!isD05Writer&&!isD05Theme&&!isD05Registration&&!is3160))))
+   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!isD05Writer&&!isD05PrivateReceipt&&!isD05Theme&&!isD05Registration&&!is3160))))
   fail('REQUEST_SCOPE_INVALID');
  const runnerJobRefs=withJobs?validateRunnerJobRefs(raw.runnerJobRefs):null;
  const normalized=structuredClone(event);
@@ -109,6 +111,7 @@ export function authenticateProcess(event,env,role){
   ...(isOperator?{w05OperatorTopology:true}:{}),
    ...(is2960?{w052960MaintenanceStatus:true}:{}),
    ...(isD05Writer?{d05WriterCheckpoint:true}:{}),
+   ...(isD05PrivateReceipt?{d05PrivateFinalReceipt:true}:{}),
    ...(isD05Theme?{d05ThemeFinalOutputs:true}:{}),
    ...(isD05Registration?{d05ConfiguredRegistrations:true}:{}),
    ...(is3160?{c3160RecoveryCas:true}:{})};
@@ -604,6 +607,78 @@ export function inspectD05WriterCheckpointReadonly({
  catch{return {status:'STATE_UNKNOWN',code:'D05_WRITER_JSON_INVALID',
   recoveryEligible:false};}
 }
+
+/**
+ * D05 #3178: read ONLY the last local paid-theme run and its immutable private
+ * final-calculation receipt. Never return scores, source records, paths or keys.
+ * No provider calls, re-computation, database access or filesystem writes.
+ */
+export function inspectD05PrivateFinalReceiptReadonly({
+ fileSystem=fs,root='E:/ZGmini/data',now=Date.now()
+}={}){
+ const pending=code=>({status:'PARTIAL',code,receiptMatched:false,
+  operationalWrites:0,providerCalls:0,d1Writes:0});
+ const digest=b=>createHash('sha256').update(b).digest('hex');
+ const SHA=/^[a-f0-9]{64}$/;
+ const day=s=>typeof s==='string'&&/^20\d{2}-\d{2}-\d{2}$/.test(s)&&
+  Number.isFinite(Date.parse(s+'T00:00:00Z'))&&
+  new Date(s+'T00:00:00Z').toISOString().slice(0,10)===s;
+ const iso=s=>typeof s==='string'&&Number.isFinite(Date.parse(s))&&
+  new Date(s).toISOString()===s&&Date.parse(s)<=now;
+ let real;
+ try{real=fileSystem.realpathSync.native(root);}
+ catch{return pending('D05_PRIVATE_DATA_ROOT_UNAVAILABLE');}
+ const run=readFixedReadonlyBytes(path.join(root,'marketparquet-paid','theme-last-run.json'),
+  {fileSystem,verifiedRoot:real,minBytes:2,maxBytes:2097152});
+ if(!run.ok)return pending('D05_PRIVATE_RUN_REPORT_'+run.reason);
+ let report;
+ try{report=JSON.parse(run.bytes.toString('utf8'));}
+ catch{return pending('D05_PRIVATE_RUN_REPORT_INVALID');}
+ const marker=report?.d05PrivateFinalOutputReadback;
+ if(marker?.status!=='LOCAL_PRIVATE_FINAL_THEME_EVENTS_VERIFIED')
+  return pending(marker?.status==='UNPROVEN_PRIVATE_FINAL_OUTPUT'?
+   'D05_PRIVATE_OUTPUT_UNPROVEN':marker?.status==='NO_VERIFIED_PRIVATE_FINAL_OUTPUT'?
+   'D05_PRIVATE_OUTPUT_NOT_VERIFIED':'D05_PRIVATE_RECEIPT_NOT_RECORDED');
+ if(!SHA.test(marker.finalEventBodySha256??'')||
+  !SHA.test(marker.privateBodySha256??'')||
+  !iso(marker.calculatedAt)||!day(marker.confirmedObservationDate)||
+  !Number.isSafeInteger(marker.scoreCount)||marker.scoreCount<1||marker.scoreCount>256||
+  report.confirmedDate!==marker.confirmedObservationDate||
+  report.privateStored?.status!=='PRIVATE_STORED_READBACK_VERIFIED'||
+  report.privateStored?.bodySha256!==marker.privateBodySha256||
+  report.privateStored?.count!==marker.scoreCount)
+  return pending('D05_PRIVATE_RUN_RECEIPT_MISMATCH');
+ const file=path.join(root,'marketparquet-paid','derived',
+  'd05-private-final-theme-'+marker.finalEventBodySha256+'.json');
+ const stored=readFixedReadonlyBytes(file,{fileSystem,verifiedRoot:real,
+  minBytes:2,maxBytes:131072});
+ if(!stored.ok)return pending('D05_PRIVATE_RECEIPT_FILE_'+stored.reason);
+ if(digest(stored.bytes)!==marker.finalEventBodySha256)
+  return pending('D05_PRIVATE_RECEIPT_HASH_MISMATCH');
+ let parsed;
+ try{parsed=JSON.parse(stored.bytes.toString('utf8'));}
+ catch{return pending('D05_PRIVATE_RECEIPT_JSON_INVALID');}
+ if(parsed?.schema!=='ZGMINI_D05_PRIVATE_THEME_FINAL_EVENTS_R1'||
+  parsed.privateBodySha256!==marker.privateBodySha256||
+  !SHA.test(parsed.sourceVersion??'')||!SHA.test(parsed.registrySha256??'')||
+  parsed.calculatedAt!==marker.calculatedAt||
+  parsed.confirmedObservationDate!==marker.confirmedObservationDate||
+  !Array.isArray(parsed.events)||parsed.events.length!==marker.scoreCount||
+  !parsed.events.every(e=>e&&typeof e.scoreId==='string'&&
+   e.scoreId.startsWith('theme:')&&e.phase==='CONFIRMED'&&
+   e.calculatedAt===marker.calculatedAt&&
+   e.asOfDate===marker.confirmedObservationDate))
+  return pending('D05_PRIVATE_RECEIPT_CONTENT_MISMATCH');
+ return {status:'PASS',code:'D05_PRIVATE_FINAL_RECEIPT_READBACK_VERIFIED',
+  calculatedAt:marker.calculatedAt,
+  confirmedObservationDate:marker.confirmedObservationDate,
+  scoreCount:marker.scoreCount,
+  privateBodySha256:marker.privateBodySha256,
+  finalEventBodySha256:marker.finalEventBodySha256,
+  receiptMatched:true,localOnly:true,
+  operationalWrites:0,providerCalls:0,d1Writes:0};
+}
+
 export function compactD05WriterResult(base,status){
  return {...base,observedAtUtc:new Date().toISOString(),
   status:status?.status==='READ_ONLY_OBSERVED'?'PASS':'PARTIAL',
@@ -1901,6 +1976,10 @@ export function collect(role,ctx,env=process.env){
   return compact2960ProcessResult(base,inspect2960MaintenanceStatusReadonly());
  if(ctx.d05WriterCheckpoint===true)
   return compactD05WriterResult(base,inspectD05WriterCheckpointReadonly());
+ if(ctx.d05PrivateFinalReceipt===true){
+  const receipt=inspectD05PrivateFinalReceiptReadonly();
+  return {...base,status:receipt.status,code:receipt.code,d05PrivateFinalReceipt:receipt};
+ }
  if(ctx.d05ThemeFinalOutputs===true)
   return inspectD05PaidThemeFinalOutputsReadonly().then(result=>({...base,
    status:result.status,code:result.code,d05ThemeFinalOutputs:result}));
@@ -1977,6 +2056,12 @@ export function toText(r){
    'd05LatestCalculatedAt='+(r.d05ThemeFinalOutputs.latestCalculatedAt??'UNKNOWN'),
    'd05CurrentReceiptMatched='+(r.d05ThemeFinalOutputs.currentReceiptMatched??'UNKNOWN'),
    'd05ArchiveScanComplete='+(r.d05ThemeFinalOutputs.archiveScanComplete??'UNKNOWN')]:[]),
+  ...(r.d05PrivateFinalReceipt?[
+   'd05PrivateReceipt='+r.d05PrivateFinalReceipt.code,
+   'd05PrivateCalculatedAt='+(r.d05PrivateFinalReceipt.calculatedAt??'UNKNOWN'),
+   'd05PrivateScoreCount='+(r.d05PrivateFinalReceipt.scoreCount??'UNKNOWN'),
+   'd05PrivateReceiptSha='+(r.d05PrivateFinalReceipt.finalEventBodySha256??'UNKNOWN'),
+   'd05PrivateReceiptMatched='+r.d05PrivateFinalReceipt.receiptMatched]:[]),
   ...(r.d05ConfiguredRegistrations?[
    'd05ConfiguredRegistry='+r.d05ConfiguredRegistrations.code,
    'd05ConfiguredDefinitionCount='+(r.d05ConfiguredRegistrations.registeredDefinitionCount??'UNKNOWN'),
