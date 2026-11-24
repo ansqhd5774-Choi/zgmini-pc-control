@@ -4,6 +4,7 @@ import {readFileSync,mkdtempSync,mkdirSync,writeFileSync,rmSync,realpathSync} fr
 import path from 'node:path';
 import os from 'node:os';
 import {readFixedReadonlyBytes} from '../controller/fixed-readonly-bytes.mjs';
+import {validateControllerConfigTransition} from '../tools/maintenance-contract.mjs';
 import {
  W05_FIVE_OPERATION,W05_SOURCE_FILES,
  summarizeW05FiveKeyEvidence,compareW05FiveKeyWithApprovedReaders,
@@ -26,7 +27,10 @@ test('W05 added readback is A/light, fixed dispatch and no visitor-triggered ope
  const policy=JSON.parse(readFileSync(new URL('../config/operations.json',import.meta.url),'utf8'));
  assert.equal(policy.operations[W05_FIVE_OPERATION].grade,'A');
  assert.equal(policy.operations[W05_FIVE_OPERATION].resource,'light');
- assert.ok(policy.operations[W05_FIVE_OPERATION].timeoutSeconds>=90);
+ assert.equal(policy.operations[W05_FIVE_OPERATION].timeoutSeconds,90);
+ const previous=structuredClone(policy);
+ delete previous.operations[W05_FIVE_OPERATION];
+ assert.equal(validateControllerConfigTransition(previous,policy),true);
  assert.equal(policy.mutationsEnabled,false);
  const dispatch=readFileSync(new URL('../controller/operations.mjs',import.meta.url),'utf8');
  assert.match(dispatch,/request\.operation==='w05-five-key-d1-api-readback-readonly'/);
