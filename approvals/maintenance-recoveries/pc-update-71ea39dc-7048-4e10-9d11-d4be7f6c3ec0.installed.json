@@ -1,0 +1,48 @@
+{
+  "schema": "ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V1",
+  "approved": true,
+  "operation": "RECONCILE_INSTALLED",
+  "requestId": "pc-update-71ea39dc-7048-4e10-9d11-d4be7f6c3ec0",
+  "issueNumber": 3409,
+  "sourceSha": "fcb098d20fb9a6c48f371786c69f7f1fdf5bc34a",
+  "targetControllerSha": "6b3c9c0ce77354d81babe4c9ea7785663c6c2cb4",
+  "approvedCurrentWriterConfigSha256": "00e1b32c9983a8630ca5fd9ed99eafcf6c7eaeac39dbcdb7b68111906d778c64",
+  "files": [
+    {
+      "path": "tools/maintenance-recovery.mjs",
+      "sha256": "fdf3d2e1821e8429106072677f63f8abb86bf4d0d3ce16143da8ff08fb134e05"
+    },
+    {
+      "path": "tools/update.mjs",
+      "sha256": "387e52424819904d8a500b94bbfed7d7980baf5dadfc68f211eaffda4d246191"
+    },
+    {
+      "path": "tools/maintenance-contract.mjs",
+      "sha256": "cdaf63cef96d872cccb2a2fc33cab37eba7d1a91301b7f382c338374e2bf335e"
+    },
+    {
+      "path": "controller/fixed-readonly-bytes.mjs",
+      "sha256": "ef545e7621da26f790ac15089aba3c82956fb40e287c3a1ec9ad13cddfe3bdf8"
+    }
+  ],
+  "casDigests": {
+    "ledgerSha256": "345bf82792772d72f0eb51c2f03c385fcfd22bfe46546ff46930c3176cbf548d",
+    "ownerSha256": "9acd366360ea24acd5222c7ae6534bab5b111641c99671cd8033eab9db24ed3a",
+    "markerSha256": "30f257f10a909fc11d61ed63d015a51d55af6cdfcbb1df39d2644b887bf39997",
+    "backlogSha256": "4ba5c0645638b75d0b09ad679c801f3a58e1fa4d4deacbaeeba596c0d0355c7d",
+    "snapshotSha256": "de9e3e9623ebb219f20fb4e7f6ef600478da45170535417396118efefdbe1efb",
+    "protectionSha256": "2c4b04dae01f7c295dfee4c4bed65070b831a9b0ec614a013b0263f410f83b26",
+    "writerSha256": "00e1b32c9983a8630ca5fd9ed99eafcf6c7eaeac39dbcdb7b68111906d778c64"
+  },
+  "proof": {
+    "issueNumber": 3438,
+    "runId": 45457196689,
+    "jobId": 138669741465,
+    "runnerName": "zgmini-pc-03",
+    "resultPath": "results/45457196689-1-seat-3.json",
+    "resultSha256": "f333bac8bab7e497bc9e5c3003a8bb981e6d209781900f11169dd50bd500c2bb"
+  },
+  "observedAtUtc": "2026-11-24T18:13:27.206Z",
+  "observedRunId": 45456982356,
+  "note": "Existing standing Controller recovery approval scope; exact source/file hashes, historical CAS, and later independent A receipt pinned. This file does not itself authorize unverified OS writes: independent Windows operator must validate live identity, original approval, seven-file CAS, protected baseline, active workflow, Supervisor, and A Run/Job. Original postcheck #3410 remains UNKNOWN."
+}

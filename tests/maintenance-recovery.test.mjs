@@ -2,7 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {classifyRecovery,archiveUntouched,
- verifyMaintenanceManifest as recoveryInventory,verifyOperatingRunners,inspectOperatingRunners,inspectEvidenceFile,fixedInstalledRecoveryCase} from '../tools/maintenance-recovery.mjs';
+ verifyMaintenanceManifest as recoveryInventory,verifyOperatingRunners,inspectOperatingRunners,inspectEvidenceFile,fixedInstalledRecoveryCase,permittedInstalledRecoveryProtection} from '../tools/maintenance-recovery.mjs';
 import {verifyMaintenanceManifest as statusInventory} from '../tools/automation-status.mjs';
 test('fixed installed reconciliation admits only original #2960 and W04 #3409 identities',()=>{
  const a=fixedInstalledRecoveryCase('pc-update-e8767e20-6bad-4418-97c6-561cf79a8213');
@@ -27,6 +27,18 @@ test('fixed installed reconciliation admits only original #2960 and W04 #3409 id
   'pc-update-71ea39dc-7048-4e10-9d11-d4be7f6c3ec0-postcheck',
   'pc-update-e8767e20-6bad-4418-97c6-561cf79a8214'])
   assert.equal(fixedInstalledRecoveryCase(id),null);
+});
+test('W04 exact unchanged protection never accepts Writer drift; legacy remains narrow',()=>{
+ const legacy=fixedInstalledRecoveryCase('pc-update-e8767e20-6bad-4418-97c6-561cf79a8213');
+ const w04=fixedInstalledRecoveryCase('pc-update-71ea39dc-7048-4e10-9d11-d4be7f6c3ec0');
+ const same={allowed:true,code:'RECOVERY_ORIGINAL_PROTECTION_UNCHANGED',preservedWriterConfig:false};
+ const delta={allowed:true,code:'RECOVERY_CURRENT_WRITER_CONFIG_PRESERVED',preservedWriterConfig:true};
+ assert.equal(permittedInstalledRecoveryProtection(w04,same),true);
+ assert.equal(permittedInstalledRecoveryProtection(w04,delta),false);
+ assert.equal(permittedInstalledRecoveryProtection(legacy,same),false);
+ assert.equal(permittedInstalledRecoveryProtection(legacy,delta),true);
+ assert.equal(permittedInstalledRecoveryProtection(w04,{...same,allowed:false}),false);
+ assert.equal(permittedInstalledRecoveryProtection(null,same),false);
 });
 const sha='a'.repeat(40),id='pc-update-recovery-fixture';
 test('inspect evidence distinguishes missing, unreadable and malformed bytes without disclosing local paths',()=>{

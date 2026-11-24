@@ -186,6 +186,14 @@ export function fixedInstalledRecoveryCase(id){
   proof:proof3409,allowUnchangedBaseline:true});
  return null;
 }
+// Preserve #2960's approved Writer-only delta; #3409 is attested as
+// unchanged, so reject even a separately valid Writer-only deviation.
+export function permittedInstalledRecoveryProtection(fixed,choice){
+ return choice?.allowed===true&&(
+  fixed?.allowUnchangedBaseline===true?
+   choice.code==='RECOVERY_ORIGINAL_PROTECTION_UNCHANGED':
+   fixed?.allowUnchangedBaseline===false&&choice.preservedWriterConfig===true);
+}
 export function classifyInstalledReconciliationProof(proof){
  const checks={
   ORIGINAL_LEDGER:proof?.originalLedger===true,
@@ -375,10 +383,7 @@ async function reconcileInstalledRecoveryFixed({id,source,g,before}){
   workflowActive:before.state.workflow==='active',
   backlogReconciled:pending,
   supervisorVerified:verifyInstalledRecoverySupervisor(targetSha),
-  protectedWriterPreserved:protectedChoice.allowed===true&&
-   (protectedChoice.preservedWriterConfig===true||
-    (fixed.allowUnchangedBaseline&&
-     protectedChoice.code==='RECOVERY_ORIGINAL_PROTECTION_UNCHANGED')),
+  protectedWriterPreserved:permittedInstalledRecoveryProtection(fixed,protectedChoice),
   sourceAndCasVerified:true,currentAReceiptVerified:success,
   operatorVerified:true
  };
@@ -413,8 +418,9 @@ async function reconcileInstalledRecoveryFixed({id,source,g,before}){
   need(Object.keys(now).every(k=>bytes[k].equals(now[k]))&&
    before.state.ownerAlive===false&&alive(owner.pid)===false&&
    verifyInstalledRecoverySupervisor(targetSha)&&
-   selectPreservedRecoveryProtection(baseline,protectedSnapshot(),
-    {approvedCurrentWriterConfigSha256:approval.approvedCurrentWriterConfigSha256}).allowed===true,
+   permittedInstalledRecoveryProtection(fixed,
+    selectPreservedRecoveryProtection(baseline,protectedSnapshot(),
+     {approvedCurrentWriterConfigSha256:approval.approvedCurrentWriterConfigSha256})),
    'INSTALLED_RECOVERY_PREARCHIVE_CAS_DRIFT');
   // A fresh independent runtime+workflow readback is required at the exact
   // archive boundary. The seven-file CAS alone cannot prove live Controller
