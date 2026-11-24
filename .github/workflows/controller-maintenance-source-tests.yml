@@ -330,6 +330,8 @@ jobs:
         run: node --test --test-concurrency=1 tests/shared-resource-issue-admission.test.mjs
       - name: Verify W05 fixed five-key D1/API reader stays source-only, private and fail closed
         run: node --test --test-concurrency=1 tests/w05-five-key-controller-readonly.test.mjs
+      - name: Verify fixed Cloudflare Production Deployment read-only A and safe failure paths
+        run: node --test --test-concurrency=1 tests/w05-cloudflare-deployment-readonly.test.mjs
       - name: Verify W05 immutable service-only BLS source adapter and isolated PC workspace
         if: steps.scope.outputs.w05 == 'true'
         run: node --test --test-concurrency=1 tests/w05-wpsfd42-service-readonly.test.mjs
