@@ -1,5 +1,5 @@
 import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';import {need,exclusive,readAllPages} from './common.mjs';
-import {renderBoundedReport,uploadVerifiedReportPair,resolveUploadPolicy} from './report-upload-verified.mjs';
+import {renderBoundedReport,uploadVerifiedReportPair,resolveUploadPolicy,hasVerifiedReportComment} from './report-upload-verified.mjs';
 import {cleanupVerifiedJobTemps} from './report-temp-retention.mjs';
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const token=process.env.GITHUB_TOKEN;need(token,'REPORT_AUTH_MISSING');
@@ -22,7 +22,7 @@ const scopeNotice=transfer?.status==='SUMMARY_ONLY'?
 const body=`${marker}\n**${report.status} — ${report.code}**${scopeNotice}\n\n실행: ${runUrl}\n\n${files.map(x=>'- '+x).join('\n')}\n\nJSON 결과:\n\n\`\`\`json\n${json}\`\`\`\n\nTXT 결과:\n\n\`\`\`text\n${txt}\`\`\`\n`;
 const allComments=()=>readAllPages(async page=>{const r=await api(`issues/${pointer.issueNumber}/comments?per_page=100&page=${page}`);need(r.status===200,'REPORT_COMMENTS_LOOKUP_FAILED');return r.data;});
 let comments=await allComments();
-if(!comments.some(x=>x.user?.login==='github-actions[bot]'&&x.body?.includes(marker))){try{const post=await api(`issues/${pointer.issueNumber}/comments`,'POST',{body});need(post.status===201,'REPORT_COMMENT_WRITE_FAILED');}catch(error){comments=await allComments();need(comments.some(x=>x.user?.login==='github-actions[bot]'&&x.body?.includes(marker)),'REPORT_COMMENT_OUTCOME_UNKNOWN');}}
+if(!hasVerifiedReportComment(comments,{marker,body})){try{const post=await api(`issues/${pointer.issueNumber}/comments`,'POST',{body});need(post.status===201,'REPORT_COMMENT_WRITE_FAILED');}catch(error){comments=await allComments();need(hasVerifiedReportComment(comments,{marker,body}),'REPORT_COMMENT_OUTCOME_UNKNOWN');}}
 console.log(JSON.stringify({status:'REPORT_UPLOADED',issueNumber:pointer.issueNumber,resultFiles:files.length,artifactBytes:0,runUrl}));
 // The report is already published. An optional cleanup failure cannot cause a
 // duplicate execution, retroactively fail upload, or remove recovery evidence.
