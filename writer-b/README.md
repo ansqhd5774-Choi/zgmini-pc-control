@@ -14,6 +14,8 @@
 4. 성공·처리 가능한 실패 모두 Task 원본 정의와 활성 상태를 확인한 뒤 공유 lease를 반환한다. 복원이 불명확하면 `WRITER_B_RECOVERY_REQUIRED`로 claim/lease/백업을 보존한다. Task 정의 drift가 있으면 무조건 Enable하지 않는다.
 5. 프로세스 강제 종료·전원 중단은 JavaScript finally의 실행을 보장하지 않는다. `TASK_PAUSE_INTENT` 이후 영수증이 없으면 동일 ID 재실행·자동 Enable을 금지하고, 정확 요청 journal/백업·실제 source/config·Task를 기존 복구 계약으로 대조한다. 소스 부분 적용 중 예약을 켜지 않는다.
 
+360초를 초과하는 실제 Core 순차 실행이 확인된 경우에만, **별도 명시 승인**을 담은 정확 manifest에서 `coreMaintenance: "PAUSE_NEW_STARTS_DRAIN_1200S_V1"`를 선택할 수 있다. 새 모드의 최대 자연 종료 대기는 **1200초(20분)** 이며 Workflow 자체도 30분으로 유한하다. 기존 360초 승인에서 자동 승격하지 않고, Task/XML·원본 CAS·2회 연속 유휴 검증·원상 복구·고유 requestId를 모두 동일하게 적용한다. 강제 종료·lock 삭제·DB/D1 변경·새 예약은 하지 않는다. 구현과 CI 또는 PR 병합만으로 설치 권한이나 운영 완료를 선언하지 않는다.
+
 최대 drain 360초는 완료 보장이 아니다. 더 오래 실행되는 Core를 강제로 끝내지 않는다. 이 모드는 공통 Writer B에만 적용하며 A 조회·다른 업무의 전역 조건이 아니다. 코드/CI 완료, 실제 B 설치, 기능 수집·게시 성공은 구분한다. W05 #2222는 재실행하지 않고 원담당이 현행 preimage와 위 선택을 담은 **새 승인 manifest·새 요청 ID**로 기존 공통 workflow를 사용한다. 신규 CMD·Controller·예약은 만들지 않는다.
 
 > 공통 Writer B의 실제 PC 설치 선례: [#651](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/651), [#666](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/666). 해당 당시의 승인 범위에만 유효하며, 후속 기능 파일의 자동 설치·게시 성공을 뜻하지 않는다.
