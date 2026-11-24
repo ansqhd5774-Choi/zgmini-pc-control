@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath,pathToFileURL} from 'node:url';
 
 export const FIXED=Object.freeze({
  repository:'ansqhd5774-Choi/zgmini-pc-control',
@@ -45,7 +45,7 @@ export function assertOrigin(origin){
 }
 export function validateSourceReceipt(r){
  need(r?.status==='SOURCE_PREPARED_ONLY'&&
-   r.code==='PINNED_ISOLATED_WORKTREE_VERIFIED'&&
+   r.code==='EXACT_RELEASE_WORKTREE_CAS_VERIFIED'&&
    r.requestId===FIXED.original&&r.sourceSha===FIXED.approvedSource&&
    /^[a-f0-9]{40}$/.test(r.stagedHead??'')&&
    r.recoveryExecuted===false&&r.controllerWrites===0&&r.leaseWrites===0,
@@ -202,24 +202,52 @@ export async function runOnce({platform=process.platform,env=process.env}={}){
   git(['merge-base','--is-ancestor',FIXED.release,'refs/remotes/origin/main']);
   git(['merge-base','--is-ancestor',FIXED.approvedSource,FIXED.release]);
   const bootstrapParent=path.dirname(FIXED.bootstrap);
-  need(fs.existsSync(bootstrapParent)&&fs.lstatSync(bootstrapParent).isDirectory(),
-    'OPERATOR_BOOTSTRAP_PARENT_UNAVAILABLE');
+  const maintStat=fs.lstatSync(FIXED.maintenance);
+  need(maintStat.isDirectory()&&!maintStat.isSymbolicLink(),
+    'OPERATOR_MAINTENANCE_ROOT_UNSAFE');
+  if(!fs.existsSync(bootstrapParent))fs.mkdirSync(bootstrapParent);
+  const parentStat=fs.lstatSync(bootstrapParent);
+  need(parentStat.isDirectory()&&!parentStat.isSymbolicLink(),
+    'OPERATOR_BOOTSTRAP_PARENT_UNSAFE');
   git(['worktree','add','--detach',FIXED.bootstrap,FIXED.release]);
   need(git(['-C',FIXED.bootstrap,'rev-parse','HEAD']).toString().trim()===FIXED.release,
     'OPERATOR_BOOTSTRAP_SOURCE_UNVERIFIED');
   const prep='tools/w04-3409-independent-source-prep.mjs';
   need(sha(readStrict(path.join(FIXED.bootstrap,prep)))===sha(show(FIXED.release,prep)),
     'OPERATOR_BOOTSTRAP_FILE_DRIFT');
-  const prepared=parseOutput(runExe(FIXED.node,[path.join(FIXED.bootstrap,prep),'--prepare'],
-    {timeout:180000,maxBuffer:16384}),'OPERATOR_SOURCE_PREP_RESULT_INVALID');
+  // Reuse the already-reviewed V2 approval, CAS and four-file validators,
+  // but stage the immutable approved release rather than a moving origin/main.
+  const module=await import(pathToFileURL(path.join(FIXED.bootstrap,prep)).href);
+  module.assertIndependentOperator();
+  const original='approvals/maintenance-recoveries/'+FIXED.original+'.installed.json';
+  const originalRaw=show(FIXED.release,original);
+  need(sha(originalRaw)==='e9707741bb4a39cc933b2cb8b5e04ec27242992aa7d974d0fb1af89d21fd9005',
+    'OPERATOR_ORIGINAL_V1_APPROVAL_DRIFT');
+  const pinnedRaw=show(FIXED.release,FIXED.approval);
+  const approval=JSON.parse(pinnedRaw);
+  const oldApproval=JSON.parse(originalRaw);
+  module.validateApproval(approval);
+  need(Object.keys(oldApproval.casDigests??{}).length===7&&
+   Object.keys(oldApproval.casDigests).filter(k=>k!=='writerSha256')
+    .every(k=>approval.casDigests[k]===oldApproval.casDigests[k])&&
+   approval.casDigests.writerSha256!==oldApproval.casDigests.writerSha256,
+   'OPERATOR_ORIGINAL_SIX_CAS_CHANGED');
+  module.verifyCas(approval);
+  git(['worktree','add','--detach',FIXED.staged,FIXED.release]);
+  need(git(['-C',FIXED.staged,'rev-parse','HEAD']).toString().trim()===FIXED.release,
+    'OPERATOR_STAGED_HEAD_UNVERIFIED');
+  need(sha(readStrict(path.join(FIXED.staged,FIXED.approval),32768))===sha(pinnedRaw),
+    'OPERATOR_STAGED_APPROVAL_CHANGED');
+  module.verifyStagedFiles(approval,git);
+  module.verifyCas(approval);
+  const prepared={status:'SOURCE_PREPARED_ONLY',
+   code:'EXACT_RELEASE_WORKTREE_CAS_VERIFIED',requestId:FIXED.original,
+   sourceSha:FIXED.approvedSource,stagedHead:FIXED.release,
+   controllerWrites:0,leaseWrites:0,recoveryExecuted:false};
   validateSourceReceipt(prepared);
   append(report,['PHASE=SOURCE_PREPARED_ONLY','STAGED_HEAD='+prepared.stagedHead]);
   const stagedSha=git(['-C',FIXED.staged,'rev-parse','HEAD']).toString().trim();
   need(stagedSha===prepared.stagedHead,'OPERATOR_STAGED_HEAD_CHANGED');
-  const pinnedRaw=show(FIXED.release,FIXED.approval);
-  const approval=JSON.parse(pinnedRaw);
-  need(sha(readStrict(path.join(FIXED.staged,FIXED.approval),32768))===sha(pinnedRaw),
-    'OPERATOR_STAGED_APPROVAL_CHANGED');
   append(report,['PHASE=RECOVERY_INVOCATION_STARTED','RECOVERY_ATTEMPTS=1']);
   // Only the already-approved independent operator may execute this B effect.
   const result=parseOutput(runExe(FIXED.node,[
