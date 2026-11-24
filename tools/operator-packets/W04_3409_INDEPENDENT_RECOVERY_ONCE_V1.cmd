@@ -6,7 +6,7 @@ rem The fixed JS source is authenticated against its committed Git blob ID.
 rem Do not repeat if an attempt or stage already exists. No reset/clean/rollback.
 set "ZG_NODE=E:\ZGmini\runtime\node.exe"
 set "ZG_SCRIPT=%~dp0w04-3409-recovery-once.mjs"
-set "ZG_JS_BLOB=d9d60610143726662a2be58e8605f2ecbd421e05"
+set "ZG_JS_BLOB=42d505fad9b6b0e35e1c7a15769800cc419f7d15"
 if defined GITHUB_ACTIONS goto :no_runner
 if defined RUNNER_NAME goto :no_runner
 if not exist "%ZG_NODE%" goto :no_node
