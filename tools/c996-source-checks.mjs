@@ -33,6 +33,7 @@ export const GROUPS=Object.freeze({
   // These tests were previously omitted even when core Writer B changed:
   // approval label↔mode, extended natural drain, recovery, and Census cap.
   'writer-b/contract.test.mjs','writer-b/installer.test.mjs',
+  'writer-b/w04-eta538-national-provider-preservation.test.mjs',
   'writer-b/windows-guards.test.mjs','writer-b/core-idle-window.test.mjs',
   'inflation-census-api-b/coordinator.test.mjs'],
  employment:['tests/employment-r6-collection-evidence-readonly.test.mjs',
