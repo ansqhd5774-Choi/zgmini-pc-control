@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
+import {readFixedReadonlyBytes} from './fixed-readonly-bytes.mjs';
 
 const hash = (value) => createHash('sha256').update(value).digest('hex');
 const CORE_TASK = 'ZGMINI-PC-Local-Core';
@@ -194,7 +195,8 @@ export function inspectSidecarSourceGate(dataRoot, {
     scriptStatus:[],ledgerStatus:'UNKNOWN',sameLedgerSnapshot:null,
     reasonShape:'NOT_CHECKED',reasonConcepts:[],
     matchingErrorSite:'NOT_CHECKED',matchedScript:null,siteLine:null,
-    gatePatternCategories:[],matchedGateCategories:[],operationalWrites:0,providerCalls:0,d1Writes:0};
+    gatePatternCategories:[],matchedGateCategories:[],ledgerOriginCandidates:[],sourceGuardCandidates:[],
+    staticGateProvenance:'UNVERIFIED_SOURCE_ONLY',operationalWrites:0,providerCalls:0,d1Writes:0};
   const directory=path.join(dataRoot,'pc-writer','archive-sidecar-r7');
   let stat;
   try{stat=fs.lstatSync(directory);}catch(error){return {...output,ledgerStatus:error?.code==='ENOENT'?'DIRECTORY_MISSING':'DIRECTORY_NOT_READABLE'};}
@@ -242,7 +244,9 @@ export function inspectSidecarSourceGate(dataRoot, {
       'CHECKOUT','WORKTREE','ARCHIVE','LOCK','PERMISSION','CLEAN'];
     output.reasonConcepts=concepts.filter(word=>tokens.has(word)).slice(0,12);
   }
-  const sites=[],gates=new Set();
+  // Candidate-only static evidence. Never interpret this as a runtime stack trace.
+  // A bounded source script must match its pinned hash and predate the ledger.
+  const sites=[],gates=new Set(),ledgerOrigins=[],sourceGuards=[];
   for(const name of Object.keys(SIDECAR_SOURCE_EXPECTED)){
     // Test callers may inject only the original two pins. Production defaults
     // always include both fixed children; never accept arbitrary filenames.
@@ -266,8 +270,24 @@ export function inspectSidecarSourceGate(dataRoot, {
     // Only explicit JS throw Error / VBS Err.Raise statements count. Comments,
     // logs, constants and other quoted literals cannot establish error sites.
     const lines=source.split(/\r?\n/);
+    // A literal ledger filename paired with a write API in the same pinned file
+    // identifies a *possible* last-run writer, not the process that wrote it.
+    if(lines.some(line=>/last-run\.json/i.test(line)) &&
+       lines.some(line=>/\b(?:writeFileSync|writeFile|appendFileSync|appendFile)\s*\(/.test(line)))
+      ledgerOrigins.push(name);
     for(let index=0;index<lines.length;index++){
       const line=lines[index];
+      // No raw code, paths, SHA literals, or ledger reason is returned.
+      // These are source guard *candidates*, not a diagnosis of the failure.
+      if(!/^\s*(?:\/\/|\/\*|\*|['"])/.test(line) &&
+         /(?:^\s*if\s*\(|\b(?:need|check|ensure|assert|stop|fail)\s*\()/i.test(line)){
+        const window=lines.slice(index,Math.min(index+3,lines.length)).join(' ');
+        const kind=/(?:config\.source|approvedSourceSha|sourceSha)/i.test(window)?
+          'SOURCE_APPROVAL_REFERENCE':/(?:rev-parse|git\.exe|execFileSync\s*\(\s*['"]git)/i.test(window)?
+          'GIT_REFERENCE':/(?:diff\s+--quiet|status\s+--porcelain|dirty)/i.test(window)?
+          'CLEAN_TREE_REFERENCE':null;
+        if(kind && sourceGuards.length<16)sourceGuards.push({file:name,line:index+1,kind});
+      }
       let matched=false;
       if(name.endsWith('.mjs')){
         const thrown=line.match(/^\s*throw\s+(?:new\s+)?Error\s*\(\s*(['"])([^'"\r\n]{2,160})\1\s*\)/);
@@ -292,6 +312,8 @@ export function inspectSidecarSourceGate(dataRoot, {
     output.matchingErrorSite='NOT_CHECKED';return output;
   }
   output.gatePatternCategories=[...gates].sort();
+   output.ledgerOriginCandidates=ledgerOrigins;
+   output.sourceGuardCandidates=sourceGuards;
   output.matchingErrorSite=sites.length===1?'UNIQUE':sites.length>1?'MULTIPLE':'NONE';
   if(sites.length===1){output.matchedScript=sites[0].name;output.siteLine=sites[0].line;
     output.matchedGateCategories=sites[0].categories;}
@@ -395,6 +417,46 @@ function feedRows(db, key) {
   return db.prepare("SELECT snapshot_key,stored_at,body FROM public_feed_snapshots_v1 WHERE kind='output' AND feed_key=? AND snapshot_key GLOB '????-??-??' ORDER BY snapshot_key DESC LIMIT 90").all(key);
 }
 
+// Project only fixed, non-sensitive composite stage metadata from the existing
+// Writer checkpoint. This is NOT direct D1 verification or proof of new input.
+const COMPOSITE_STAGE_STATUSES=new Set([
+ 'LOCAL_STORED','UNCHANGED','VERIFIED','BACKLOG','PENDING',
+ 'PENDING_VERIFIED_MARKET','PREVIOUS_RELEASE_PRESERVED',
+ 'REMOTE_NEWER_PRESERVED','FAILED','UNAVAILABLE','PARTIAL',
+]);
+const COMPOSITE_FAILURE_IDS=new Set([
+ 'market','composite-archive-local','market-publication',
+ 'composite-observed-publication',
+]);
+const safeCompositeStage=value=>typeof value==='string'&&
+ COMPOSITE_STAGE_STATUSES.has(value)?value:null;
+const safeTime=value=>typeof value==='string'&&Number.isFinite(Date.parse(value))&&
+ /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/.test(value)?
+ new Date(value).toISOString():null;
+
+export function inspectCompositeWriterCheckpoint(dataRoot){
+ const file=path.join(dataRoot,'pc-writer','local-writer-last-run.json');
+ let root;try{root=fs.realpathSync.native(dataRoot)}catch{return {state:'ROOT_UNAVAILABLE'}}
+ const r=readFixedReadonlyBytes(file,{verifiedRoot:root,minBytes:2,maxBytes:131072});
+ if(!r.ok)return {state:r.reason};
+ let w;try{w=JSON.parse(r.bytes.toString('utf8'));}catch{return {state:'INVALID_JSON'}}
+ if(!w||typeof w!=='object'||Array.isArray(w))return {state:'INVALID_SHAPE'};
+ const stage=v=>v&&typeof v==='object'&&!Array.isArray(v)?
+  {status:safeCompositeStage(v.status),storedDays:Number.isSafeInteger(v.storedDays)&&v.storedDays>=0?v.storedDays:null,
+   publishedDays:Number.isSafeInteger(v.publishedDays)&&v.publishedDays>=0?v.publishedDays:null,
+   deferredDays:Number.isSafeInteger(v.deferredDays)&&v.deferredDays>=0?v.deferredDays:null,
+   points:Number.isSafeInteger(v.points)&&v.points>=0?v.points:null}:null;
+ const failures=Array.isArray(w.failures)?w.failures.slice(0,80)
+  .filter(x=>x&&COMPOSITE_FAILURE_IDS.has(x.id)).map(x=>x.id):[];
+ return {state:'READ',evidence:'LOCAL_WRITER_LEDGER_ONLY_NOT_INDEPENDENT_EXECUTION',
+  checkpointSha256:hash(r.bytes),at:safeTime(w.at),
+  mode:w.mode==='PUBLISH'?'PUBLISH':w.mode==='DRY_RUN'?'DRY_RUN':null,
+  writerStatus:safeLedgerStatus(w.status),
+  market:stage(w.market),compositeArchiveLocal:stage(w.compositeObserved),
+  compositePublication:stage(w.compositeObservedPublication),
+  failedStages:[...new Set(failures)],d1PerKeyReadback:'NOT_VERIFIED'};
+}
+
 function readDb(dataRoot) {
   const dbFile=path.join(dataRoot,'pc-writer','storage','core.sqlite');
   if (!fs.existsSync(dbFile)) return {sqliteOpened:false,status:'DB_NOT_FOUND'};
@@ -412,7 +474,16 @@ function readDb(dataRoot) {
     const original = summary(feedRows(db,'fear-greed-observed'),'observations','observedAt');
     const checks = summary(feedRows(db,'fear-greed-verified-checks'),'checks','checkedAt');
     const composite = summary(db.prepare("SELECT snapshot_key,stored_at,body FROM market_public_snapshots_v1 WHERE snapshot_key LIKE 'composite-observed:%' ORDER BY snapshot_key DESC LIMIT 90").all().map(r=>({...r,snapshot_key:r.snapshot_key.replace('composite-observed:','')})),'points','calculatedAt');
-    return {sqliteOpened:true,status:'READ',currentPublic,original,checks,composite};
+    // Use the same native read-only SQLite connection; hash exact stored UTF-8
+    // bodies, never return raw current/observation payload or credentials.
+    const currentComposite=db.prepare("SELECT body,stored_at FROM market_public_snapshots_v1 WHERE snapshot_key='current'").get();
+    const lastComposite=db.prepare("SELECT snapshot_key,body,stored_at FROM market_public_snapshots_v1 WHERE snapshot_key LIKE 'composite-observed:%' ORDER BY snapshot_key DESC LIMIT 1").get();
+    const project=row=>row&&typeof row.body==='string'&&Buffer.byteLength(row.body,'utf8')<=2_000_000?
+      {storedAt:safeStoredAt(row.stored_at),bodySha256:hash(Buffer.from(row.body,'utf8'))}:null;
+    const localCompositeKeys={current:project(currentComposite),
+      latestArchiveKey:lastComposite&&/^composite-observed:\d{4}-\d\d-\d\d$/.test(lastComposite.snapshot_key)?lastComposite.snapshot_key:null,
+      latestArchive:project(lastComposite)};
+    return {sqliteOpened:true,status:'READ',currentPublic,original,checks,composite,localCompositeKeys};
   } catch(error) {
     return {sqliteOpened:!!db,status:'READ_FAILED',errorCode: typeof error?.code==='string'&&/^ERR_[A-Z_]+$|^SQLITE_[A-Z_]+$/.test(error.code)?error.code:'SQLITE_READ_ERROR'};
   } finally {try{db?.close()}catch{}}
@@ -426,7 +497,7 @@ export function inspectFearGreedArchive(dataRoot,{queryTask}={}) {
   const complete=local.status==='READ';
   const sidecar=sidecarTrace(dataRoot);
   return {status:complete?'PASS':'BLOCKED',code:complete?'FEAR_GREED_ARCHIVE_READONLY_DIAGNOSIS':`FEAR_GREED_${local.status}`,
-    task,local,archiveTrace:{alignment:archiveAlignment(local),sidecar,
+    task,local,writerComposite:inspectCompositeWriterCheckpoint(dataRoot),archiveTrace:{alignment:archiveAlignment(local),sidecar,
       sidecarSourceGate:inspectSidecarSourceGate(dataRoot,{priorSidecar:sidecar}),
       publicationLedger:publicationLedgerTrace(dataRoot)},
     sqliteOpened:local.sqliteOpened,operationalWrites:0,providerCalls:0,d1Writes:0,
