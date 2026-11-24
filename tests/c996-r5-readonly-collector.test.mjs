@@ -33,5 +33,20 @@ test('unchanged no-follow lstat path traversal emits bounded progress markers',(
  assert.ok(steps.every(x=>Number.isSafeInteger(x.depth)&&x.depth>=0&&x.depth<=24));
 });
 
-// Temporary CI-only harness: exercise the unchanged #1521 diagnostic test on the b9 integration tree.
-import './fear-greed-archive-status.test.mjs';
+// CI-only focused test: old b9's four symlink fixture tests require Windows
+// CreateSymbolicLink privilege unavailable on this isolated low-privilege runner.
+// Retain that full-suite failure as evidence; do not change permissions or
+// soften production symlink protections. Test the new diagnostic contract only.
+import {spawnSync} from 'node:child_process';
+test('CNN #1521 b9 known Sidecar hash allowlist focused regression on isolated Windows',()=>{
+ const target=fileURLToPath(new URL('./fear-greed-archive-status.test.mjs',import.meta.url));
+ const exact='^read-only Sidecar diagnosis accepts only explicitly pinned source generations, never unknown bytes$';
+ const run=spawnSync(process.execPath,['--test','--test-name-pattern='+exact,target],{
+  encoding:'utf8',windowsHide:true,timeout:60000,maxBuffer:1024*1024,
+ });
+ assert.equal(run.error,undefined,String(run.error));
+ assert.equal(run.status,0,(run.stdout??'')+'\\n'+(run.stderr??''));
+ assert.match(run.stdout,/# pass 1/);
+ assert.match(run.stdout,/# fail 0/);
+ assert.match(run.stdout,/ok \\d+ - read-only Sidecar diagnosis accepts only explicitly pinned source generations/);
+});
