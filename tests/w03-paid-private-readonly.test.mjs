@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
-import {inspectW03PaidPrivateReadonly} from '../tools/w03-paid-private-readonly.mjs';
+import {inspectW03PaidPrivateReadonly,summarizeD05ThemeCandidates} from '../tools/w03-paid-private-readonly.mjs';
 
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const H='a'.repeat(64),Q='b'.repeat(64);
@@ -91,4 +91,36 @@ test('missing last run and directory substitution are not reported as completed'
   fs.mkdirSync(x.report);
   assert.equal(inspectW03PaidPrivateReadonly({root:x.root}).code,'W03_LAST_RUN_W03_FILE_UNSAFE');
  }finally{x.clean();}
+});
+
+test('D05 final-output archive counts real calculation days only and does not expose scores or IDs',()=>{
+ const now=Date.parse('2026-11-24T02:00:00.000Z');
+ const n=(v)=>'theme-'+v.repeat(64)+'.json';
+ const event=(i,at='2026-11-23T16:00:00.000Z')=>({
+  scoreId:'theme:sample-'+i,score:63.51,phase:'CONFIRMED',
+  asOfDate:'2026-11-20',calculatedAt:at,calculatedDateKst:'2026-11-24',
+  eventId:createHash('sha256').update(i+'|'+at).digest('hex')
+ });
+ const rows=Array.from({length:30},(_,i)=>event(i));
+ const receipt={status:'LOCAL_FINAL_THEME_OUTPUT_VERIFIED',candidateBodySha256:'a'.repeat(64),
+  calculatedAt:rows[0].calculatedAt,scoreCount:30,
+  outputEventsSha256:createHash('sha256').update(JSON.stringify(rows.map(e=>e.eventId).sort())).digest('hex')};
+ const out=summarizeD05ThemeCandidates([n('a'),n('b')],()=>rows,{now,receipt});
+ assert.equal(out.status,'PASS');assert.equal(out.dailyFinalScorePoints,30);
+ assert.equal(out.distinctCalculationDates,1);assert.equal(out.latestDateThemeCount,30);
+ assert.equal(out.complete30Dates,1);assert.equal(out.currentReceiptMatched,true);
+ assert.equal(out.oneYearComplete,false);
+ assert.doesNotMatch(JSON.stringify(out),/sample-|63\.51/);
+ const gap=summarizeD05ThemeCandidates([n('a'),n('b')],name=>{
+  if(name===n('b'))throw Error('SECRET');return rows.slice(0,29);
+ },{now,receipt});
+ assert.equal(gap.status,'PARTIAL');assert.equal(gap.distinctThemeCount,29);
+ assert.equal(gap.rejectedCandidateFiles,1);assert.equal(gap.currentReceiptMatched,false);
+ assert.doesNotMatch(JSON.stringify(gap),/SECRET/);
+ const conflict=summarizeD05ThemeCandidates([n('a'),n('b')],name=>
+  name===n('a')?rows:[{...rows[0],eventId:'e'.repeat(64)}],{now});
+ assert.equal(conflict.status,'PARTIAL');assert.equal(conflict.clockConflicts,1);
+ const stale=summarizeD05ThemeCandidates([n('a')],()=>rows,{now,deadline:0});
+ assert.equal(stale.status,'PARTIAL');assert.equal(stale.scannedCandidateFiles,0);
+ assert.equal(summarizeD05ThemeCandidates(['../escape.json'],()=>rows,{now}).status,'STATE_UNKNOWN');
 });
