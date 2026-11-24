@@ -10,10 +10,21 @@ const MAX_LEDGER_BYTES = 65536;
 const MAX_SIDECAR_SOURCE_BYTES = 131072;
 const MAX_SIDECAR_FILES = 64;
 const MAX_LEDGER_FILES = 12;
+// Read-only diagnostic provenance: the installed Sidecar was upgraded after R7.
+// A known digest permits bounded static attribution, NOT operational execution,
+// source approval, or skipping the Sidecar's own protection gate.
 const SIDECAR_SOURCE_EXPECTED = Object.freeze({
-  'archive-run.mjs': '04770152c01d4584fe3ee1b0166fc718718656b95cb3639680a6f23fe75191de',
+  'archive-run.mjs': Object.freeze([
+    '04770152c01d4584fe3ee1b0166fc718718656b95cb3639680a6f23fe75191de', // R7
+    'e6966138c99d8bf45382e7aad2f00082102dd0ac4cd1d689ffee71fa2098e892', // observed 11/06
+    'ce07af0b5e8d17625644e204f2815c1f754aff2468bc5434ac13c0dadcecd907', // current R10
+  ]),
   'run-original-then-archive.vbs': '9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c',
 });
+function pinnedSidecarSourceMatch(actual,expected){
+ const allowed=Array.isArray(expected)?expected:[expected];
+ return allowed.some(sha=>typeof sha==='string'&&/^[0-9a-f]{64}$/.test(sha)&&sha===actual);
+}
 const LEDGER_NAME = /^(?=[a-z0-9_.-]{1,100}\.json$)(?=.*(?:last-run|status|ledger|checkpoint|result|report))[a-z0-9_.-]+\.json$/i;
 const ALLOWED_ROOTS = ['e:\\zgmini\\data\\pc-writer\\', 'e:\\zgmini\\projects\\'];
 const safeIso = value => typeof value==='string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString()===value ? value : null;
@@ -233,7 +244,7 @@ export function inspectSidecarSourceGate(dataRoot, {
     const file=readBounded(name,MAX_SIDECAR_SOURCE_BYTES);
     const item={file:name,status:file.status};
     if(file.status!=='READ'){output.scriptStatus.push(item);continue;}
-    item.status=hash(file.bytes)===expectedHashes[name]?'MATCH':'CHANGED';
+    item.status=pinnedSidecarSourceMatch(hash(file.bytes),expectedHashes[name])?'MATCH':'CHANGED';
     item.modifiedAfterLedger=file.modifiedMs>ledger.modifiedMs;
     output.scriptStatus.push(item);
     if(item.status!=='MATCH'||item.modifiedAfterLedger)continue;
