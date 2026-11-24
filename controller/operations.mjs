@@ -111,6 +111,10 @@ const r6GroupNames=new Set([
 ]);
 const r6Code=value=>typeof value==='string'&&/^[A-Z][A-Z0-9_]{0,99}$/.test(value)?value:null;
 const r6Count=value=>Number.isSafeInteger(value)&&value>=0&&value<=100000?value:null;
+const r6Time=value=>typeof value==='string'
+ &&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)
+ &&Number.isFinite(Date.parse(value))
+ &&new Date(value).toISOString()===value?value:null;
 function r6CollectionProjection(raw){
  if(!raw||typeof raw!=='object'||Array.isArray(raw))return null;
  const rows=(items,planned)=>Array.isArray(items)?items.slice(0,12).flatMap(item=>{
@@ -120,7 +124,10 @@ function r6CollectionProjection(raw){
   return [{groupName:item.groupName,status,
    ...(r6Code(item.failureCode)?{failureCode:r6Code(item.failureCode)}:{}),
    ...(!planned&&r6Count(item.providerRequests)!==null?{providerRequests:item.providerRequests}:{}),
-   ...(planned?{due:item.due===true}: {})}];
+   ...(planned?{due:item.due===true,
+    ...Object.fromEntries(['retryAt','releaseAt','collectAt']
+     .map(key=>[key,r6Time(item[key])]).filter(([,value])=>value!==null))
+   }: {})}];
  }).slice(0,6):[];
  return {status:r6Code(raw.status),code:r6Code(raw.code),
   providerRequests:r6Count(raw.providerRequests),
