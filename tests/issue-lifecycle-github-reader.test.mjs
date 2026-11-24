@@ -29,10 +29,12 @@ const contents=data=>{
    sha:createHash('sha1').update('blob '+bytes.length+'\0').update(bytes).digest('hex')};
 };
 const make=()=>{
- const body='<!-- zgmini-pc-result:43166235600:1:3 -->\n'+
-  'results/43166235600-1-seat-3.json\nresults/43166235600-1-seat-3.txt';
  const json=JSON.stringify(report),txt=fields.map(f=>f+'='+
    (report[f]===null?'null':String(report[f]))).join('\r\n')+'\r\n';
+ const fence=String.fromCharCode(96).repeat(3);
+ const body='<!-- zgmini-pc-result:43166235600:1:3 -->\n'+
+  'results/43166235600-1-seat-3.json\nresults/43166235600-1-seat-3.txt\n'+
+  fence+'json\n'+json+fence+'\n'+fence+'text\n'+txt+fence;
  const prefix='repos/'+REPO+'/';
  const paths=new Map([
   [prefix+'issues/'+issueNumber,{number:issueNumber,state:'open',body:JSON.stringify(request),
@@ -75,6 +77,8 @@ const faults=[
  ['missing TXT file',x=>x.paths.delete(x.prefix+'contents/results/43166235600-1-seat-3.txt?ref='+commit),'PINNED_BLOB_UNVERIFIED'],
  ['altered TXT with valid Git blob',x=>x.paths.set(x.prefix+'contents/results/43166235600-1-seat-3.txt?ref='+commit,contents('status=BLOCKED\r\n')),'PAIR_FIELD_MISMATCH'],
  ['comment author not bot',x=>x.paths.get(x.prefix+'issues/comments/'+commentId).user.login='attacker','RESULT_COMMENT_UNVERIFIED'],
+ ['forged comment JSON',x=>{const c=x.paths.get(x.prefix+'issues/comments/'+commentId);c.body=c.body.replace('"status":"PASS"','"status":"BLOCKED"');},'RESULT_COMMENT_CONTENT_MISMATCH'],
+ ['forged comment TXT',x=>{const c=x.paths.get(x.prefix+'issues/comments/'+commentId);c.body=c.body.replace('status=PASS','status=BLOCKED');},'RESULT_COMMENT_CONTENT_MISMATCH'],
  ['GitHub GET throws',x=>x.args.githubGet=async()=>{throw Error('down');},'GITHUB_OBJECT_PROVENANCE_MISMATCH'],
  ['non-success workflow',x=>x.paths.get(x.prefix+'actions/runs/'+runId).conclusion='failure','GITHUB_RUN_NOT_SUCCESS']
 ];
