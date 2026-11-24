@@ -1,5 +1,7 @@
 # 새 일반챗의 자동 작업 시작
 
+**2026-11-24 Cloudflare 조회 공식 경로:** Cloudflare Production Deployment·Version·트래픽·도메인 읽기 확인에는 [기존 PC Wrangler OAuth·고정 GET 표준](CLOUDFLARE_OFFICIAL_PC_READONLY_STANDARD.md)을 사용한다. 운영 PC A [#3306](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3306) 원본 결과가 유효하면 재조회하지 않는다. 웹 디버그와 수동 대시보드는 필수가 아니다. 읽기 경로를 Cloudflare 배포·설정 변경 승인으로 해석하지 않는다.
+
 **2026-11-23 Controller 요청 작성:** 승인된 Controller 유지보수 요청은 [단회 제출 공통 경로](CONTROLLER_AUTO_UPDATE.md)의 `tools/maintenance-request.mjs`를 사용한다. 제목·라벨·본문을 함께 생성하고 생성 영수증과 원격 readback을 보존한다. 제출 timeout에는 같은 영수증의 `reconcile`만 수행하며 새 요청을 만들지 않는다. 원격 저장·수신·설치 성공은 구분한다. 기존 유효 승인·모듈 의존성 검사·롤백을 재사용하며 새 전역 Gate를 만들지 않는다.
 
 **2026-11-22 반복 정체 방지:** 도구 접근 실패를 기능 장애로 확대하지 않는다. 원래 요청의 최신 결과·원장 단계를 먼저 확인하고, 승인 명세의 정확한 소스와 이동하는 main 끝을 구분한다. 기존 승인 효과는 실행 명세에 연결해 진행하고 실제 부족한 효과만 결정받는다. 독립 작업은 계속한다. [공통 정본의 승인·실행·결과 연결 기준](PC_AUTOMATION_STANDARD.md#승인실행결과-연결의-반복-정체-방지--2026-11-22)을 따른다.
