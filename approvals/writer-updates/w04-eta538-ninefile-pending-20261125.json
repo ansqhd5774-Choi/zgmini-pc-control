@@ -4,7 +4,7 @@
   "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
   "sourceRepository": "ansqhd5774-Choi/zgmini",
   "sourceBranch": "codex/employment-1y-reader-r1",
-  "candidateSourceSha": "6cbda4367d64fc8022e4b254c63c4a891a24454f",
+  "candidateSourceSha": "50769db23ac6a5f55203855f5231d12dc0595bb4",
   "baseHead": "4cdf4727e59a0667d641354bb5b3e7ede761daf7",
   "baseConfigSourceSha": "4cdf4727e59a0667d641354bb5b3e7ede761daf7",
   "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
@@ -12,16 +12,10 @@
   "coreTask": "ZGMINI-PC-Local-Core",
   "files": [
     {
-      "path": "lib/market-score/employment-r6-provider.mjs",
-      "change": "M",
-      "beforeSha256": "b94cd97208bc5ea19be4068a170e3c45b051639c5ee3d1ec2156c1ed18c587d6",
-      "afterSha256": "b91bd2973adf8a74f4fb01c166ce44b415b54cbe9ffcc95d02307cf115380474"
-    },
-    {
       "path": "lib/market-score/employment-r6-collector.mjs",
       "change": "M",
       "beforeSha256": "848c83202b2b63944629655850542ef2a90fefdeed48ffbfdc1774ad487a0bc5",
-      "afterSha256": "214c4adb3a8b8426067f1989be89cf929df8ab672ccf6aaade151fdba923a6cc"
+      "afterSha256": "580fefcbf6b592208fd6a9f98aaf56b89dcd3bb665ad0f8a215fececc5d386df"
     },
     {
       "path": "lib/market-score/employment-r6-dol-advance-pdf-candidate.mjs",
@@ -64,6 +58,10 @@
     {
       "path": "lib/market-score/employment-r6-scheduler.mjs",
       "sha256": "7f33c6f3920317cdfd362bb04b570f7af8a5c3322e5924edb4c0cfaf31c16a88"
+    },
+    {
+      "path": "lib/market-score/employment-r6-provider.mjs",
+      "sha256": "b94cd97208bc5ea19be4068a170e3c45b051639c5ee3d1ec2156c1ed18c587d6"
     },
     {
       "path": "lib/market-score/employment-r4-shadow-contract.mjs",
