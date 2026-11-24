@@ -67,11 +67,14 @@ export function summarizeW05FiveKeyEvidence(receipt,{sourceSha=null}={}){
  const allStructural=results.every(r=>r.status==='STRUCTURAL_MATCH_NOT_RUNTIME_PROOF');
  return {...defaultResult(allStructural?
   'W05_FIVE_KEY_STRUCTURAL_ONLY_DEPLOYMENT_UNVERIFIED':
-  'W05_FIVE_KEY_COMPARISON_PARTIAL_OR_UNVERIFIED','PARTIAL'),
+  'W05_FIVE_KEY_COMPARISON_PARTIAL_OR_UNVERIFIED','STATE_UNKNOWN'),
   keysChecked:5,results,liveD1ApiCompared:true,
   sourceCheckoutVerified:SHA40.test(sourceSha??''),
   sourceSha:SHA40.test(sourceSha??'')?sourceSha:null,
   structuralMatches:results.filter(r=>r.status==='STRUCTURAL_MATCH_NOT_RUNTIME_PROOF').length,
+  // The supported pc-job ledger status is STATE_UNKNOWN until an independently
+  // verified active Cloudflare Deployment is attached. Never emit PARTIAL,
+  // which the common request ledger does not accept on duplicate readback.
   // The A-grade registration does not attest Cloudflare active Deployment.
   ownerAuthorizationVerified:false,deploymentIdentityVerified:false,
   runtimeVerified:false};
