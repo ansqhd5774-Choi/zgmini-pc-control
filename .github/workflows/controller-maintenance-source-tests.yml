@@ -48,6 +48,8 @@ on:
       - 'tests/earnings-c-checkpoint-readonly.test.mjs'
       - 'tests/earnings-bea-mfg-archive-readonly.test.mjs'
       - 'controller/w05-wpsfd42-service-readonly.mjs'
+      - 'controller/writer-publication-evidence-readonly.mjs'
+      - 'tests/writer-publication-evidence-readonly.test.mjs'
       - 'tests/w05-wpsfd42-service-readonly.test.mjs'
       - 'config/operations.json'
       - 'tests/core-task-observation.test.mjs'
@@ -327,6 +329,9 @@ jobs:
       - name: Verify W05 immutable service-only BLS source adapter and isolated PC workspace
         if: steps.scope.outputs.w05 == 'true'
         run: node --test --test-concurrency=1 tests/w05-wpsfd42-service-readonly.test.mjs
+      - name: Verify W05 fixed Writer readback projection remains read-only and redacted
+        if: steps.scope.outputs.w05 == 'true'
+        run: node --test --test-concurrency=1 tests/writer-publication-evidence-readonly.test.mjs
       - name: Verify W05 BEA manufacturing raw CSV/meta archive R3-11 fixed A reader without provider or PC writes
         if: steps.scope.outputs.w05 == 'true'
         run: node --test --test-concurrency=1 tests/earnings-bea-mfg-archive-readonly.test.mjs tests/earnings-bea-unit-archive-readonly.test.mjs
