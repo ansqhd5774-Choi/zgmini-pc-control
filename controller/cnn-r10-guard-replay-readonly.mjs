@@ -140,7 +140,7 @@ export function projectCnnR10Line19OperandsReadonly(source,raw={}) {
    /\bstatus\b/.test(s)&&/\bporcelain\b/.test(s)?'GIT_STATUS':
    /\b(?:config|approved|sourceSha)\b/i.test(s)?'SOURCE_CONFIG_REFERENCE':
    /\b(?:checkpoint|lastRun)\b/i.test(s)?'CHECKPOINT_REFERENCE':
-   /\b(?:existsSync|statSync|lstatSync)\b/.test(s)?'FIXED_FILESYSTEM':
+   /\b(?:existsSync|statSync|lstatSync)\b/.test(s)?'FILESYSTEM_PATH_UNVERIFIED':
    /\bprocess\.env\b/.test(s)?'PROCESS_ENV':
    'UNVERIFIED';
   const comparison=/!==/.test(s)?'STRICT_NOT_EQUAL':
