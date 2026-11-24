@@ -1,0 +1,41 @@
+{
+  "schema": "ZGMINI_PC_UPDATE_V1",
+  "installedSha": "45682a7dcc62c801f3ba903b639a2eacce242d68",
+  "targetSha": "4396d2bb326d86b8ce9e27c528519bf0090b8e9e",
+  "allowFiles": [
+    {
+      "path": "controller/fear-greed-archive-readonly.mjs",
+      "sha256": "62fe09b8fba4aaff12b7dc62531e5462a591346ecdb67550dc7c1394b02f0094"
+    }
+  ],
+  "purpose": "pc-controller-maintenance",
+  "controllerOnlyInstall": true,
+  "approval": {
+    "grade": "B",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3120",
+    "scope": "PC_CONTROL_CONTROLLER_UPDATE"
+  },
+  "checks": {
+    "targetSha": "4396d2bb326d86b8ce9e27c528519bf0090b8e9e",
+    "status": "PASS",
+    "manifestSha256": "b4af4762b1814bd7652c45ff77cf7060ca281cbb0cf313e33ed7bb18df9cec88"
+  },
+  "backup": {
+    "strategy": "VERSIONED_SNAPSHOT",
+    "rollback": {
+      "kind": "RESTORE_INSTALLED_SHA",
+      "sha": "45682a7dcc62c801f3ba903b639a2eacce242d68"
+    }
+  },
+  "postOperation": "fear-greed-archive-status",
+  "postSourceBranch": "main",
+  "postSourceSha": "a4065d0e19c74d1730f1ee95c69c31b4cb96ce44",
+  "selectiveSource": {
+    "schema": "ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1",
+    "branch": "codex/cnn1521-r10-child-selective-20261124",
+    "mainSha": "36955fdc4c5b9cd2876599d897aaa9b6005e4009",
+    "customPaths": [
+      "controller/fear-greed-archive-readonly.mjs"
+    ]
+  }
+}
