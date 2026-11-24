@@ -24,6 +24,8 @@ export const ROLE_OPERATION='process-inventory-readonly';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const TARGET2960='pc-update-e8767e20-6bad-4418-97c6-561cf79a8213';
 const PROBE2960='w05-2960-maintenance-status-readonly';
+const TARGET3076='pc-update-1f6d54c3-00a4-46b1-abdf-61964d170012';
+const PROBE3076='cnn-3076-maintenance-status-readonly';
 const D05_WRITER_PROBE='d05-writer-checkpoint-readonly';
 const MAX_BYTES=32768;
 const KNOWN_PROCESSES=new Set([
@@ -86,11 +88,12 @@ export function authenticateProcess(event,env,role){
  const withW05=keys==='operation,probe,requestId,role,schema';
   const isOperator=withW05&&raw.probe==='w05-operator-topology-readonly';
   const is2960=withW05&&raw.probe===PROBE2960;
+  const is3076=withW05&&raw.probe===PROBE3076;
   const isD05Writer=withW05&&raw.probe===D05_WRITER_PROBE;
  if(!raw||(!basic&&!withJobs&&!withW05)||
    raw.schema!==SCHEMA||raw.operation!==ROLE_OPERATION||raw.role!==role||
    (withJobs&&role!=='operating')||
-   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!isD05Writer))))
+   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!is3076&&!isD05Writer))))
   fail('REQUEST_SCOPE_INVALID');
  const runnerJobRefs=withJobs?validateRunnerJobRefs(raw.runnerJobRefs):null;
  const normalized=structuredClone(event);
@@ -102,6 +105,7 @@ export function authenticateProcess(event,env,role){
  return {...verified,...(runnerJobRefs?{runnerJobRefs}:{}),
   ...(isOperator?{w05OperatorTopology:true}:{}),
    ...(is2960?{w052960MaintenanceStatus:true}:{}),
+   ...(is3076?{cnn3076MaintenanceStatus:true}:{}),
    ...(isD05Writer?{d05WriterCheckpoint:true}:{})};
 }
 export function sanitizeProbe(raw){
@@ -330,18 +334,18 @@ export function sanitizeMaintenanceStatus(raw){
  };
 }
 
-/** Fixed #2960 request only. Never release leases, infer ownership or expose raw journal. */
-export function project2960MaintenanceStatus(raw){
+/** Internal projection for fixed request scopes only. Never expose raw journals. */
+function projectFixedMaintenanceStatus(raw,target,schema,observedCode,incompleteCode){
  const tok=v=>typeof v==='string'&&/^[A-Z0-9_]{1,96}$/.test(v)?v:null;
  const file=v=>['PRESENT','ABSENT','UNKNOWN','UNSAFE','UNVERIFIED'].includes(v)?v:'UNKNOWN';
  const num=v=>Number.isSafeInteger(v)&&v>=0&&v<=100000?v:null;
  const flag=v=>typeof v==='boolean'?v:null;
- const h=raw?.historicalRequest?.requestId===TARGET2960?raw.historicalRequest:null;
- const e=raw?.recoveryEvidence?.requestId===TARGET2960?raw.recoveryEvidence:null;
+ const h=raw?.historicalRequest?.requestId===target?raw.historicalRequest:null;
+ const e=raw?.recoveryEvidence?.requestId===target?raw.recoveryEvidence:null;
  const b=e?.backlog,l=e?.installLease,good=Boolean(h&&e);
- return {schema:'ZGMINI_W05_2960_MAINTENANCE_READONLY_V1',requestId:TARGET2960,
+ return {schema,requestId:target,
   status:good?'READ_ONLY_OBSERVED':'STATE_UNKNOWN',
-  code:good?'W05_2960_STATUS_OBSERVED':'W05_2960_EVIDENCE_INCOMPLETE',
+  code:good?observedCode:incompleteCode,
   actualControllerSha:asSha(raw?.actualControllerSha),
   workflowState:['active','disabled_manually','disabled_inactivity'].includes(raw?.workflowState)?
    raw.workflowState:'UNVERIFIED',
@@ -366,6 +370,30 @@ export function project2960MaintenanceStatus(raw){
   leaseBoundToOriginalRequest:null,recoveryEligible:false,
   protectedStateUnchanged:null,operationalWrites:0,providerCalls:0,d1Writes:0};
 }
+export function project2960MaintenanceStatus(raw){
+ return projectFixedMaintenanceStatus(raw,TARGET2960,'ZGMINI_W05_2960_MAINTENANCE_READONLY_V1',
+  'W05_2960_STATUS_OBSERVED','W05_2960_EVIDENCE_INCOMPLETE');
+}
+// Fixed #3076 request only; distinguish the historical updater ledger from
+// current host/receiver state. Observing either is not permission to apply.
+export function project3076MaintenanceStatus(raw){
+ const out=projectFixedMaintenanceStatus(raw,TARGET3076,'ZGMINI_CNN_3076_MAINTENANCE_READONLY_V1',
+  'CNN_3076_STATUS_OBSERVED','CNN_3076_EVIDENCE_INCOMPLETE');
+ const upload=raw?.historicalRequest?.requestId===TARGET3076?raw.historicalRequest.reportUploadStatus:null;
+ return {...out,reportUploadStatus:typeof upload==='string'&&/^[A-Z0-9_]{1,96}$/.test(upload)?upload:null,
+  maintenance:sanitizeMaintenanceStatus(raw),executionAuthorized:false};
+}
+export function compact3076ProcessResult(base,status){
+ const observed=status?.requestId===TARGET3076?status:project3076MaintenanceStatus(null);
+ return {...base,observedAtUtc:new Date().toISOString(),
+  status:observed.status==='READ_ONLY_OBSERVED'?'PASS':'PARTIAL',
+  code:observed.code,cnn3076MaintenanceStatus:observed};
+}
+function inspect3076MaintenanceStatusReadonly(){
+ try{return project3076MaintenanceStatus(collectAutomationStatus(['--request-id',TARGET3076]));}
+ catch{return project3076MaintenanceStatus(null);}
+}
+
 // Compare only the exact #2960 approved protected snapshot, never dump its
 // file hashes, local paths, secrets or current operating configuration.
 // Null means the baseline/current observation cannot be compared, not drift.
@@ -1660,6 +1688,8 @@ export function collect(role,ctx,env=process.env){
  }
  if(ctx.w052960MaintenanceStatus===true)
   return compact2960ProcessResult(base,inspect2960MaintenanceStatusReadonly());
+ if(ctx.cnn3076MaintenanceStatus===true)
+  return compact3076ProcessResult(base,inspect3076MaintenanceStatusReadonly());
  if(ctx.d05WriterCheckpoint===true)
   return compactD05WriterResult(base,inspectD05WriterCheckpointReadonly());
  const withMaintenance=role==='operating'?{...base,
@@ -1716,6 +1746,12 @@ export function toText(r){
   'memoryGroupCoverage='+(r.snapshot?.memoryGroupCoverage??'UNAVAILABLE'),
   'otherSubgroupCoverage='+(r.snapshot?.otherSubgroupCoverage??'UNAVAILABLE'),
   'maintenanceStatus='+(r.maintenance?.status??'NOT_APPLICABLE'),
+  ...(r.cnn3076MaintenanceStatus?[
+   'cnn3076RequestId='+r.cnn3076MaintenanceStatus.requestId,
+   'cnn3076HistoricalStatus='+(r.cnn3076MaintenanceStatus.historicalRequest?.status??'UNKNOWN'),
+   'cnn3076HistoricalPhase='+(r.cnn3076MaintenanceStatus.historicalRequest?.phase??'UNKNOWN'),
+   'cnn3076ActualControllerSha='+(r.cnn3076MaintenanceStatus.actualControllerSha??'UNKNOWN'),
+   'cnn3076ReportUploadStatus='+(r.cnn3076MaintenanceStatus.reportUploadStatus??'UNKNOWN')]:[]),
   'c2505Recovery='+(r.c2505RecoveryCheckpoint?.status??'NOT_APPLICABLE'),
   'c2505RecoveryCode='+(r.c2505RecoveryCheckpoint?.code??'NOT_APPLICABLE'),
   'c2505ByteProof='+(r.c2505ByteProof?.status??'NOT_APPLICABLE'),
