@@ -11,9 +11,9 @@ import {selectR6GitBinary} from './employment-r6-d1-readback-readonly.mjs';
 
 export const W05_FIVE_OPERATION='w05-five-key-d1-api-readback-readonly';
 export const W05_SOURCE_FILES=Object.freeze([
- 'scripts/api-site/compare-five-public-readbacks-r1.mjs',
- 'scripts/api-site/five-key-inplace-readback-prework-r12.mjs',
- 'scripts/api-site/five-key-public-api-reader-r1.mjs',
+ 'lib/w05-audit/compare-five-public-readbacks-r1.mjs',
+ 'lib/w05-audit/five-key-inplace-readback-prework-r12.mjs',
+ 'lib/w05-audit/five-key-public-api-reader-r1.mjs',
  'worker/theme-paid-contract.mjs',
  'worker/public-display-freshness.mjs',
  'worker/employment-r6-public-display.mjs',
@@ -149,9 +149,9 @@ export async function inspectW05FiveKeyD1ApiReadback(dataRoot,{
  let modules;
  try{
   modules=sourceLoader?await sourceLoader(root):{
-   ...(await import(pathToFileURL(path.join(root,'scripts','api-site',
+   ...(await import(pathToFileURL(path.join(root,'lib','w05-audit',
     'five-key-inplace-readback-prework-r12.mjs')).href)),
-   ...(await import(pathToFileURL(path.join(root,'scripts','api-site',
+   ...(await import(pathToFileURL(path.join(root,'lib','w05-audit',
     'five-key-public-api-reader-r1.mjs')).href))
   };
  }catch{return defaultResult('W05_COMPARATOR_MODULE_IMPORT_FAILED');}
