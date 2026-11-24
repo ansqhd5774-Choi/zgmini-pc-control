@@ -1959,3 +1959,21 @@ test('CNN Sidecar B manifest pin read is strictly fixed operating owner A only',
  assert.throws(()=>authenticateProcess({...q,issue:{...q.issue,
   body:JSON.stringify({...p,probe:'cnn-sidecar-b-preimage-pins-readonly',target:'SECRET'})}},env,'operating'));
 });
+
+
+test('CNN Sidecar B resource check is a fixed operating-only A route',()=>{
+ const e=event(),p=JSON.parse(e.issue.body);
+ const q={...e,issue:{...e.issue,body:JSON.stringify({...p,
+  probe:'cnn-sidecar-b-resource-readonly'})}};
+ const auth=authenticateProcess(q,env,'operating');
+ assert.equal(auth.cnnSidecarBResources,true);
+ assert.throws(()=>authenticateProcess(q,env,'handoff'));
+ for(const bad of ['cnn-sidecar-b-resource-readonly;cmd',
+  'cnn-sidecar-b-resource-readonly ','cnn-sidecar-b-resource']){
+  assert.throws(()=>authenticateProcess({...e,issue:{...e.issue,
+   body:JSON.stringify({...p,probe:bad})}},env,'operating'));
+ }
+ assert.throws(()=>authenticateProcess({...q,issue:{...q.issue,
+  body:JSON.stringify({...p,probe:'cnn-sidecar-b-resource-readonly',
+   target:'SECRET'})}},env,'operating'));
+});
