@@ -201,7 +201,7 @@ test('D05 archive count beyond 10000 remains bounded and verifies the actual dyn
  assert.equal(out.currentReceiptMatched,true);
  assert.equal(out.publicFinalOutputCoverageVerified,true);
  assert.equal(out.oneYearComplete,false);
- assert.doesNotMatch(JSON.stringify(out),/sample-0|63\\.51/);
+ assert.doesNotMatch(JSON.stringify(out),/sample-0|63\.51/);
  const excess=Array(100001).fill(file(0));
  assert.equal(summarizeD05ThemeCandidates(excess,()=>{throw Error('READ_MUST_NOT_RUN')}).code,
   'D05_THEME_ARCHIVE_INVENTORY_INVALID');
