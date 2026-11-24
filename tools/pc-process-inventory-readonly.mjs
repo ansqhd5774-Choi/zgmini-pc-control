@@ -22,6 +22,7 @@ import {inspectW03PaidPrivateReadonly,inspectD05PaidThemeFinalOutputsReadonly,in
 import {validateRunnerJobRefs,inspectRunnerJobHistory} from './runner-job-history-readonly.mjs';
 import {inspectW043409SourcePreflightReadonly} from './w04-3409-source-preflight-readonly.mjs';
 import {inspect3409ArchivedReceiptReadonly} from './w04-3409-archive-receipt-readonly.mjs';
+import {inspect3409OperatorFileSafetyReadonly} from './w04-3409-operator-file-safety-readonly.mjs';
 
 export const TITLE='pc-process-inventory-readonly';
 export const SCHEMA='ZGMINI_PC_PROCESS_INVENTORY_REQUEST_V1';
@@ -606,14 +607,15 @@ function inspect3409MaintenanceStatusReadonly(){
   // A completed original recovery may have archived its install lease;
   // never require that old lease to remain available for archive readback.
   const recoveryArchive=inspect3409ArchivedReceiptReadonly();
+  const operatorFileSafety=inspect3409OperatorFileSafetyReadonly();
   if(result.status!=='READ_ONLY_OBSERVED')
-   return {...result,recoveryArchive};
+   return {...result,recoveryArchive,operatorFileSafety};
   const protectedCheck=inspect3409ProtectedBaselineReadonly();
   return {...result,protectedStateUnchanged:protectedCheck.unchanged,
    protectedDifferenceClass:protectedCheck.differenceClass,
    recoveryCas:recoveryArchive.status==='ARCHIVE_VERIFIED'?null:
     inspect3409RecoveryCasReadonly(),
-   recoveryArchive,
+   recoveryArchive,operatorFileSafety,
    sourcePreflight:inspectW043409SourcePreflightReadonly()};
  }catch{return project3409MaintenanceStatus(null);}
 }
