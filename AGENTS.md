@@ -4,6 +4,8 @@
 
 # ZGMINI PC 자동 실행 공통 기준
 
+**Cloudflare 공식 PC 조회 경로(2026-11-24):** 기존 운영 PC Wrangler OAuth와 등록된 A급 `w05-cloudflare-deployment-readonly`를 재사용하는 고정 Cloudflare 공식 API GET이 [#3306 실제 PC PASS](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3306)로 검증됐다. Cloudflare 활성 배포·Version·트래픽·도메인 **읽기 확인의 1차 표준 경로**는 [공식 PC 읽기 절차](docs/CLOUDFLARE_OFFICIAL_PC_READONLY_STANDARD.md)다. 웹 디버그·수동 Cloudflare 대시보드·유료 브라우저를 필수조건으로 두지 않는다. 다른 Worker 조회나 배포/DNS/D1 쓰기 권한은 자동 확대하지 않고, 기존 유효 증거를 반복 실행하지 않는다. GitHub 기록은 다른 대화·PC를 자동 변경하지 않는다.
+
 **자동화 프로세스 전문가 작업 기준(2026-11-22):** [AUTOMATION_PROCESS_EXPERT_WORK_STANDARD.md](docs/AUTOMATION_PROCESS_EXPERT_WORK_STANDARD.md)를 공통 실행 기준의 보완 지침으로 적용한다. 기존 승인·안전 보호를 유지하면서 실제 실패 조건 → 최소 수정 → 범위에 맞는 결과 검증을 우선한다. 조회 가시성·idle·실패를 구분하고 092의 이미 완료된 운영 증거를 재사용한다. 새 승인 Gate·무관한 기능 변경·반복 진단을 만들지 않는다.
 
 **GitHub 15분 예약 장애 조사 종료(2026-11-23 사용자 결정):** 예약 누락은 기술적으로 미해결이지만 외부 사례 재검증·GitHub Support 재문의·외부 스케줄러·Cron 반복 실험은 사용자 명시 재지시 전까지 **중단한 작업**이다. #1743·#2427 OPEN 원장은 조사 재개 근거가 아니다. 기존 예약·정상 자동화·운영 증거를 보존하고, 독립적으로 승인된 Runner·인계 최적화만 계속한다. 정확한 범위는 [자동화 담당 전용 정본](docs/AUTOMATION_PROCESS_EXPERT_WORK_STANDARD.md#2026-11-23-사용자-최종-결정--github-actions-15분-예약-장애-조사-종료)을 따른다.

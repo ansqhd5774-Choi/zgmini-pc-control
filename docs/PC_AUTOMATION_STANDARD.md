@@ -65,6 +65,12 @@ GitHub 커넥터와 기존 작업 도구는 유지하면서 현재 목표에 필
 | DB/D1 게시·배포 | 해당 업무 승인·정확 대상·CAS/동등성·readback·복구 | 단순 코드 병합·HTTP 200 |
 | 복구 | 정확 원본 요청·현재 단계·변경 효과·검증된 복구 계약 | 과거 사건의 상태를 현재값으로 복사 |
 
+### Cloudflare 운영 읽기 — 공식 PC·Wrangler OAuth 경로 (2026-11-24)
+
+Cloudflare 활성 Production Deployment·Version·traffic·`zgmini.kr` 바인딩 확인의 **공식 1차 실행 경로**는 이미 등록·설치되어 실제 Windows PASS를 획득한 A/light·90초 `w05-cloudflare-deployment-readonly`다. 운영 PC 내부의 기존 Wrangler OAuth와 고정 Cloudflare REST API GET을 재사용하고, `pc-job` Issue → Actions/Runner → JSON/TXT 원격 readback으로 검증한다. **웹 디버그, 유료 브라우저, 사용자 Cloudflare 대시보드 수동 조작을 선행조건으로 만들지 않는다.** [실제 구현·요청·보안·증거·실패 기준](CLOUDFLARE_OFFICIAL_PC_READONLY_STANDARD.md).
+
+유효한 [실PC A #3306](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3306)·[원본 JSON](../results/45373166159-1-seat-4.json) 증거는 해당 관측 시각/Version 범위에서 재사용한다. 재조회가 필요할 때만 고유 요청으로 단회 실행한다. 새 Worker/계정이나 Cloudflare **쓰기**(배포, route/traffic, DNS, D1, 설정)를 A 조회의 권한으로 확대하지 않는다. `sourceShaVerified=false`는 Cloudflare API의 독립 Git SHA 증명 미확정으로 유지하며, GitHub 공식 빌드 Version 일치 및 활성 배포 읽기 PASS와 구분한다. 기존 Controller 미설치가 실제 확인된 경우에만 정규 승인 B 등록 절차를 사용하고, 매 조회마다 재설치하지 않는다.
+
 ### 업무 데이터 보호와 실행에 필요한 조정 상태
 
 읽기 전용은 업무 행·산식·DB schema·공개 값에 쓰기를 허용하지 않는 계약이다. 정상적인 조회에 필요한 SQLite 읽기 잠금과 WAL 공유 메모리의 생성·갱신·정리를 업무 데이터 쓰기와 동일하게 금지하지 않는다. SQLite 내부 조정은 승인된 고정 조회에서 SQLite 엔진이 수행하며, 작업자가 보조 파일을 직접 생성·삭제하거나 journal mode·checkpoint를 강제로 바꾸지 않는다.
