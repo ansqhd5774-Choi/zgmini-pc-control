@@ -137,14 +137,19 @@ const D05_PINS=Object.freeze({
 });
 const D05_CANDIDATE=/^theme-([a-f0-9]{64})\.json$/;
 const d05Unknown=code=>UNKNOWN(code,{scope:'PAID_PUBLIC_FINAL_OUTPUTS_ONLY',
- expectedThemeCount:30,actualFinalOutputCoverageVerified:false,
+ expectedPublicThemeCount:null,dashboardTargetThemeCount:30,
+ publicFinalOutputCoverageVerified:false,full30FinalOutputCoverageVerified:false,
  oneYearComplete:false});
+const d05ExpectedPublicIds=ids=>Array.isArray(ids)&&ids.length>0&&ids.length<=30&&
+ ids.every(id=>typeof id==='string'&&/^[a-z][a-z0-9-]*$/.test(id))&&
+ new Set(ids).size===ids.length?new Set(ids.map(id=>'theme:'+id)):null;
 const d05Iso=x=>typeof x==='string'&&Number.isFinite(Date.parse(x))&&
  new Date(x).toISOString()===x;
 const kstDay=ms=>new Date(ms+32400000).toISOString().slice(0,10);
 
 export function summarizeD05ThemeCandidates(names,readOne,{
- now=Date.now(),deadline=Date.now()+90000,receipt=null
+ now=Date.now(),deadline=Date.now()+90000,receipt=null,
+ publicExpectedIds=null,publicReadyIds=null,confirmedDate=null
 }={}){
  if(!Array.isArray(names)||names.length>10000||
     names.some(n=>typeof n!=='string'||!D05_CANDIDATE.test(n))||
@@ -191,21 +196,34 @@ export function summarizeD05ThemeCandidates(names,readOne,{
  }
  const sorted=[...dates.keys()].sort();
  const lastDay=sorted.at(-1)??null,lastCount=dates.get(lastDay)?.size??0;
+ const expected=d05ExpectedPublicIds(publicExpectedIds);
+ const ready=d05ExpectedPublicIds(publicReadyIds);
+ const last=dates.get(lastDay)??new Set();
+ const correctRoster=expected!==null&&ready!==null&&expected.size===ready.size&&
+  [...expected].every(id=>ready.has(id))&&last.size===expected.size&&
+  [...last].every(id=>expected.has(id));
+ const correctObservationDate=safeDate(confirmedDate)&&
+  [...days.values()].filter(e=>e.calculatedDateKst===lastDay).every(e=>e.asOfDate===confirmedDate);
  const completeScan=scanned===names.length&&rejected===0&&conflicts===0;
- const coverage=completeScan&&themes.size===30&&lastCount===30;
+ const coverage=completeScan&&receiptMatch&&receipt?.calculatedAt===latest&&
+  correctRoster&&correctObservationDate;
  return {status:coverage?'PASS':'PARTIAL',
-  code:coverage?'D05_THEME_FINAL_OUTPUTS_READBACK_VERIFIED':'D05_THEME_FINAL_OUTPUTS_INCOMPLETE',
-  scope:'PAID_PUBLIC_FINAL_OUTPUTS_ONLY',expectedThemeCount:30,
+  code:coverage?'D05_PAID_PUBLIC_FINAL_OUTPUTS_READBACK_VERIFIED':'D05_PAID_PUBLIC_FINAL_OUTPUTS_UNVERIFIED',
+  scope:'PAID_PUBLIC_FINAL_OUTPUTS_ONLY',expectedPublicThemeCount:expected?.size??null,
+  dashboardTargetThemeCount:30,
   candidateFiles:names.length,scannedCandidateFiles:scanned,
   validCandidateFiles:valid,rejectedCandidateFiles:rejected,clockConflicts:conflicts,
   archiveScanComplete:completeScan,actualOutputEvents:actualEvents,
   dailyFinalScorePoints:days.size,distinctThemeCount:themes.size,distinctCalculationDates:dates.size,
+  completePublicDates:expected===null?null:[...dates.values()].filter(ids=>
+   ids.size===expected.size&&[...ids].every(id=>expected.has(id))).length,
   complete30Dates:[...dates.values()].filter(x=>x.size===30).length,
   earliestCalculatedDate:sorted[0]??null,latestCalculatedDate:lastDay,
   latestCalculatedAt:latest,latestDateThemeCount:lastCount,
   currentReceiptMatched:receiptMatch,
   dailyEventsSha256:digest(Buffer.from(JSON.stringify([...days.values()].map(e=>e.eventId).sort()))),
-  actualFinalOutputCoverageVerified:coverage,oneYearComplete:false,
+  publicFinalOutputCoverageVerified:coverage,full30FinalOutputCoverageVerified:false,
+  oneYearComplete:false,
   operationalWrites:0,providerCalls:0,d1Writes:0};
 }
 
@@ -230,8 +248,14 @@ export async function inspectD05PaidThemeFinalOutputsReadonly(){
   if(names.length>10000)return d05Unknown('D05_THEME_ARCHIVE_INVENTORY_INVALID');
   const run=read(path.join(dataRoot,'pc-writer','marketparquet-paid','theme-last-run.json'),
    dataRoot,524288);
-  let receipt=null;
-  if(run.ok)try{receipt=JSON.parse(run.bytes.toString('utf8')).d05FinalOutputReadback??null;}catch{}
+  let receipt=null,publicExpectedIds=null,publicReadyIds=null,confirmedDate=null;
+  if(run.ok)try{
+   const report=JSON.parse(run.bytes.toString('utf8'));
+   receipt=report.d05FinalOutputReadback??null;
+   publicExpectedIds=report.expectedIds??null;
+   publicReadyIds=report.readyIds??null;
+   confirmedDate=report.confirmedDate??null;
+  }catch{}
   // Three exact immutable approved modules, no caller-supplied code.
   const {readStoredPaidThemeFinalScoreDays}=await import(pathToFileURL(
    path.join(sourceRoot,'lib/score-history/d05-final-theme-candidate-readback-r1.mjs')).href);
@@ -248,7 +272,7 @@ export async function inspectD05PaidThemeFinalOutputsReadonly(){
     if(f!==expected)throw Error('D05_THEME_FILE_SCOPE');return bytes.bytes;
    }};
    return readStoredPaidThemeFinalScoreDays({directory:dir,fromDay,toDay,now,fileSystem}).points;
-  },{now,receipt,deadline:now+90000});
+  },{now,receipt,publicExpectedIds,publicReadyIds,confirmedDate,deadline:now+90000});
   if(!pinsMatch())return d05Unknown('D05_THEME_READER_SOURCE_CHANGED');
   const after=fs.readdirSync(dir).filter(n=>D05_CANDIDATE.test(n)).sort();
   if(JSON.stringify([...names].sort())!==JSON.stringify(after))

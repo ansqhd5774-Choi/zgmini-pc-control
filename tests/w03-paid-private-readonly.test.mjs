@@ -93,7 +93,7 @@ test('missing last run and directory substitution are not reported as completed'
  }finally{x.clean();}
 });
 
-test('D05 final-output archive counts real calculation days only and does not expose scores or IDs',()=>{
+test('D05 public-only archive checks the approved registered roster, not the 30-card UI catalog',()=>{
  const now=Date.parse('2026-11-24T02:00:00.000Z');
  const n=(v)=>'theme-'+v.repeat(64)+'.json';
  const event=(i,at='2026-11-23T16:00:00.000Z')=>({
@@ -101,26 +101,45 @@ test('D05 final-output archive counts real calculation days only and does not ex
   asOfDate:'2026-11-20',calculatedAt:at,calculatedDateKst:'2026-11-24',
   eventId:createHash('sha256').update(i+'|'+at).digest('hex')
  });
- const rows=Array.from({length:30},(_,i)=>event(i));
+ const rows=Array.from({length:10},(_,i)=>event(i));
+ const publicExpectedIds=rows.map(e=>e.scoreId.slice(6));
+ const publicReadyIds=[...publicExpectedIds];
+ const confirmedDate='2026-11-20';
  const receipt={status:'LOCAL_FINAL_THEME_OUTPUT_VERIFIED',candidateBodySha256:'a'.repeat(64),
-  calculatedAt:rows[0].calculatedAt,scoreCount:30,
+  calculatedAt:rows[0].calculatedAt,scoreCount:10,
   outputEventsSha256:createHash('sha256').update(JSON.stringify(rows.map(e=>e.eventId).sort())).digest('hex')};
- const out=summarizeD05ThemeCandidates([n('a'),n('b')],()=>rows,{now,receipt});
- assert.equal(out.status,'PASS');assert.equal(out.dailyFinalScorePoints,30);
- assert.equal(out.distinctCalculationDates,1);assert.equal(out.latestDateThemeCount,30);
- assert.equal(out.complete30Dates,1);assert.equal(out.currentReceiptMatched,true);
- assert.equal(out.oneYearComplete,false);
- assert.doesNotMatch(JSON.stringify(out),/sample-|63\.51/);
+ const options={now,receipt,publicExpectedIds,publicReadyIds,confirmedDate};
+ const out=summarizeD05ThemeCandidates([n('a'),n('b')],()=>rows,options);
+ assert.equal(out.status,'PASS');assert.equal(out.dailyFinalScorePoints,10);
+ assert.equal(out.code,'D05_PAID_PUBLIC_FINAL_OUTPUTS_READBACK_VERIFIED');
+ assert.equal(out.scope,'PAID_PUBLIC_FINAL_OUTPUTS_ONLY');
+ assert.equal(out.expectedPublicThemeCount,10);assert.equal(out.dashboardTargetThemeCount,30);
+ assert.equal(out.distinctCalculationDates,1);assert.equal(out.latestDateThemeCount,10);
+ assert.equal(out.completePublicDates,1);assert.equal(out.complete30Dates,0);
+ assert.equal(out.currentReceiptMatched,true);assert.equal(out.publicFinalOutputCoverageVerified,true);
+ assert.equal(out.full30FinalOutputCoverageVerified,false);assert.equal(out.oneYearComplete,false);
+ assert.doesNotMatch(JSON.stringify(out),/sample-|63\\.51/);
  const gap=summarizeD05ThemeCandidates([n('a'),n('b')],name=>{
-  if(name===n('b'))throw Error('SECRET');return rows.slice(0,29);
- },{now,receipt});
- assert.equal(gap.status,'PARTIAL');assert.equal(gap.distinctThemeCount,29);
+  if(name===n('b'))throw Error('SECRET');return rows.slice(0,9);
+ },options);
+ assert.equal(gap.status,'PARTIAL');assert.equal(gap.distinctThemeCount,9);
  assert.equal(gap.rejectedCandidateFiles,1);assert.equal(gap.currentReceiptMatched,false);
  assert.doesNotMatch(JSON.stringify(gap),/SECRET/);
  const conflict=summarizeD05ThemeCandidates([n('a'),n('b')],name=>
-  name===n('a')?rows:[{...rows[0],eventId:'e'.repeat(64)}],{now});
+  name===n('a')?rows:[{...rows[0],eventId:'e'.repeat(64)}],options);
  assert.equal(conflict.status,'PARTIAL');assert.equal(conflict.clockConflicts,1);
- const stale=summarizeD05ThemeCandidates([n('a')],()=>rows,{now,deadline:0});
+ const stale=summarizeD05ThemeCandidates([n('a')],()=>rows,{...options,deadline:0});
  assert.equal(stale.status,'PARTIAL');assert.equal(stale.scannedCandidateFiles,0);
- assert.equal(summarizeD05ThemeCandidates(['../escape.json'],()=>rows,{now}).status,'STATE_UNKNOWN');
+ assert.equal(summarizeD05ThemeCandidates(['../escape.json'],()=>rows,options).status,'STATE_UNKNOWN');
+ for(const change of [
+  {publicExpectedIds:null},{publicExpectedIds:['sample-0','sample-0']},
+  {publicExpectedIds:[...publicExpectedIds.slice(0,-1),'other']},
+  {publicReadyIds:publicReadyIds.slice(1)},
+  {confirmedDate:'2026-11-19'},
+  {receipt:null},
+  {receipt:{...receipt,calculatedAt:'2026-11-20T01:00:00.000Z'}}
+ ]){
+  const result=summarizeD05ThemeCandidates([n('a')],()=>rows,{...options,...change});
+  assert.equal(result.status,'PARTIAL');assert.equal(result.publicFinalOutputCoverageVerified,false);
+ }
 });
