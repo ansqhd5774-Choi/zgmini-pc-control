@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {validateApproval,verifyCas,verifyStagedFiles,REQUEST_ID,SOURCE_SHA,STAGE} from '../tools/w04-3409-independent-source-prep.mjs';
+import {validateApproval,verifyCas,verifyStagedFiles,REQUEST_ID,SOURCE_SHA,STAGE,CAS_PATHS} from '../tools/w04-3409-independent-source-prep.mjs';
 const digest=b=>createHash('sha256').update(b).digest('hex');
 const keys=['ledger','owner','marker','backlog','snapshot','protection','writer'];
 const files=['tools/maintenance-recovery.mjs','tools/update.mjs','tools/maintenance-contract.mjs','controller/fixed-readonly-bytes.mjs'];
@@ -20,7 +20,7 @@ test('accepts only the exact approved W04 case',()=>{
 test('every CAS must match independently, including current Writer',()=>{
  const a=approval();let seen=0;
  const stat=()=>({isFile:()=>true,isSymbolicLink:()=>false,size:8});
- const read=p=>{const k=keys.find(k=>p.includes(k))??'writer';seen++;return Buffer.from(k);};
+ const read=p=>{const k=Object.keys(CAS_PATHS).find(k=>CAS_PATHS[k]===p);seen++;return Buffer.from(k);};
  assert.equal(verifyCas(a,read,stat),true);assert.equal(seen,7);
  const bad=approval();bad.casDigests.writerSha256=digest(Buffer.from('changed'));
  bad.approvedCurrentWriterConfigSha256=bad.casDigests.writerSha256;
