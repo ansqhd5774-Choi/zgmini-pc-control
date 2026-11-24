@@ -518,6 +518,20 @@ const safeD05Iso=v=>typeof v==='string'&&/^20\d\d-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\
 const D05_TIMING_SCOPE='ATTEMPT_OUTPUT_CALLBACKS_ONLY_NOT_FULL_CORE_OR_WRITER';
 const d05TimingInt=(n,max)=>Number.isSafeInteger(n)&&n>=0&&n<=max;
 const d05TimingStage=v=>typeof v==='string'&&/^[a-z][a-z0-9-]{0,64}$/.test(v);
+const D05_VISIBLE_TIMING_STAGES=new Set([
+ 'market','market-publication','composite-archive-local',
+ 'composite-observed-publication','us-breadth-calculation',
+ 'us-breadth-publication','korea-calculation','korea-publication',
+ 'rate-sentiment-calculation','rate-sentiment-publication',
+ 'api-connection-health-snapshot','market-calendar-er1-future',
+ 'market-calendar-r44-delta','market-calendar-taxonomy',
+ 'asset-r10-sidecars-publication','inflation-19-publication',
+ 'inflation-7-publication','cnn-observed-archive',
+ 'employment-r6-one-year-publication','arrows','feed-publication',
+ 'projection-publication','projection-build','w05-stored-sidecar',
+ 'other-stages',
+]);
+const d05VisibleTimingStage=v=>D05_VISIBLE_TIMING_STAGES.has(v)?v:'other-stages';
 // Existing one-file D05 scope: emit bounded stage timings only, never raw
 // feed keys, source inputs, file paths, credential values or report bodies.
 export function projectD05WriterTiming(raw){
@@ -535,14 +549,14 @@ export function projectD05WriterTiming(raw){
   v.failed>v.samples))return invalid();
  const slowest=raw.slowest.map(v=>v&&d05TimingStage(v.stage)&&
   d05TimingInt(v.elapsedMs,86_400_000)&&typeof v.success==='boolean'?
-  {stage:v.stage,elapsedMs:v.elapsedMs,success:v.success}:null);
+  {stage:d05VisibleTimingStage(v.stage),elapsedMs:v.elapsedMs,success:v.success}:null);
  if(slowest.includes(null)||slowest.length>raw.samples||
   stages.reduce((n,[,v])=>n+v.samples,0)!==raw.samples||
   stages.reduce((n,[,v])=>n+v.totalMs,0)!==raw.totalMeasuredMs)
   return invalid();
  return {status:'OBSERVED_LOCAL_CHECKPOINT',scope:D05_TIMING_SCOPE,
   samples:raw.samples,totalMeasuredMs:raw.totalMeasuredMs,
-  byStage:stages.map(([stage,v])=>({stage,samples:v.samples,
+  byStage:stages.map(([stage,v])=>({stage:d05VisibleTimingStage(stage),samples:v.samples,
    totalMs:v.totalMs,failed:v.failed})).sort((a,b)=>b.totalMs-a.totalMs),
   slowest};
 }
