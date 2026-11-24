@@ -8,7 +8,13 @@ test('PC CI standard preserves source-only checks and does not require operation
  for(const area of ['Lint','Type Check','Build','Unit','Integration','E2E','Security','Secret']){
   assert.ok(standard.includes('| '+area+' |'),'missing scope: '+area);
  }
- assert.match(standard,/\| E2E \|[^\n]*\| PARTIAL \|/);
+ assert.match(standard,/\| E2E \|[^\n]*\| IMPLEMENTED \(대표 격리 E2E\) \|/);
+ assert.match(standard,/실제 GitHub Issue 등록\/워크플로 진입/);
+ const representative=text('tests/employment-r6-controller-integration.test.mjs');
+ assert.match(representative,/isolated issue admission to Controller\/Writer result reaches exact JSON\/TXT receipt/);
+ assert.match(representative,/blocked unapproved source preserves no-write receipt/);
+ assert.match(representative,/uploadVerifiedReportPair\(/);
+ assert.match(representative,/validatePublicationRequest\(/);
  assert.match(standard,/NOT_APPLICABLE \(TS 전용\)/);
  assert.match(standard,/NOT_APPLICABLE \(웹 방식 Build\)/);
  const c996=text('.github/workflows/c996-r5-readonly-source-checks.yml');

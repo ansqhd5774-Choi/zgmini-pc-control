@@ -6,6 +6,9 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {runOperation} from '../controller/operations.mjs';
 import {executeJob} from '../controller/engine.mjs';
+import {validateRequest} from '../controller/common.mjs';
+import {renderBoundedReport,uploadVerifiedReportPair} from '../controller/report-upload-verified.mjs';
+import {validatePublicationRequest} from '../tools/publication-contract.mjs';
 
 const SHA='a'.repeat(40),CONTROL_SHA='b'.repeat(40);
 const ENTRY='scripts/pc-writer/employment-r6-runner-stage.mjs';
@@ -83,4 +86,85 @@ test('unapproved SHA is BLOCKED without falsely claiming Controller SHA executed
  assert.equal(out.report.actualExecutionSha,null);
  assert.equal(out.report.sqliteOpened,false);
  assert.equal(out.report.protectedStateUnchanged,true);
+});
+
+
+test('isolated issue admission to Controller/Writer result reaches exact JSON/TXT receipt, not D1',async t=>{
+ const f=setup(t),runId='4151002',attempt='1',seat='3';
+ const issue={number:9201,user:{login:'ansqhd5774-Choi'},
+  labels:[{name:'pc-job'}],body:JSON.stringify(f.request)};
+ assert.equal(issue.user.login,'ansqhd5774-Choi');
+ assert.ok(issue.labels.some(label=>label.name==='pc-job'));
+ const admitted=validateRequest(JSON.parse(issue.body),f.policy);
+ const outcome=await executeJob(admitted,{root:f.root,host:f.host,policy:f.policy,
+  seat:Number(seat),runId,attempt,queryTask:()=>Buffer.from('fixture task XML')});
+ assert.equal(outcome.report.status,'PASS');
+ assert.equal(outcome.report.actualExecutionSha,SHA);
+ assert.equal(outcome.report.controlSourceSha,CONTROL_SHA);
+ assert.equal(outcome.report.protectedStateUnchanged,true);
+ assert.equal(outcome.report.operationalWrites,0);
+ assert.equal(outcome.report.providerCalls,0);
+ assert.equal(outcome.report.d1Writes,0);
+ assert.equal(fs.readFileSync(f.core,'utf8'),'synthetic only');
+ assert.equal(fs.readFileSync(f.candidate,'utf8'),'synthetic candidate');
+ const pointer=JSON.parse(fs.readFileSync(outcome.file,'utf8'));
+ assert.equal(pointer.jobId,`run-${runId}-1-seat-${seat}`);
+ const {json,txt}=renderBoundedReport(pointer,32768);
+ const remote=new Map(),calls=[];
+ const api=async(route,method='GET',body)=>{
+  calls.push({route,method});
+  if(method==='PUT'){
+   remote.set(route,Buffer.from(body.content,'base64'));
+   return {status:201,data:{}};
+  }
+  if(!remote.has(route))return {status:404,data:{}};
+  return {status:200,data:{type:'file',encoding:'base64',
+   content:remote.get(route).toString('base64')}};
+ };
+ const opts={api,repository:'ansqhd5774-Choi/zgmini-pc-control',
+  runId,attempt,seat,json,txt,wait:async()=>{}};
+ const links=await uploadVerifiedReportPair(opts);
+ assert.equal(links.length,2);
+ const resultBase=`contents/results/${runId}-${attempt}-seat-${seat}`;
+ assert.equal(remote.get(resultBase+'.json').toString('utf8'),json);
+ assert.equal(remote.get(resultBase+'.txt').toString('utf8'),txt);
+ assert.equal(JSON.parse(json).actualExecutionSha,SHA);
+ assert.equal(calls.filter(call=>call.method==='PUT').length,2);
+ assert.equal(calls.filter(call=>call.method==='GET').length,4);
+ await uploadVerifiedReportPair(opts);
+ assert.equal(calls.filter(call=>call.method==='PUT').length,2,
+  'repeated receipt must not cause a new write');
+ assert.throws(()=>validatePublicationRequest(issue.body,{
+  actor:'ansqhd5774-Choi',repository:'ansqhd5774-Choi/zgmini-pc-control',
+  privateRepository:true,eventName:'issues',eventAction:'opened',
+  labels:['pc-job']}),/PUBLICATION_EVENT_NOT_AUTHORIZED/,
+  'an A request must not be accepted as an approved D1 publication');
+});
+test('blocked unapproved source preserves no-write receipt and refuses conflicting remote bytes',async t=>{
+ const f=setup(t),runId='4151003',seat='4',request={...f.request,sourceSha:'d'.repeat(40)};
+ const out=await executeJob(validateRequest(request,f.policy),{
+  root:f.root,host:f.host,policy:f.policy,seat:Number(seat),runId,
+  queryTask:()=>Buffer.from('fixture task XML')});
+ assert.equal(out.report.status,'BLOCKED');
+ assert.equal(out.report.code,'R6_BUNDLE_NOT_APPROVED');
+ assert.equal(out.report.actualExecutionSha,null);
+ assert.equal(out.report.operationalWrites,0);
+ assert.equal(out.report.d1Writes,0);
+ assert.equal(out.report.protectedStateUnchanged,true);
+ const {json,txt}=renderBoundedReport(out.report,32768);
+ const key=`contents/results/${runId}-1-seat-${seat}.json`;
+ const operations=[];
+ const api=async(route,method='GET')=>{
+  operations.push({route,method});
+  return route===key?{status:200,data:{type:'file',encoding:'base64',
+   content:Buffer.from('different receipt').toString('base64')}}:
+   {status:404,data:{}};
+ };
+ await assert.rejects(uploadVerifiedReportPair({api,
+  repository:'ansqhd5774-Choi/zgmini-pc-control',
+  runId,attempt:'1',seat,json,txt,wait:async()=>{}}),
+ {code:'REPORT_REMOTE_CONTENT_CHANGED'});
+ assert.equal(operations.some(call=>call.method==='PUT'),false);
+ assert.equal(fs.readFileSync(f.core,'utf8'),'synthetic only');
+ assert.equal(fs.readFileSync(f.candidate,'utf8'),'synthetic candidate');
 });
