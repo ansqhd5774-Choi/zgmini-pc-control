@@ -1692,3 +1692,50 @@ test('CNN static projection exposes only pinned candidates, never raw private te
   assert.equal(r.sidecarFailureResolved,false);
  }
 });
+
+
+test('CNN Git predicate probe is fixed operating-only and rejects arbitrary inputs',()=>{
+ const e=event(),body=JSON.parse(e.issue.body);
+ const request={...body,probe:'cnn-sidecar-git-predicates-readonly'};
+ const exact={...e,issue:{...e.issue,body:JSON.stringify(request)}};
+ assert.equal(authenticateProcess(exact,env,'operating').cnnSidecarGitPredicates,true);
+ assert.throws(()=>authenticateProcess(exact,env,'handoff'));
+ for(const extra of [
+  {path:'C:/unexpected'},{script:'archive-run.mjs'},
+  {probe:'cnn-sidecar-git-predicates-readonly;cmd'},
+  {checkout:'E:/different'}
+ ]){
+  assert.throws(()=>authenticateProcess({...e,issue:{...e.issue,
+   body:JSON.stringify({...request,...extra})}},env,'operating'));
+ }
+});
+test('CNN Git evidence differentiates mismatch, dirty, unknown and verified bounds',async()=>{
+ const {projectCnnGitEvidence,inspectCnnGitPredicatesReadonly}=
+  await import('../controller/cnn-sidecar-git-predicates-readonly.mjs');
+ const raw={sourcePin:true,ledgerStable:true,ledgerStatus:'BLOCKED',
+  head:'a'.repeat(40),approved:'b'.repeat(40),checkpoint:'a'.repeat(40),
+  gitVerified:true,trackedClean:false,mentionsCheckout:true,guardSites:true,
+  secret:'SECRET_PRIVATE_SOURCE_DO_NOT_LEAK'};
+ const output=projectCnnGitEvidence(raw);
+ assert.equal(output.status,'PASS');
+ assert.equal(output.gitHeadMatchesConfig,false);
+ assert.equal(output.trackedTreeClean,false);
+ assert.equal(output.gitHeadMatchesCheckpoint,true);
+ assert.equal(output.ledgerBlocked,true);
+ assert.equal(output.failurePredicateResolved,false);
+ assert.equal(output.sidecarFailureResolved,false);
+ assert.equal(output.operationalWrites,0);
+ assert.ok(!JSON.stringify(output).includes('SECRET_PRIVATE_SOURCE_DO_NOT_LEAK'));
+ for(const bad of [
+  {...raw,sourcePin:false},{...raw,ledgerStable:false},
+  {...raw,gitVerified:false},{...raw,approved:null},
+  {...raw,trackedClean:null},{...raw,head:'invalid'},
+ ]){
+  const uncertain=projectCnnGitEvidence(bad);
+  assert.equal(uncertain.status,'STATE_UNKNOWN');
+  assert.equal(uncertain.failurePredicateResolved,false);
+ }
+ const wrongRoot=inspectCnnGitPredicatesReadonly('/unapproved/location');
+ assert.equal(wrongRoot.status,'STATE_UNKNOWN');
+ assert.equal(wrongRoot.operationalWrites,0);
+});
