@@ -166,6 +166,10 @@ export async function inspectCnnPublicReadback(dataRoot,{
  const current=local?.local?.currentPublic;
  if(!iso(current?.observedAt))return {...out,code:'CNN_CURRENT_SOURCE_UNVERIFIED'};
  const day=current.observedAt.slice(0,10);
+ const original=local?.local?.original?.recentDates?.find(x=>x.date===day);
+ const checks=local?.local?.checks?.recentDates?.find(x=>x.date===day);
+ if(!original||!checks)return {...out,code:'CNN_LOCAL_DAY_INCOMPLETE',
+  local:{status:'DAY_INCOMPLETE',date:day},sqliteOpened:true};
  // Fixed 1D/1W windows only; source dates outside both are reported stale.
  if(clock()-Date.parse(current.observedAt)>2*86400000)
   return {...out,code:'CNN_CURRENT_STALE_FOR_1D',local:{status:'STALE',date:day}};
