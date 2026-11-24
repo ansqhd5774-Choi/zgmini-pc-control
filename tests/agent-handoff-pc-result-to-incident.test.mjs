@@ -94,6 +94,35 @@ test('common writer/controller and unknown failure classes retain precise classi
   }
 });
 
+test('fixed core-status timeout is routed to common triage without guessing the root cause', () => {
+  for (const [operation, expected] of [
+    ['core-status', 'COMMON_CONTROLLER'],
+    ['d05-lineage-readonly', 'FEATURE'],
+    ['runner-smoke', 'FEATURE']
+  ]) {
+    const candidate = input();
+    candidate.originIssue.body = JSON.stringify({...request(), operation});
+    Object.assign(candidate.report, {operation, code: 'JOB_EXECUTION_TIMEOUT',
+      lastPass: 'ALLOWLISTED_WORKER_STARTED', firstFail: 'OWN_WORKER_TIMEOUT'});
+    const item = parseHandoff(preparePcFailureHandoff(candidate).body);
+    assert.equal(item.failure.kind, expected, operation);
+    assert.equal(item.failure.code, 'JOB_EXECUTION_TIMEOUT');
+    assert.equal(item.failure.firstFail, 'OWN_WORKER_TIMEOUT');
+    assert.deepEqual(item.failure.fileRefs, []);
+    assert.equal(item.origin.issueNumber, 1009);
+  }
+});
+
+test('core-status timeouts preserve authenticated request and result identity checks', () => {
+  const candidate = input();
+  candidate.originIssue.body = JSON.stringify({...request(), operation: 'core-status'});
+  Object.assign(candidate.report, {operation: 'core-status',
+    code: 'JOB_EXECUTION_TIMEOUT',lastPass: 'ALLOWLISTED_WORKER_STARTED',
+    firstFail: 'OWN_WORKER_TIMEOUT'});
+  candidate.report.requestedSourceSha='c'.repeat(40);
+  assert.throws(()=>preparePcFailureHandoff(candidate),/PC_HANDOFF_SOURCE_SHA_MISMATCH_STOP/);
+});
+
 test('closed authenticated incident remains the same dedup anchor without implying a new route', () => {
   const prepared=preparePcFailureHandoff(input());
   const item={repository:repo,number:2001,state:'closed',
