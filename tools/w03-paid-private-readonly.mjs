@@ -281,3 +281,79 @@ export async function inspectD05PaidThemeFinalOutputsReadonly(){
   return result;
  }catch{return d05Unknown('D05_THEME_ARCHIVE_READ_UNVERIFIED');}
 }
+
+
+/**
+ * D05 fixed, read-only count of configured registration definitions.
+ * This is not a probe of the 30 dashboard cards, approval rights, or computed
+ * final score histories. Never exports private configured theme names/IDs.
+ * The source of registration is the unchanged theme-config-registry listRegistered
+ * directory: E:/ZGmini/data/theme-config/definitions.
+ */
+export function inspectD05ConfiguredRegistrationReadonly({root=ROOT,fileSystem=fs}={}){
+ const base={scope:'CONFIGURED_REGISTRATION_FILES_ONLY',
+  registeredDefinitionCount:null,validDefinitionCount:0,registryManifestSha256:null,
+  registeredThemesCalculated:false,publicPublicationAuthorized:false,
+  dashboard30CoverageVerified:false,operationalWrites:0,providerCalls:0,d1Writes:0};
+ const unknown=code=>({status:'STATE_UNKNOWN',code,...base});
+ const realpath=fileSystem.realpathSync.native??fileSystem.realpathSync;
+ const contained=(parent,child)=>{
+  const rel=path.relative(parent,child);
+  return rel!==''&&rel!=='..'&&!rel.startsWith('..'+path.sep)&&
+   !path.isAbsolute(rel);
+ };
+ try{
+  const dataRoot=realpath(root);
+  if(!fileSystem.lstatSync(dataRoot).isDirectory())
+   return unknown('D05_CONFIGURED_DATA_ROOT_UNVERIFIED');
+  const parent=path.join(root,'theme-config');
+  if(!fileSystem.existsSync(parent))
+   return unknown('D05_CONFIGURED_PARENT_UNAVAILABLE');
+  const pstat=fileSystem.lstatSync(parent);
+  if(!pstat.isDirectory()||pstat.isSymbolicLink()||
+    !contained(dataRoot,realpath(parent)))
+   return unknown('D05_CONFIGURED_PARENT_UNSAFE');
+  const dir=path.join(parent,'definitions');
+  if(!fileSystem.existsSync(dir))
+   return {status:'PARTIAL',code:'D05_CONFIGURED_DEFINITIONS_DIRECTORY_ABSENT',
+    ...base,registrationDirectoryPresent:false};
+  const stat=fileSystem.lstatSync(dir),resolved=realpath(dir);
+  if(!stat.isDirectory()||stat.isSymbolicLink()||!contained(dataRoot,resolved))
+   return unknown('D05_CONFIGURED_DEFINITIONS_DIRECTORY_UNSAFE');
+  const names=fileSystem.readdirSync(dir).sort();
+  if(names.length>256||names.some(n=>typeof n!=='string'||
+   n.length>54||!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*\.json$/.test(n)))
+   return unknown('D05_CONFIGURED_DEFINITIONS_INVENTORY_INVALID');
+  const manifests=[];
+  for(const name of names){
+   const file=path.join(dir,name);
+   const raw=readFixedReadonlyBytes(file,{fileSystem,
+    verifiedRoot:dataRoot,minBytes:2,maxBytes:32768});
+   if(!raw.ok)return unknown('D05_CONFIGURED_DEFINITION_UNREADABLE');
+   let d;
+   try{d=JSON.parse(raw.bytes.toString('utf8'));}catch{
+    return unknown('D05_CONFIGURED_DEFINITION_INVALID_JSON');
+   }
+   const exactKeys=d?.schema==='ZGMINI_THEME_CONFIG_V2'?
+    ['schema','id','label','provider','profile','etfs','benchmark','startDate',
+     'selectionEvidence','aumEvidence','provisionalPolicy']:
+    ['schema','id','label','provider','profile','etfs','benchmark','startDate'];
+   if(!d||!['ZGMINI_THEME_CONFIG_V1','ZGMINI_THEME_CONFIG_V2'].includes(d.schema)||
+    Object.keys(d).length!==exactKeys.length||
+    !exactKeys.every(k=>Object.hasOwn(d,k))||
+    d.id!==name.slice(0,-5)||d.provider!=='getmarkethistory'||
+    typeof d.label!=='string'||!d.label.trim()||d.label.length>60||
+    !Array.isArray(d.etfs)||!d.etfs.length||d.etfs.length>256||
+    d.benchmark!=='SPY')
+    return unknown('D05_CONFIGURED_DEFINITION_SHAPE_UNVERIFIED');
+   manifests.push([name,digest(raw.bytes)]);
+  }
+  const after=fileSystem.readdirSync(dir).sort();
+  if(JSON.stringify(after)!==JSON.stringify(names))
+   return unknown('D05_CONFIGURED_DIRECTORY_CHANGED_DURING_READ');
+  return {...base,status:'PASS',code:'D05_CONFIGURED_REGISTRATIONS_READONLY',
+   registrationDirectoryPresent:true,registeredDefinitionCount:names.length,
+   validDefinitionCount:manifests.length,
+   registryManifestSha256:digest(Buffer.from(JSON.stringify(manifests)))};
+ }catch{return unknown('D05_CONFIGURED_REGISTRY_UNAVAILABLE');}
+}
