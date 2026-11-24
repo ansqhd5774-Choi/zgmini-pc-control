@@ -1854,7 +1854,7 @@ export function readControllerUpdateArtifacts(requestId,{
    // Issue opened timestamp. Do not expose unbounded private backlog history.
    const utc=v=>typeof v==='string'&&
     /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/.test(v)&&
-    Number.isFinite(Date.parse(v))?v:null;
+    Number.isFinite(Date.parse(v))&&new Date(Date.parse(v)).toISOString().slice(0,19)===v.slice(0,19)?v:null;
    const only=data.windows.length===1?data.windows[0]:null;
    const paused=utc(only?.pausedAt),resumed=only?.resumedAt===null?null:utc(only?.resumedAt);
    backlog={file:'PRESENT',windows:data.windows.length,
