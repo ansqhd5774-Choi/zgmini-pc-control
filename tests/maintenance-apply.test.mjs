@@ -235,6 +235,21 @@ test('approved out-of-process update waits for drain and verifies actual new SHA
  assert.ok(f.events.indexOf('reconnect')<f.events.indexOf('resume'));
  assert.ok(f.events.indexOf('resume')<f.events.indexOf('replay-missed-issues'));
 });
+test('bounded idle telemetry is persisted on successful supervisor stop',async()=>{
+ const f=fixture({stopOwnSupervisor:async()=>({retryCount:2,elapsedMs:6000,observedBusy:true})});
+ const result=await applyApprovedUpdate(request,f.port);
+ assert.equal(result.status,'PASS');
+ assert.deepEqual(result.supervisorIdleWait,{retryCount:2,elapsedMs:6000,observedBusy:true});
+ assert.deepEqual(f.records.get(request.requestId).supervisorIdleWait,result.supervisorIdleWait);
+});
+
+test('unverified idle telemetry is not treated as measured',async()=>{
+ const f=fixture({stopOwnSupervisor:async()=>({retryCount:-1,elapsedMs:NaN,observedBusy:'yes'})});
+ const result=await applyApprovedUpdate(request,f.port);
+ assert.equal(result.status,'PASS');
+ assert.equal(Object.hasOwn(result,'supervisorIdleWait'),false);
+});
+
 test('partial host.json corruption still returns original request ledger and recovery lock',()=>{
  const ledger={requestId:request.requestId,status:'RECOVERY_REQUIRED',phase:'SWITCHED'};
  const state=readMaintenanceRecoveryStatus(request.requestId,{
