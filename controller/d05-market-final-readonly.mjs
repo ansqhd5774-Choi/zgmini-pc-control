@@ -53,7 +53,7 @@ export function compareD05MarketStored(current,dated,{dayKey}={}){
  if(!day(dayKey)||new Date(b.storedAt).toISOString().slice(0,10)!==dayKey)
   return {...out,code:'D05_MARKET_STORED_DAY_MISMATCH'};
  const identical=a.bodySha256===b.bodySha256&&a.storedAt===b.storedAt;
- return {...out,status:identical?'PASS':'PARTIAL',
+ return {...out,status:identical?'PASS':'BLOCKED',
   code:identical?'D05_MARKET_13_STORED_SNAPSHOT_MATCHED':'D05_MARKET_CURRENT_DAY_MISMATCH',
   sameEventVerified:identical,localCurrent:a,localDated:b};
 }
