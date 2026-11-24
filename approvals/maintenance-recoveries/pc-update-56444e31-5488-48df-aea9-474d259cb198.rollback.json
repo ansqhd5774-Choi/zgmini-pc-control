@@ -1,0 +1,34 @@
+{
+  "schema": "ZGMINI_PC_ROLLBACK_APPROVAL_V1",
+  "approved": true,
+  "requestId": "pc-update-56444e31-5488-48df-aea9-474d259cb198",
+  "sourceSha": "a19ce199142d64b0aa6de800f1c2c6d9b07c141c",
+  "toolSha256": "414064c4853d674b3aea078158342ad854722fb03864fa8fd214a2f974dcf677",
+  "ledgerSha256": "9359ea893172168cc96c67990310f2b9f87141ea6765571abbdc8f73a3444c71",
+  "ownerSha256": "6a8ed403e29babc88d2d53e4786be5708c3e6dcff8c6181965e79c7c443c860f",
+  "markerSha256": "a0d9f4762fbee551a1c3d2a8a52121fd5d7daa4d85bd890a991dd0915a902b2d",
+  "snapshotHostSha256": "4f26abd18ba889e03feb9460184a969b77cb0b6da2333e3f47f2a6c7b547460a",
+  "protectionSha256": "24730072d05b782c1f8d9cd3f3cd7f44bce3a622a6c65973e084b91409d194b0",
+  "files": [
+    {
+      "path": "tools/controller-rollback-recovery.mjs",
+      "sha256": "414064c4853d674b3aea078158342ad854722fb03864fa8fd214a2f974dcf677"
+    },
+    {
+      "path": "tools/update.mjs",
+      "sha256": "575c7b091e2c4111df4aee0ee150c1b5c0ef8fcb3567394cff1665d5ab714fd7"
+    },
+    {
+      "path": "tools/maintenance-apply.mjs",
+      "sha256": "785f0a5b6b17e83161742566f966a22ab995b69365d88bf303654c0b1bdebd6b"
+    },
+    {
+      "path": "tools/maintenance-contract.mjs",
+      "sha256": "cdaf63cef96d872cccb2a2fc33cab37eba7d1a91301b7f382c338374e2bf335e"
+    },
+    {
+      "path": "tools/maintenance-lock.mjs",
+      "sha256": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd"
+    }
+  ]
+}
