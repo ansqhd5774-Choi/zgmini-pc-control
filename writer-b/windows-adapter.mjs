@@ -21,7 +21,7 @@ import {snapshotUnrelatedDirty} from './unrelated-snapshot.mjs';
 import {decodeTaskXmlBytes,coreQuietFromProbe,
  coreReadyForMaintenance,coreMaintenanceWindowBlockCode,inhibitCoreStarts,
  attestTaskFirstHopLauncher} from './windows-guards.mjs';
-import {awaitNaturalCoreIdle,
+import {awaitNaturalCoreIdle,isReservedCoreMaintenance,coreDrainWaitMs,
  MAX_POST_PREPARE_IDLE_WAIT_MS} from './core-idle-window.mjs';
 import {sameTaskDefinitionExceptSettingsEnabled} from '../r17-writer-b/r17-b-xml.mjs';
 import {acquireInstallLock,createInstallJournal,releaseInstallClaim} from '../r17-writer-b/r17-b-claim.mjs';
@@ -329,11 +329,11 @@ export function makeWindowsBAdapter(auth,{candidateRoot,controlRoot}){
     definitionMatches:()=>fixedTaskXml(task).normalized===originalXml.normalized,
     probe:taskProbe,cycleLockExists:()=>fs.existsSync(CORE_CYCLE_LOCK),journal,
     disable:()=>exec('schtasks',['/Change','/TN',task,'/Disable']),
-   },{reserved:m.coreMaintenance==='PAUSE_NEW_STARTS_DRAIN_360S_V1'});
+   },{reserved:isReservedCoreMaintenance(m.coreMaintenance)});
   },
   async waitForCoreDrain(){
    let consecutive=0;const until=Date.now()+
-    (m.coreMaintenance==='PAUSE_NEW_STARTS_DRAIN_360S_V1'?360000:90000);
+    coreDrainWaitMs(m.coreMaintenance);
    while(Date.now()<until){
     consecutive=taskQuiet(taskProbe())?consecutive+1:0;
     if(consecutive>=2){journal('CORE_DRAINED');return;}
@@ -433,7 +433,7 @@ export function makeWindowsBAdapter(auth,{candidateRoot,controlRoot}){
     definitionMatches:()=>fixedTaskXml(task).normalized===originalXml.normalized,
     probe:taskProbe,cycleLockExists:()=>fs.existsSync(CORE_CYCLE_LOCK),journal,
     disable:()=>exec('schtasks',['/Change','/TN',task,'/Disable']),
-   },{reserved:m.coreMaintenance==='PAUSE_NEW_STARTS_DRAIN_360S_V1'});
+   },{reserved:isReservedCoreMaintenance(m.coreMaintenance)});
    journal('ROLLBACK_CORE_PAUSED');
   },
   async restoreOriginalConfig(){
