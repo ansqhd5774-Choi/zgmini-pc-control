@@ -59,6 +59,9 @@ export function classifyIssueCompletion({issue,request,result,evidence,intent} =
       result.protectedStateUnchanged !== true) return deny('RESULT_NOT_SAFE_PASS');
   if (result.operationalWrites !== 0 || result.providerCalls !== 0 || result.d1Writes !== 0)
     return deny('UNSAFE_SIDE_EFFECTS');
+  if (!/^[0-9a-f]{64}$/i.test(String(result.protectedBeforeSha256 ?? '')) ||
+      result.protectedAfterSha256 !== result.protectedBeforeSha256)
+    return deny('PROTECTED_STATE_HASH_MISMATCH');
   if (result.reportTransfer?.status === 'SUMMARY_ONLY' || evidence.reportTransfer === 'SUMMARY_ONLY' ||
       result.result?.inventoryTruncated === true || result.result?.operationalReadiness === 'NOT_ASSERTED' && intent.requiresOperationalReadiness === true)
     return deny('PARTIAL_EVIDENCE');
