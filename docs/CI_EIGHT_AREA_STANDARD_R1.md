@@ -24,10 +24,10 @@
 | Build | npm 기반 배포 빌드/lockfile 없음. Controller·Writer 선택 소스 인계에는 SHA/manifest·CAS·transitive import closure 계약 검사 사용 | NOT_APPLICABLE (웹 방식 Build) |
 | Unit | `c996-r5-readonly-source-checks.yml`의 변경 소스별 `node --test`·미등록 신규 시험 선택 | IMPLEMENTED |
 | Integration | Controller→Writer, 승인/실패/복구·선택 설치, 게시 계약의 격리 시험 | IMPLEMENTED (격리 계약); 실운영 동일 실행 계보는 별개 |
-| E2E | GitHub Issue→실제 운영 Controller→Writer→DB/D1→API/UI 전체를 격리 CI로 실행하지 않음. 격리 계약/부분 실측 근거는 있으나 대표 full-path CI E2E 자동 합격 범위 미정 | PARTIAL |
+| E2E | `tests/employment-r6-controller-integration.test.mjs`가 합성 Issue 본문·정책 검증 → 격리 Controller→Writer 결과 → JSON/TXT 원격 바이트 readback·재업로드 방지 및 부정확한 게시 권한 거부를 하나의 경로로 검증. 격리 C996에서 자동 실행 | IMPLEMENTED (대표 격리 E2E) |
 | Security | `c996-r5-readonly-source-checks.yml` Zizmor GitHub Actions 변경 보안 검사 | IMPLEMENTED (Workflow 변경 범위) |
 | Secret | `pc-secret-scan.yml` Gitleaks PR history, 보호 출력 | IMPLEMENTED |
 
 **실행 근거:** PR #3434 HEAD `57343f59832a...` C996 [#45455116728](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45455116728), Gitleaks/Oxlint [#45455117121](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45455117121), 게시 계약 [#45455117036](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45455117036) SUCCESS. PR 병합 `b299f9594097...`. 별도 운영 원장 #3390의 W04 한 키 local/D1 hash PASS, #3408 실제 SQLite 읽기 PASS는 각각 검증 범위만 인정한다.
 
-**E2E 표준화의 다음 필수 범위:** 기존 승인·격리 Runner에서 **대표 시나리오의 Issue 접수→Controller/Writer 모의 실행→결과 영수증→공개 결과 계약 검증**이 자동화된 단일 CI 경로로 연결돼 있는지 먼저 판별한다. 빠진 **격리 구간**에 한해 기존 시험을 연결하고 정상/거부 fixture를 검증한다. 운영 Provider/SQLite/D1 실 쓰기, Controller 설치, 새 PC Job 반복 접수는 CI 표준화의 필수조건으로 추가하지 않는다. 실제 운영 원본 #3404 보고쌍 충돌, #3414 PDF hash/PC Job 진입 미검증은 별도 기능·자동화 복구 범위로 관리한다.
+**E2E 적용 범위:** 대표 격리 A 경로는 기존 `tests/employment-r6-controller-integration.test.mjs`에 연결된 정상·승인되지 않은 SHA 거부 시나리오로 검증한다. `validateRequest`는 합성 Issue 본문과 정책을 판정하며 실제 GitHub event listener를 실행하지 않는다. `executeJob`은 합성 승인 source를 실행하고 결과를 임시 workspace에 저장한다. `renderBoundedReport` 및 `uploadVerifiedReportPair`는 모의 GitHub API에서 정확한 JSON/TXT 두 파일의 PUT→GET 바이트 비교, 중복 무쓰기, 충돌 시 fail-closed를 검증한다. `validatePublicationRequest`는 이 A 요청의 D1 게시 권한이 없음을 확인한다. **실제 GitHub Issue 등록/워크플로 진입·Provider 호출·운영 SQLite/D1 쓰기·Production API/UI·B 게시 작업을 이 시험이 수행하거나 보장하지 않는다.** 운영 종단 계보와 #3404 결과쌍 충돌·#3414 PDF 감사 등은 기능·공통 자동화 담당의 별도 검증 범위다. CI 표준의 대표 격리 E2E 판정은 해당 테스트가 C996 정확 HEAD에서 통과할 때에만 유효하다.
