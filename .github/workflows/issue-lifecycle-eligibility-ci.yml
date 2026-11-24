@@ -3,7 +3,9 @@ on:
   pull_request:
     paths:
       - 'controller/issue-lifecycle-eligibility.mjs'
+      - 'controller/issue-lifecycle-review-evidence.mjs'
       - 'tests/issue-lifecycle-eligibility.test.mjs'
+      - 'tests/issue-lifecycle-review-evidence.test.mjs'
       - '.github/workflows/issue-lifecycle-eligibility-ci.yml'
   workflow_dispatch:
 permissions:
@@ -18,4 +20,4 @@ jobs:
         with:
           node-version: '22'
       - name: Offline classifier fixtures (no GitHub mutations)
-        run: node --test tests/issue-lifecycle-eligibility.test.mjs
+        run: node --test tests/issue-lifecycle-eligibility.test.mjs tests/issue-lifecycle-review-evidence.test.mjs
