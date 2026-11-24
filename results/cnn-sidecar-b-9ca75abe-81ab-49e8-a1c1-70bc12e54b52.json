@@ -1,0 +1,14 @@
+{
+  "schema": "ZGMINI_CNN_SIDECAR_B_RESULT_V1",
+  "requestId": "9ca75abe-81ab-49e8-a1c1-70bc12e54b52",
+  "status": "SIDECAR_B_PREFLIGHT_OR_RUNTIME_STOP",
+  "code": "SIDECAR_B_PROBE_LINEAGE_STOP",
+  "applied": false,
+  "changedFileCount": 0,
+  "controlSha": "236e63ab16aec72b09a5333748c445d1226554f4",
+  "manifestSha256": "b87b2b9c9f08d84bcfbaaadaffb91b5827ca1a845977cffa7d3d9e87172e9ef3",
+  "beforeSha256": null,
+  "afterSha256": null,
+  "backupVerified": false,
+  "retry": "READ_ONLY_RECONCILE_NO_REPLAY"
+}
