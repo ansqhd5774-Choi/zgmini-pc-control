@@ -1,9 +1,5 @@
 name: ZGMINI Handoff Queue Control Board
 on:
-  workflow_run:
-    workflows:
-      - ZGMINI Handoff Queue Candidate Selector
-    types: [completed]
   workflow_dispatch: {}
   schedule:
     - cron: '7,22,37,52 * * * *'
@@ -21,11 +17,7 @@ jobs:
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
       github.event.repository.private == true &&
       vars.ZGMINI_AGENT_HANDOFF_ENABLED == 'true' &&
-      ((github.event_name == 'workflow_run' &&
-        github.event.workflow_run.conclusion == 'success' &&
-        github.event.workflow_run.head_branch == 'main' &&
-        github.event.workflow_run.actor.login == 'ansqhd5774-Choi') ||
-       (github.event_name == 'workflow_dispatch' &&
+      ((github.event_name == 'workflow_dispatch' &&
         github.actor == 'ansqhd5774-Choi') ||
        (github.event_name == 'schedule' &&
         github.ref == 'refs/heads/main'))

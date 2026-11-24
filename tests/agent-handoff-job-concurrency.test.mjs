@@ -73,16 +73,25 @@ test('no new triggers, runner, provider operations or permissions are introduced
   }
 });
 
-test('completed-run fanout is limited to intake, selector and board',()=>{
+test('completed-run fanout ends at selector; full board is a success-dependent read-only job',()=>{
   const intake=read('agent-handoff.yml');
   const selector=read('agent-handoff-candidate-selector.yml');
   const board=read('agent-handoff-queue-board.yml');
   assert.match(intake,/^  issue_comment:/m);
   assert.match(selector,/^  workflow_run:/m);
   assert.match(selector,/- ZGMINI Agent Handoff Intake/);
-  assert.match(board,/^  workflow_run:/m);
-  assert.match(board,/- ZGMINI Handoff Queue Candidate Selector/);
-  assert.doesNotMatch(board,/- ZGMINI Agent Handoff Intake/);
+  assert.doesNotMatch(board,/^  workflow_run:/m);
+  assert.doesNotMatch(board,/github\.event\.workflow_run/);
+  assert.match(board,/^  schedule:/m);
+  assert.match(board,/^  workflow_dispatch:/m);
+  const after=selector.slice(selector.indexOf('  authenticated-readonly-board-after-selection:'));
+  assert.match(after,/needs: verify-and-select-candidates/);
+  assert.match(after,/needs\.verify-and-select-candidates\.result == 'success'/);
+  assert.match(after,/github\.ref == 'refs\/heads\/main'/);
+  assert.match(after,/permissions:\s*\n\s*contents: read\s*\n\s*issues: read\s*\n\s*pull-requests: read/);
+  assert.doesNotMatch(after,/issues: write|contents: write|continue-on-error|always\(\)/);
+  assert.match(after,/group: zgmini-handoff-control-board\s*\n\s*cancel-in-progress: false\s*\n\s*queue: max/);
+  assert.equal(after.slice(after.indexOf('    runs-on:')),board.slice(board.indexOf('    runs-on:')));
   // Keep the schedule, explicit owner dispatch and labeled-event fallback.
   for(const file of ['agent-handoff-wide-scout.yml',
     'agent-handoff-deep-diagnostics.yml',
@@ -96,10 +105,10 @@ test('completed-run fanout is limited to intake, selector and board',()=>{
     assert.match(yaml,/types: \[labeled\]/);
   }
   const oldFanout=1+1+2+3;
-  const newFanout=1+1+1;
+  const newFanout=1+1;
   assert.equal(oldFanout,7);
-  assert.equal(newFanout,3);
-  assert.equal(oldFanout-newFanout,4);
+  assert.equal(newFanout,2);
+  assert.equal(oldFanout-newFanout,5);
 });
 
 test('009 admits only relevant events and serializes actual issue writers without dropping queued events',()=>{
