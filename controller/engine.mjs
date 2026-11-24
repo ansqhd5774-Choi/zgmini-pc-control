@@ -1,5 +1,6 @@
 import fs from 'node:fs';import path from 'node:path';import {spawn,execFileSync} from 'node:child_process';import {fileURLToPath} from 'node:url';
-import {digest,need,validateRequest,writeJson,exclusive,errorCode} from './common.mjs';import {protectedState,readCore,nativeTaskXml,nativeRetiredIranEvidence} from './operations.mjs';
+import {digest,need,validateRequest,writeJson,exclusive,errorCode} from './common.mjs';import {protectedState,readCore,nativeTaskXml,nativeRetiredIranEvidence,
+ CORE_STATUS_STAGES} from './operations.mjs';
 import {memoryAdmissionMinimum,waitForMemoryAdmission} from './memory-admission.mjs';
 import {R6_READONLY_STAGES} from './employment-r6-collection-evidence-readonly.mjs';
 const worker=fileURLToPath(new URL('./worker.mjs',import.meta.url));
@@ -9,16 +10,20 @@ const worker=fileURLToPath(new URL('./worker.mjs',import.meta.url));
 const ISOLATED_READS=new Set(['runner-smoke','core-status','core-runtime-source-readonly','writer-install-preimage-readonly']);
 const unavailableProtection=e=>['RETIRED_IRAN_INVENTORY_UNAVAILABLE',
  'PROTECTED_TASK_XML_QUERY_FAILED'].includes(errorCode(e));
-export function readFixedR6Stage(workspace){
+function readFixedStage(workspace,filename,allowedStages){
  try{
-  const marker=path.join(workspace,'employment-r6-readonly-stage.json');
+  const marker=path.join(workspace,filename);
   const stat=fs.lstatSync(marker);
   if(!stat.isFile()||stat.isSymbolicLink()||stat.size<2||stat.size>128)return null;
   const body=JSON.parse(fs.readFileSync(marker,'utf8'));
-  return body&&typeof body==='object'&&Object.keys(body).length===1&&
-   R6_READONLY_STAGES.includes(body.stage)?body.stage:null;
+  return body&&typeof body==='object'&&!Array.isArray(body)&&
+   Object.keys(body).length===1&&allowedStages.includes(body.stage)?body.stage:null;
  }catch{return null;}
 }
+export const readFixedR6Stage=workspace=>
+ readFixedStage(workspace,'employment-r6-readonly-stage.json',R6_READONLY_STAGES);
+export const readFixedCoreStatusStage=workspace=>
+ readFixedStage(workspace,'core-status-readonly-stage.json',CORE_STATUS_STAGES);
 function noteUnavailableProtection(report,error,phase){
  report[phase==='PRECHECK'?'protectionPrecheckCode':'protectionPostcheckCode']=errorCode(error);
  if(phase==='POSTCHECK')report.postcheckFailureCode=errorCode(error);
@@ -87,6 +92,9 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
    report.status='FAIL';report.code='JOB_EXECUTION_TIMEOUT';report.firstFail='OWN_WORKER_TIMEOUT';
    if(request.operation==='employment-r6-collection-evidence-readonly'){
     const lastStage=readFixedR6Stage(workspace);
+    if(lastStage)report.workerLastEnteredStage=lastStage;
+   }else if(request.operation==='core-status'){
+    const lastStage=readFixedCoreStatusStage(workspace);
     if(lastStage)report.workerLastEnteredStage=lastStage;
    }
   }
