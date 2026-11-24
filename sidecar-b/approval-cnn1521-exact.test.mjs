@@ -16,7 +16,7 @@ test('CNN #1521 approved B manifest binds exact current A #3274 and pinned one-f
  assert.equal(m.installedConfigSource,m.installedHead);
  assert.equal(m.beforeSha256,PREIMAGE);
  assert.equal(m.afterSha256,CANDIDATE_DIGEST);
- assert.equal(sha256(fs.readFileSync(new URL('./approved/archive-run.mjs',import.meta.url))),m.afterSha256);
+ assert.equal(sha256(fs.readFileSync(new URL('./approved/archive-run-r1-20261124.mjs',import.meta.url))),m.afterSha256);
  assert.equal(m.taskDefinitionSha256,'dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028');
  assert.equal(m.wrapperSha256,'9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c');
  assert.equal(m.runCount,1);

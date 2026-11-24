@@ -8,7 +8,7 @@ import {pathToFileURL} from 'node:url';
 import {DatabaseSync} from 'node:sqlite';
 import {CNN_KEY,CNN_VERSION,COMP_PREFIX,COMPOSITE_VERSION,cnnGroup,cnnMerge,compositeSample,compositeMerge} from './archive-core-r10.mjs';
 import {captureVerifiedCheck,publishVerifiedChecks} from './verified-checks-r10.mjs';
-const APPROVED='24077edc2fb4196e83ba202fdd9681b1fe841447';
+const APPROVED='e4b768530335182f422ebd51d163a6f5b754361c';
 const SRC='E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release';
 const HOME='E:\\ZGmini\\data\\pc-writer';
 const out=path.join(HOME,'archive-sidecar-r7','last-run.json');
