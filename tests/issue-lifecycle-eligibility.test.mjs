@@ -3,15 +3,15 @@ import assert from 'node:assert/strict';
 import {classifyIssueCompletion} from '../controller/issue-lifecycle-eligibility.mjs';
 
 const good = () => ({
-  issue: {state:'open',number:3336},
-  request: {schema:'ZGMINI_PC_PROCESS_INVENTORY_REQUEST_V1',requestId:'verified-request-id',operation:'process-inventory-readonly'},
-  result: {requestId:'verified-request-id',operation:'process-inventory-readonly',jobId:'run-45405985982-1-seat-1',status:'PASS',
-    code:'PROCESS_INVENTORY_COLLECTED',firstFail:null,protectedStateUnchanged:true,
+  issue: {state:'open',number:1299},
+  request: {schema:'ZGMINI_PC_JOB_V1',requestId:'req-1299',operation:'release-calendar-runtime-readonly'},
+  result: {requestId:'req-1299',operation:'release-calendar-runtime-readonly',jobId:'run-43166235600-1-seat-3',status:'PASS',
+    code:'RELEASE_CALENDAR_SOURCE_INVENTORY_READONLY',firstFail:null,protectedStateUnchanged:true,
     operationalWrites:0,providerCalls:0,d1Writes:0},
-  evidence: {issueNumber:3336,requestId:'verified-request-id',runId:'45405985982',attempt:1,seat:1,
+  evidence: {issueNumber:1299,requestId:'req-1299',runId:'43166235600',attempt:1,seat:3,
     jsonVerified:true,txtVerified:true,commentVerified:true,runConcludedSuccessfully:true},
   intent: {autoCloseEnabled:true,kind:'SINGLE_READONLY_DIAGNOSTIC',
-    objectiveSatisfied:true,approvedByIndependentPolicy:true,requestId:'verified-request-id'}
+    objectiveSatisfied:true,approvedByIndependentPolicy:true,requestId:'req-1299'}
 });
 test('off by default', () => {
   const a=good();a.intent.autoCloseEnabled=false;
@@ -40,6 +40,8 @@ const negatives=[
  ['runtime source unknown (#936)',a=>{a.intent.requiresRuntimeSourceVerified=true;a.result.result={runtimeSourceVerified:false};},'RUNTIME_SOURCE_UNVERIFIED'],
  ['failure flow not proved (#1033)',a=>a.intent.objectiveSatisfied=false,'OBJECTIVE_UNVERIFIED'],
  ['D1 readback unverified (#930)',a=>a.intent.objectiveSatisfied=false,'OBJECTIVE_UNVERIFIED']
+ ['unsupported inventory schema',a=>{a.request.schema='ZGMINI_PC_PROCESS_INVENTORY_REQUEST_V1';a.request.operation='process-inventory-readonly';a.result.operation='process-inventory-readonly';a.result.code='PROCESS_INVENTORY_COLLECTED';},'SCHEMA_NOT_APPROVED'],
+ ['runtime source not verified even with permissive intent',a=>{a.request.operation='core-runtime-source-readonly';a.result.operation='core-runtime-source-readonly';a.result.code='CORE_RUNTIME_SOURCE_VERIFIED';a.result.result={runtimeSourceVerified:false};},'RUNTIME_SOURCE_UNVERIFIED']
 ];
 for(const [name,mutate,reason] of negatives){
  test(name,()=>{const a=good();mutate(a);assert.equal(classifyIssueCompletion(a).reason,reason);});
