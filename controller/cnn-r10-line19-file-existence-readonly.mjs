@@ -8,7 +8,9 @@ const unknown={schema:'ZGMINI_CNN_R10_LINE19_FILES_V1',status:'STATE_UNKNOWN',
  firstRuntimeFailure:null,operationalWrites:0,providerCalls:0,d1Writes:0};
 function decodeLiteral(s){
  const m=/^(['"])([\s\S]{1,300})\1$/.exec(s.trim());
- if(!m||/[\r\n]/.test(m[2])||/\\(?![\\/])/.test(m[2]))return null;
+ if(!m||/[\r\n]/.test(m[2]))return null;
+ // Consume valid doubled backslashes before rejecting any remaining escapes.
+ if(m[2].replace(/\\\\/g,'').replace(/\\\//g,'').includes('\\'))return null;
  const value=m[2].replace(/\\\\/g,'\\').replace(/\\\//g,'/');
  return /^[A-Za-z0-9 _./:\\-]+$/.test(value)?value:null;
 }
