@@ -59,6 +59,21 @@ export async function readVerifiedPcJobReceipt(request={}){
     issue,run,comment,jsonText,txtText,attempt,seat
   });
   if(verified.verified!==true)return deny(verified.reason);
+  // Detect Issue state/body changes and workflow reruns during multi-request read.
+  // This is a conservative snapshot guard, not a write lock or close permission.
+  const [issueAfter,runAfter]=await Promise.all([
+    get(`issues/${issueNumber}`),get(`actions/runs/${runId}`)
+  ]);
+  if(!issueAfter||issueAfter.number!==issueNumber||
+      issueAfter.repository_url!==issue.repository_url||
+      issueAfter.state!=='open'||issueAfter.body!==issue.body||
+      typeof issue.updated_at!=='string'||!issue.updated_at||
+      issueAfter.updated_at!==issue.updated_at||
+      !runAfter||runAfter.id!==runId||
+      runAfter.repository?.full_name!==REPO||
+      runAfter.run_attempt!==attempt||runAfter.status!=='completed'||
+      runAfter.conclusion!=='success')
+    return deny('SNAPSHOT_CHANGED_DURING_REVIEW');
   return Object.freeze({verified:true,reason:'AUTHENTICATED_PINNED_GITHUB_RECEIPT',
     report:verified.report,evidence:verified.evidence,
     artifactCommitSha});
