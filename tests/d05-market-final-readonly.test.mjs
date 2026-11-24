@@ -29,7 +29,7 @@ test('D05 exactly 13 saved outputs and identical current/day evidence',()=>{
 test('different same-date storage rows are not marked as matched',()=>{
  const other=makeBody();other.domains[2].score=99;
  const r=compareD05MarketStored(row(),row(other),{dayKey:'2026-11-24'});
- assert.equal(r.status,'PARTIAL');
+ assert.equal(r.status,'BLOCKED');
  assert.equal(r.sameEventVerified,false);
 });
 test('missing domain, unexpected id, invalid score, invalid body and wrong timestamp fail closed',()=>{
