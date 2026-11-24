@@ -7,6 +7,23 @@ export const MAX_CORE_IDLE_WAIT_MS=6*60000;
 // the late natural-idle window short so the bounded transaction can finish.
 export const MAX_POST_PREPARE_IDLE_WAIT_MS=90000;
 export const CORE_IDLE_POLL_MS=1500;
+// A longer Core cycle may exceed the 360s reserved drain. The extended bound
+// is explicitly selected by a distinct approved manifest mode; neither an
+// existing approval nor NATURAL_IDLE is silently promoted.
+export const EXTENDED_CORE_DRAIN_MS=20*60000;
+const RESERVED_CORE_DRAIN_MS=Object.freeze({
+ PAUSE_NEW_STARTS_DRAIN_360S_V1:360000,
+ PAUSE_NEW_STARTS_DRAIN_1200S_V1:EXTENDED_CORE_DRAIN_MS,
+});
+export const isReservedCoreMaintenance=mode=>
+ typeof mode==='string'&&Object.hasOwn(RESERVED_CORE_DRAIN_MS,mode);
+export function coreDrainWaitMs(mode){
+ if(mode===undefined)return 90000;
+ if(!isReservedCoreMaintenance(mode))
+  throw Object.assign(new Error('WRITER_B_MAINTENANCE_APPROVAL_STOP'),
+   {code:'WRITER_B_MAINTENANCE_APPROVAL_STOP'});
+ return RESERVED_CORE_DRAIN_MS[mode];
+}
 const stop=(code,idleObservation=null)=>{throw Object.assign(new Error(code),
  {code,...(idleObservation?{idleObservation}:{})});};
 const need=(ok,code)=>{if(!ok)stop(code);};
