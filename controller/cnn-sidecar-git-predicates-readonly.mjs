@@ -54,6 +54,12 @@ export function projectCnnGitEvidence(raw){
  const configVerified=approved!==null,verified=pin&&stable&&gitVerified&&configVerified;
  const mismatch=gitVerified&&configVerified?head!==approved:null;
  const trackedDirty=gitVerified?!raw.trackedClean:null;
+ const extendedVerified=verified&&raw.gitStatusSnapshotStable===true&&
+  ['MAIN','DETACHED','OTHER'].includes(raw.branchClass)&&
+  typeof raw.fullTreeClean==='boolean'&&
+  typeof raw.untrackedPresent==='boolean'&&
+  (raw.fullTreeClean!==true||raw.untrackedPresent===false)&&
+  (raw.trackedClean!==false||raw.fullTreeClean===false);
  return {
   schema:'ZGMINI_CNN_GIT_PREDICATES_READONLY_V1',
   status:verified?'PASS':'STATE_UNKNOWN',
@@ -65,6 +71,14 @@ export function projectCnnGitEvidence(raw){
   gitCheckoutVerified:gitVerified,configSourceVerified:configVerified,
   gitHeadMatchesConfig:mismatch===null?null:!mismatch,
   trackedTreeClean:gitVerified?raw.trackedClean:null,
+  // Only the fixed *checkout* is tested here: the Sidecar's actual Git cwd,
+  // flags and first failing conditional remain unverified.
+  gitExtendedStatus:extendedVerified?'PASS':'STATE_UNKNOWN',
+  gitBranchClass:extendedVerified?raw.branchClass:'UNKNOWN',
+  gitWholeTreeClean:extendedVerified?raw.fullTreeClean:null,
+  gitUntrackedPresent:extendedVerified?raw.untrackedPresent:null,
+  gitStatusSnapshotStable:extendedVerified,
+  runtimeSidecarGitRootVerified:false,
   gitHeadMatchesCheckpoint:head&&checkpoint?head===checkpoint:null,
   // The pinned script can compute the checkout at runtime; a static source
   // mention is a clue only, not proof of its actual Git cwd.
@@ -82,7 +96,8 @@ export function inspectCnnGitPredicatesReadonly(dataRoot,{strictPlatform=true,
  const root=path.resolve(dataRoot);
  const empty={sourcePin:false,ledgerStable:false,ledgerStatus:null,head:null,
   approved:null,checkpoint:null,gitVerified:false,trackedClean:null,
-  mentionsCheckout:null,guardSites:false};
+  branchClass:null,fullTreeClean:null,untrackedPresent:null,
+  gitStatusSnapshotStable:false,mentionsCheckout:null,guardSites:false};
  if((strictPlatform&&(process.platform!=='win32'||
       path.normalize(root).toLowerCase()!==path.normalize('E:\\ZGmini\\data').toLowerCase()))
     ||typeof git!=='function')return projectCnnGitEvidence(empty);
@@ -128,6 +143,21 @@ export function inspectCnnGitPredicatesReadonly(dataRoot,{strictPlatform=true,
   if(safeSha(head)&&typeof status==='string'&&status.length<=65536){
    empty.gitVerified=true;empty.head=head;
    empty.trackedClean=status.trim().length===0;
+  }
+  // Distinguish the previously untested branch/untracked scope. Do not
+  // disclose filenames or branch names, and fail closed on concurrent changes.
+  const wholeA=git(real,['status','--porcelain=v1','--untracked-files=normal']);
+  const branchA=git(real,['rev-parse','--abbrev-ref','HEAD']).trim();
+  const wholeB=git(real,['status','--porcelain=v1','--untracked-files=normal']);
+  const branchB=git(real,['rev-parse','--abbrev-ref','HEAD']).trim();
+  const headAfter=git(real,['rev-parse','--verify','HEAD']).trim();
+  if(safeSha(head)&&head===headAfter&&wholeA===wholeB&&
+     branchA===branchB&&typeof wholeA==='string'&&wholeA.length<=65536&&
+     /^[A-Za-z0-9._/-]{1,128}$/.test(branchA)){
+   empty.gitStatusSnapshotStable=true;
+   empty.branchClass=branchA==='main'?'MAIN':branchA==='HEAD'?'DETACHED':'OTHER';
+   empty.fullTreeClean=wholeA.trim().length===0;
+   empty.untrackedPresent=wholeA.split(/\r?\n/).some(line=>line.startsWith('?? '));
   }
  }catch{}
  return projectCnnGitEvidence(empty);
