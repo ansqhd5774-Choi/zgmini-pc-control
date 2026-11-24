@@ -10,6 +10,7 @@ import {classifyInstalledReconciliationProof,main as maintenanceRecoveryMain} fr
 import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,project2960MaintenanceStatus,compare2960ProtectedBaseline,classify2960ProtectionDifference,assess2960OriginalLeaseLineage,compact2960ProcessResult,projectD05WriterCheckpoint,compactD05WriterResult,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 import {inspect3160RecoveryCasReadonly} from '../tools/pc-process-inventory-readonly.mjs';
+import {inspect3160RollbackPreflightReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
  const request={schema:SCHEMA,operation:ROLE_OPERATION,role,
@@ -1533,4 +1534,42 @@ test('#3160 exact BACKED_UP CAS is bound to immutable bytes and never approves r
  assert.equal(run().code,'C3160_LEDGER_IDENTITY_OR_PHASE_DRIFT');
  bytes.delete(path.join(m,'leases/controller-install/RECOVERY_REQUIRED.json'));
  assert.equal(run().code,'C3160_ORIGINAL_FILES_UNAVAILABLE');
+});
+
+
+test('#3160 ENOENT preflight distinguishes absent local manifest from original lease without writes',()=>{
+ const id='pc-update-56444e31-5488-48df-aea9-474d259cb198';
+ const root='E:/ZGmini/projects/zgmini-pc-control';
+ const maintenance='E:/ZGmini/automation/pc-maintenance';
+ const manifestPath=path.join(root,'approvals/maintenance-recoveries',id+'.rollback.json');
+ const packagePath=path.join(maintenance,'approved',id+'.json');
+ const toolPath=path.join(root,'tools/controller-rollback-recovery.mjs');
+ const data=new Map([[packagePath,Buffer.from('{}')],[toolPath,Buffer.from('not pinned')]]);
+ const read=p=>{if(!data.has(p))throw Object.assign(Error('missing'),{code:'ENOENT'});return data.get(p);};
+ const stat=p=>{
+  if(p===path.join(maintenance,'leases/controller-recovery'))throw Object.assign(Error('missing'),{code:'ENOENT'});
+  const b=read(p);return{isFile:()=>true,isDirectory:()=>false,isSymbolicLink:()=>false,size:b.length};
+ };
+ const run=()=>inspect3160RollbackPreflightReadonly({checkoutRoot:root,
+  maintenanceRoot:maintenance,read,stat,list:()=>[],
+  gitAvailable:()=>({status:0}),gitCheck:()=>({status:1,stdout:Buffer.alloc(0)})});
+ const before=run();
+ assert.equal(before.status,'READ_ONLY_OBSERVED');
+ assert.equal(before.localApproval,'ABSENT');
+ assert.equal(before.approvalIdentity,'MISSING');
+ assert.equal(before.localApprovedPackage,'PRESENT');
+ assert.equal(before.checkoutHeadApproval,'NOT_READABLE_FROM_HEAD');
+ assert.equal(before.recoveryClaim,'ABSENT');
+ assert.equal(before.recoveryRecordCount,0);
+ assert.equal(before.localRecoveryToolShaVerified,false);
+ assert.equal(before.recoveryEligible,false);
+ assert.equal(before.operationalWrites,0);
+ const approved={schema:'ZGMINI_PC_ROLLBACK_APPROVAL_V1',approved:true,requestId:id,
+  sourceSha:'a19ce199142d64b0aa6de800f1c2c6d9b07c141c',
+  ledgerSha256:'9359ea893172168cc96c67990310f2b9f87141ea6765571abbdc8f73a3444c71'};
+ data.set(manifestPath,Buffer.from(JSON.stringify(approved)));
+ const after=run();
+ assert.equal(after.localApproval,'PRESENT');
+ assert.equal(after.approvalIdentity,'EXPECTED_IDENTITY');
+ assert.equal(after.recoveryEligible,false);
 });
