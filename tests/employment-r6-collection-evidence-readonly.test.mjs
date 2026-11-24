@@ -840,3 +840,47 @@ test('W04 ETA538 saved-only audit checks binary PDF, Base64 and all four Nationa
   assert.equal(auditStoredEta538PdfRawLinkage(db,{approvedPdfSha256:original}).status,'PDF_BYTES_OR_HASH_MISMATCH');
  }finally{db.close();}
 });
+
+
+test('W04 stored DOL RELEASE counters include exact noop and history rows without provider calls',t=>{
+ const {data,file}=fixture(t),db=createDb(file);
+ seed(db,{weeks:1});
+ db.exec('ALTER TABLE market_score_employment_r4_shadow_runs_v1 ADD COLUMN noop_count INTEGER;'+
+  'ALTER TABLE market_score_employment_r4_shadow_runs_v1 ADD COLUMN history_rows_added INTEGER;');
+ const release='2026-11-24T19:23:15.174Z';
+ db.prepare('INSERT INTO market_score_employment_r4_shadow_runs_v1 '+
+  '(provider,status,completed_at,provider_requests,collected_rows,inserted_count,'+
+  'revised_count,noop_count,rejected_count,history_rows_added,failure_code,detail_json) '+
+  'VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').run(
+  'EMPLOYMENT_R6_DOL_UI_WEEKLY_CLAIMS','SUCCESS',release,2,3440,42,
+  11,3387,0,53,null,JSON.stringify({mode:'RELEASE',secret:'PRIVATE_DO_NOT_EXPORT'}));
+ db.close();
+ const before=sha(file);
+ const result=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(result.status,'PASS',JSON.stringify(result));
+ assert.equal(result.dol.RELEASE.completedAt,release);
+ assert.equal(result.dol.RELEASE.collectedRows,3440);
+ assert.equal(result.dol.RELEASE.inserted,42);
+ assert.equal(result.dol.RELEASE.revised,11);
+ assert.equal(result.dol.RELEASE.noop,3387);
+ assert.equal(result.dol.RELEASE.rejected,0);
+ assert.equal(result.dol.RELEASE.historyRowsAdded,53);
+ assert.equal(result.providerCalls,0);
+ assert.equal(result.operationalWrites,0);
+ assert.equal(result.d1Writes,0);
+ assert.equal(sha(file),before);
+ assert.doesNotMatch(JSON.stringify(result),/PRIVATE_DO_NOT_EXPORT|secret/);
+});
+
+test('W04 optional historic counters absent from older schema remain null, not zero',t=>{
+ const {data,file}=fixture(t),db=createDb(file);
+ seed(db,{weeks:1});
+ db.close();
+ const result=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(result.status,'PASS',JSON.stringify(result));
+ assert.equal(result.dol.BACKFILL.inserted,2799);
+ assert.equal(result.dol.BACKFILL.noop,null);
+ assert.equal(result.dol.BACKFILL.historyRowsAdded,null);
+ assert.equal(result.providerCalls,0);
+ assert.equal(result.operationalWrites,0);
+});

@@ -147,7 +147,9 @@ function summarizeRun(row,provider){
   completedAt:stamp(row.completed_at),
   failureCode:FAILURE_CODES.has(row.failure_code)?row.failure_code:row.failure_code==null?null:'OTHER',
   providerRequests:safeInt(row.provider_requests),collectedRows:safeInt(row.collected_rows),
-  inserted:safeInt(row.inserted_count),revised:safeInt(row.revised_count),rejected:safeInt(row.rejected_count),
+  inserted:safeInt(row.inserted_count),revised:safeInt(row.revised_count),
+  noop:safeInt(row.noop_count),rejected:safeInt(row.rejected_count),
+  historyRowsAdded:safeInt(row.history_rows_added),
   missingSeriesCount:Array.isArray(detail?.missingSeries)?missing.length:null,
   knownMissingSeries:safeMissing.slice(0,12),
   latestInitialClaimsObservationDate:provider==='dol'?date(detail?.latestInitialClaimsObservationDate):null,
@@ -640,7 +642,15 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
   result.pitRawSchema=inspectPitRawSchema(db,tables,gate.path,filesystem);
   if(TABLES.some(t=>!tables.has(t)))return {...result,status:'STATE_UNKNOWN',code:'R6_EVIDENCE_TABLE_MISSING',
    missingTableCount:TABLES.filter(t=>!tables.has(t)).length};
-  const query=db.prepare(`SELECT status,completed_at,provider_requests,collected_rows,inserted_count,revised_count,rejected_count,failure_code,detail_json
+  // Optional run-count columns may be absent from legacy fixture databases.
+  // Report NULL, never fabricate 0 or reject otherwise valid existing evidence.
+  const runColumns=new Set(db.prepare('PRAGMA table_info(market_score_employment_r4_shadow_runs_v1)')
+   .all().map(row=>row.name));
+  const optionalColumn=name=>runColumns.has(name)?name:'NULL';
+  const query=db.prepare(`SELECT status,completed_at,provider_requests,collected_rows,inserted_count,revised_count,
+    ${optionalColumn('noop_count')} AS noop_count,
+    ${optionalColumn('history_rows_added')} AS history_rows_added,
+    rejected_count,failure_code,detail_json
    FROM market_score_employment_r4_shadow_runs_v1 WHERE provider=? AND json_extract(detail_json,'$.mode')=?
    ORDER BY completed_at DESC LIMIT 1`);
   markStage('RUN_SUMMARY');
