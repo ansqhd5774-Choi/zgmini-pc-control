@@ -1814,3 +1814,31 @@ test('CNN pinned SOURCE SHA origin classifier returns only bounded static classe
  assert.equal(unknown.guardOrigin,null);
  assert.equal(unknown.status,'STATE_UNKNOWN');
 });
+
+test('CNN SHA40 literal comparison is bounded and never exposes private pins',async()=>{
+ const {projectCnnGitEvidence}=await import('../controller/cnn-sidecar-git-predicates-readonly.mjs');
+ const base={sourcePin:true,ledgerStable:true,ledgerStatus:'BLOCKED',
+  head:'a'.repeat(40),approved:'a'.repeat(40),checkpoint:'a'.repeat(40),
+  gitVerified:true,trackedClean:true,wholeTreeClean:true,
+  sourceShaLiterals:['b'.repeat(40)],
+  secret:'PRIVATE_CODE_OR_TOKEN_DO_NOT_LEAK'};
+ const probe=v=>projectCnnGitEvidence({...base,...v});
+ assert.equal(probe({}).pinnedScriptSha40LiteralRelation,'OTHER_ONLY');
+ assert.equal(probe({sourceShaLiterals:['a'.repeat(40)]})
+  .pinnedScriptSha40LiteralRelation,'APPROVED_ONLY');
+ assert.equal(probe({sourceShaLiterals:['a'.repeat(40),'b'.repeat(40)]})
+  .pinnedScriptSha40LiteralRelation,'MIXED');
+ assert.equal(probe({sourceShaLiterals:[]})
+  .pinnedScriptSha40LiteralRelation,'NONE');
+ assert.equal(probe({sourceShaLiterals:Array.from({length:5},(_,i)=>
+  String(i+1).repeat(40))}).pinnedScriptSha40LiteralRelation,'AMBIGUOUS');
+ for(const invalid of [{sourcePin:false},{ledgerStable:false},
+  {gitVerified:false},{approved:null},{sourceShaLiterals:null}]){
+  assert.equal(probe(invalid).pinnedScriptSha40LiteralRelation,'UNVERIFIED');
+ }
+ const output=probe({});
+ assert.equal(output.failurePredicateResolved,false);
+ assert.equal(output.sidecarFailureResolved,false);
+ assert.equal(output.operationalWrites,0);
+ assert.doesNotMatch(JSON.stringify(output),/PRIVATE_CODE_OR_TOKEN|bbbbbbbbbbbb|aaaaaaaaaaaa/);
+});

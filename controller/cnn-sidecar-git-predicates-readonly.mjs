@@ -91,6 +91,14 @@ export function projectCnnGitEvidence(raw){
  const trackedDirty=gitVerified?!raw.trackedClean:null;
  const wholeTreeClean=gitVerified&&typeof raw?.wholeTreeClean==='boolean'?
   raw.wholeTreeClean:null;
+ // Strictly static, short R10 preflight only. No SHA/string value leaves probe.
+ const rawLiterals=pin&&stable&&Array.isArray(raw?.sourceShaLiterals)?
+  [...new Set(raw.sourceShaLiterals.map(safeSha).filter(Boolean))]:null;
+ const literalRelation=!rawLiterals||!gitVerified||!configVerified?'UNVERIFIED':
+  rawLiterals.length===0?'NONE':
+  rawLiterals.length>4?'AMBIGUOUS':
+  rawLiterals.every(v=>v===approved)?'APPROVED_ONLY':
+  rawLiterals.some(v=>v===approved)?'MIXED':'OTHER_ONLY';
  return {
   schema:'ZGMINI_CNN_GIT_PREDICATES_READONLY_V1',
   status:verified?'PASS':'STATE_UNKNOWN',
@@ -109,6 +117,8 @@ export function projectCnnGitEvidence(raw){
   sourceStatusGuardClass:pin&&[
    'TRACKED_ONLY','UNTRACKED_INCLUDED','DEFAULT_OR_UNKNOWN','NOT_FOUND'
   ].includes(raw?.sourceStatusGuardClass)?raw.sourceStatusGuardClass:'UNVERIFIED',
+  // Static SHA40 presence != proof of actual guard execution.
+  pinnedScriptSha40LiteralRelation:literalRelation,
   gitHeadMatchesCheckpoint:head&&checkpoint?head===checkpoint:null,
   // The pinned script can compute the checkout at runtime; a static source
   // mention is a clue only, not proof of its actual Git cwd.
@@ -140,7 +150,7 @@ export function inspectCnnGitPredicatesReadonly(dataRoot,{strictPlatform=true,
  const empty={sourcePin:false,ledgerStable:false,ledgerStatus:null,head:null,
   approved:null,checkpoint:null,gitVerified:false,trackedClean:null,
   mentionsCheckout:null,guardSites:false,wholeTreeClean:null,
-  sourceStatusGuardClass:'UNVERIFIED'};
+  sourceStatusGuardClass:'UNVERIFIED',sourceShaLiterals:null};
  if((strictPlatform&&(process.platform!=='win32'||
       path.normalize(root).toLowerCase()!==path.normalize('E:\\ZGmini\\data').toLowerCase()))
     ||typeof git!=='function')return projectCnnGitEvidence(empty);
@@ -153,6 +163,11 @@ export function inspectCnnGitPredicatesReadonly(dataRoot,{strictPlatform=true,
  empty.guardSites=lines.length>=23&&
   [18,20,22].every(i=>/(?:\bif\b|\bneed\b|\bcheck\b|\bassert\b|\bfail\b|\bstop\b)/i.test(lines[i]));
  empty.mentionsCheckout=initial.toString('utf8').toLowerCase().includes(CHECKOUT);
+ // Immutable SHA-pinned script. Only first 36 source-preflight lines are
+ // scanned; reject SHA256 substrings. Return only bounded categories.
+ empty.sourceShaLiterals=[...new Set((lines.slice(0,36).join('\n')
+  .match(/(?<![a-z0-9])[a-f0-9]{40}(?![a-z0-9])/gi)??[])
+  .map(v=>v.toLowerCase()))].slice(0,6);
  // Only the three pinned candidate guards are relevant. This classifier
  // returns no private code, options, file names or command arguments.
  const window=lines.slice(18,27).join(' ');
