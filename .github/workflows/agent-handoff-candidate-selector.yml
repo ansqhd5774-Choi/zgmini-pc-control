@@ -1,10 +1,5 @@
 name: ZGMINI Handoff Queue Candidate Selector
 on:
-  workflow_run:
-    workflows:
-      - ZGMINI Agent Handoff PC Failure Intake
-      - ZGMINI Agent Handoff Writer B Failure Intake
-    types: [completed]
   workflow_dispatch:
   push:
     branches: [main]
@@ -25,10 +20,7 @@ jobs:
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
       github.event.repository.private == true &&
       vars.ZGMINI_AGENT_HANDOFF_ENABLED == 'true' &&
-      ((github.event_name == 'workflow_run' &&
-        github.event.workflow_run.conclusion == 'success' &&
-        github.event.workflow_run.actor.login == 'ansqhd5774-Choi') ||
-       (github.event_name == 'workflow_dispatch' &&
+      ((github.event_name == 'workflow_dispatch' &&
         github.actor == 'ansqhd5774-Choi') ||
        (github.event_name == 'push' &&
         github.ref == 'refs/heads/main' &&

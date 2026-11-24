@@ -342,3 +342,36 @@ test('direct intake selection accepts exact owner workflow and original admissib
   assert.throws(()=>validateTrigger({...event,action:'created',issue:{labels:[{name:'agent-handoff'}]},comment:{body:'ZGMINI_HANDOFF_WORK_UPDATE_V1'}},commentEnv));
   assert.throws(()=>validateTrigger({...event,action:'edited',comment:{body:'ZGMINI_AGENT_HANDOFF_RESULT_V1'}},commentEnv));
 });
+
+
+test('failure-intake selector preserves authorized producer and historical manual origins',()=>{
+  const repo=HANDOFF_REPOSITORY;
+  const repository={full_name:repo,private:true};
+  const pcRef=repo+'/.github/workflows/agent-handoff-pc-failure-intake.yml@refs/heads/main';
+  const writerRef=repo+'/.github/workflows/agent-handoff-writer-b-failure-intake.yml@refs/heads/main';
+  const env={GITHUB_REPOSITORY:repo,GITHUB_EVENT_PATH:'event.json',GITHUB_WORKFLOW_REF:pcRef,
+    GITHUB_REF:'refs/heads/main',GITHUB_ACTOR:owner,GITHUB_EVENT_NAME:'workflow_run',GITHUB_JOB:'verify-and-select-after-failure-intake'};
+  const run={name:'ZGMINI PC Job',event:'issues',actor:{login:owner},
+    head_repository:{full_name:repo},id:100,run_attempt:1,created_at:'2026-11-24T00:00:00Z',conclusion:'failure'};
+  const event={repository,action:'completed',workflow_run:run};
+  assert.doesNotThrow(()=>validateTrigger(event,env));
+  assert.doesNotThrow(()=>validateTrigger({...event,workflow_run:{...run,conclusion:'success'}},env));
+  for(const changed of [{conclusion:'skipped'},{actor:{login:'other'}},{event:'push'},{head_repository:{full_name:'other/repo'}},{name:'other'},{run_attempt:0}])
+    assert.throws(()=>validateTrigger({...event,workflow_run:{...run,...changed}},env));
+  assert.throws(()=>validateTrigger(event,{...env,GITHUB_ACTOR:'other'}));
+  assert.throws(()=>validateTrigger(event,{...env,GITHUB_REF:'refs/heads/dev'}));
+  assert.throws(()=>validateTrigger(event,{...env,GITHUB_JOB:'other-job'}));
+  assert.throws(()=>validateTrigger(event,{...env,GITHUB_WORKFLOW_REF:writerRef}));
+  const writer={...run,name:'ZGMINI Approved Writer B Source Overlay Once',head_sha:'a'.repeat(40),head_branch:'main'};
+  const writerEnv={...env,GITHUB_WORKFLOW_REF:writerRef};
+  assert.doesNotThrow(()=>validateTrigger({...event,workflow_run:writer},writerEnv));
+  for(const changed of [{run_attempt:2},{head_branch:'dev'},{head_sha:'bad'}])
+    assert.throws(()=>validateTrigger({...event,workflow_run:{...writer,...changed}},writerEnv));
+  const manual={repository,sender:{login:owner},inputs:{confirmation:'reconcile-2307-resource-wait',mode:'preview'}};
+  const manualEnv={...env,GITHUB_EVENT_NAME:'workflow_dispatch'};
+  assert.doesNotThrow(()=>validateTrigger(manual,manualEnv));
+  assert.doesNotThrow(()=>validateTrigger({...manual,inputs:{...manual.inputs,mode:'apply'}},manualEnv));
+  assert.throws(()=>validateTrigger({...manual,inputs:{...manual.inputs,confirmation:'other'}},manualEnv));
+  assert.throws(()=>validateTrigger(manual,{...manualEnv,GITHUB_WORKFLOW_REF:writerRef}));
+  assert.throws(()=>validateTrigger({...manual,sender:{login:'other'}},manualEnv));
+});

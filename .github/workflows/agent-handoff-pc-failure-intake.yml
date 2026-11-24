@@ -69,3 +69,67 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         shell: cmd
         run: node agent-handoff/pc-2307-wait-recovery.mjs
+  # Keep original intake independent; avoid a second completion-triggered Run.
+  verify-and-select-after-failure-intake:
+    needs: enqueue-confirmed-failures
+    if: >-
+      needs.enqueue-confirmed-failures.result == 'success' &&
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      vars.ZGMINI_AGENT_HANDOFF_ENABLED == 'true' &&
+      github.ref == 'refs/heads/main' &&
+      github.actor == 'ansqhd5774-Choi'
+    permissions:
+      contents: read
+      issues: write
+    concurrency:
+      group: zgmini-handoff-candidate-selector
+      cancel-in-progress: false
+      queue: max
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0 pinned
+        with:
+          node-version: '22'
+      - name: Verify up to 10 incidents sequentially and record metadata-only candidates
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node agent-handoff/queue-dispatcher.mjs
+  authenticated-readonly-board-after-selection:
+    needs: verify-and-select-after-failure-intake
+    if: >-
+      needs.verify-and-select-after-failure-intake.result == 'success' &&
+      github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    concurrency:
+      group: zgmini-handoff-control-board
+      cancel-in-progress: false
+      queue: max
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 6
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Classify authenticated backlog, priority, owner receipts and review age
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node agent-handoff/queue-board-runner.mjs
