@@ -222,8 +222,10 @@ export function projectCnnR10ThreeGuardsReadonly(source,raw={}){
  const prefix=lines.slice(0,23).join('\n');
  for(const m of prefix.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([^;\n]{1,240})/g)){
   if(/\brev-parse\b/.test(m[2])&&/\bHEAD\b/.test(m[2])&&
-     /(?:execFileSync|spawnSync|execSync)/.test(m[2])&&head)
+     /(?:execFileSync|spawnSync|execSync)/.test(m[2])&&head){
    values.set(m[1],head);
+   gitHeadVariables.add(m[1]);
+  }
  }
  // Narrowly handle direct boolean expressions; unsupported expressions remain
  // UNKNOWN, rather than being evaluated dynamically or guessed.
