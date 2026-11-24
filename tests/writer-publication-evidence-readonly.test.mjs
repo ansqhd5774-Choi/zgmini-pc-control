@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
-import {inspectWriterPublicationEvidence,readER1LocalOutput}
+import {inspectWriterPublicationEvidence,readER1LocalOutput,projectW05SavedSidecars}
  from '../controller/writer-publication-evidence-readonly.mjs';
 const fixture=()=>{
  const d=fs.mkdtempSync(path.join(os.tmpdir(),'er1-meta-'));
@@ -176,3 +176,66 @@ test('spoofed metadata status MATCHED without identical stored_at and SHA is rej
  }finally{f.close();}
 });
 
+
+test('W05 fixed three-key receipts expose only last Writer readback metadata',()=>{
+ const f=fixture();try{
+  const base={at:'2026-11-24T05:15:46.993Z',source:'a'.repeat(40),
+   mode:'PUBLISH',status:'VERIFIED',secret:'NEVER_EXPOSE_WRITER_PRIVATE',
+   w05SavedSidecars:{
+    wpsfd42:{key:'detail:earnings-recession-indicators:bls-wpsfd42:v1',
+     status:'READBACK_VERIFIED',sourceVersion:'1'.repeat(64),
+     sourceStoredAt:1795351641253,publishedAt:1795500000123,raw:'SECRET_WPS'},
+    qfr:{key:'detail:earnings-recession-indicators:census-qfr-mfg-margin:v1',
+     status:'ALREADY_STORED',sourceVersion:'2'.repeat(64),
+     sourceStoredAt:1793112733108,publishedAt:1795500000123},
+    bea:{status:'SKIPPED_SOURCE_STALE',raw:'SECRET_BEA'},
+    attacker:{key:'other',secret:'SECRET_UNRELATED'},
+   },failures:[]};
+  f.write('local-writer-last-run.json',base);
+  const r=inspectWriterPublicationEvidence(f.d);
+  assert.equal(r.status,'PASS');
+  assert.deepEqual(Object.keys(r.w05Sidecars.keys),['wpsfd42','qfr','bea']);
+  assert.equal(r.w05Sidecars.writerSource,'a'.repeat(40));
+  assert.equal(r.w05Sidecars.keys.wpsfd42.readbackAtWriter,true);
+  assert.equal(r.w05Sidecars.keys.qfr.readbackAtWriter,true);
+  assert.equal(r.w05Sidecars.keys.bea.evidence,'SKIPPED');
+  assert.equal(r.w05Sidecars.keys.bea.readbackAtWriter,false);
+  assert.equal(r.w05Sidecars.publicApiUiVerified,false);
+  assert.equal(r.w05Sidecars.productionVerified,false);
+  assert.equal(JSON.stringify(r).includes('SECRET'),false);
+  assert.equal(JSON.stringify(r).includes('NEVER_EXPOSE'),false);
+ }finally{f.close();}
+});
+test('W05 receipt rejects DRY_RUN, wrong key and invalid provenance',()=>{
+ const key='detail:earnings-recession-indicators:bls-wpsfd42:v1';
+ const row={key,status:'READBACK_VERIFIED',sourceVersion:'f'.repeat(64),
+  sourceStoredAt:1795351641253};
+ const raw={source:'a'.repeat(40),at:'2026-11-24T05:15:46Z',mode:'PUBLISH',
+  status:'VERIFIED',w05SavedSidecars:{wpsfd42:row}};
+ assert.equal(projectW05SavedSidecars({...raw,mode:'DRY_RUN'})
+  .keys.wpsfd42.readbackAtWriter,false);
+ assert.equal(projectW05SavedSidecars({...raw,w05SavedSidecars:{
+  wpsfd42:{...row,key:'unrelated'}}}).keys.wpsfd42.readbackAtWriter,false);
+ assert.equal(projectW05SavedSidecars({...raw,w05SavedSidecars:{
+  wpsfd42:{...row,sourceVersion:'not-a-hash'}}}).keys.wpsfd42.readbackAtWriter,false);
+ assert.equal(projectW05SavedSidecars({...raw,at:null})
+  .keys.wpsfd42.readbackAtWriter,false);
+});
+test('W05 per-key failure survives a globally VERIFIED_WITH_GAPS Writer run',()=>{
+ const f=fixture();try{
+  f.write('local-writer-last-run.json',{
+   source:'a'.repeat(40),at:'2026-11-24T05:20:00Z',mode:'PUBLISH',
+   status:'VERIFIED_WITH_GAPS',failures:[
+    {id:'w05-saved-sidecar:bea',reason:'W05_SAVED_REMOTE_READBACK_MISSING',
+     debugSecret:'PRIVATE_BEA_PAYLOAD'},
+    {id:'other-secret',reason:'PRIVATE_UNRELATED'},
+   ],w05SavedSidecars:{},
+  });
+  const r=inspectWriterPublicationEvidence(f.d);
+  assert.equal(r.w05Sidecars.keys.bea.evidence,'WRITER_FAILED');
+  assert.equal(r.w05Sidecars.keys.bea.failureReason,
+   'W05_SAVED_REMOTE_READBACK_MISSING');
+  assert.equal(r.w05Sidecars.keys.qfr.evidence,'NOT_RECORDED');
+  assert.equal(JSON.stringify(r).includes('PRIVATE_'),false);
+ }finally{f.close();}
+});
