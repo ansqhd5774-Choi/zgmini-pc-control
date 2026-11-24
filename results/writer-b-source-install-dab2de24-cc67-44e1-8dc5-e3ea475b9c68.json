@@ -1,0 +1,24 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "dab2de24-cc67-44e1-8dc5-e3ea475b9c68",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "a163c4f34e4e1c50987feaea0f3a7ef00442afaf",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "37f9048705793da5e49c4ff271f90dff444ec44b",
+  "candidateSourceSha": "0d409c5ec0b6c392429f2bbdf9ce78e34deed133",
+  "manifestSha256": "a319ca47d18f1497a469552411aadba97b7dd7b8a280e04b074dc2b5e8695b57",
+  "baseTreeOid": "39c8f2da61b09bbfdb9c7f27cbbadf2d7890a2b9",
+  "preparedTreeOid": "c54d5786896420191e700c578af6fe13ec6238cc",
+  "provenanceSha256": "767378bd5898774f6249c2d7f82b5d99b2697ebfd04d2b4ae0f0a321ff4612f3",
+  "runId": "45309297058",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/sector-fear-greed-r3-local-cycle.mjs",
+    "scripts/pc-writer/theme-paid-cycle.mjs",
+    "lib/score-history/d05-final-score-output-events-r1.mjs",
+    "lib/score-history/d05-final-sector-local-readback-r1.mjs",
+    "lib/score-history/d05-final-theme-candidate-readback-r1.mjs"
+  ]
+}
