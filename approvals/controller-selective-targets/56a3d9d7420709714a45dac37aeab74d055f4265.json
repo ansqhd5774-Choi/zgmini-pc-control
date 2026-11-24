@@ -1,0 +1,17 @@
+{
+  "schema": "ZGMINI_CONTROLLER_SELECTIVE_PIN_V1",
+  "installedSha": "4396d2bb326d86b8ce9e27c528519bf0090b8e9e",
+  "targetSha": "56a3d9d7420709714a45dac37aeab74d055f4265",
+  "sourceMainSha": "033104b9a4c7575efb8cadf7a6f5d562b777eb64",
+  "targetBranch": "codex/cnn1521-ledger-origin-selective-r2-20261124",
+  "customPaths": [
+    "controller/fear-greed-archive-readonly.mjs"
+  ],
+  "allowFiles": [
+    {
+      "path": "controller/fear-greed-archive-readonly.mjs",
+      "sha256": "8acd96d94104b92832116f5a2b76cf9615eaf745ffb85580e0fcd706048db8c1"
+    }
+  ],
+  "approvalRef": "PENDING_APPROVAL_PR_NUMBER"
+}
