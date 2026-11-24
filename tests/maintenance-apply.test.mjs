@@ -975,7 +975,11 @@ test('a persistently Busy runner is refused after at most 30 seconds',async()=>{
  await assert.rejects(waitForSupervisorStopIdle({
   readRunners:()=>{const rows=idleRaceSeats();reads++;rows[0].busy=true;return rows;},
   verifySafety:()=>{},now:()=>clock,pause:async ms=>{clock+=ms;}
- }),{code:'RUNNERS_NOT_IDLE'});
+ }),error=>{
+  assert.equal(error.code,'RUNNERS_NOT_IDLE');
+  assert.deepEqual(error.supervisorIdleWait,{retryCount:10,elapsedMs:30000,observedBusy:true});
+  return true;
+ });
  assert.equal(clock,30000);
  assert.equal(reads,11);
 });
