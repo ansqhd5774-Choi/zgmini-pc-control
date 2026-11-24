@@ -15,6 +15,7 @@ const day=x=>typeof x==='string'&&/^20\d{2}-\d{2}-\d{2}$/.test(x)&&
 const validScore=x=>typeof x==='number'&&Number.isFinite(x)&&x>=0&&x<=100;
 const base=(code,opened=false)=>({status:'STATE_UNKNOWN',code,sqliteOpened:opened,
  scope:'MARKET_OVERALL_AND_12_DOMAINS_ONLY',sameEventVerified:false,
+ localStoredSnapshotMatched:false,
  d1Readback:'NOT_PERFORMED',apiReadback:'NOT_PERFORMED',oneYearPitVerified:false,
  providerCalls:0,d1Writes:0,operationalWrites:0});
 const validVersion=x=>typeof x==='string'&&x.length>0&&x.length<=160;
@@ -55,7 +56,8 @@ export function compareD05MarketStored(current,dated,{dayKey}={}){
  const identical=a.bodySha256===b.bodySha256&&a.storedAt===b.storedAt;
  return {...out,status:identical?'PASS':'BLOCKED',
   code:identical?'D05_MARKET_13_STORED_SNAPSHOT_MATCHED':'D05_MARKET_CURRENT_DAY_MISMATCH',
-  sameEventVerified:identical,localCurrent:a,localDated:b};
+  sameEventVerified:false,localStoredSnapshotMatched:identical,
+  localCurrent:a,localDated:b};
 }
 
 export function inspectD05MarketFinalReadonly(dataRoot,{fileSystem=fs,
