@@ -107,6 +107,18 @@ const runExe=(bin,args,{timeout=60000,maxBuffer=8_000_000}={})=>{
   throw error;
  }
 };
+export function chooseTrustedGitExecutable({readStat=fs.lstatSync}={}){
+ for(const candidate of ['C:/Program Files/Git/cmd/git.exe',
+   'C:/Program Files (x86)/Git/cmd/git.exe']){
+  try{
+   const st=readStat(candidate);
+   if(st.isFile()&&!st.isSymbolicLink()&&st.nlink===1&&st.size>0)
+    return candidate;
+  }catch{/* Try the other supported installed Git location. */}
+ }
+ fail('OPERATOR_TRUSTED_GIT_MISSING');
+}
+let verifiedGitExecutable=null;
 let isolatedHooksPath=null;
 export function isolatedGitArguments(args,{hooksPath=isolatedHooksPath,root=FIXED.root}={}){
  need(typeof hooksPath==='string'&&path.isAbsolute(hooksPath),
@@ -122,7 +134,7 @@ const git=(args)=>{
    'OPERATOR_HOOK_ISOLATION_DRIFT');
  // Explicit -c is inherited by worktree checkout: repository/default hooks
  // cannot run even if another party changes Git's configured hooksPath.
- return runExe('git',isolatedGitArguments(args));
+ return runExe(verifiedGitExecutable??chooseTrustedGitExecutable(),isolatedGitArguments(args));
 };
 const show=(rev,rel)=>git(['show',rev+':'+rel]);
 
@@ -144,7 +156,7 @@ function verifyInstalledOperator(){
   {timeout:12000,maxBuffer:65536}));
  need(whoami.includes('S-1-16-8192')&&!whoami.includes('S-1-16-12288'),
    'OPERATOR_MEDIUM_INTEGRITY_REQUIRED');
- const verified=String(runExe('cscript.exe',['//NoLogo',
+ const verified=String(runExe('C:/Windows/System32/cscript.exe',['//NoLogo',
    path.join(FIXED.maintenance,'tools/maintenance-ancestry.vbs'),
    'OPERATOR',String(process.pid),'0'],{timeout:12000,maxBuffer:4096})).trim();
  need(verified==='INDEPENDENT_OPERATOR','OPERATOR_WINDOWS_ORIGIN_UNVERIFIED');
@@ -198,6 +210,7 @@ export async function runOnce({platform=process.platform,env=process.env}={}){
   'OPERATOR_PREVIOUS_SOURCE_STAGE_RECONCILE_FIRST');
  verifyInstalledOperator();
  isolatedHooksPath=fs.mkdtempSync(path.join(env.TEMP,'ZGMINI_W04_3409_EMPTY_HOOKS_'));
+ verifiedGitExecutable=chooseTrustedGitExecutable();
  const oldHead=verifyGitCheckout();
  const report=reportPath(env);
  need(!fs.existsSync(report),'OPERATOR_PREVIOUS_ATTEMPT_RECONCILE_FIRST');
