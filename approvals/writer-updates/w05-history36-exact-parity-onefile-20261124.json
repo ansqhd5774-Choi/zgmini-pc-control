@@ -1,0 +1,54 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "codex/w05-saved-publication-exact-history-readback-20261124",
+  "candidateSourceSha": "4499e801d88484cafe6aaf28b1246a5e72ae06ec",
+  "baseHead": "15f65455bbe44cef76f87a3f589ad08f94359184",
+  "baseConfigSourceSha": "15f65455bbe44cef76f87a3f589ad08f94359184",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/w05-stored-sidecar-publication-r1.mjs",
+      "change": "M",
+      "beforeSha256": "63c26de726ec47bc4c998a1fed6b8d717d8d38c560d407810a2b38165ec68d0a",
+      "afterSha256": "aa0ac939771e8277880e2fb6803d1c5ebfc7c2f5f5fac8a3ce9baf73890d382a"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "scripts/pc-writer/run-local.mjs",
+      "sha256": "a96c0c7c3513fda6f9d51b35caee7d634e2a05c69ff3575d3b99c37072a60ec6"
+    },
+    {
+      "path": "scripts/pc-writer/EARNINGS_R3D_STORED_BLS_CALC_READONLY.mjs",
+      "sha256": "b441a52551a015ab9522280ee7c3f620fc8efd967c8dd0e6e04865bb72c97b31"
+    },
+    {
+      "path": "scripts/pc-writer/d1.mjs",
+      "sha256": "10beefecc524b569eba9abf826036fc8e069b4b6f0c3b3340a7bd6a5ab6353a5"
+    },
+    {
+      "path": "scripts/pc-writer/d1-transient.mjs",
+      "sha256": "5fd4be11dc4a671a9634757bb449807e497a7974c5fd061faa06b455dd0d253e"
+    },
+    {
+      "path": "scripts/pc-writer/d1-diagnostics.mjs",
+      "sha256": "eb5ffbcdb56805ca15affac876493217de52b21e0f90f99976bbcff8ddc13037"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false,
+  "coreMaintenance": "PAUSE_NEW_STARTS_DRAIN_1200S_V1"
+}
