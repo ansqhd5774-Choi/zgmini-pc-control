@@ -427,7 +427,7 @@ export function auditStoredEta538PdfRawLinkage(db,{
  if(!requiredRaw.every(k=>rawCols.has(k))||
     !requiredCurrent.every(k=>currentCols.has(k)))
   return eta538Fail('SCHEMA_UNAVAILABLE');
- if(!/^20\\d{2}-\\d{2}-\\d{2}$/.test(releaseDate)||
+ if(!/^20\d{2}-\d{2}-\d{2}$/.test(releaseDate)||
   !/^[0-9a-f]{64}$/.test(approvedPdfSha256))
   return eta538Fail('PIN_INVALID');
  const keyPrefix='DOL_ETA538_PDF:';
