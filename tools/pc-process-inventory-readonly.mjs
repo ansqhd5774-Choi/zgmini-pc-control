@@ -1441,6 +1441,88 @@ export function inspect3160RecoveryCasReadonly({
  }catch{return unknown('C3160_ORIGINAL_FILES_UNAVAILABLE');}
 }
 
+// Fixed #3160 ENOENT preflight: observe only approved non-secret file presence,
+// checkout commit proof and recovery claim. Never call recovery, modify a lease,
+// or infer that this Actions runner is an independent Windows operator.
+export function inspect3160RollbackPreflightReadonly({
+ checkoutRoot='E:/ZGmini/projects/zgmini-pc-control',
+ maintenanceRoot='E:/ZGmini/automation/pc-maintenance',
+ read=fs.readFileSync,stat=fs.lstatSync,list=fs.readdirSync,
+ gitCheck=(cwd,rel)=>spawnSync('git',['show','HEAD:'+rel],{
+  cwd,encoding:null,windowsHide:true,timeout:12000,maxBuffer:32768}),
+ gitAvailable=()=>spawnSync('git',['--version'],{
+  encoding:'utf8',windowsHide:true,timeout:8000,maxBuffer:1024})
+}={}){
+ const rel='approvals/maintenance-recoveries/'+C3160_ID+'.rollback.json';
+ const states=['PRESENT','ABSENT','UNVERIFIED','UNSAFE'];
+ const fixedFile=(p,cap=32768)=>{
+  try{
+   const st=stat(p);
+   if(!st.isFile()||st.isSymbolicLink()||st.size<1||st.size>cap)
+    return {state:'UNSAFE',bytes:null};
+   const a=read(p),b=read(p);
+   if(!Buffer.isBuffer(a)||!Buffer.isBuffer(b)||a.length!==st.size||!a.equals(b))
+    return {state:'UNVERIFIED',bytes:null};
+   return {state:'PRESENT',bytes:a};
+  }catch(e){return {state:e?.code==='ENOENT'?'ABSENT':'UNVERIFIED',bytes:null};}
+ };
+ const dirState=p=>{
+  try{const x=stat(p);return x.isDirectory()&&!x.isSymbolicLink()?'PRESENT':'UNSAFE';}
+  catch(e){return e?.code==='ENOENT'?'ABSENT':'UNVERIFIED';}
+ };
+ const approval=fixedFile(path.join(checkoutRoot,rel),8192);
+ const approvedPackage=fixedFile(path.join(maintenanceRoot,'approved',C3160_ID+'.json'),131072);
+ const claim=dirState(path.join(maintenanceRoot,'leases/controller-recovery'));
+ let approvalIdentity='UNVERIFIED';
+ if(approval.state==='ABSENT')approvalIdentity='MISSING';
+ if(approval.bytes){
+  try{
+   const a=JSON.parse(approval.bytes.toString('utf8'));
+   approvalIdentity=a.schema==='ZGMINI_PC_ROLLBACK_APPROVAL_V1'&&a.approved===true&&
+    a.requestId===C3160_ID&&
+    a.sourceSha==='a19ce199142d64b0aa6de800f1c2c6d9b07c141c'&&
+    a.ledgerSha256==='9359ea893172168cc96c67990310f2b9f87141ea6765571abbdc8f73a3444c71'
+    ?'EXPECTED_IDENTITY':'IDENTITY_DRIFT';
+  }catch{approvalIdentity='INVALID_JSON';}
+ }
+ let gitAvailableState='UNVERIFIED',checkoutHeadApproval='UNVERIFIED';
+ try{
+  const g=gitAvailable();
+  gitAvailableState=g?.error?.code==='ENOENT'?'ABSENT':
+   g?.status===0?'AVAILABLE':'UNVERIFIED';
+  if(gitAvailableState==='AVAILABLE'){
+   const head=gitCheck(checkoutRoot,rel);
+   checkoutHeadApproval=head?.status===0&&Buffer.isBuffer(head.stdout)?
+    approval.bytes?.equals(head.stdout)===true?'MATCHES_LOCAL_APPROVAL':
+     'HEAD_PRESENT_BUT_DIFFERS':
+    head?.error?.code==='ENOENT'?'GIT_EXECUTABLE_ABSENT':
+     'NOT_READABLE_FROM_HEAD';
+  }
+ }catch{}
+ const tool=fixedFile(path.join(checkoutRoot,'tools/controller-rollback-recovery.mjs'),2097152);
+ let toolHashMatch=null;
+ if(tool.bytes)toolHashMatch=createHash('sha256').update(tool.bytes).digest('hex')===
+  '414064c4853d674b3aea078158342ad854722fb03864fa8fd214a2f974dcf677';
+ let recoveryRecordCount=null;
+ try{
+  const names=list(path.join(maintenanceRoot,'recovery'));
+  if(Array.isArray(names)&&names.length<=3000)
+   recoveryRecordCount=names.filter(x=>
+    x.startsWith(C3160_ID+'-rollback-')&&
+    /^[a-z0-9-]+\.json$/.test(x)).length;
+ }catch{}
+ const localApproval=states.includes(approval.state)?approval.state:'UNVERIFIED';
+ const localApprovedPackage=states.includes(approvedPackage.state)?approvedPackage.state:'UNVERIFIED';
+ return {schema:'ZGMINI_C3160_OPERATOR_PREFLIGHT_READONLY_V1',
+  requestId:C3160_ID,status:'READ_ONLY_OBSERVED',
+  localApproval,approvalIdentity,localApprovedPackage,
+  gitAvailable:gitAvailableState,checkoutHeadApproval,
+  localRecoveryTool:tool.state,localRecoveryToolShaVerified:toolHashMatch,
+  recoveryClaim:claim,recoveryRecordCount,
+  // No conclusion about human operator identity or safe rollback execution.
+  recoveryEligible:false,operationalWrites:0,providerCalls:0,d1Writes:0};
+}
+
 // Fixed read-only HTTP request log projection. The source module is the
 // already-tested Controller A adapter, loaded from the exact Git checkout.
 // No caller input, secrets, URLs, query paths, or raw log lines are returned.
@@ -1810,7 +1892,8 @@ export function collect(role,ctx,env=process.env){
  }
  if(ctx.c3160RecoveryCas===true){
   const result=inspect3160RecoveryCasReadonly();
-  return {...base,status:result.status==='READ_ONLY_OBSERVED'?'PASS':'PARTIAL',
+  const preflight=inspect3160RollbackPreflightReadonly();
+  return {...base,c3160LocalPreflight:preflight,status:result.status==='READ_ONLY_OBSERVED'?'PASS':'PARTIAL',
    code:result.status==='READ_ONLY_OBSERVED'?'C3160_CAS_CAPTURED':'C3160_CAS_UNVERIFIED',
    c3160RecoveryCas:result,maintenance:collectMaintenanceStatusReadonly()};
  }
@@ -1901,6 +1984,9 @@ export function toText(r){
   ...(r.c3160RecoveryCas?[
    'c3160RecoveryCas='+r.c3160RecoveryCas.code,
    'c3160BacklogOpen='+(r.c3160RecoveryCas.backlog?.openWindows??'UNKNOWN')]:[]),
+  ...(r.c3160LocalPreflight?[
+   'c3160LocalApproval='+r.c3160LocalPreflight.localApproval,
+   'c3160RecoveryClaim='+r.c3160LocalPreflight.recoveryClaim]:[]),
   'maintenanceSourceSha='+(r.maintenance?.maintenanceSourceSha??'UNKNOWN'),
   'installLockHeld='+(r.maintenance?.installLockHeld??'UNKNOWN'),
   'c2094StageEvidence='+(r.c2094StageEvidence?.status??'NOT_APPLICABLE'),
