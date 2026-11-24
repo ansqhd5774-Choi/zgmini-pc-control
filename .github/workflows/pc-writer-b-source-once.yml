@@ -24,7 +24,9 @@ jobs:
       cancel-in-progress: false
       queue: max
     runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
-    timeout-minutes: 12
+    # Extended Core drain is opt-in via an exact approved manifest. Leave room
+    # for 20m natural finish plus checkout, rollback and report; no force stop.
+    timeout-minutes: 30
     defaults:
       run:
         shell: cmd
