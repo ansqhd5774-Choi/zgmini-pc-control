@@ -1,0 +1,67 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "4f67d290908e46847694c1111ca1b1e6ddc751a3",
+  "baseHead": "acf8ef23e6400a9a07e9897f48005c95bbbc6416",
+  "baseConfigSourceSha": "acf8ef23e6400a9a07e9897f48005c95bbbc6416",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/theme-paid-cycle.mjs",
+      "change": "M",
+      "beforeSha256": "53aeb6ef708d31421e0cf01bcafca3914460dfe496a78e778f44b61addd600b3",
+      "afterSha256": "539ecf4f4650125a21c221874e02e4d004318aea1c3082e49dba8bc3f0c16255",
+      "candidateSha256": "432761ed76b63a96a808a3cd4a8aa339281cc83d51c9e7877c757d3c167d7a84",
+      "insertions": [
+        {
+          "anchor": " if(publish&&validPaidThemeRecord(output.record)){const applied=await publishPaidThemeRecord({remote,dbId:config.core,record:output.record,preimage:seed.preimage,now});result.status=applied.status;result.d1Writes=applied.written;result.storedAt=applied.storedAt;result.bodySha256=applied.bodySha256??sha(seed.preimage.body);}",
+          "position": "before",
+          "text": " // D05 private: record only actual calculated final outputs. The original\n // content-addressed private snapshot may be reused for many clocked cycles.\n // A missing/invalid private receipt must never block the existing public lane.\n if(privateStored?.status==='PRIVATE_STORED_READBACK_VERIFIED'){\n  try{\n   const {storeVerifiedPrivateThemeFinalEvents}=await import(\n    '../../lib/score-history/d05-private-theme-final-events-r1.mjs');\n   result.d05PrivateFinalOutputReadback=storeVerifiedPrivateThemeFinalEvents({\n    directory:dir,privateStored,sourceVersion,\n    registrySha256:context.registrySha256,confirmedDate:phases.confirmed,\n    calculatedAtMs:now,now:Date.now()\n   });\n  }catch{result.d05PrivateFinalOutputReadback={status:'UNPROVEN_PRIVATE_FINAL_OUTPUT'};}\n }else{result.d05PrivateFinalOutputReadback={status:'NO_VERIFIED_PRIVATE_FINAL_OUTPUT'};}\n"
+        }
+      ]
+    },
+    {
+      "path": "lib/score-history/d05-private-theme-final-events-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "b6367b8cc213258bd18e764c7aadf7acc2ea6b1547b85cf73f920c5aa260e4cf"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "lib/score-history/d05-final-score-output-events-r1.mjs",
+      "sha256": "07283b49b13914f86f41ae54dbf88f95f5ea9f92db3e2276871ef3a6e80793b0"
+    },
+    {
+      "path": "lib/score-history/d05-final-theme-candidate-readback-r1.mjs",
+      "sha256": "1eab44663396b43aa29d25d0c9618b5bf1cce5850199fa36251b6f43aaaa6267"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": [
+      {
+        "id": "existing-core-launcher",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+        "dependsOn": [
+          "scripts/pc-writer/theme-paid-cycle.mjs",
+          "lib/score-history/d05-private-theme-final-events-r1.mjs"
+        ]
+      }
+    ]
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false,
+  "coreMaintenance": "PAUSE_NEW_STARTS_DRAIN_360S_V1"
+}
