@@ -78,15 +78,24 @@ const readStrict=(file,max=131072)=>{
   'OPERATOR_FILE_UNSAFE');
  return fs.readFileSync(file);
 };
-export function sanitizedChildEnvironment(input=process.env){
+export function sanitizedChildEnvironment(input=process.env,{gitExecutable=null}={}){
  const clean={...input};
- // Never inherit Git/Node environment-level executable, hook, module preload,
- // custom runtime search or helper injection from the operator desktop.
+ // The approved recovery script also launches 'git' through PATH. Do not
+ // let the operator desktop select its nested Git or command processor.
  for(const k of Object.keys(clean)){
   if(/^GIT_/i.test(k)||/^GCM_/i.test(k)||/^NODE_/i.test(k)||
-    /^NPM_CONFIG_/i.test(k)||/^SSH_ASKPASS$/i.test(k))
+    /^NPM_CONFIG_/i.test(k)||/^SSH_ASKPASS$/i.test(k)||
+    /^PATH$/i.test(k)||/^COMSPEC$/i.test(k))
    delete clean[k];
  }
+ const gitDir=gitExecutable===null?'':path.win32.dirname(gitExecutable);
+ if(gitDir){
+  need(['c:/program files/git/cmd','c:/program files (x86)/git/cmd']
+   .includes(gitDir.replaceAll('\\','/').toLowerCase()),
+   'OPERATOR_CHILD_GIT_PATH_INVALID');
+ }
+ clean.Path=['C:\\Windows\\System32','C:\\Windows',...(gitDir?[gitDir]:[])].join(';');
+ clean.ComSpec='C:\\Windows\\System32\\cmd.exe';
  clean.GIT_OPTIONAL_LOCKS='0';
  clean.GIT_TERMINAL_PROMPT='0';
  clean.GCM_INTERACTIVE='never';
@@ -95,7 +104,7 @@ export function sanitizedChildEnvironment(input=process.env){
 const runExe=(bin,args,{timeout=60000,maxBuffer=8_000_000}={})=>{
  try{
   return execFileSync(bin,args,{encoding:null,windowsHide:true,shell:false,timeout,maxBuffer,
-   env:sanitizedChildEnvironment()});
+   env:sanitizedChildEnvironment(process.env,{gitExecutable:verifiedGitExecutable})});
  }catch(error){
   // Existing tools return bounded JSON error codes; never print raw child output.
   for(const raw of [error?.stdout,error?.stderr]){
