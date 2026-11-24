@@ -73,8 +73,9 @@ export function classifyPinnedCnnGuardOrigin(source,approved){
   uniques.length!==1?'AMBIGUOUS':
   uniques[0]===expected?'MATCH':'MISMATCH';
 
- const assigned=[...live.matchAll(/\b(?:const|let|var)\s+([A-Za-z_]\w*(?:source|approved|expected|sha)\w*)\s*=\s*(['"])([0-9a-f]{40})\2/gi)]
-  .filter(m=>uniques.length===1&&m[3].toLowerCase()===uniques[0]);
+ const assigned=[...live.matchAll(/\b(?:const|let|var)\s+([A-Za-z_]\w*)\s*=\s*(['"])([0-9a-f]{40})\2/gi)]
+  .filter(m=>/(?:source|approved|expected|sha)/i.test(m[1])&&
+   uniques.length===1&&m[3].toLowerCase()===uniques[0]);
  const names=[...new Set(assigned.map(m=>m[1]))];
  const hits=[];
  if(names.length>0&&lines.length>=23){
