@@ -1,0 +1,72 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-45331980003-1-seat-1",
+  "requestId": "pc-07ec9d13-c0b5-41c4-9f1e-526629de9bda",
+  "startedAt": "2026-11-24T05:15:16.416Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "4396d2bb326d86b8ce9e27c528519bf0090b8e9e",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "55f27815fbd877a1a27a2f9f8027bde92d7b4f99",
+  "sourceBranch": "main",
+  "operation": "shared-resource-release-readonly",
+  "seat": 1,
+  "status": "PASS",
+  "code": "SHARED_RESOURCE_READONLY_SNAPSHOT",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-w05-post3190-lease-and-task-readback-20261124",
+  "effectClass": "REGISTERED_OPERATION",
+  "pcOperationalApprovedSha": "15f65455bbe44cef76f87a3f589ad08f94359184",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "SHARED_RESOURCE_READONLY_SNAPSHOT",
+    "evidenceLevel": "TWO_WINDOWS_SAMPLES_NOT_RELEASE_AUTHORIZATION",
+    "observedAt": "2026-11-24T05:15:23.796Z",
+    "sampleCount": 2,
+    "sourceStable": true,
+    "observedConfigSourceSha": "15f65455bbe44cef76f87a3f589ad08f94359184",
+    "taskXmlStable": true,
+    "resources": {
+      "writer-source": {
+        "state": "OBSERVED_BUSY",
+        "releaseCondition": "CORE_IDLE_WINDOW_VERIFIED",
+        "writerLockObserved": false,
+        "coreLockObserved": true
+      },
+      "controller-install": {
+        "state": "UNVERIFIED",
+        "reason": "OWNER_LEASE_AND_MAINTENANCE_STATE_NOT_ATTESTED"
+      },
+      "pc-job-heavy-memory": {
+        "state": "UNVERIFIED",
+        "reason": "OWN_REQUEST_AND_SEAT_LEASES_REQUIRE_CONTEXT_BOUND_ATTESTATION"
+      },
+      "result-upload": {
+        "state": "UNVERIFIED",
+        "reason": "REMOTE_RESULT_PAIR_AND_RECEIPT_NOT_ATTESTED"
+      }
+    },
+    "releaseVerified": false,
+    "runtimeSourceVerified": false,
+    "approvalVerified": false,
+    "ownerReplanAuthorized": false,
+    "automaticPcRetries": 0,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "sqliteOpened": false,
+    "operationalWrites": 0
+  },
+  "protectedBeforeSha256": "d5c2b4bfd450647a97102a096a3ffb02175c65f95e7696987194d59566294591",
+  "protectedAfterSha256": "d5c2b4bfd450647a97102a096a3ffb02175c65f95e7696987194d59566294591",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "4396d2bb326d86b8ce9e27c528519bf0090b8e9e",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-24T05:15:26.842Z",
+  "durationMs": 10426
+}
