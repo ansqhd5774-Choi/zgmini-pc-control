@@ -185,3 +185,28 @@
 39,4,3,4,4,4,4,5,5,79
 40,3,3,5,5,3,4,3,5,74
 ```
+
+
+## R2 적용 진행 증거 — 2026-11-25 (R1 최초 판정 이후)
+
+이 절은 위 1차 조사표의 **시점 이후 실제 추가된 변경**만 기록한다. 40개 후보 전부가 구현됐다는 뜻은 아니다.
+
+| R2 후보 | 적용 효과 | 분리 작업 브랜치 | PR·main 병합 | 실제 검사 | 운영 효과·한계 |
+|---|---|---|---|---|---|
+| #19 CI Observability | GitHub API Run/Job의 정확 `created_at→started_at` 대기시간과 `started_at→completed_at` 실행시간 요약기, rerun attempt·누락 fail-closed | `codex/pc-automation-process-improvement-20261119-ci-metrics-r1` | [PC PR #3483](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3483) 병합 `31fad3098bf06553b486ccf8902cb68b4201d1c8` | [C996 #45480699312](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45480699312) 신규 테스트 7/7 PASS, [Secret #45480699180](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45480699180) SUCCESS, main 파일 readback | 읽기 전용 CLI·모듈 구현 완료. 신규 예약·자동 실행은 없음. fixture 검증과 실제 API 측정의 차이를 유지하며 속도 향상은 주장하지 않음 |
+| #12 Workflow Governance | 원본 actionlint v1.7.12 MIT·Linux tarball SHA256 `8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8`를 검증해 변경된 YAML만 기존 Node.js CI에서 정적 검사 | `codex/ci-actionlint-governance-r1-20261125` | [본체 PR #1581](https://github.com/ansqhd5774-Choi/zgmini/pull/1581) 병합 `5d0c95d6dc9b1da17c454474721b03d7f58ff27b` | [Node #45481070398 Attempt 2](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45481070398) SUCCESS, CodeQL #45481070408·Secret #45481070396 SUCCESS, 본체 main readback | YAML 1파일 검사 PASS, GitHub Job step 소요 약 1초(초 단위 시각). 원본 기존 CI 8종 유지, 신규 Workflow/Runner 0건 |
+
+### 신규 실패 관측 및 추적
+
+- 본체 [#1582](https://github.com/ansqhd5774-Choi/zgmini/issues/1582)는 신규 actionlint 코드 결함이 아니라 변경되지 않은 `tests/korea-rev7-d1-status.test.mjs`의 Miniflare 내부 AssertionError로 [Node #45481070398 Attempt 1](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45481070398) 실패 후 자동 생성된 실제 CI Issue다. Attempt 2 전체 성공에도 **flake 근본 원인 미확정**이므로 OPEN으로 보존하고 원인별 원본 로그를 기록했다.
+- 본체 [#1576](https://github.com/ansqhd5774-Choi/zgmini/issues/1576)·[#1577](https://github.com/ansqhd5774-Choi/zgmini/issues/1577)도 실제 봇 생성 UI CI 장애로 확인. 이번 CI 도구 변경과 독립이므로 닫거나 기능 소스를 무단 수정하지 않았다.
+- 본체 `workflow_run → github-actions[bot] Issue` 운영 실증은 #1582 원본으로 확인됐다. 따라서 R1 이전의 '본체 생성 미실증' 관측은 **이후 실제 증거로 갱신**된다.
+
+### 후속 적용 순서
+
+1. **#1 Dynamic CI**: 기존 paths 필터·changed-source 선별과 공개 `dorny/paths-filter`를 비교, 검사 누락 없이 최적화할 수 있는 조건만 적용.
+2. **#29 Bundle Size** 및 **#8/#24 Performance**: 기존 Build CSS/JS 아티팩트에 기준선·동일 조건 비교를 연결. 임의 임계치로 PR 차단하지 않음.
+3. **#25 Accessibility/#23 Cross-browser**: 기존 Playwright 대표 화면에 한정해 무료 격리 실증 후 확대.
+4. **#6/#15/#20/#36**: 보안·구조·데이터 무결성·성능 통계의 기존 보호와 중복 제거 후 필요한 것만 추가.
+
+**누적 적용 현황(새 R2 변경 기준):** 12종 중 #12·#19 **2종 소스 구현 및 main 병합**, #12는 실제 새 Workflow 검사 실행 PASS, #19는 기존 C996 fixture 회귀시험 PASS/실행 가능한 CLI 구현(정기 실행·운영 자동 호출 미구성). 나머지 10종은 기존 R1 후보 분류 상태를 유지한다. 속도·품질 개선 수치, 새 예약/운영 설치 및 자동 복구 성공률은 별도 운영 증거가 없으므로 미확정.
