@@ -1,0 +1,23 @@
+{
+  "schema": "ZGMINI_CONTROLLER_SELECTIVE_PIN_V1",
+  "installedSha": "ff105611be1bd67bb12e6ecc4abdd93d27464338",
+  "targetSha": "c5c7ee4d9554beeedf1572752e7e90aafa260730",
+  "sourceMainSha": "edf55a2d64fb2687dafa20d6bcd9142b6fd37e76",
+  "targetBranch": "codex/w05-cloudflare-active-deployment-a-20261124",
+  "customPaths": [],
+  "allowFiles": [
+    {
+      "path": "config/operations.json",
+      "sha256": "74002d9c2ff42072179f2f4bbc5d43eee99a0a7bf9cf10d7ebb9bde59c0674f2"
+    },
+    {
+      "path": "controller/operations.mjs",
+      "sha256": "4b51b958e79efc2737c21548216bb0ccfbb394c5ab1a2f4fd32b01c6cf636271"
+    },
+    {
+      "path": "controller/w05-cloudflare-deployment-readonly.mjs",
+      "sha256": "3c3d8090949ffc9e18f1c2191b91bcccda78f824c69942436aa86a2d68cf0c6d"
+    }
+  ],
+  "approvalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3293"
+}
