@@ -11,6 +11,10 @@ const JOURNALS=String.raw`E:\ZGmini\data\pc-writer\writer-b-install-once`;
 const stop=code=>{throw Object.assign(new Error(code),{code});};
 const need=(ok,code)=>{if(!ok)stop(code);};
 const digest=file=>sha256(fs.readFileSync(file));
+const backupMatches=(file,expected)=>{
+ try{return typeof file==='string'&&digest(file)===expected;}
+ catch{return false;}
+};
 const event=(file,status)=>{const fd=fs.openSync(file,'a');
  try{fs.writeSync(fd,JSON.stringify({status,at:new Date().toISOString()})+'\n');
  fs.fsyncSync(fd);}finally{fs.closeSync(fd);}};
@@ -72,7 +76,7 @@ function createFileIO({
    log('BACKUP_VERIFIED');
   },
   async atomicReplace(bytes,before,after){
-   requireLock();need(backup&&digest(backup)===before,
+   requireLock();need(backupMatches(backup,before),
     'SIDECAR_B_BACKUP_STOP');
    targetCheck(target);need(digest(target)===before,'SIDECAR_B_CAS_STOP');
    need(sha256(bytes)===after,'SIDECAR_B_CANDIDATE_HASH_STOP');
@@ -87,7 +91,7 @@ function createFileIO({
    // Recovery failure must retain the shared owner lock, including when the
    // backup itself is missing or corrupt (before restoration starts).
    retain=true;
-   requireLock();need(backup&&digest(backup)===expected,
+   requireLock();need(backupMatches(backup,expected),
     'SIDECAR_B_BACKUP_STOP');
    // Preserve evidence of any unknown replacement bytes in the journal.
    const temp=target+'.sidecar-b-restore-'+requestId+'.tmp';
