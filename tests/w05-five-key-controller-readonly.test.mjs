@@ -44,9 +44,9 @@ test('exact installed source must contain complete paid, inflation, employment v
   assert.ok(W05_SOURCE_FILES.includes(p),p);
  assert.ok(W05_SOURCE_FILES.every(p=>!p.startsWith('/')&&!p.includes('..')));
 });
-test('actual observed 5 source/API fixture matches remain PARTIAL without active deployment attestation',()=>{
+test('actual observed 5 source/API fixture matches remain STATE_UNKNOWN without active deployment attestation',()=>{
  const r=summarizeW05FiveKeyEvidence(fixture(),{sourceSha:SOURCE});
- assert.equal(r.status,'PARTIAL');
+ assert.equal(r.status,'STATE_UNKNOWN');
  assert.equal(r.code,'W05_FIVE_KEY_STRUCTURAL_ONLY_DEPLOYMENT_UNVERIFIED');
  assert.deepEqual(r.results.map(row=>row.slot),SLOTS);
  assert.deepEqual(r.results.map(row=>row.status),
@@ -63,12 +63,12 @@ test('actual observed 5 source/API fixture matches remain PARTIAL without active
  assert.doesNotMatch(JSON.stringify(r),/DO_NOT_EXPOSE|privateMetadata|password|secret|body/);
  assert.equal(r.results.find(v=>v.slot==='theme').rollingAndSidecarsVerified,false);
 });
-test('actual mismatches and partial results never convert into PASS',()=>{
+test('actual mismatches and partial results never convert into PASS or unsupported PARTIAL',()=>{
  const x=fixture();
  x.results[2].status='PUBLIC_BODY_MISMATCH';
  x.results[3].status='THEME_READER_BRANCH_UNVERIFIED';
  const r=summarizeW05FiveKeyEvidence(x,{sourceSha:SOURCE});
- assert.equal(r.status,'PARTIAL');
+ assert.equal(r.status,'STATE_UNKNOWN');
  assert.equal(r.code,'W05_FIVE_KEY_COMPARISON_PARTIAL_OR_UNVERIFIED');
  assert.equal(r.structuralMatches,3);
  assert.deepEqual(r.results.map(v=>v.status),x.results.map(v=>v.status));
@@ -86,7 +86,7 @@ test('missing or malicious receipt cannot claim a live public comparison',()=>{
   if(input?.results?.length===5&&input?.schema==='ZGMINI_W05_FIVE_KEY_INPLACE_PREWORK_R12'&&
      input.keysChecked===5&&input.results.every((v,i)=>v.slot===SLOTS[i]&&
      /^[A-Z][A-Z0-9_]{2,90}$/.test(v.status))){
-    assert.equal(evidence.status,'PARTIAL');
+    assert.equal(evidence.status,'STATE_UNKNOWN');
   }else{
     assert.equal(evidence.status,'STATE_UNKNOWN');
     assert.equal(evidence.liveD1ApiCompared,false);
@@ -99,7 +99,7 @@ test('receipt sanitizer drops malformed optional hashes and timestamps, never ou
  receipt.results[0].d1ReadAt='malformed';
  receipt.results[0].apiObservedAt='2026-11-24T07:00:01+00:00';
  const x=summarizeW05FiveKeyEvidence(receipt,{sourceSha:'wrong'});
- assert.equal(x.status,'PARTIAL');
+ assert.equal(x.status,'STATE_UNKNOWN');
  assert.equal(x.sourceCheckoutVerified,false);
  assert.equal(x.sourceSha,null);
  assert.equal(x.results[0].d1BodySha256,undefined);
@@ -138,7 +138,7 @@ test('bounded 5-key operation forwards only supplied reads, not arbitrary operat
  });
  assert.deepEqual(sql,[{q:'FIXED_SQL_FROM_OWNER',p:['fixed']}]);
  assert.equal(result.structuralMatches,0);
- assert.equal(result.status,'PARTIAL');
+ assert.equal(result.status,'STATE_UNKNOWN');
  assert.equal(result.runtimeVerified,false);
 });
 test('invalid data root and missing config fail closed without touching provider, database or credentials',async()=>{
