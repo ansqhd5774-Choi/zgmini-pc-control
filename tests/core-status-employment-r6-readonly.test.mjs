@@ -132,3 +132,42 @@ test('core-status verifies stored R6 public-result checksum without leaking body
  fs.unlinkSync(resultFile);
  assert.equal(read().checkpoints['local-writer-last-run.json'].employmentR6.localResultReadback,'MISSING');
 });
+
+test('core-status retains canonical R6 release and retry timestamps without raw-body exposure',t=>{
+ const view=fixture(t,{
+  status:'NOOP',providerRequests:0,groups:[],
+  plannedGroups:[
+   {groupName:'DOL_UI_WEEKLY_CLAIMS',status:'CIRCUIT_OPEN',
+    due:false,failureCode:'DOL_RELEASE_OBSERVATION_STALE',
+    retryAt:'2026-11-24T13:50:37.666Z',
+    providerResponse:'PRIVATE_RAW_BODY_NEVER_EXPORT'},
+   {groupName:'BLS_JOLTS',status:'RELEASE_ALREADY_STORED',due:false,
+    releaseAt:'2026-11-24T13:00:00.000Z',
+    collectAt:'2026-11-24T13:10:00.000Z'},
+   {groupName:'BLS_ECI',status:'CIRCUIT_OPEN',due:false,
+    retryAt:'2026-11-24T13:50:37Z',
+    releaseAt:'2026-02-30T13:00:00.000Z',
+    collectAt:'2026-11-24T13:10:00+00:00',
+    rawToken:'PRIVATE_TOKEN_NEVER_EXPORT'},
+   {groupName:'BLS_BED',status:'WAITING_FOR_COLLECTION_WINDOW',due:false,
+    retryAt:'https://example.com/secret?token=LEAK',
+    releaseAt:'2026-11-24T14:00:00.000Z',
+    collectAt:'2026-11-24T14:10:00.000Z'},
+  ],
+ },{});
+ const actual=view.checkpoints['local-collection-last-run.json'].employmentR6;
+ assert.deepEqual(actual.plannedGroups,[
+  {groupName:'DOL_UI_WEEKLY_CLAIMS',status:'CIRCUIT_OPEN',
+   failureCode:'DOL_RELEASE_OBSERVATION_STALE',due:false,
+   retryAt:'2026-11-24T13:50:37.666Z'},
+  {groupName:'BLS_JOLTS',status:'RELEASE_ALREADY_STORED',
+   due:false,releaseAt:'2026-11-24T13:00:00.000Z',
+   collectAt:'2026-11-24T13:10:00.000Z'},
+  {groupName:'BLS_ECI',status:'CIRCUIT_OPEN',due:false},
+  {groupName:'BLS_BED',status:'WAITING_FOR_COLLECTION_WINDOW',
+   due:false,releaseAt:'2026-11-24T14:00:00.000Z',
+   collectAt:'2026-11-24T14:10:00.000Z'},
+ ]);
+ assert.equal(actual.providerRequests,0);
+ assert.doesNotMatch(JSON.stringify(view),/PRIVATE_RAW_BODY|PRIVATE_TOKEN|LEAK|example\\.com/);
+});
