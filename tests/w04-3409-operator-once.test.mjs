@@ -18,7 +18,7 @@ const rawResult=()=>({
  workflowChanged:false,dbD1Writes:0,casDigests:{...approval.casDigests}
 });
 const prepared=()=>({
- status:'SOURCE_PREPARED_ONLY',code:'PINNED_ISOLATED_WORKTREE_VERIFIED',
+ status:'SOURCE_PREPARED_ONLY',code:'EXACT_RELEASE_WORKTREE_CAS_VERIFIED',
  requestId:FIXED.original,sourceSha:FIXED.approvedSource,
  stagedHead:FIXED.release,controllerWrites:0,leaseWrites:0,recoveryExecuted:false
 });
@@ -91,6 +91,9 @@ test('packet stages through pinned Git ancestry; runtime path never invokes sour
  const src=read('tools/operator-packets/w04-3409-recovery-once.mjs').toString();
  assert.match(src,/git\(\['fetch','--no-tags','origin','main'\]\)/);
  assert.match(src,/git\(\['worktree','add','--detach',FIXED.bootstrap,FIXED.release\]\)/);
+ assert.match(src,/git\(\['worktree','add','--detach',FIXED.staged,FIXED.release\]\)/);
+ assert.match(src,/module.verifyStagedFiles\(approval,git\)/);
+ assert.match(src,/module.verifyCas\(approval\)/);
  assert.match(src,/validateSourceReceipt\(prepared\)/);
  assert.match(src,/validateRecoveryResult\(result,approval\)/);
  assert.match(src,/verifyArchive\(result,approval\)/);
