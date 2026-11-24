@@ -8,7 +8,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {inspectWriterPublicationEvidence,readER1LocalOutput,projectW05SavedSidecars}
  from '../controller/writer-publication-evidence-readonly.mjs';
 const fixture=()=>{
- const d=fs.mkdtempSync(path.join(os.tmpdir(),'er1-meta-'));
+ const d=fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(),'er1-meta-')));
  fs.mkdirSync(path.join(d,'pc-writer'));return{d,write:(p,o)=>fs.writeFileSync(
   path.join(d,'pc-writer',p),JSON.stringify(o)),close:()=>fs.rmSync(d,{recursive:true,force:true})};
 };
