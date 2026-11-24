@@ -908,13 +908,22 @@ test('drain and final stop both require Online seats before Supervisor mutation'
 
 test('a briefly Busy runner can settle after backup without an unguarded stop',async()=>{
  let clock=0,reads=0,checks=0;
- await waitForSupervisorStopIdle({
+ const observed=await waitForSupervisorStopIdle({
   readRunners:()=>{const rows=idleRaceSeats();if(++reads<3)rows[2].busy=true;return rows;},
   verifySafety:()=>{checks++;},now:()=>clock,pause:async ms=>{clock+=ms;}
  });
  assert.equal(clock,6000);
  assert.equal(reads,3);
  assert.equal(checks,3);
+ assert.deepEqual(observed,{retryCount:2,elapsedMs:6000,observedBusy:true});
+});
+
+test('an immediately Idle Runner records zero retry and zero elapsed time',async()=>{
+ const observed=await waitForSupervisorStopIdle({
+  readRunners:idleRaceSeats,verifySafety:()=>{},now:()=>0,
+  pause:async()=>{throw Error('unexpected pause');}
+ });
+ assert.deepEqual(observed,{retryCount:0,elapsedMs:0,observedBusy:false});
 });
 
 test('a persistently Busy runner is refused after at most 30 seconds',async()=>{
