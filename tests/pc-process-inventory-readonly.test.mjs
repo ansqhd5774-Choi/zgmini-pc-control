@@ -11,6 +11,7 @@ import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,proj
  from '../tools/pc-process-inventory-readonly.mjs';
 import {inspect3160RecoveryCasReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 import {inspect3160RollbackPreflightReadonly} from '../tools/pc-process-inventory-readonly.mjs';
+import {projectCnnSidecarStaticGuard} from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
  const request={schema:SCHEMA,operation:ROLE_OPERATION,role,
@@ -1641,4 +1642,53 @@ test('D05 #3178 actual private receipt validates both immutable bytes and run li
   assert.equal(inspectD05PrivateFinalReceiptReadonly({root,now:Date.parse(calc)+90000}).code,
    'D05_PRIVATE_OUTPUT_NOT_VERIFIED');
  }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('CNN pinned static guard uses existing operating-only probe and no caller paths',()=>{
+ const e=event(),body=JSON.parse(e.issue.body);
+ const request={...body,probe:'cnn-sidecar-static-guard-readonly'};
+ const exact={...e,issue:{...e.issue,body:JSON.stringify(request)}};
+ assert.equal(authenticateProcess(exact,env,'operating').cnnSidecarStaticGuard,true);
+ assert.throws(()=>authenticateProcess(exact,env,'handoff'));
+ for(const data of [
+  {...request,path:'E:/other'}, {...request,script:'unsafe'},
+  {...request,probe:'cnn-sidecar-static-guard-readonly;cmd'},
+  {...request,probe:'cnn-source-full-text-readonly'}
+ ]){
+  assert.throws(()=>authenticateProcess({...e,issue:{...e.issue,
+   body:JSON.stringify(data)}},env,'operating'));
+ }
+});
+
+test('CNN static projection exposes only pinned candidates, never raw private text',()=>{
+ const raw={ledgerStatus:'READ',scriptStatus:[
+  'archive-run.mjs','run-original-then-archive.vbs',
+  'archive-core-r10.mjs','verified-checks-r10.mjs'
+ ].map(file=>({file,status:'MATCH',modifiedAfterLedger:false})),
+ ledgerOriginCandidates:['archive-run.mjs'],
+ sourceGuardCandidates:[{file:'archive-run.mjs',line:42,kind:'GIT_REFERENCE',
+  secret:'DO_NOT_EXPOSE'}],reasonConcepts:['SOURCE','SHA'],
+ matchingErrorSite:'NONE',rawSource:'DO_NOT_EXPOSE',reason:'DO_NOT_EXPOSE'};
+ const result=projectCnnSidecarStaticGuard(raw);
+ assert.equal(result.status,'PASS');
+ assert.equal(result.sidecarFailureResolved,false);
+ assert.equal(result.sameLedgerSnapshotVerified,false);
+ assert.deepEqual(result.sourceGuardCandidates,[{file:'archive-run.mjs',line:42,
+  kind:'GIT_REFERENCE'}]);
+ assert.equal(result.operationalWrites,0);
+ assert.equal(result.providerCalls,0);
+ assert.equal(result.d1Writes,0);
+ assert.ok(!JSON.stringify(result).includes('DO_NOT_EXPOSE'));
+ for(const invalid of [
+  {...raw,sourceGuardCandidates:[{file:'private.txt',line:1,kind:'GIT_REFERENCE'}]},
+  {...raw,scriptStatus:raw.scriptStatus.map((x,i)=>i===0?{...x,modifiedAfterLedger:true}:x)},
+  {...raw,ledgerStatus:'CHANGED_DURING_DIAGNOSIS'},
+  {...raw,reasonConcepts:['SOURCE','SECRET']},
+  {...raw,sourceGuardCandidates:[{file:'archive-run.mjs',line:0,kind:'GIT_REFERENCE'}]}
+ ]){
+  const r=projectCnnSidecarStaticGuard(invalid);
+  assert.equal(r.status,'STATE_UNKNOWN');
+  assert.deepEqual(r.sourceGuardCandidates,[]);
+  assert.equal(r.sidecarFailureResolved,false);
+ }
 });
