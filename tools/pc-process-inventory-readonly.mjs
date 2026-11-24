@@ -628,7 +628,7 @@ export function inspectD05PrivateFinalReceiptReadonly({
  let real;
  try{real=fileSystem.realpathSync.native(root);}
  catch{return pending('D05_PRIVATE_DATA_ROOT_UNAVAILABLE');}
- const run=readFixedReadonlyBytes(path.join(root,'marketparquet-paid','theme-last-run.json'),
+ const run=readFixedReadonlyBytes(path.join(root,'pc-writer','marketparquet-paid','theme-last-run.json'),
   {fileSystem,verifiedRoot:real,minBytes:2,maxBytes:2097152});
  if(!run.ok)return pending('D05_PRIVATE_RUN_REPORT_'+run.reason);
  let report;
@@ -648,7 +648,7 @@ export function inspectD05PrivateFinalReceiptReadonly({
   report.privateStored?.bodySha256!==marker.privateBodySha256||
   report.privateStored?.count!==marker.scoreCount)
   return pending('D05_PRIVATE_RUN_RECEIPT_MISMATCH');
- const file=path.join(root,'marketparquet-paid','derived',
+ const file=path.join(root,'pc-writer','marketparquet-paid','derived',
   'd05-private-final-theme-'+marker.finalEventBodySha256+'.json');
  const stored=readFixedReadonlyBytes(file,{fileSystem,verifiedRoot:real,
   minBytes:2,maxBytes:131072});
