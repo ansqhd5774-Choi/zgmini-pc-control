@@ -395,6 +395,121 @@ function coverage(rows){
 }
 
 
+// The generic R6 audit expects detail.responseHash; ETA538 PDF raw uses an
+// original binary SHA and a separate Base64-text SHA. Check both identities
+// and exact four CURRENT row links without publishing PDF bytes or values.
+// This is not an independent reparse of the four statistics from the PDF.
+const ETA538_IDS=Object.freeze({
+ INITIAL_CLAIMS:'DOL:ETA538:InitialClaims:SA',
+ INITIAL_CLAIMS_4W:'DOL:ETA538:InitialClaims:SA4WK',
+ CONTINUED_CLAIMS:'DOL:ETA538:ContinuedClaims:SA',
+ INSURED_UNEMPLOYMENT_RATE:'DOL:ETA538:IUR:SA',
+});
+const ETA538_RAW_TABLE='market_score_employment_r6_raw_snapshot_v1';
+const ETA538_CURRENT_TABLE='market_score_employment_r4_shadow_current_v1';
+const eta538Sha=value=>createHash('sha256').update(value).digest('hex');
+const eta538Fail=code=>({status:code,releaseDate:null,verifiedNationalRows:0,
+ originalPdfSha256Matched:false,valuesReparsed:false,pitAttested:false});
+export function auditStoredEta538PdfRawLinkage(db){
+ const requiredRaw=['snapshot_id','chunk_index','chunk_count','release_group',
+  'provider','request_key','retrieved_at','body_sha256','body_chunk',
+  'detail_json','content_type'];
+ const requiredCurrent=['provider','geography_type','geography_code',
+  'logical_series_id','observation_date','provider_series_id','unit','value',
+  'source_hash','provenance_json'];
+ const have=table=>new Set(db.prepare('PRAGMA table_info('+table+')').all()
+  .map(x=>x.name));
+ const rawCols=have(ETA538_RAW_TABLE),currentCols=have(ETA538_CURRENT_TABLE);
+ if(!requiredRaw.every(k=>rawCols.has(k))||
+    !requiredCurrent.every(k=>currentCols.has(k)))
+  return eta538Fail('SCHEMA_UNAVAILABLE');
+ const keyPrefix='DOL_ETA538_PDF:';
+ const first=db.prepare("SELECT * FROM "+ETA538_RAW_TABLE+
+  " WHERE release_group='DOL_UI_WEEKLY_CLAIMS' AND provider='DOL_ETA'"+
+  " AND request_key LIKE 'DOL_ETA538_PDF:%' AND chunk_index=0"+
+  " ORDER BY retrieved_at DESC LIMIT 1").get();
+ if(!first)return eta538Fail('NOT_STORED');
+ const releaseDate=String(first.request_key??'').slice(keyPrefix.length);
+ if(!/^20\d{2}-\d{2}-\d{2}$/.test(releaseDate)||
+  first.request_key!==keyPrefix+releaseDate||
+  !Number.isSafeInteger(first.chunk_count)||first.chunk_count<1||
+  first.chunk_count>128)return eta538Fail('PDF_HEAD_INVALID');
+ const detail=safeJson(first.detail_json);
+ if(!detail||detail.schema!=='W04_DOL_ETA538_PDF_BASE64_SNAPSHOT_V1'||
+  detail.bodyEncoding!=='BASE64_PDF_BYTES'||
+  detail.originalContentType!=='application/pdf'||
+  detail.sourceReleaseDate!==releaseDate||
+  detail.sourceUrl!=='https://oui.doleta.gov/press/'+releaseDate.slice(0,4)+'/'+
+   releaseDate.slice(5,7)+releaseDate.slice(8,10)+releaseDate.slice(2,4)+'.pdf'||
+  first.content_type!=='application/pdf'||
+  !/^[0-9a-f]{64}$/.test(detail.originalBodySha256??'')||
+  !/^[0-9a-f]{64}$/.test(detail.bodyTextSha256??'')||
+  !Number.isSafeInteger(detail.originalBodyBytes)||
+  detail.originalBodyBytes<80||detail.originalBodyBytes>8000000||
+  !detail.sourceObservationWeeks||typeof detail.sourceObservationWeeks!=='object')
+  return eta538Fail('PDF_METADATA_INVALID');
+ const parts=db.prepare("SELECT * FROM "+ETA538_RAW_TABLE+
+  " WHERE snapshot_id=? ORDER BY chunk_index LIMIT 129").all(first.snapshot_id);
+ if(parts.length!==first.chunk_count)return eta538Fail('PDF_CHUNKS_INVALID');
+ let encoded='',total=0;
+ for(let i=0;i<parts.length;i++){
+  const row=parts[i];
+  if(row.chunk_index!==i||row.chunk_count!==first.chunk_count||
+   row.snapshot_id!==first.snapshot_id||row.body_sha256!==first.body_sha256||
+   row.request_key!==first.request_key||row.detail_json!==first.detail_json||
+   row.retrieved_at!==first.retrieved_at||
+   typeof row.body_chunk!=='string'||row.body_chunk.length>120000)
+   return eta538Fail('PDF_CHUNKS_INVALID');
+  encoded+=row.body_chunk;total+=row.body_chunk.length;
+  if(total>10666672)return eta538Fail('PDF_SIZE_INVALID');
+ }
+ if(!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded))
+  return eta538Fail('PDF_BASE64_INVALID');
+ const bytes=Buffer.from(encoded,'base64'),bodyTextHash=eta538Sha(encoded);
+ if(bytes.toString('base64')!==encoded||
+  bytes.length!==detail.originalBodyBytes||
+  bodyTextHash!==first.body_sha256||bodyTextHash!==detail.bodyTextSha256||
+  eta538Sha(bytes)!==detail.originalBodySha256||
+  eta538Sha('DOL_UI_WEEKLY_CLAIMS|DOL_ETA|'+first.request_key+'|'+bodyTextHash)!==first.snapshot_id||
+  !bytes.subarray(0,8).toString('latin1').startsWith('%PDF-')||
+  !bytes.subarray(Math.max(0,bytes.length-1024)).toString('latin1').includes('%%EOF'))
+  return eta538Fail('PDF_BYTES_OR_HASH_MISMATCH');
+ const rows=db.prepare('SELECT * FROM '+ETA538_CURRENT_TABLE+
+  " WHERE provider='DOL_ETA' AND geography_type='NATIONAL'"+
+  " AND geography_code='US'"+
+  " AND json_extract(provenance_json,'$.rawSnapshotId')=?"+
+  ' ORDER BY logical_series_id LIMIT 6').all(first.snapshot_id);
+ if(rows.length!==4)return eta538Fail('PDF_NATIONAL_ROW_COUNT_INVALID');
+ const keys=Object.keys(ETA538_IDS);
+ if(Object.keys(detail.sourceObservationWeeks).length!==4||
+  keys.some(k=>!/^20\d{2}-\d{2}-\d{2}$/.test(detail.sourceObservationWeeks[k]??''))||
+  new Set(rows.map(x=>x.logical_series_id)).size!==4)
+  return eta538Fail('PDF_NATIONAL_ROW_IDENTITY_INVALID');
+ for(const row of rows){
+  if(!Object.hasOwn(ETA538_IDS,row.logical_series_id)||
+   row.provider_series_id!==ETA538_IDS[row.logical_series_id]||
+   row.observation_date!==detail.sourceObservationWeeks[row.logical_series_id]||
+   typeof row.value!=='number'||!Number.isFinite(row.value)||row.value<0)
+   return eta538Fail('PDF_NATIONAL_ROW_IDENTITY_INVALID');
+  const provenance=safeJson(row.provenance_json);
+  const canonical={logicalSeriesId:row.logical_series_id,
+   observationDate:row.observation_date,providerSeriesId:row.provider_series_id,
+   value:row.value,unit:row.unit,releaseDate};
+  const digest=eta538Sha(JSON.stringify(canonical));
+  if(!provenance||
+   provenance.originalPdfSha256!==detail.originalBodySha256||
+   provenance.responseHash!==bodyTextHash||
+   provenance.rawSnapshotId!==first.snapshot_id||
+   provenance.rawRecordHash!==digest||row.source_hash!==digest||
+   provenance.sourceKind!=='ETA538_ADVANCE_RELEASE_PDF')
+   return eta538Fail('PDF_NATIONAL_ROW_HASH_LINK_INVALID');
+ }
+ return {status:'PDF_BYTES_AND_FOUR_ROW_HASH_LINKS_VERIFIED_NOT_VALUE_REPARSE',
+  releaseDate,verifiedNationalRows:4,originalPdfSha256Matched:true,
+  observationWeeks:Object.fromEntries(keys.map(k=>[k,detail.sourceObservationWeeks[k]])),
+  valuesReparsed:false,pitAttested:false};
+}
+
 // W04 fixed-scope National RAW-vs-run audit. Link only by the original
 // response BODY digest stored in the run (never by a coincidental date).
 // Raw XML, exact digest and individual values must never leave this operation.
@@ -496,7 +611,7 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
  filesystem=fs,openDatabase=openSqliteReadonly,onStage=null,
 }={}){
  const result={status:'BLOCKED',code:'R6_EVIDENCE_DATA_ROOT_DENIED',sqliteOpened:false,
-  scope:'R6_DOL_BED_FIXED_SQLITE_DIAGNOSTIC',dol:null,bed:null,eta539:null,stateClaims:null,pitRawSchema:null,eta539RawCurrentParity:null,...noWrite()};
+  scope:'R6_DOL_BED_FIXED_SQLITE_DIAGNOSTIC',dol:null,bed:null,eta539:null,stateClaims:null,pitRawSchema:null,eta539RawCurrentParity:null,eta538Pdf:null,...noWrite()};
  if(typeof dataRoot!=='string'||!path.isAbsolute(dataRoot))return result;
  const root=(()=>{try{return filesystem.realpathSync(dataRoot);}catch{return null;}})();
  if(!root||path.basename(root).toLowerCase()!=='data'||path.basename(path.dirname(root)).toLowerCase()!=='zgmini')return result;
@@ -528,6 +643,7 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
   }
   markStage('NATIONAL_RAW_RUN_COMPARISON');
   result.nationalRaw=Object.fromEntries(MODES.map(mode=>[mode,auditStoredNationalRun(db,mode)]));
+  result.eta538Pdf=auditStoredEta538PdfRawLinkage(db);
   markStage('ETA539_METADATA');
   const snapshots=db.prepare(`SELECT request_key,retrieved_at,chunk_count,http_status,
    json_extract(detail_json,'$.historyWeeks') AS history_weeks,
