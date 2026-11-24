@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync,mkdtempSync,mkdirSync,writeFileSync,rmSync,realpathSync} from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import {readFixedReadonlyBytes} from '../controller/fixed-readonly-bytes.mjs';
 import {
  W05_FIVE_OPERATION,W05_SOURCE_FILES,
  summarizeW05FiveKeyEvidence,compareW05FiveKeyWithApprovedReaders,
@@ -151,6 +152,9 @@ test('invalid data root and missing config fail closed without touching provider
   assert.equal(absent.code,'W05_WRITER_CONFIG_NOT_AVAILABLE');
   mkdirSync(path.join(dir,'pc-writer'),{recursive:true});
   writeFileSync(path.join(dir,'pc-writer','config.json'),'{bad');
+  const protection=readFixedReadonlyBytes(path.join(dir,'pc-writer','config.json'),{
+   verifiedRoot:verified,minBytes:2,maxBytes:131072});
+  assert.equal(protection.ok,true,'safe fixed-byte reader: '+protection.reason);
   const malformed=await inspectW05FiveKeyD1ApiReadback(verified);
   assert.equal(malformed.code,'W05_WRITER_CONFIG_INVALID');
   writeFileSync(path.join(dir,'pc-writer','config.json'),JSON.stringify({
