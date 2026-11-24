@@ -64,6 +64,14 @@
     {
       "path": "lib/market-score/employment-r6-scheduler.mjs",
       "sha256": "7f33c6f3920317cdfd362bb04b570f7af8a5c3322e5924edb4c0cfaf31c16a88"
+    },
+    {
+      "path": "lib/market-score/employment-r4-shadow-contract.mjs",
+      "sha256": "1efdd95e7d840502c672690374991d97ddd14ba511b5eddf22a25c21abb7c177"
+    },
+    {
+      "path": "lib/market-score/employment-r4-shadow-provider.mjs",
+      "sha256": "01b37fae6aa24556eea8c01f58836f59311f238058a4797057048e133bdb2f29"
     }
   ],
   "runtimeDependencies": {
