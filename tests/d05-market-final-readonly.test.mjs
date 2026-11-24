@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
 import {projectD05MarketRow,compareD05MarketStored,inspectD05MarketFinalReadonly}
  from '../controller/d05-market-final-readonly.mjs';
 
@@ -56,7 +57,7 @@ test('fixed SQLite lookup reads current and exact UTC day with no operational wr
   realpathSync:Object.assign(p=>p,{native:p=>p}),
   lstatSync:()=>({isFile:()=>true,isSymbolicLink:()=>false,size:1024})
  };
- const out=inspectD05MarketFinalReadonly('/tmp/test-d05',{fileSystem:files,
+ const out=inspectD05MarketFinalReadonly(path.resolve('tmp-test-d05'),{fileSystem:files,
   openDatabase:()=>fake});
  assert.equal(out.status,'PASS');
  assert.deepEqual(queried,['current','2026-11-24']);
