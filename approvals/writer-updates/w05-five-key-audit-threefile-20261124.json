@@ -1,0 +1,93 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "a0735cac4a4dc56f0da0d3d0f82a93fd5b4486c7",
+  "baseHead": "24077edc2fb4196e83ba202fdd9681b1fe841447",
+  "baseConfigSourceSha": "24077edc2fb4196e83ba202fdd9681b1fe841447",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "lib/w05-audit/compare-five-public-readbacks-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "cac1611e66c552152909dae0962e953aaa50b473975a55f916f4e364ed7a634f"
+    },
+    {
+      "path": "lib/w05-audit/five-key-inplace-readback-prework-r12.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "63db7e32a2ff6bea20931a58e8aa31d88e642a76e264bb07cb1befa935dd7e6a"
+    },
+    {
+      "path": "lib/w05-audit/five-key-public-api-reader-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "5bf4403527658647cf07244fb8c2e45e347a7d58c20cea185e1ef781a28b818f"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "worker/theme-paid-contract.mjs",
+      "sha256": "a02fc6d6ccddfad2ed3abb33132b44f188e4249c0fdbb6be3e5d0cf7ca08a91b"
+    },
+    {
+      "path": "worker/public-display-freshness.mjs",
+      "sha256": "abdf00a5c1c5c7ae9e978dd27ceb1c4c572e15ac67c0378cc971204129714878"
+    },
+    {
+      "path": "worker/employment-r6-public-display.mjs",
+      "sha256": "2c7110e13f7025dff7c204d8a3727d14c937898e612ed35d38686ef6be88562e"
+    },
+    {
+      "path": "worker/inflation-causal-public-r1.mjs",
+      "sha256": "86c5003c3b37cac16e3e5e9b5ed610f9e00f29ee6005cb2abb91fb04abea951f"
+    },
+    {
+      "path": "worker/inflation-causal-candidates-public-7-r1.mjs",
+      "sha256": "a2b1f8e593cf5b4c88f5bff5bf107a36acd4a2354e6abb14614c29a07630de5e"
+    },
+    {
+      "path": "lib/market-score/employment-r6-formula.mjs",
+      "sha256": "9c811f735db664ac6fada79d692a2c9fff244e85b434dfe2a8c4c8ea4211c204"
+    },
+    {
+      "path": "lib/market-score/employment-r6-window.mjs",
+      "sha256": "dc41a6780f05d28c31ee52b77b2f688df27216d109ae4c7dc1aa17a9da07decd"
+    },
+    {
+      "path": "lib/inflation-causal-public-catalog.mjs",
+      "sha256": "db4e05baaa62b51a0a783ce66466c18bb02a924894fc3aca605f473cbe3632e5"
+    },
+    {
+      "path": "lib/inflation-causal-candidates-public-7-catalog.mjs",
+      "sha256": "14e810c504e9aa9ea81e538c83ff7d100a9abbac5e30a6d5684789b1a3161749"
+    },
+    {
+      "path": "scripts/pc-writer/d1.mjs",
+      "sha256": "10beefecc524b569eba9abf826036fc8e069b4b6f0c3b3340a7bd6a5ab6353a5"
+    },
+    {
+      "path": "scripts/pc-writer/d1-transient.mjs",
+      "sha256": "5fd4be11dc4a671a9634757bb449807e497a7974c5fd061faa06b455dd0d253e"
+    },
+    {
+      "path": "scripts/pc-writer/d1-diagnostics.mjs",
+      "sha256": "eb5ffbcdb56805ca15affac876493217de52b21e0f90f99976bbcff8ddc13037"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": null,
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
