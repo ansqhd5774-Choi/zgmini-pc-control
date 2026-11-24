@@ -62,6 +62,11 @@ export function classifyIssueCompletion({issue,request,result,evidence,intent} =
   if (!/^[0-9a-f]{64}$/i.test(String(result.protectedBeforeSha256 ?? '')) ||
       result.protectedAfterSha256 !== result.protectedBeforeSha256)
     return deny('PROTECTED_STATE_HASH_MISMATCH');
+  // Parent PASS is not proof that nested observations are complete.
+  if (result.result?.earningsApiRequestObservations?.status === 'STATE_UNKNOWN' ||
+      result.result?.earningsApiRequestObservations?.coverage === 'PARTIAL' ||
+      result.result?.earningsApiRequestObservations?.tailTruncated === true)
+    return deny('NESTED_OBSERVATION_INCOMPLETE');
   if (result.reportTransfer?.status === 'SUMMARY_ONLY' || evidence.reportTransfer === 'SUMMARY_ONLY' ||
       result.result?.inventoryTruncated === true || result.result?.operationalReadiness === 'NOT_ASSERTED' && intent.requiresOperationalReadiness === true)
     return deny('PARTIAL_EVIDENCE');
