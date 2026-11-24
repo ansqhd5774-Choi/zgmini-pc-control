@@ -108,8 +108,8 @@ test('isolated issue admission to Controller/Writer result reaches exact JSON/TX
  assert.equal(fs.readFileSync(f.core,'utf8'),'synthetic only');
  assert.equal(fs.readFileSync(f.candidate,'utf8'),'synthetic candidate');
  const pointer=JSON.parse(fs.readFileSync(outcome.file,'utf8'));
- assert.equal(pointer.report.jobId,`run-${runId}-1-seat-${seat}`);
- const {json,txt}=renderBoundedReport(pointer.report,32768);
+ assert.equal(pointer.jobId,`run-${runId}-1-seat-${seat}`);
+ const {json,txt}=renderBoundedReport(pointer,32768);
  const remote=new Map(),calls=[];
  const api=async(route,method='GET',body)=>{
   calls.push({route,method});
