@@ -27,6 +27,7 @@ const PDF_FILES=[...FILES,
  'lib/market-score/employment-r6-dol-pdf-raw-envelope.mjs',
  'lib/market-score/employment-r6-dol-eta538-provider.mjs',
  'lib/market-score/employment-r6-dol-advance-row-readback.mjs',
+ 'lib/market-score/employment-r6-dol-release-text.mjs',
 ];
 const isPdfApproval=approval=>approval?.schema===DOL_MANUAL_PDF_SCHEMA;
 const scopedFiles=approval=>isPdfApproval(approval)?PDF_FILES:FILES;
