@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {validateApproval,verifyCas,verifyStagedFiles,REQUEST_ID,SOURCE_SHA,STAGE,CAS_PATHS} from '../tools/w04-3409-independent-source-prep.mjs';
+import {validateApproval,verifyCas,verifyStagedFiles,REQUEST_ID,SOURCE_SHA,STAGE,CAS_PATHS,assertIndependentOperator} from '../tools/w04-3409-independent-source-prep.mjs';
 const digest=b=>createHash('sha256').update(b).digest('hex');
 const keys=['ledger','owner','marker','backlog','snapshot','protection','writer'];
 const files=['tools/maintenance-recovery.mjs','tools/update.mjs','tools/maintenance-contract.mjs','controller/fixed-readonly-bytes.mjs'];
@@ -32,4 +32,20 @@ test('staged file bytes must match both source object and manifest',()=>{
  const read=p=>Buffer.from(p.slice(STAGE.length+1).replaceAll('\\','/'));
  assert.equal(verifyStagedFiles(a,git,read),true);assert.equal(seen,4);
  assert.throws(()=>verifyStagedFiles(a,git,()=>Buffer.from('corrupt')),/PREP_STAGED_FILE_DRIFT/);
+});
+
+test('source preparation demands the installed independent Windows operator proof',()=>{
+ let attestations=0;
+ assert.throws(()=>assertIndependentOperator({platform:'linux',env:{},attest:()=>{attestations++;}}),
+  /PREP_INDEPENDENT_WINDOWS_ONLY/);
+ assert.equal(attestations,0);
+ assert.throws(()=>assertIndependentOperator({platform:'win32',env:{RUNNER_NAME:'zgmini-pc-01'},
+  attest:()=>{attestations++;}}),/PREP_INDEPENDENT_WINDOWS_ONLY/);
+ assert.equal(attestations,0);
+ assert.throws(()=>assertIndependentOperator({platform:'win32',env:{},
+  attest:()=>{attestations++;throw new Error('RECOVERY_OPERATOR_ATTESTATION_UNVERIFIED');}}),
+  /RECOVERY_OPERATOR_ATTESTATION_UNVERIFIED/);
+ assert.equal(attestations,1);
+ assert.equal(assertIndependentOperator({platform:'win32',env:{},attest:()=>{attestations++;}}),true);
+ assert.equal(attestations,2);
 });

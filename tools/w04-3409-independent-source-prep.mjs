@@ -6,6 +6,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {verifyRecoveryOperator} from './update.mjs';
 
 export const REQUEST_ID='pc-update-71ea39dc-7048-4e10-9d11-d4be7f6c3ec0';
 export const SOURCE_SHA='fcb098d20fb9a6c48f371786c69f7f1fdf5bc34a';
@@ -64,9 +65,17 @@ export function verifyStagedFiles(approval,git,read=fs.readFileSync) {
  }
  return true;
 }
-export function run({git,read=fs.readFileSync,stat=fs.lstatSync,exists=fs.existsSync,mkdir=fs.mkdirSync}={}) {
- check(process.platform==='win32'&&!process.env.GITHUB_ACTIONS&&!process.env.RUNNER_NAME,
+export function assertIndependentOperator({platform=process.platform,env=process.env,
+ attest=verifyRecoveryOperator}={}) {
+ check(platform==='win32'&&!env.GITHUB_ACTIONS&&!env.RUNNER_NAME,
   'PREP_INDEPENDENT_WINDOWS_ONLY');
+ // The installed maintainer's Windows ancestry proof (operator PID/SID/session)
+ // is mandatory before any Git fetch, staging or directory creation.
+ attest();
+ return true;
+}
+export function run({git,read=fs.readFileSync,stat=fs.lstatSync,exists=fs.existsSync,mkdir=fs.mkdirSync}={}) {
+ assertIndependentOperator();
  check(!exists(STAGE),'PREP_STAGE_ALREADY_EXISTS');
  check(exists(MAINT+'/leases/controller-install'),'PREP_ORIGINAL_LEASE_MISSING');
  const g=git??(args=>execFileSync('git',['-C',REPO,'--no-optional-locks',...args],
