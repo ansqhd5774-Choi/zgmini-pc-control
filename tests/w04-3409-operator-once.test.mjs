@@ -125,7 +125,8 @@ test('actual Git worktree with injected config cannot run active post-checkout h
   GIT_CONFIG_VALUE_0:malicious,GIT_CONFIG_PARAMETERS:'core.hooksPath='+malicious,
   GIT_EXEC_PATH:path.join(root,'untrusted-git-exec'),
   GIT_TEMPLATE_DIR:malicious,GIT_ASKPASS:path.join(root,'untrusted-helper')};
- const env=sanitizedChildEnvironment(injected);
+ const env=sanitizedChildEnvironment(injected,{gitExecutable:
+  process.platform==='win32'?chooseTrustedGitExecutable():null});
  const git=(args)=>execFileSync('git',args,{
   cwd:repo,env,stdio:'pipe',timeout:15000,windowsHide:true});
  git(['init','-q']);git(['config','user.name','ZGMINI Operator Test']);
