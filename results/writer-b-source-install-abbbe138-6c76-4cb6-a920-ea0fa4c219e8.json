@@ -1,0 +1,21 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "abbbe138-6c76-4cb6-a920-ea0fa4c219e8",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "0fe9996a9694a89245709327b3cc3c5f1a4a174a",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "acf8ef23e6400a9a07e9897f48005c95bbbc6416",
+  "candidateSourceSha": "4f67d290908e46847694c1111ca1b1e6ddc751a3",
+  "manifestSha256": "011f43ad2af50dfd7cab14aebc73f7df064784001054f2ecb04f25fdd0455b49",
+  "baseTreeOid": "a050d53d9eaff7b18e5dc0029b8d557d780a642a",
+  "preparedTreeOid": "9a8c65f8011521f1927ff90f2672f4f7df8df2aa",
+  "provenanceSha256": "1ff614cf22189fee0b506839f3d3b7163cc8d5ef5cd8f6b6c8ef4d02d378b040",
+  "runId": "45328065956",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/theme-paid-cycle.mjs",
+    "lib/score-history/d05-private-theme-final-events-r1.mjs"
+  ]
+}
