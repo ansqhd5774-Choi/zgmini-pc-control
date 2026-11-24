@@ -1,0 +1,17 @@
+{
+  "schema": "ZGMINI_CONTROLLER_SELECTIVE_PIN_V1",
+  "installedSha": "b3320e84c1011f5a0bf726c262eabf626d9b5e97",
+  "targetSha": "3c20e036ffa56a9a9670916d68c30451d6a699bc",
+  "sourceMainSha": "79197105d1cb675e75f89abb8af92b997b2cb54f",
+  "targetBranch": "codex/w04-core-status-timing-selective-20261124",
+  "customPaths": [
+    "controller/operations.mjs"
+  ],
+  "allowFiles": [
+    {
+      "path": "controller/operations.mjs",
+      "sha256": "ee3f3cf07ecfccecd5e434739e70050abc717004c721037b864a3efa2802f39f"
+    }
+  ],
+  "approvalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3340"
+}
