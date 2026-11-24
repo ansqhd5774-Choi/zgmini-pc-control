@@ -28,6 +28,11 @@ test('D05 exactly 13 saved outputs and identical current/day evidence',()=>{
  assert.equal(r.oneYearPitVerified,false);
  assert.equal(r.operationalWrites,0);
 });
+test('domain presentation order does not alter canonical ID mapping',()=>{
+ const b=makeBody();b.domains.reverse();
+ const p=projectD05MarketRow(row(b),'current');
+ assert.deepEqual(p.outputs.map(x=>x.id),['overall',...IDS]);
+});
 test('different same-date storage rows are not marked as matched',()=>{
  const other=makeBody();other.domains[2].score=99;
  const r=compareD05MarketStored(row(),row(other),{dayKey:'2026-11-24'});
