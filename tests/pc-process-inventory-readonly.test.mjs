@@ -1739,3 +1739,52 @@ test('CNN Git evidence differentiates mismatch, dirty, unknown and verified boun
  assert.equal(wrongRoot.status,'STATE_UNKNOWN');
  assert.equal(wrongRoot.operationalWrites,0);
 });
+
+test('CNN whole-tree/branch probe projects bounded states and fails closed',async()=>{
+ const {projectCnnGitEvidence}=await import('../controller/cnn-sidecar-git-predicates-readonly.mjs');
+ const sha='a'.repeat(40),approved='a'.repeat(40);
+ const basic={sourcePin:true,ledgerStable:true,ledgerStatus:'BLOCKED',
+  head:sha,approved,checkpoint:sha,gitVerified:true,trackedClean:true,
+  mentionsCheckout:true,guardSites:true,secretPath:'E:/PRIVATE_DO_NOT_LEAK'};
+ const clean=projectCnnGitEvidence({...basic,gitStatusSnapshotStable:true,
+  branchClass:'MAIN',fullTreeClean:true,untrackedPresent:false});
+ assert.equal(clean.status,'PASS');
+ assert.equal(clean.gitExtendedStatus,'PASS');
+ assert.equal(clean.gitWholeTreeClean,true);
+ assert.equal(clean.gitUntrackedPresent,false);
+ assert.equal(clean.gitBranchClass,'MAIN');
+ assert.equal(clean.runtimeSidecarGitRootVerified,false);
+ assert.equal(clean.failurePredicateResolved,false);
+ const untracked=projectCnnGitEvidence({...basic,gitStatusSnapshotStable:true,
+  branchClass:'DETACHED',fullTreeClean:false,untrackedPresent:true});
+ assert.equal(untracked.status,'PASS');
+ assert.equal(untracked.gitExtendedStatus,'PASS');
+ assert.equal(untracked.trackedTreeClean,true);
+ assert.equal(untracked.gitWholeTreeClean,false);
+ assert.equal(untracked.gitUntrackedPresent,true);
+ assert.equal(untracked.gitBranchClass,'DETACHED');
+ assert.equal(untracked.sidecarFailureResolved,false);
+ const other=projectCnnGitEvidence({...basic,gitStatusSnapshotStable:true,
+  branchClass:'OTHER',fullTreeClean:false,untrackedPresent:true});
+ assert.equal(other.gitBranchClass,'OTHER');
+ assert.ok(!JSON.stringify(other).includes('PRIVATE_DO_NOT_LEAK'));
+ assert.ok(!JSON.stringify(other).includes(sha));
+ for(const invalid of [
+  {...basic,gitStatusSnapshotStable:false,branchClass:'MAIN',fullTreeClean:false,untrackedPresent:true},
+  {...basic,gitStatusSnapshotStable:true,branchClass:'bad/raw/branch',fullTreeClean:true,untrackedPresent:false},
+  {...basic,gitStatusSnapshotStable:true,branchClass:'MAIN',fullTreeClean:true,untrackedPresent:true},
+  {...basic,gitStatusSnapshotStable:true,branchClass:'MAIN',fullTreeClean:null,untrackedPresent:false},
+  {...basic,gitStatusSnapshotStable:true,branchClass:'MAIN',fullTreeClean:false,untrackedPresent:null},
+  {...basic,sourcePin:false,gitStatusSnapshotStable:true,branchClass:'MAIN',fullTreeClean:false,untrackedPresent:true},
+  {...basic,trackedClean:false,gitStatusSnapshotStable:true,branchClass:'MAIN',fullTreeClean:true,untrackedPresent:false}
+ ]){
+  const out=projectCnnGitEvidence(invalid);
+  assert.equal(out.gitExtendedStatus,'STATE_UNKNOWN');
+  assert.equal(out.gitUntrackedPresent,null);
+  assert.equal(out.gitBranchClass,'UNKNOWN');
+  assert.equal(out.failurePredicateResolved,false);
+  assert.equal(out.operationalWrites,0);
+  assert.equal(out.providerCalls,0);
+  assert.equal(out.d1Writes,0);
+ }
+});
