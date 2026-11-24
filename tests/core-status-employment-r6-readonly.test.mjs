@@ -171,3 +171,66 @@ test('core-status retains canonical R6 release and retry timestamps without raw-
  assert.equal(actual.providerRequests,0);
  assert.doesNotMatch(JSON.stringify(view),/PRIVATE_RAW_BODY|PRIVATE_TOKEN|LEAK|example\\.com/);
 });
+
+
+test('R6 row-change counter projection retains bounded real zero and positive counts',t=>{
+ const report=fixture(t,{status:'SUCCESS',providerRequests:2,
+  groups:[{groupName:'DOL_UI_WEEKLY_CLAIMS',status:'SUCCESS',providerRequests:2,
+   collectedRows:31000,inserted:0,revised:1,noop:30999,rejected:0,
+   historyRowsAdded:1,rawSnapshots:2,rawSnapshotNoops:1,
+   runId:'DO_NOT_TRANSFER',rawBody:'DO_NOT_TRANSFER'}],
+  plannedGroups:[{groupName:'DOL_UI_WEEKLY_CLAIMS',status:'RELEASE_ALREADY_STORED',
+    due:false,collectedRows:55,inserted:8}]},{}).checkpoints['local-collection-last-run.json'].employmentR6;
+ assert.deepEqual(report.groups,[{groupName:'DOL_UI_WEEKLY_CLAIMS',status:'SUCCESS',providerRequests:2,
+  collectedRows:31000,inserted:0,revised:1,noop:30999,rejected:0,
+  historyRowsAdded:1,rawSnapshots:2,rawSnapshotNoops:1}]);
+ assert.deepEqual(report.plannedGroups,[{groupName:'DOL_UI_WEEKLY_CLAIMS',
+  status:'RELEASE_ALREADY_STORED',due:false}]);
+ assert(!JSON.stringify(report).includes('DO_NOT_TRANSFER'));
+});
+
+test('R6 row-change counter projection refuses missing invalid and unbounded values',t=>{
+ const report=fixture(t,{status:'PARTIAL',providerRequests:0,
+  groups:[{groupName:'DOL_UI_WEEKLY_CLAIMS',status:'PARTIAL',
+   collectedRows:0,inserted:-1,revised:1.5,noop:'0',rejected:NaN,
+   historyRowsAdded:1000001,rawSnapshots:1,rawSnapshotNoops:undefined,
+   extra:'PRIVATE_KEY_NOT_FOR_OUTPUT'}],plannedGroups:[]},{}).checkpoints['local-collection-last-run.json'].employmentR6;
+ assert.deepEqual(report.groups,[{groupName:'DOL_UI_WEEKLY_CLAIMS',
+  status:'PARTIAL',collectedRows:0,rawSnapshots:1}]);
+ assert(!JSON.stringify(report).includes('PRIVATE_KEY_NOT_FOR_OUTPUT'));
+});
+
+
+test('W04 core-status distinguishes a stored prior DOL release from the latest NOOP',t=>{
+ const release='2026-11-24T19:23:15.174Z';
+ const result=fixture(t,{status:'NOOP',providerRequests:0,groups:[],plannedGroups:[],
+  lastStoredDolRelease:{status:'SUCCESS',completedAt:release,
+   collectedRows:2800,inserted:3,revised:1,noop:2796,rejected:0,
+   historyRowsAdded:4,rawHash:'PRIVATE_SHA',runId:'PRIVATE_ID'}},{}).
+  checkpoints['local-collection-last-run.json'].employmentR6;
+ assert.equal(result.status,'NOOP');
+ assert.deepEqual(result.groups,[]);
+ assert.deepEqual(result.lastStoredDolRelease,{status:'SUCCESS',completedAt:release,
+  collectedRows:2800,inserted:3,revised:1,noop:2796,rejected:0,historyRowsAdded:4});
+ assert.doesNotMatch(JSON.stringify(result),/PRIVATE_SHA|PRIVATE_ID/);
+});
+
+test('W04 invalid past DOL release timestamps and statuses cannot masquerade as verified evidence',t=>{
+ for(const bad of [
+  {status:'SUCCESS',completedAt:'2026-11-24T19:23:15Z',inserted:5},
+  {status:'READY',completedAt:'2026-11-24T19:23:15.174Z',inserted:5},
+  {status:'SUCCESS',completedAt:'https://example.com/token',inserted:5},
+ ]){
+  const result=fixture(t,{status:'NOOP',providerRequests:0,groups:[],
+   plannedGroups:[],lastStoredDolRelease:bad},{}).
+   checkpoints['local-collection-last-run.json'].employmentR6;
+  assert.equal(Object.hasOwn(result,'lastStoredDolRelease'),false);
+ }
+ const valid=fixture(t,{status:'NOOP',providerRequests:0,groups:[],plannedGroups:[],
+  lastStoredDolRelease:{status:'SUCCESS',completedAt:'2026-11-24T19:23:15.174Z',
+   inserted:0,revised:'4',noop:-5,collectedRows:1000001}},{}).
+  checkpoints['local-collection-last-run.json'].employmentR6;
+ assert.deepEqual(valid.lastStoredDolRelease,{
+  status:'SUCCESS',completedAt:'2026-11-24T19:23:15.174Z',inserted:0,
+ });
+});
