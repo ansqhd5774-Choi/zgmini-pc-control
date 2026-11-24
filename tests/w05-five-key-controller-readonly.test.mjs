@@ -222,3 +222,13 @@ test('W05 selective B cannot substitute another target or change live module byt
  const policy=JSON.parse(readFileSync(new URL('../config/operations.json',import.meta.url),'utf8'));
  assert.equal(policy.operations[W05_FIVE_OPERATION].timeoutSeconds,90);
 });
+
+// A source PR that only registered the A operation cannot authorize a later
+// selective B pin. The approving PR must carry the exact target pin at its
+// merge commit; changing the pin's provenance without the manifest is denied.
+test('W05 selective B denies approval PR and pin provenance divergence',()=>{
+ const m=W05_B_MANIFEST,p=W05_B_PIN;
+ assert.throws(()=>validateControllerSelectivePin(m,{...p,
+  approvalRef:'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3254'}),
+  /SELECTIVE_PIN_MISMATCH/);
+});
