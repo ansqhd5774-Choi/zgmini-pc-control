@@ -1771,3 +1771,46 @@ test('CNN tracks untracked-only dirt separately from tracked status with safe cl
  assert.equal(withoutPin.sourceStatusGuardClass,'UNVERIFIED');
  assert.equal(withoutPin.status,'STATE_UNKNOWN');
 });
+
+test('CNN pinned SOURCE SHA origin classifier returns only bounded static classes',async()=>{
+ const {classifyPinnedCnnGuardOrigin,projectCnnGitEvidence}=
+  await import('../controller/cnn-sidecar-git-predicates-readonly.mjs');
+ const source=[
+  'const EXPECTED_SOURCE_SHA="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";',
+  'const secret="PRIVATE_TOKEN_MUST_NOT_ESCAPE";',
+  "const v=execFileSync('git',['rev-parse','HEAD']);",
+  "if(!v) throw Error('SOURCE SHA');"
+ ].join('\n');
+ const a=classifyPinnedCnnGuardOrigin(source,'b'.repeat(40));
+ assert.equal(a.reasonLine,4);
+ assert.equal(a.reasonSiteClass,'THROW');
+ assert.equal(a.gitBinaryClass,'PATH_LOOKUP');
+ assert.equal(a.fixedShaRelation,'MISMATCH');
+ assert.doesNotMatch(JSON.stringify(a),/PRIVATE_TOKEN|aaaaaaaa|bbbbbbbb/);
+ const b=classifyPinnedCnnGuardOrigin(source,'a'.repeat(40));
+ assert.equal(b.fixedShaRelation,'MATCH');
+ const c=classifyPinnedCnnGuardOrigin(source.replace("throw Error('SOURCE SHA');",
+  "need(v,'SOURCE SHA');"),'a'.repeat(40));
+ assert.equal(c.reasonSiteClass,'CHECK_HELPER');
+ const d=classifyPinnedCnnGuardOrigin('const z=10;','a'.repeat(40));
+ assert.equal(d.reasonSiteClass,'NO_DIRECT_LITERAL');
+ assert.equal(d.gitBinaryClass,'UNVERIFIED');
+ const e=classifyPinnedCnnGuardOrigin(source+'\nthrow Error("SOURCE SHA");','a'.repeat(40));
+ assert.equal(e.reasonLine,null);
+ assert.equal(e.reasonSiteClass,'MULTIPLE_LITERAL_SITES');
+ const old={sourcePin:true,ledgerStable:true,ledgerStatus:'BLOCKED',
+  head:'b'.repeat(40),approved:'b'.repeat(40),checkpoint:'b'.repeat(40),
+  gitVerified:true,trackedClean:true,wholeTreeClean:true,guardSites:true,
+  guardOrigin:a};
+ const projected=projectCnnGitEvidence(old);
+ assert.equal(projected.guardOrigin.reasonLine,4);
+ assert.equal(projected.guardOrigin.gitBinaryClass,'PATH_LOOKUP');
+ assert.equal(projected.guardOrigin.fixedShaRelation,'MISMATCH');
+ assert.equal(projected.failurePredicateResolved,false);
+ assert.equal(projected.operationalWrites,0);
+ assert.equal(projected.providerCalls,0);
+ assert.equal(projected.d1Writes,0);
+ const unknown=projectCnnGitEvidence({...old,sourcePin:false});
+ assert.equal(unknown.guardOrigin,null);
+ assert.equal(unknown.status,'STATE_UNKNOWN');
+});
