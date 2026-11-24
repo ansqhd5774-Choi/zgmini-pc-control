@@ -8,6 +8,14 @@ on:
       - 'ZGMINI Controller Maintenance Source Tests'
       - 'W05 QFR Publication - Focused Source CI'
       - 'Issue Lifecycle Eligibility (offline)'
+      - 'ZGMINI Automation Status Readonly Source Tests'
+      - 'ZGMINI CNN Sidecar B Source Contract CI'
+      - 'ZGMINI D05 Readonly Source Tests'
+      - 'ZGMINI 092 Writer B Source and Lineage Tests'
+      - 'SEC Core four-file Writer B approval source tests'
+      - 'ZGMINI W04 DOL Manual Source Tests'
+      - 'SEC Core Structural Insert Contract (source-only)'
+      - 'ZGMINI Agent Handoff PR Evidence CI'
     types: [completed]
 permissions:
   contents: read
