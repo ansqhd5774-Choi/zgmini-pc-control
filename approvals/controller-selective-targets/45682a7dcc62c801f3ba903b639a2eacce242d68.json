@@ -1,0 +1,17 @@
+{
+  "schema": "ZGMINI_CONTROLLER_SELECTIVE_PIN_V1",
+  "installedSha": "b9a423cf38d0967d6ed336912a66433f79502d3d",
+  "targetSha": "45682a7dcc62c801f3ba903b639a2eacce242d68",
+  "sourceMainSha": "a272d1b6c593c78a0667035d8d10992f6f981877",
+  "targetBranch": "codex/cnn-1521-b9-exact-onefile-diagnostic-20261124",
+  "customPaths": [
+    "controller/fear-greed-archive-readonly.mjs"
+  ],
+  "allowFiles": [
+    {
+      "path": "controller/fear-greed-archive-readonly.mjs",
+      "sha256": "4f125e65131b3a666dc9c28b8de3a83bbaf29471c27dbc77b646f8ebdfb5cad0"
+    }
+  ],
+  "approvalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3068"
+}
