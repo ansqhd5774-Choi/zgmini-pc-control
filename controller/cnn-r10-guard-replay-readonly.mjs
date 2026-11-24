@@ -60,7 +60,7 @@ export function classifyPinnedCnnR10Line19Readonly(source) {
 // establish what an earlier Sidecar invocation executed.
 export function projectCnnR10Line19OperandsReadonly(source,raw={}) {
  const empty={schema:'ZGMINI_CNN_R10_LINE19_OPERANDS_V1',
-  status:'STATE_UNKNOWN',connective:'UNKNOWN',atomClasses:[],
+  status:'STATE_UNKNOWN',connective:'UNKNOWN',atomClasses:[],atomSemantics:[],
   currentStaticCondition:'UNKNOWN',runtimeCondition:'NOT_OBSERVED',
   firstRuntimeFailure:null,operationalWrites:0,providerCalls:0,d1Writes:0};
  if(!raw.sourcePin||!raw.ledgerStable||!raw.gitVerified||
@@ -123,9 +123,40 @@ export function projectCnnR10Line19OperandsReadonly(source,raw={}) {
   }
   return s;
  };
+ const atomSemantics=[];
+ const semantic=(expr)=>{
+  const s=expr.trim();
+  const family=/\b(?:execFileSync|spawnSync|execSync)\s*\(/.test(s)&&
+    /(?:\bre?v-parse\b|\bstatus\b|\bgit\b)/i.test(s)?'GIT_PROCESS':
+   /\b(?:fs\.)?(?:existsSync|statSync|lstatSync|realpathSync)\s*\(/.test(s)?'FILESYSTEM_METADATA':
+   /\b(?:readFileSync|openSync)\s*\(/.test(s)?'FILESYSTEM_READ':
+   /\b(?:createHash|digest)\s*\(/.test(s)?'HASHING':
+   /\b(?:path\.(?:join|resolve|relative|normalize)|realpathSync)\s*\(/.test(s)?'PATH_RESOLUTION':
+   /\bprocess\.env\b/.test(s)?'ENV_REFERENCE':
+   /\.includes\s*\(/.test(s)?'MEMBER_INCLUDES':
+   /\.test\s*\(/.test(s)?'MEMBER_TEST':
+   /\b[A-Za-z_$][\w$]*\s*\(/.test(s)?'LOCAL_OR_OTHER_CALL':'UNKNOWN';
+  const input=/\brev-parse\b/.test(s)&&/\bHEAD\b/.test(s)?'GIT_HEAD':
+   /\bstatus\b/.test(s)&&/\bporcelain\b/.test(s)?'GIT_STATUS':
+   /\b(?:config|approved|sourceSha)\b/i.test(s)?'SOURCE_CONFIG_REFERENCE':
+   /\b(?:checkpoint|lastRun)\b/i.test(s)?'CHECKPOINT_REFERENCE':
+   /\b(?:existsSync|statSync|lstatSync)\b/.test(s)?'FILESYSTEM_PATH_UNVERIFIED':
+   /\bprocess\.env\b/.test(s)?'PROCESS_ENV':
+   'UNVERIFIED';
+  const comparison=/!==/.test(s)?'STRICT_NOT_EQUAL':
+   /===/.test(s)?'STRICT_EQUAL':
+   /(?:>=|<=|>|<)\s*[0-9]/.test(s)?'NUMERIC_COMPARISON':
+   /!\s*(?:[A-Za-z_$]|\()/.test(s)?'NEGATED_BOOLEAN':
+   /\b(?:true|false)\b/.test(s)?'BOOLEAN_LITERAL':'OTHER_OR_UNKNOWN';
+  const booleanForm=/^\s*!/.test(s)?'NEGATED':
+   /^\s*\w[\w$.]*\s*\(/.test(s)?'CALL_RESULT':
+   /\.([A-Za-z_$][\w$]*)\s*\(/.test(s)?'METHOD_RESULT':'UNKNOWN';
+  return {family,input,comparison,booleanForm,value:'NOT_EVALUATED'};
+ };
  const types=[],ops=new Set();
  const classify=(s)=>{
   if(types.length>=8)return null;
+  atomSemantics.push(semantic(s));
   const m=/^\s*([A-Za-z_$][\w$]*)\s*(===|!==|==|!=)\s*([A-Za-z_$][\w$]*)\s*$/.exec(s);
   if(!m){types.push(/[.(\[]/.test(s)?'CALL_OR_MEMBER_OR_GROUP':'UNSUPPORTED');return null;}
   const known=values.has(m[1])&&values.has(m[3]);
@@ -153,7 +184,7 @@ export function projectCnnR10Line19OperandsReadonly(source,raw={}) {
  const value=evaluate(expression);
  return {...empty,status:'STATIC_CLASSIFIED',
   connective:ops.size>1?'MIXED':ops.has('AND')?'AND_ONLY':ops.has('OR')?'OR_ONLY':'NONE',
-  atomClasses:types,
+  atomClasses:types,atomSemantics,
   currentStaticCondition:value===true?'TRUE':value===false?'FALSE':'UNKNOWN'};
 }
 

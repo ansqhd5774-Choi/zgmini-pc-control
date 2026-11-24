@@ -165,3 +165,40 @@ test('line19 static operands never get promoted to previous runtime branch',()=>
  assert.equal(r.firstReplayFailure,null);
  assert.equal(r.firstRuntimeFailure,null);
 });
+
+
+test('line19 reports strictly allowlisted semantic classes without raw operands',async()=>{
+ const {projectCnnR10Line19OperandsReadonly:probe}=await import('../controller/cnn-r10-guard-replay-readonly.mjs');
+ const lines=script();
+ lines[18]="if (fs.existsSync(privatePath) && execFileSync('git',['status','--porcelain']).length > 0) throw Error('SECRET');";
+ const r=probe(lines.join('\n'),facts());
+ assert.equal(r.connective,'AND_ONLY');
+ assert.equal(r.atomSemantics.length,2);
+ assert.equal(r.atomSemantics[0].family,'FILESYSTEM_METADATA');
+ assert.equal(r.atomSemantics[0].input,'FILESYSTEM_PATH_UNVERIFIED');
+ assert.equal(r.atomSemantics[1].family,'GIT_PROCESS');
+ assert.equal(r.atomSemantics[1].input,'GIT_STATUS');
+ assert.equal(r.currentStaticCondition,'UNKNOWN');
+ assert.doesNotMatch(JSON.stringify(r),/privatePath|SECRET|execFileSync|--porcelain/);
+});
+test('line19 does not run calls when classifying dataflow families',async()=>{
+ const {projectCnnR10Line19OperandsReadonly:probe}=await import('../controller/cnn-r10-guard-replay-readonly.mjs');
+ const lines=script();let invoked=0;
+ globalThis.__forbidCall=()=>{invoked++;throw Error('CALLED');};
+ lines[18]="if (__forbidCall('SECRET') && process.env.MY_PRIVATE) throw Error('SECRET');";
+ const r=probe(lines.join('\n'),facts());
+ assert.equal(invoked,0);
+ assert.equal(r.atomSemantics[0].value,'NOT_EVALUATED');
+ assert.equal(r.atomSemantics[1].input,'PROCESS_ENV');
+ assert.equal(r.firstRuntimeFailure,null);
+ assert.doesNotMatch(JSON.stringify(r),/MY_PRIVATE|__forbidCall|SECRET/);
+ delete globalThis.__forbidCall;
+});
+test('line19 cannot classify unverified source inputs',async()=>{
+ const {projectCnnR10Line19OperandsReadonly:probe}=await import('../controller/cnn-r10-guard-replay-readonly.mjs');
+ const lines=script();
+ lines[18]="if (fs.existsSync(secret) && helper(secret)) throw Error('SECRET');";
+ const result=probe(lines.join('\n'),{...facts(),gitVerified:false});
+ assert.deepEqual(result.atomSemantics,[]);
+ assert.equal(result.status,'STATE_UNKNOWN');
+});
