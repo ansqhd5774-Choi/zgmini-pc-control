@@ -15,7 +15,7 @@ import {readMaintenanceRecoveryStatus,protectedSnapshot} from './update.mjs';
 import {readFixedReadonlyBytes} from '../controller/fixed-readonly-bytes.mjs';
 import {createHash} from 'node:crypto';
 import {inspectTask as inspectMarketParquetTask} from './marketparquet-task-source-readonly.mjs';
-import {inspectW03PaidPrivateReadonly,inspectD05PaidThemeFinalOutputsReadonly} from './w03-paid-private-readonly.mjs';
+import {inspectW03PaidPrivateReadonly,inspectD05PaidThemeFinalOutputsReadonly,inspectD05ConfiguredRegistrationReadonly} from './w03-paid-private-readonly.mjs';
 import {validateRunnerJobRefs,inspectRunnerJobHistory} from './runner-job-history-readonly.mjs';
 
 export const TITLE='pc-process-inventory-readonly';
@@ -26,6 +26,7 @@ const TARGET2960='pc-update-e8767e20-6bad-4418-97c6-561cf79a8213';
 const PROBE2960='w05-2960-maintenance-status-readonly';
 const D05_WRITER_PROBE='d05-writer-checkpoint-readonly';
 const D05_THEME_PROBE='d05-theme-final-outputs-readonly';
+const D05_REGISTERED_PROBE='d05-configured-registration-readonly';
 const MAX_BYTES=32768;
 const KNOWN_PROCESSES=new Set([
  'runner.listener.exe','runner.worker.exe','node.exe','wscript.exe','cscript.exe',
@@ -89,10 +90,11 @@ export function authenticateProcess(event,env,role){
   const is2960=withW05&&raw.probe===PROBE2960;
   const isD05Writer=withW05&&raw.probe===D05_WRITER_PROBE;
   const isD05Theme=withW05&&raw.probe===D05_THEME_PROBE;
+  const isD05Registration=withW05&&raw.probe===D05_REGISTERED_PROBE;
  if(!raw||(!basic&&!withJobs&&!withW05)||
    raw.schema!==SCHEMA||raw.operation!==ROLE_OPERATION||raw.role!==role||
    (withJobs&&role!=='operating')||
-   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!isD05Writer&&!isD05Theme))))
+   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!isD05Writer&&!isD05Theme&&!isD05Registration))))
   fail('REQUEST_SCOPE_INVALID');
  const runnerJobRefs=withJobs?validateRunnerJobRefs(raw.runnerJobRefs):null;
  const normalized=structuredClone(event);
@@ -105,7 +107,8 @@ export function authenticateProcess(event,env,role){
   ...(isOperator?{w05OperatorTopology:true}:{}),
    ...(is2960?{w052960MaintenanceStatus:true}:{}),
    ...(isD05Writer?{d05WriterCheckpoint:true}:{}),
-   ...(isD05Theme?{d05ThemeFinalOutputs:true}:{})};
+   ...(isD05Theme?{d05ThemeFinalOutputs:true}:{}),
+   ...(isD05Registration?{d05ConfiguredRegistrations:true}:{})};
 }
 export function sanitizeProbe(raw){
  if(!raw||raw.schema!=='ZGMINI_PC_PROCESS_PROBE_V1')fail('PROBE_SCHEMA_INVALID');
@@ -1668,6 +1671,11 @@ export function collect(role,ctx,env=process.env){
  if(ctx.d05ThemeFinalOutputs===true)
   return inspectD05PaidThemeFinalOutputsReadonly().then(result=>({...base,
    status:result.status,code:result.code,d05ThemeFinalOutputs:result}));
+ if(ctx.d05ConfiguredRegistrations===true){
+  const result=inspectD05ConfiguredRegistrationReadonly();
+  return {...base,status:result.status,code:result.code,
+   d05ConfiguredRegistrations:result};
+ }
  const withMaintenance=role==='operating'?{...base,
   maintenance:collectMaintenanceStatusReadonly(),
   ...(ctx.w052960MaintenanceStatus?{
@@ -1736,6 +1744,10 @@ export function toText(r){
    'd05LatestCalculatedAt='+(r.d05ThemeFinalOutputs.latestCalculatedAt??'UNKNOWN'),
    'd05CurrentReceiptMatched='+(r.d05ThemeFinalOutputs.currentReceiptMatched??'UNKNOWN'),
    'd05ArchiveScanComplete='+(r.d05ThemeFinalOutputs.archiveScanComplete??'UNKNOWN')]:[]),
+  ...(r.d05ConfiguredRegistrations?[
+   'd05ConfiguredRegistry='+r.d05ConfiguredRegistrations.code,
+   'd05ConfiguredDefinitionCount='+(r.d05ConfiguredRegistrations.registeredDefinitionCount??'UNKNOWN'),
+   'd05ConfiguredInventoryHash='+(r.d05ConfiguredRegistrations.registryManifestSha256??'UNKNOWN')]:[]),
   'maintenanceSourceSha='+(r.maintenance?.maintenanceSourceSha??'UNKNOWN'),
   'installLockHeld='+(r.maintenance?.installLockHeld??'UNKNOWN'),
   'c2094StageEvidence='+(r.c2094StageEvidence?.status??'NOT_APPLICABLE'),
