@@ -112,8 +112,13 @@ export async function applyApprovedUpdate(request, port) {
     await record('DRAINED');
     failureOperation='backup';await port.backup();backup=true;
     await record('BACKED_UP');
-    failureOperation='stopOwnSupervisor';await port.stopOwnSupervisor();supervisorStopped=true;
-    await record('SUPERVISOR_STOPPED');
+    failureOperation='stopOwnSupervisor';const idleWait=await port.stopOwnSupervisor();supervisorStopped=true;
+    const validIdleWait=idleWait&&Number.isSafeInteger(idleWait.retryCount)&&idleWait.retryCount>=0
+      &&Number.isSafeInteger(idleWait.elapsedMs)&&idleWait.elapsedMs>=0
+      &&typeof idleWait.observedBusy==='boolean';
+    await record('SUPERVISOR_STOPPED',validIdleWait?{supervisorIdleWait:{
+      retryCount:idleWait.retryCount,elapsedMs:idleWait.elapsedMs,
+      observedBusy:idleWait.observedBusy}}:{});
     failureOperation='switchVersion';await port.switchVersion();switched=true;
     await record('SWITCHED');
     failureOperation='reconnect';await port.reconnect();

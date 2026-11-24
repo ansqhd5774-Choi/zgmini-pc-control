@@ -235,6 +235,21 @@ test('approved out-of-process update waits for drain and verifies actual new SHA
  assert.ok(f.events.indexOf('reconnect')<f.events.indexOf('resume'));
  assert.ok(f.events.indexOf('resume')<f.events.indexOf('replay-missed-issues'));
 });
+test('bounded idle telemetry is persisted on successful supervisor stop',async()=>{
+ const f=fixture({stopOwnSupervisor:async()=>({retryCount:2,elapsedMs:6000,observedBusy:true})});
+ const result=await applyApprovedUpdate(request,f.port);
+ assert.equal(result.status,'PASS');
+ assert.deepEqual(result.supervisorIdleWait,{retryCount:2,elapsedMs:6000,observedBusy:true});
+ assert.deepEqual(f.records.get(request.requestId).supervisorIdleWait,result.supervisorIdleWait);
+});
+
+test('unverified idle telemetry is not treated as measured',async()=>{
+ const f=fixture({stopOwnSupervisor:async()=>({retryCount:-1,elapsedMs:NaN,observedBusy:'yes'})});
+ const result=await applyApprovedUpdate(request,f.port);
+ assert.equal(result.status,'PASS');
+ assert.equal(Object.hasOwn(result,'supervisorIdleWait'),false);
+});
+
 test('partial host.json corruption still returns original request ledger and recovery lock',()=>{
  const ledger={requestId:request.requestId,status:'RECOVERY_REQUIRED',phase:'SWITCHED'};
  const state=readMaintenanceRecoveryStatus(request.requestId,{
@@ -908,13 +923,22 @@ test('drain and final stop both require Online seats before Supervisor mutation'
 
 test('a briefly Busy runner can settle after backup without an unguarded stop',async()=>{
  let clock=0,reads=0,checks=0;
- await waitForSupervisorStopIdle({
+ const observed=await waitForSupervisorStopIdle({
   readRunners:()=>{const rows=idleRaceSeats();if(++reads<3)rows[2].busy=true;return rows;},
   verifySafety:()=>{checks++;},now:()=>clock,pause:async ms=>{clock+=ms;}
  });
  assert.equal(clock,6000);
  assert.equal(reads,3);
  assert.equal(checks,3);
+ assert.deepEqual(observed,{retryCount:2,elapsedMs:6000,observedBusy:true});
+});
+
+test('an immediately Idle Runner records zero retry and zero elapsed time',async()=>{
+ const observed=await waitForSupervisorStopIdle({
+  readRunners:idleRaceSeats,verifySafety:()=>{},now:()=>0,
+  pause:async()=>{throw Error('unexpected pause');}
+ });
+ assert.deepEqual(observed,{retryCount:0,elapsedMs:0,observedBusy:false});
 });
 
 test('a persistently Busy runner is refused after at most 30 seconds',async()=>{

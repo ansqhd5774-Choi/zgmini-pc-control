@@ -248,6 +248,16 @@ export function normalizedResult(request,result,code){
       isSha(from.recoverySha)&&from.recoverySha===from.actualInstalledSha
        ?'PREVIOUS_VERSION_VERIFIED':'UNVERIFIED'}:{}),
     ...(inventory?{sourceInventory:inventory}:{}),
+    ...(status==='SUCCEEDED'&&from.supervisorIdleWait
+      &&Number.isSafeInteger(from.supervisorIdleWait.retryCount)
+      &&from.supervisorIdleWait.retryCount>=0
+      &&Number.isSafeInteger(from.supervisorIdleWait.elapsedMs)
+      &&from.supervisorIdleWait.elapsedMs>=0
+      &&typeof from.supervisorIdleWait.observedBusy==='boolean'
+      ?{supervisorIdleWait:{
+        retryCount:from.supervisorIdleWait.retryCount,
+        elapsedMs:from.supervisorIdleWait.elapsedMs,
+        observedBusy:from.supervisorIdleWait.observedBusy}}:{}),
   };
 }
 function resultComment(result,uploadStatus=null){

@@ -701,6 +701,18 @@ test("coordinator PASS, ROLLED_BACK and RECOVERY_REQUIRED map to safe comment ou
 });
 
 
+test('safe measured idle retry survives final maintenance result normalization',()=>{
+ const request={requestId:REQUEST_ID,targetControllerSha:TARGET,operation:'controller-update'};
+ const sample={status:'PASS',code:'APPROVED_UPDATE_AND_DIAGNOSTIC_VERIFIED',
+  supervisorIdleWait:{retryCount:2,elapsedMs:6000,observedBusy:true}};
+ assert.deepEqual(normalizedResult(request,sample).supervisorIdleWait,sample.supervisorIdleWait);
+ assert.equal(Object.hasOwn(normalizedResult(request,{...sample,
+  supervisorIdleWait:{retryCount:-1,elapsedMs:0,observedBusy:true}}),'supervisorIdleWait'),false);
+ assert.equal(Object.hasOwn(normalizedResult(request,{...sample,
+  supervisorIdleWait:{retryCount:1,elapsedMs:Infinity,observedBusy:true}}),'supervisorIdleWait'),false);
+ assert.equal(Object.hasOwn(normalizedResult(request,{...sample,status:'RECOVERY_REQUIRED'}),'supervisorIdleWait'),false);
+});
+
 test('unknown controller recovery does not assert disabled workflow',()=>{
  const request={requestId:REQUEST_ID,targetControllerSha:TARGET,operation:'controller-update'};
  const raw={status:'RECOVERY_REQUIRED',code:'BACKLOG_ORIGINAL_REQUEST_INVALID',
