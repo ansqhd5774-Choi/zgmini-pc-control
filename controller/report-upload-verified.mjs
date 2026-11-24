@@ -139,7 +139,13 @@ function verifyRemoteFile(response,bytes){
  const data=response.data;
  if(data?.type!=='file'||data?.encoding!=='base64'||typeof data.content!=='string')
   fail('REPORT_REMOTE_INVALID');
- const remote=Buffer.from(data.content.replace(/\s/g,''),'base64');
+ // GitHub wraps valid base64 in CR/LF. Never accept arbitrary ignored
+ // characters, impossible padding or noncanonical pad bits as verified bytes.
+ const encoded=data.content.replace(/[\r\n]/g,'');
+ if(!encoded||!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded))
+  fail('REPORT_REMOTE_INVALID');
+ const remote=Buffer.from(encoded,'base64');
+ if(remote.toString('base64')!==encoded)fail('REPORT_REMOTE_INVALID');
  if(!remote.equals(bytes))fail('REPORT_REMOTE_CONTENT_CHANGED');
  return true;
 }
