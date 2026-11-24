@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {HANDOFF_REPOSITORY, HANDOFF_OWNER, processQueue} from './queue-selector.mjs';
-import {collectBoard,validateDirectIntakeFollowup,validateFailureIntakeFollowup} from './queue-board-runner.mjs';
+import {HANDOFF_REPOSITORY, HANDOFF_OWNER, processQueue, assessIncident} from './queue-selector.mjs';
+import {collectBoard,mapBounded,validateDirectIntakeFollowup,validateFailureIntakeFollowup} from './queue-board-runner.mjs';
 import {ownerExecutionPlan} from './queue-board.mjs';
 import {readIssueCommentLedger} from './comment-ledger.mjs';
 
@@ -44,7 +44,7 @@ export function validateTrigger(event, env) {
   }
 }
 
-async function request(resource, {method='GET', body}={}) {
+async function request(resource, {method='GET', body, signal=AbortSignal.timeout(25000)}={}) {
   const token = process.env.GITHUB_TOKEN;
   if (!token) throw Error('HANDOFF_SELECTOR_TOKEN_UNAVAILABLE');
   const response = await fetch(API + '/' + resource, {
@@ -53,7 +53,7 @@ async function request(resource, {method='GET', body}={}) {
       'X-GitHub-Api-Version': '2022-11-28',
       ...(body ? {'Content-Type': 'application/json'} : {})},
     ...(body ? {body:JSON.stringify(body)} : {}),
-    signal: AbortSignal.timeout(25000)
+    signal
   });
   if (!response.ok) throw Error('HANDOFF_SELECTOR_GITHUB_HTTP_' + response.status);
   return response.json();
@@ -121,6 +121,73 @@ export function isolateInitialCommentRead(readComments, onDeferred) {
   };
 }
 
+// No-op optimization only: a bounded, complete current inventory, exact
+// authenticated receipt for every pending Incident, and stable readback.
+// All uncertainty falls back to the existing serialized writer Job.
+const NOOP_LIMIT=10;
+const NOOP_REFS=new Map([
+  [HANDOFF_REPOSITORY+'/.github/workflows/agent-handoff-pc-failure-intake.yml@refs/heads/main','enqueue-confirmed-failures'],
+  [HANDOFF_REPOSITORY+'/.github/workflows/agent-handoff-writer-b-failure-intake.yml@refs/heads/main','enqueue-verified-writer-b-failures']
+]);
+export function validateNoopTrigger(event,env){
+  const job=NOOP_REFS.get(env.GITHUB_WORKFLOW_REF);
+  if(!job||env.GITHUB_EVENT_NAME!=='workflow_run')throw Error('HANDOFF_SELECTOR_NOOP_SCOPE_STOP');
+  validateFailureIntakeFollowup(event,env,job);
+}
+function noopIdentity(issue){
+  if(!Number.isSafeInteger(issue?.number)||issue.number<1||issue.state!=='open'||
+    !Array.isArray(issue.labels)||typeof issue.updated_at!=='string'||
+    !Number.isFinite(Date.parse(issue.updated_at))||
+    !Number.isSafeInteger(issue.comments)||issue.comments<0)
+    throw Error('HANDOFF_SELECTOR_NOOP_IDENTITY_STOP');
+  return JSON.stringify({number:issue.number,body:issue.body,title:issue.title,
+    state:issue.state,user:issue.user?.login,labels:issue.labels.map(x=>x.name).sort(),
+    updated_at:issue.updated_at,comments:issue.comments});
+}
+function noopInventory(rows){
+  if(!Array.isArray(rows)||rows.length>NOOP_LIMIT)throw Error('HANDOFF_SELECTOR_NOOP_CAP_STOP');
+  const issues=rows.filter(x=>!x.pull_request);
+  const numbers=new Set(issues.map(x=>x.number));
+  if(numbers.size!==issues.length)throw Error('HANDOFF_SELECTOR_NOOP_DUPLICATE_STOP');
+  return {issues,identity:issues.map(noopIdentity).sort().join('\n')};
+}
+export async function verifyNoopSelection(io){
+  try{
+    const first=noopInventory(await io.listIssues());
+    const verified=await mapBounded(first.issues,async issue=>{
+      const [fresh,comments]=await Promise.all([io.readIssue(issue.number),io.readComments(issue.number)]);
+      return noopIdentity(issue)===noopIdentity(fresh)&&Array.isArray(comments)&&
+        comments.length===fresh.comments&&
+        assessIncident({...fresh,repository:HANDOFF_REPOSITORY},comments).state==='ALREADY_SELECTED';
+    });
+    if(verified.some(x=>!x))return {reusable:false,state:'SELECTION_REQUIRED'};
+    const after=noopInventory(await io.listIssues());
+    if(after.identity!==first.identity)return {reusable:false,state:'SELECTION_REQUIRED'};
+    return {reusable:true,state:'SELECTION_REUSED_VERIFIED',scanned:first.issues.length};
+  }catch{
+    return {reusable:false,state:'SELECTION_REQUIRED'};
+  }
+}
+export async function verifyNoopMain(env=process.env){
+  const event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
+  validateNoopTrigger(event,env);
+  // One shared deadline, only GETs. The normal Job remains the fallback.
+  const signal=AbortSignal.timeout(10000);
+  const read=resource=>request(resource,{signal});
+  const output=await verifyNoopSelection({
+    listIssues:()=>pages('issues?state=open&labels=agent-handoff%2Chandoff-agent-pending',1,read),
+    readIssue:n=>read('issues/'+n),
+    readComments:n=>readIssueCommentLedger(page=>{
+      if(page>5)throw Error('HANDOFF_SELECTOR_NOOP_COMMENT_CAP');
+      return read('issues/'+n+'/comments?per_page=100&page='+page);
+    })
+  });
+  if(!env.GITHUB_OUTPUT)throw Error('HANDOFF_SELECTOR_NOOP_OUTPUT_REQUIRED');
+  fs.appendFileSync(env.GITHUB_OUTPUT,'reusable='+String(output.reusable)+'\n','utf8');
+  process.stdout.write(JSON.stringify(output)+'\n');
+  return output;
+}
+
 export async function main(env=process.env) {
   const event = JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
   validateTrigger(event, env);
@@ -146,4 +213,5 @@ export async function main(env=process.env) {
   return output;
 }
 if (process.argv[1] && import.meta.url===pathToFileURL(path.resolve(process.argv[1])).href)
-  main().catch(e=>{process.stderr.write(e.message+'\n');process.exitCode=1;});
+  (process.argv[2]==='--verify-noop'?verifyNoopMain():main())
+    .catch(e=>{process.stderr.write(e.message+'\n');process.exitCode=1;});

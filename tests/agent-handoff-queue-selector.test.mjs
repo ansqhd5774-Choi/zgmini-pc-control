@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {fingerprintHandoff, parseHandoff, routeHandoff} from '../agent-handoff/contract.mjs';
 import {assessIncident, selectionReceipt, processQueue, SELECTION_MARKER,
   HANDOFF_BOT, HANDOFF_REPOSITORY} from '../agent-handoff/queue-selector.mjs';
-import {validateTrigger, finalizeSelection, isolateInitialCommentRead, pages} from '../agent-handoff/queue-dispatcher.mjs';
+import {validateTrigger, finalizeSelection, isolateInitialCommentRead, pages, verifyNoopSelection, validateNoopTrigger} from '../agent-handoff/queue-dispatcher.mjs';
 
 const owner = 'ansqhd5774-Choi';
 function fixture(n=2001) {
@@ -374,4 +374,50 @@ test('failure-intake selector preserves authorized producer and historical manua
   assert.throws(()=>validateTrigger({...manual,inputs:{...manual.inputs,confirmation:'other'}},manualEnv));
   assert.throws(()=>validateTrigger(manual,{...manualEnv,GITHUB_WORKFLOW_REF:writerRef}));
   assert.throws(()=>validateTrigger({...manual,sender:{login:'other'}},manualEnv));
+});
+
+
+function noopFixture(n=2001){
+ const {issue,route,request,issue_url}=fixture(n);
+ const fresh={...issue,updated_at:'2026-11-24T00:00:00Z',comments:2};
+ const receipt={user:{login:HANDOFF_BOT},issue_url,body:selectionReceipt(request,fingerprintHandoff(request))};
+ return {fresh,comments:[route,receipt]};
+}
+function noopIO(items){
+ return {listIssues:async()=>items.map(x=>x.fresh),
+  readIssue:async n=>items.find(x=>x.fresh.number===n).fresh,
+  readComments:async n=>items.find(x=>x.fresh.number===n).comments};
+}
+test('complete stable no-op proof only reuses exact authenticated prior selection receipts',async()=>{
+ const a=noopFixture(),b=noopFixture(2002);
+ assert.deepEqual(await verifyNoopSelection(noopIO([a,b])),{reusable:true,state:'SELECTION_REUSED_VERIFIED',scanned:2});
+ assert.deepEqual(await verifyNoopSelection(noopIO([])),{reusable:true,state:'SELECTION_REUSED_VERIFIED',scanned:0});
+ for(const comments of [[a.comments[0]],[a.comments[0],{...a.comments[1],user:{login:owner}}],[...a.comments,a.comments[1]]]){
+  const item={fresh:{...a.fresh,comments:comments.length},comments};
+  assert.equal((await verifyNoopSelection(noopIO([b,item]))).reusable,false);
+ }
+});
+test('no-op proof falls back for inventory drift, count mismatch, unverified reads and bounds',async()=>{
+ const a=noopFixture(),b=noopFixture(2002),io=noopIO([a]);
+ assert.equal((await verifyNoopSelection({...io,readIssue:async()=>({...a.fresh,updated_at:'2026-11-24T00:01:00Z'})})).reusable,false);
+ assert.equal((await verifyNoopSelection({...io,readComments:async()=>[a.comments[0]]})).reusable,false);
+ assert.equal((await verifyNoopSelection({...io,readComments:async()=>{throw Error('HTTP_403')}})).reusable,false);
+ assert.equal((await verifyNoopSelection({...io,listIssues:async()=>{throw Error('INCOMPLETE')}})).reusable,false);
+ let listCalls=0;
+ assert.equal((await verifyNoopSelection({...io,listIssues:async()=>++listCalls===1?[a.fresh]:[a.fresh,b.fresh]})).reusable,false);
+ assert.equal((await verifyNoopSelection(noopIO([a,a]))).reusable,false);
+ assert.equal((await verifyNoopSelection(noopIO(Array.from({length:11},(_,i)=>noopFixture(3000+i))))).reusable,false);
+});
+test('no-op proof only runs in the exact normal producer Job, never historical manual or selector',()=>{
+ const repo=HANDOFF_REPOSITORY,repository={full_name:repo,private:true};
+ const event={repository,action:'completed',workflow_run:{name:'ZGMINI PC Job',event:'issues',actor:{login:owner},head_repository:{full_name:repo},id:100,run_attempt:1,created_at:'2026-11-24T00:00:00Z',conclusion:'success'}};
+ const env={GITHUB_REPOSITORY:repo,GITHUB_EVENT_PATH:'event.json',GITHUB_REF:'refs/heads/main',GITHUB_ACTOR:owner,GITHUB_EVENT_NAME:'workflow_run',GITHUB_JOB:'enqueue-confirmed-failures',GITHUB_WORKFLOW_REF:repo+'/.github/workflows/agent-handoff-pc-failure-intake.yml@refs/heads/main'};
+ assert.doesNotThrow(()=>validateNoopTrigger(event,env));
+ assert.throws(()=>validateNoopTrigger(event,{...env,GITHUB_JOB:'verify-and-select-after-failure-intake'}));
+ assert.throws(()=>validateNoopTrigger(event,{...env,GITHUB_EVENT_NAME:'workflow_dispatch'}));
+ assert.throws(()=>validateNoopTrigger(event,{...env,GITHUB_ACTOR:'other'}));
+ const writer={...event,workflow_run:{...event.workflow_run,name:'ZGMINI Approved Writer B Source Overlay Once',head_sha:'a'.repeat(40),head_branch:'main'}};
+ const writerEnv={...env,GITHUB_JOB:'enqueue-verified-writer-b-failures',GITHUB_WORKFLOW_REF:repo+'/.github/workflows/agent-handoff-writer-b-failure-intake.yml@refs/heads/main'};
+ assert.doesNotThrow(()=>validateNoopTrigger(writer,writerEnv));
+ assert.throws(()=>validateNoopTrigger(event,writerEnv));
 });

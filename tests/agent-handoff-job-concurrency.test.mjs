@@ -165,12 +165,34 @@ test('PC and Writer B followups require successful independent intake and preser
    assert.match(selection,/github\.ref == 'refs\/heads\/main'/);
    assert.match(selection,/group: zgmini-handoff-candidate-selector/);
    assert.match(selection,/permissions:\s*\n\s*contents: read\s*\n\s*issues: write/);
-   assert.match(board,/needs: verify-and-select-after-failure-intake/);
+   assert.ok(board.includes('needs: ['+job+', verify-and-select-after-failure-intake]'));
+   assert.match(board,/!cancelled\(\) && !failure\(\)/);
+   assert.ok(selection.includes("needs."+job+".outputs.selection_reused != 'true'"));
+   assert.ok(board.includes("needs."+job+".outputs.selection_reused == 'true'"));
+   assert.match(board,/needs\.verify-and-select-after-failure-intake\.result == 'skipped'/);
    assert.match(board,/needs\.verify-and-select-after-failure-intake\.result == 'success'/);
    assert.match(board,/permissions:\s*\n\s*contents: read\s*\n\s*issues: read\s*\n\s*pull-requests: read/);
    assert.doesNotMatch(board,/issues: write|contents: write|continue-on-error|always\(\)/);
    assert.match(board,/group: zgmini-handoff-control-board/);
    assert.equal(selection.slice(selection.indexOf('    runs-on:')),selectionSteps);
    assert.equal(board.slice(board.indexOf('    runs-on:')),boardSteps);
+ }
+});
+
+
+test('no-op proof never blocks the original intake or bypasses a required selection',()=>{
+ for(const [file,job] of [['agent-handoff-pc-failure-intake.yml','enqueue-confirmed-failures'],['agent-handoff-writer-b-failure-intake.yml','enqueue-verified-writer-b-failures']]){
+  const yaml=read(file),original=yaml.slice(0,yaml.indexOf('  # Keep original intake independent'));
+  assert.match(original,/selection_reused: \$\{\{ steps\.selection-noop\.outcome == 'success' && steps\.selection-noop\.outputs\.reusable == 'true' && 'true' \|\| 'false' \}\}/);
+  const proof=original.slice(original.indexOf('      - name: Verify all pending selection receipts'));
+  assert.match(proof,/id: selection-noop/);
+  assert.match(proof,/github\.event_name == 'workflow_run'/);
+  assert.match(proof,/vars\.ZGMINI_AGENT_HANDOFF_ENABLED == 'true'/);
+  assert.match(proof,/continue-on-error: true/);
+  assert.match(proof,/run: node agent-handoff\/queue-dispatcher\.mjs --verify-noop/);
+  assert.doesNotMatch(proof,/actions: write|issues: write|pull-requests: write|schedule:/);
+  const after=yaml.slice(yaml.indexOf('  authenticated-readonly-board-after-selection:'));
+  assert.ok(after.includes("needs."+job+".result == 'success'"));
+  assert.match(after,/vars\.ZGMINI_AGENT_HANDOFF_ENABLED == 'true'/);
  }
 });
