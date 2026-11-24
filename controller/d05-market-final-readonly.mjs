@@ -31,9 +31,10 @@ export function projectD05MarketRow(row,key){
  if(body?.status!=='SUCCESS'||!day(body.asOfDate)||
   body?.overall?.status!=='READY'||!Array.isArray(body.domains)||
   body.domains.length!==DOMAINS.length)return null;
- const expected=DOMAINS.map((id,i)=>body.domains[i]?.id===id);
- if(expected.some(x=>!x))return null;
- const input=[['overall',body.overall],...body.domains.map(d=>[d.id,d])];
+ const indexed=new Map(body.domains.map(d=>[d?.id,d]));
+ if(indexed.size!==DOMAINS.length||
+  DOMAINS.some(id=>!indexed.has(id)))return null;
+ const input=[['overall',body.overall],...DOMAINS.map(id=>[id,indexed.get(id)])];
  if(input.some(([,x])=>x?.status!=='READY'||!validScore(x.score)||
   (x.asOfDate!=null&&x.asOfDate!==body.asOfDate)))return null;
  const items=input.map(([id,x])=>({id,score:x.score,asOfDate:body.asOfDate,
