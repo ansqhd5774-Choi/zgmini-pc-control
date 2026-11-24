@@ -163,7 +163,7 @@ export function verifyDolEta539StateReadback({pdfMode=false,collectorStatus,
  if(pdfMode&&collectorStatus==='SUCCESS')
   need(Number.isSafeInteger(stateRows)&&stateRows===51&&
    Number.isSafeInteger(stateGeographies)&&stateGeographies===51&&
-   typeof latestWeek==='string'&&/^\\d{4}-\\d{2}-\\d{2}$/.test(latestWeek),
+   typeof latestWeek==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(latestWeek),
    'R6_DOL_ETA539_STATE_READBACK_INVALID');
  return true;
 }
