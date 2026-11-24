@@ -176,3 +176,43 @@ export function inspectSidecarBManifestPreimageReadonly(){
   });
  }catch{return projectSidecarBManifestPreimageReadonly(null);}
 }
+
+
+// Classify only the four present-tense Windows resource predicates of the
+// approved one-file B probe. This does NOT claim/release locks, pause the
+// scheduler, enumerate command lines into results, or reconstruct past states.
+export function projectSidecarBResourceFlagsReadonly(raw) {
+ const empty={schema:'ZGMINI_CNN_SIDECAR_B_RESOURCES_V1',
+  status:'STATE_UNKNOWN',code:'CNN_B_RESOURCE_SNAPSHOT_UNVERIFIED',
+  coreQuiet:null,sidecarActive:null,controllerInstallBusy:null,
+  sharedWriterLockPresent:null,currentPreflightReadyIgnoringLease:null,
+  priorRuntimeFailure:'NOT_OBSERVED_BY_THIS_PROBE',
+  operationalWrites:0,providerCalls:0,d1Writes:0};
+ if(!raw||typeof raw!=='object'||Array.isArray(raw))return empty;
+ const names=['coreQuiet','sidecarActive','controllerInstallBusy','sharedWriterLockPresent'];
+ const flags=Object.fromEntries(names.map(n=>[n,typeof raw[n]==='boolean'?raw[n]:null]));
+ const complete=names.every(n=>flags[n]!==null);
+ const ready=complete?(flags.coreQuiet===true&&flags.sidecarActive===false&&
+  flags.controllerInstallBusy===false&&flags.sharedWriterLockPresent===false):null;
+ return {...empty,...flags,
+  status:complete?'PASS':'STATE_UNKNOWN',
+  code:complete?'CNN_B_RESOURCE_SNAPSHOT_COLLECTED':'CNN_B_RESOURCE_SNAPSHOT_PARTIAL',
+  currentPreflightReadyIgnoringLease:ready};
+}
+
+export function inspectSidecarBResourceFlagsReadonly() {
+ if(process.platform!=='win32')return projectSidecarBResourceFlagsReadonly(null);
+ const observe=reader=>{
+  try{const x=reader();return typeof x==='boolean'?x:null;}
+  catch{return null;}
+ };
+ return projectSidecarBResourceFlagsReadonly({
+  coreQuiet:observe(taskQuiet),
+  sidecarActive:observe(sidecarActive),
+  controllerInstallBusy:observe(()=>{
+   const value=maintenanceLockStatus(DATA,'controller-install')?.held;
+   return typeof value==='boolean'?value:null;
+  }),
+  sharedWriterLockPresent:observe(()=>fs.existsSync(SHARED_LOCK))
+ });
+}
