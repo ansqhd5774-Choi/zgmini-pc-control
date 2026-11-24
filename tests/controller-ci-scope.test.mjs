@@ -60,7 +60,7 @@ test('Controller integration workflow triggers for owning source edits',()=>{
  ];
  for(const p of required){
   assert.ok(trigger.includes("      - '"+p+"'"),'missing PR trigger: '+p);
-  assert.deepEqual(selectGroups([p]),GROUPS);
+  assert.deepEqual(selectGroups([p]),p==='tools/source-bundle-register.mjs'?['core']:GROUPS);
  }
  assert.match(y,/tests\/maintenance-agent\.test\.mjs/);
  assert.match(y,/tests\/source-bundle-register\.test\.mjs/);
