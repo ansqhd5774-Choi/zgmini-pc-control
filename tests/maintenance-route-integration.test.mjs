@@ -41,7 +41,7 @@ function routeFixture(t,{corruptApprovedBytes=false,operation=SOURCE_BUNDLE_OPER
  const output=value=>({stdout:JSON.stringify(value),stderr:''});
  const execFileImpl=async(_binary,args)=>{
   // Node updater invocation is [absolute updateScript, subcommand, ...].
-  if(args[0]?.endsWith('/update.mjs'))args=args.slice(1);
+  if(/[/\\]update\.mjs$/.test(args[0]??''))args=args.slice(1);
   calls.push([...args]);
   if(args[0]==='issue'&&args[1]==='view')return output(issue);
   if(args[0]==='issue'&&args[1]==='comment')return output({});
@@ -71,7 +71,7 @@ test('common B issue goes through pinned approval read + source-bundle-status/ap
  assert.equal(result.status,'SUCCEEDED');
  const commands=f.calls.filter(args=>['source-bundle-status','source-bundle-apply'].includes(args[0]));
  assert.deepEqual(commands.map(args=>args[0]),['source-bundle-status','source-bundle-apply']);
- const packagePath=commands[1][4];
+ const packagePath=commands[1][3];
  assert.equal(fs.existsSync(packagePath),true);
  const registered=JSON.parse(fs.readFileSync(packagePath));
  assert.equal(registered.issue.approvalManifestSha256,sha(f.bytes));
@@ -93,7 +93,7 @@ test('source bundle title/operation mismatch blocks before updater',async t=>{
  const f=routeFixture(t,{operation:'controller-update'});
  const result=await f.agent.processIssue(f.issue);
  assert.equal(result.status,'BLOCKED');
- assert.equal(result.code,'ISSUE_CONTRACT_INVALID');
+ assert.equal(result.code,'ISSUE_TITLE_OPERATION_MISMATCH');
  assert.equal(f.calls.some(args=>args[0]==='apply'||args[0]==='source-bundle-apply'),false);
 });
 test('legacy Controller and R6 status commands remain routed unchanged',async t=>{
