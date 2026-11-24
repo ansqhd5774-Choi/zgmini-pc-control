@@ -69,3 +69,48 @@ test('arbitrary expression with chained operands is not executed or guessed',()=
  assert.equal(r.guardEvaluation[0].guardPassed,null);
  assert.equal(r.firstReplayFailure,null);
 });
+
+
+test('line 19 reports bounded Git HEAD provenance without leaking source',async()=>{
+ const {classifyPinnedCnnR10Line19Readonly:shape}=await import('../controller/cnn-r10-guard-replay-readonly.mjs');
+ const lines=script();
+ lines[18]="if (head !== APPROVED_SOURCE_SHA) need(false,'PRIVATE_SOURCE_SHA');";
+ const result=shape(lines.join('\n'));
+ assert.deepEqual({form:result.form,comparison:result.comparison,gitInput:result.gitInput,
+  blockAction:result.blockAction},{
+  form:'DIRECT_VARIABLE_COMPARE',comparison:'STRICT_NOT_EQUAL',
+  gitInput:'GIT_HEAD',blockAction:'EXPLICIT_FAIL_HELPER'});
+ assert.equal(result.runtimeInput,'NOT_OBSERVED_BY_THIS_PROBE');
+ assert.doesNotMatch(JSON.stringify(result),/PRIVATE_SOURCE_SHA|aaaaaaaaaa|bbbbbbbbbb|head|APPROVED_SOURCE_SHA/);
+});
+test('line 19 classifies inline tracked Git status but does not evaluate it',async()=>{
+ const {classifyPinnedCnnR10Line19Readonly:shape}=await import('../controller/cnn-r10-guard-replay-readonly.mjs');
+ const lines=script();
+ lines[18]="if (execFileSync('git',['status','--porcelain','--untracked-files=no']).length > 0) need(false,'SECRET');";
+ const v=shape(lines.join('\n'));
+ assert.equal(v.form,'CALL_OR_MEMBER_EXPRESSION');
+ assert.equal(v.gitInput,'GIT_STATUS_TRACKED');
+ assert.equal(v.blockAction,'EXPLICIT_FAIL_HELPER');
+ assert.equal(v.comparison,'OTHER');
+ assert.doesNotMatch(JSON.stringify(v),/SECRET|--porcelain|--untracked-files/);
+});
+test('line 19 arbitrary compound expression is never called or treated as proven',async()=>{
+ const {classifyPinnedCnnR10Line19Readonly:shape}=await import('../controller/cnn-r10-guard-replay-readonly.mjs');
+ const lines=script();let calls=0;globalThis.__cnnTestGuard=()=>{calls++;throw Error('CALLED');};
+ lines[18]="if (hiddenValue() && __cnnTestGuard()) throw Error('SECRET');";
+ const v=shape(lines.join('\n'));
+ assert.equal(v.form,'COMPOUND_EXPRESSION');
+ assert.equal(v.gitInput,'UNKNOWN');
+ assert.equal(v.blockAction,'THROW');
+ assert.equal(calls,0);
+ assert.doesNotMatch(JSON.stringify(v),/SECRET|hiddenValue|__cnnTestGuard/);
+ delete globalThis.__cnnTestGuard;
+});
+test('short or malformed pinned sources stay unverified',async()=>{
+ const {classifyPinnedCnnR10Line19Readonly:shape}=await import('../controller/cnn-r10-guard-replay-readonly.mjs');
+ assert.equal(shape('if(1)').form,'UNKNOWN');
+ const lines=script();lines[18]='if (unknownFunction(';
+ assert.equal(shape(lines.join('\n')).form,'UNSUPPORTED');
+ const r=replay(lines.join('\n'),{...facts(),sourcePin:false});
+ assert.equal(r.line19Structure,null);
+});
