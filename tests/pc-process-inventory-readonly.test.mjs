@@ -12,6 +12,7 @@ import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,proj
 import {inspect3160RecoveryCasReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 import {inspect3160RollbackPreflightReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 import {projectCnnSidecarStaticGuard} from '../tools/pc-process-inventory-readonly.mjs';
+import {classifyCnnFixedCheckoutReadback} from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
  const request={schema:SCHEMA,operation:ROLE_OPERATION,role,
@@ -1691,4 +1692,46 @@ test('CNN static projection exposes only pinned candidates, never raw private te
   assert.deepEqual(r.sourceGuardCandidates,[]);
   assert.equal(r.sidecarFailureResolved,false);
  }
+});
+
+
+test('CNN fixed checkout Git readback is enum-only, stable and never Sidecar causal proof',()=>{
+ const head='a'.repeat(40),approved='b'.repeat(40);
+ const input={rootVerified:true,headBefore:head,headAfter:head,
+  approvedBefore:approved,approvedAfter:approved,cleanBefore:false,cleanAfter:false,
+  originalRawPath:'SECRET_PATH',sourceText:'SECRET_SOURCE'};
+ const out=classifyCnnFixedCheckoutReadback(input);
+ assert.equal(out.status,'PASS');
+ assert.equal(out.headVsApproved,'MISMATCH');
+ assert.equal(out.trackedClean,false);
+ assert.equal(out.actualSidecarGitRootVerified,false);
+ assert.equal(out.actualFailingSidecarPredicate,'UNKNOWN');
+ assert.equal(out.operationalWrites,0);
+ assert.equal(out.providerCalls,0);
+ assert.equal(out.d1Writes,0);
+ assert.ok(!JSON.stringify(out).includes('SECRET_'));
+ assert.ok(!JSON.stringify(out).includes(head));
+ assert.ok(!JSON.stringify(out).includes(approved));
+ const match=classifyCnnFixedCheckoutReadback({...input,
+  approvedBefore:head,approvedAfter:head,cleanBefore:true,cleanAfter:true});
+ assert.equal(match.status,'PASS');
+ assert.equal(match.headVsApproved,'MATCH');
+ assert.equal(match.trackedClean,true);
+ for(const unsafe of [
+  {...input,rootVerified:false},
+  {...input,headAfter:'c'.repeat(40)},
+  {...input,approvedAfter:'c'.repeat(40)},
+  {...input,cleanAfter:true},
+  {...input,headBefore:'MY_SECRET_SHA'},
+  {...input,approvedBefore:null},
+  {...input,cleanBefore:null}
+ ]){
+  const bad=classifyCnnFixedCheckoutReadback(unsafe);
+  assert.equal(bad.status,'STATE_UNKNOWN');
+  assert.equal(bad.headVsApproved,'UNKNOWN');
+  assert.equal(bad.trackedClean,null);
+  assert.equal(bad.actualFailingSidecarPredicate,'UNKNOWN');
+ }
+ assert.match(toText({schema:'ZGMINI_PC_PROCESS_INVENTORY_RESULT_V1',
+  cnnFixedCheckoutReadback:out}),/cnnSidecarRootVerified=false/);
 });
