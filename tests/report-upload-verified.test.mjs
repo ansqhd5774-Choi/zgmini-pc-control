@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
-import {renderBoundedReport,projectSourcePreflightReport,uploadVerifiedReportPair,resolveUploadPolicy} from '../controller/report-upload-verified.mjs';
+import {renderBoundedReport,projectSourcePreflightReport,uploadVerifiedReportPair,resolveUploadPolicy,hasVerifiedReportComment} from '../controller/report-upload-verified.mjs';
 
 const params={repository:'ansqhd5774-Choi/zgmini-pc-control',runId:'12345',attempt:'1',seat:'2',
  json:'{"ok":true}\n',txt:'status=PASS\r\n',wait:async()=>{}};
@@ -91,6 +91,40 @@ test('caller posts Issue comment only after await of both verified artifacts',()
  assert.ok(src.indexOf('await uploadVerifiedReportPair(')<src.indexOf('const allComments='));
  assert.ok(src.indexOf('const allComments=')<src.indexOf('if(!comments.some('));
  assert.match(src,/resultFiles:files\.length/);
+});
+
+test('quoted report marker does not suppress the exact run receipt',()=>{
+ const marker='<!-- zgmini-pc-result:12345:1:2 -->';
+ const body=marker+'\n**PASS — CORE_READONLY_DIAGNOSIS**\n';
+ const bot=userBody=>({user:{login:'github-actions[bot]'},body:userBody});
+ const other={user:{login:'ansqhd5774-Choi'},body};
+ assert.equal(hasVerifiedReportComment([
+  bot('Previous diagnostic quoted: '+body),other],{marker,body}),false);
+ assert.equal(hasVerifiedReportComment([bot(body)],{marker,body}),true);
+ assert.equal(hasVerifiedReportComment([bot(body),bot('Quoted: '+body)],{marker,body}),true);
+});
+
+test('same report identity with changed bot receipt fails closed',()=>{
+ const marker='<!-- zgmini-pc-result:12345:1:2 -->';
+ const body=marker+'\n**PASS — CORE_READONLY_DIAGNOSIS**\n';
+ const bot=body=>({user:{login:'github-actions[bot]'},body});
+ for(const replaced of [
+  marker+'\n**PASS — CORRUPTED**\n',
+  marker+'\n**FAIL — CORE_READONLY_DIAGNOSIS**\n',
+ ]){
+  assert.throws(()=>hasVerifiedReportComment([bot(replaced)],{marker,body}),
+   {code:'REPORT_COMMENT_CONTENT_CHANGED'});
+  assert.throws(()=>hasVerifiedReportComment([bot(body),bot(replaced)],{marker,body}),
+   {code:'REPORT_COMMENT_CONTENT_CHANGED'});
+ }
+ assert.equal(hasVerifiedReportComment([bot('noise '+marker+'\n**FAIL**')],{marker,body}),false);
+});
+
+test('uploader requires exact body receipt rather than embedded marker substring',()=>{
+ const src=fs.readFileSync(fileURLToPath(new URL('../controller/upload.mjs',import.meta.url)),'utf8');
+ assert.match(src,/if\(!hasVerifiedReportComment\(comments,\{marker,body\}\)\)/);
+ assert.match(src,/need\(hasVerifiedReportComment\(comments,\{marker,body\}\),'REPORT_COMMENT_OUTCOME_UNKNOWN'\)/);
+ assert.doesNotMatch(src,/body\?\.includes\(marker\)/);
 });
 
 test('reports already within the combined limit retain the existing pretty JSON and TXT',()=>{
