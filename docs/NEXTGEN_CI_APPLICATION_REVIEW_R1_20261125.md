@@ -346,3 +346,19 @@
 - [CodeQL #45498514820](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45498514820) 및 [Secret #45498514831](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45498514831) SUCCESS. 아티팩트 ci-data-contract id 14969962274 생성.
 - 이 검증은 합성 D1 계약이고 실제 운영 DB 원자료의 완전성·진짜 PIT·D1 게시/readback·Production 최신성을 인증하지 않음. 기존 기능 담당 승인·설치 경로를 대체하지 않는다.
 - **R2 누적 소스 검증·main 반영 10/12종(83.3%)**. #36 GitHub Actions Continuous Benchmarking은 별도 PR #1601 CI 진행 중. #8 Performance Budget 자동 임계치는 승인되지 않아 NOT_CONFIGURED 유지.
+
+
+## R2 #36 Continuous Benchmarking 통합 완료 및 #8 잔여 — 2026-11-25
+
+### #36 Continuous Benchmarking (main 적용)
+- 본체 [PR #1601](https://github.com/ansqhd5774-Choi/zgmini/pull/1601) → main 병합 SHA **3cb92940b0dc57a39c7551a41d65b1f973133b5d**. 같은 Node.js CI에서 GitHub Actions 메타데이터만 읽어 **main push Node.js CI 완료 실행 최근 최대 10건**의 run_attempt별 Job을 조회한다. 별도 Workflow·Runner·예약·외부 유료 서비스 없음. 기존 contents:read에 actions:read(조회만) 허용, token은 해당 단계에만 전달하고 저장하지 않는다.
+- 최근 5건/직전 5건의 Queue·Execution P50/P90 및 실패 수를 구분. 시작하지 않은 취소/skip Job은 duration null, 표본 부족은 INSUFFICIENT_COMPARABLE_HISTORY, 실제 시각 불일치/HTTP 거부/부분 Job 인벤토리는 fail-closed. 비교는 관측치 설명이지 보정된 CI 속도 개선 보장이나 임의 Budget gate 아님. 결과 JSON 7일 보관.
+- 최초 독립 HEAD [Run #45498832682](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45498832682): 실제 CI_CONTINUOUS_BENCHMARK 관측·아티팩트 id 14970112573 생성 성공, 그러나 **기존 SEC rate-limit fixture peak=9**으로 Node 전체 Regression tests 실패. 별개 원인 기록을 기존 [Issue #1582](https://github.com/ansqhd5774-Choi/zgmini/issues/1582) 댓글 7146025519에 연결; 기존 테스트 삭제·리밋 완화·운영 수집기 수정 없이 보존.
+- #20 main 변경을 비강제 병합한 통합 HEAD d1a100bd895aea2f88b75f2d12eb0aea24fad89b의 [Node CI #45499301019](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45499301019), [CodeQL #45499300759](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45499300759), [Secret #45499300770](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45499300770) **3/3 SUCCESS**. Node는 기존 full Regression, #20 synthetic D1 9*7=63/63, architecture, npm audit, #36 benchmark, 두 아티팩트 업로드 모두 성공. ci-continuous-benchmark id 14969858285; ci-data-contract id 14968878263.
+- 이 통합 실행에서 실제 메타데이터: 최근 5개 Job 실행 중앙값 **123초**, 직전 5개 **122초**(단순 변화 +0.8%); Queue 중앙값 두 그룹 모두 2초; 수집된 완료 Run 10개 중 실패 Run 1개. 실행 환경/소스/Runner 차이를 통제하지 않았으므로 개선/회귀 통계적 판정 아님. Workflow가 성공하기 전 실행 Job을 자기 표본에 포함하지 않는다.
+- main readback SHA 3cb92940b0dc57a39c7551a41d65b1f973133b5d. node.js.yml에서 #20, #36, #6 아키텍처, #15 공급망, 기존 high/critical npm audit과 전체 회귀를 모두 확인.
+
+### R2 최종 현재 상태와 #8 대기 조건
+- 기존 10종 + #36 = **11/12종(91.7%)** 한정 source 구현·관련 실제 GitHub CI 성공·main 병합. 운영 PC 설치/데이터 수집·게시·Production 웹 성능 성공률을 의미하지 않음.
+- **#8 Performance Budget**: 비교 함수·승인 source/fixture/browserVersion/viewport matching 계약과 #24 로컬 Chromium 계측은 구현되어 있으나 사용자가 승인한 수치 임계치·버전 기준선/정책이 없어 **NOT_CONFIGURED**. 임의 승인 SHA·임계치·전후 개선율 또는 PR Gate를 만들지 않음. 이 항목은 현재 11종 완료에 산입하지 않는다.
+- 지속 관리 중이지만 이번 범위와 독립인 문제: SEC 공유 1초 제한 fixture의 peak=9 반복, 공식 GitHub Dependency Review API의 과거 HTTP 403. 각 원본 증거/Issue 보존. 새 데이터 결함이나 운영 수집 실패를 가정하지 않음.
