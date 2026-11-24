@@ -322,8 +322,8 @@ test('W04 V2 112-week ETA539 readback checks latest 51 regions, not 5712 refresh
   const db={prepare(sql){
    prepared=true;
    assert.match(sql,/WITH touched AS/);
-   assert.match(sql,/observation_date=\\(SELECT MAX\\(observation_date\\) FROM touched\\)/);
-   assert.match(sql,/retrieved_at>=\\?/);
+   assert.match(sql,/observation_date=\(SELECT MAX\(observation_date\) FROM touched\)/);
+   assert.match(sql,/retrieved_at>=\?/);
    assert.match(sql,/geography_type='STATE'/);
    assert.match(sql,/logical_series_id='STATE_INITIAL_CLAIMS'/);
    return {bind(value){
