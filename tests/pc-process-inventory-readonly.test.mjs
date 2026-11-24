@@ -1452,3 +1452,19 @@ test('D05 theme final-output probe admits only the fixed operating scope',()=>{
  assert.match(txt,/d05ThemeCount=12/);
  assert.match(txt,/d05DailyPoints=45/);
 });
+
+
+test('D05 configured registration probe is fixed scope, operating-only, and count-only',()=>{
+ const e=event(),p=JSON.parse(e.issue.body);
+ const request=(probe,extra={})=>({...e,issue:{...e.issue,body:JSON.stringify({...p,probe,...extra})}});
+ const exact=request('d05-configured-registration-readonly');
+ assert.equal(authenticateProcess(exact,env,'operating').d05ConfiguredRegistrations,true);
+ assert.throws(()=>authenticateProcess(exact,env,'handoff'));
+ assert.throws(()=>authenticateProcess(request('d05-configured-registration-readonly',{path:'E:/secret'}),env,'operating'));
+ assert.throws(()=>authenticateProcess(request('d05-configured-registration-readonly cmd'),env,'operating'));
+ const txt=toText({schema:'ZGMINI_PC_PROCESS_INVENTORY_RESULT_V1',d05ConfiguredRegistrations:{
+  code:'D05_CONFIGURED_REGISTRATIONS_READONLY',registeredDefinitionCount:1,
+  registryManifestSha256:'a'.repeat(64)}});
+ assert.match(txt,/d05ConfiguredDefinitionCount=1/);
+ assert.match(txt,/d05ConfiguredInventoryHash=/);
+});
