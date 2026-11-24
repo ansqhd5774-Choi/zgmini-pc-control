@@ -21,6 +21,7 @@ import {inspectTask as inspectMarketParquetTask} from './marketparquet-task-sour
 import {inspectW03PaidPrivateReadonly,inspectD05PaidThemeFinalOutputsReadonly,inspectD05ConfiguredRegistrationReadonly} from './w03-paid-private-readonly.mjs';
 import {validateRunnerJobRefs,inspectRunnerJobHistory} from './runner-job-history-readonly.mjs';
 import {inspectW043409SourcePreflightReadonly} from './w04-3409-source-preflight-readonly.mjs';
+import {inspect3409ArchivedReceiptReadonly} from './w04-3409-archive-receipt-readonly.mjs';
 
 export const TITLE='pc-process-inventory-readonly';
 export const SCHEMA='ZGMINI_PC_PROCESS_INVENTORY_REQUEST_V1';
@@ -602,11 +603,17 @@ function inspect3409MaintenanceStatusReadonly(){
  try{
   const result=project3409MaintenanceStatus(
    collectAutomationStatus(['--request-id',TARGET3409]));
-  if(result.status!=='READ_ONLY_OBSERVED')return result;
+  // A completed original recovery may have archived its install lease;
+  // never require that old lease to remain available for archive readback.
+  const recoveryArchive=inspect3409ArchivedReceiptReadonly();
+  if(result.status!=='READ_ONLY_OBSERVED')
+   return {...result,recoveryArchive};
   const protectedCheck=inspect3409ProtectedBaselineReadonly();
   return {...result,protectedStateUnchanged:protectedCheck.unchanged,
    protectedDifferenceClass:protectedCheck.differenceClass,
-   recoveryCas:inspect3409RecoveryCasReadonly(),
+   recoveryCas:recoveryArchive.status==='ARCHIVE_VERIFIED'?null:
+    inspect3409RecoveryCasReadonly(),
+   recoveryArchive,
    sourcePreflight:inspectW043409SourcePreflightReadonly()};
  }catch{return project3409MaintenanceStatus(null);}
 }
