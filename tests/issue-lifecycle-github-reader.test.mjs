@@ -26,13 +26,13 @@ const contents=data=>{
  const bytes=Buffer.from(data,'utf8');
  return {type:'file',encoding:'base64',size:bytes.length,
    content:bytes.toString('base64'),
-   sha:createHash('sha1').update('blob '+bytes.length+'\\0').update(bytes).digest('hex')};
+   sha:createHash('sha1').update('blob '+bytes.length+'\0').update(bytes).digest('hex')};
 };
 const make=()=>{
- const body='<!-- zgmini-pc-result:43166235600:1:3 -->\\n'+
-  'results/43166235600-1-seat-3.json\\nresults/43166235600-1-seat-3.txt';
+ const body='<!-- zgmini-pc-result:43166235600:1:3 -->\n'+
+  'results/43166235600-1-seat-3.json\nresults/43166235600-1-seat-3.txt';
  const json=JSON.stringify(report),txt=fields.map(f=>f+'='+
-   (report[f]===null?'null':String(report[f]))).join('\\r\\n')+'\\r\\n';
+   (report[f]===null?'null':String(report[f]))).join('\r\n')+'\r\n';
  const prefix='repos/'+REPO+'/';
  const paths=new Map([
   [prefix+'issues/'+issueNumber,{number:issueNumber,state:'open',body:JSON.stringify(request),
@@ -73,7 +73,7 @@ const faults=[
  ['misbound comment',x=>x.paths.get(x.prefix+'issues/comments/'+commentId).issue_url='https://api.github.com/repos/'+REPO+'/issues/42','GITHUB_OBJECT_PROVENANCE_MISMATCH'],
  ['tampered Git blob',x=>x.paths.get(x.prefix+'contents/results/43166235600-1-seat-3.json?ref='+commit).sha='f'.repeat(40),'PINNED_BLOB_UNVERIFIED'],
  ['missing TXT file',x=>x.paths.delete(x.prefix+'contents/results/43166235600-1-seat-3.txt?ref='+commit),'PINNED_BLOB_UNVERIFIED'],
- ['altered TXT with valid Git blob',x=>x.paths.set(x.prefix+'contents/results/43166235600-1-seat-3.txt?ref='+commit,contents('status=BLOCKED\\r\\n')),'PAIR_FIELD_MISMATCH'],
+ ['altered TXT with valid Git blob',x=>x.paths.set(x.prefix+'contents/results/43166235600-1-seat-3.txt?ref='+commit,contents('status=BLOCKED\r\n')),'PAIR_FIELD_MISMATCH'],
  ['comment author not bot',x=>x.paths.get(x.prefix+'issues/comments/'+commentId).user.login='attacker','RESULT_COMMENT_UNVERIFIED'],
  ['GitHub GET throws',x=>x.args.githubGet=async()=>{throw Error('down');},'GITHUB_OBJECT_PROVENANCE_MISMATCH'],
  ['non-success workflow',x=>x.paths.get(x.prefix+'actions/runs/'+runId).conclusion='failure','GITHUB_RUN_NOT_SUCCESS']
