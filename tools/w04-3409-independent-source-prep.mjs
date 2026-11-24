@@ -18,7 +18,7 @@ const TARGET='6b3c9c0ce77354d81babe4c9ea7785663c6c2cb4';
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const fail=code=>{throw Object.assign(new Error(code),{code});};
 const check=(value,code)=>{if(!value)fail(code);};
-const paths={
+export const CAS_PATHS={
  ledger:MAINT+'/ledger/'+REQUEST_ID+'.json',
  owner:MAINT+'/leases/controller-install/owner.json',
  marker:MAINT+'/leases/controller-install/RECOVERY_REQUIRED.json',
@@ -35,7 +35,7 @@ export function validateApproval(approval) {
   approval.sourceSha===SOURCE_SHA && approval.targetControllerSha===TARGET,
   'PREP_APPROVAL_IDENTITY_MISMATCH');
  check(approval.casDigests&&Object.keys(approval.casDigests).length===7 &&
-  Object.keys(paths).every(k=>/^[a-f0-9]{64}$/.test(approval.casDigests[k+'Sha256']??'')) &&
+  Object.keys(CAS_PATHS).every(k=>/^[a-f0-9]{64}$/.test(approval.casDigests[k+'Sha256']??'')) &&
   approval.approvedCurrentWriterConfigSha256===approval.casDigests.writerSha256,
   'PREP_CAS_CONTRACT_INVALID');
  check(Array.isArray(approval.files)&&approval.files.length===4 &&
@@ -47,7 +47,7 @@ export function validateApproval(approval) {
 }
 export function verifyCas(approval,read=fs.readFileSync,stat=fs.lstatSync) {
  validateApproval(approval);
- for(const [name,file] of Object.entries(paths)) {
+ for(const [name,file] of Object.entries(CAS_PATHS)) {
   let s,b;
   try { s=stat(file); check(s.isFile()&&!s.isSymbolicLink()&&s.size>0&&s.size<=max[name],
     'PREP_'+name.toUpperCase()+'_UNSAFE'); b=read(file); }
@@ -75,16 +75,15 @@ export function run({git,read=fs.readFileSync,stat=fs.lstatSync,exists=fs.exists
  const origin=g(['remote','get-url','origin']).toString().trim();
  check(/^(?:https:\/\/github\.com\/|git@github\.com:)ansqhd5774-Choi\/zgmini-pc-control(?:\.git)?$/.test(origin),
   'PREP_REPO_ORIGIN_MISMATCH');
- const approval=JSON.parse(g(['show',SOURCE_SHA+':'+APPROVAL]).toString());
- validateApproval(approval);
- verifyCas(approval,read,stat);
- // A fetch is only permitted after the old approved object is available.
- // This never moves the active checkout HEAD or any Controller/runtime file.
+ // Fetch objects without checkout/reset. This fixes the observed missing
+ // fcb098d2 object; the running Controller and install lease are untouched.
  const oldHead=g(['rev-parse','HEAD']).toString().trim();
  check(/^[a-f0-9]{40}$/.test(oldHead),'PREP_HEAD_INVALID');
  g(['fetch','--no-tags','origin','main']);
- g(['merge-base','--is-ancestor',SOURCE_SHA,'refs/remotes/origin/main']);
  check(g(['rev-parse','HEAD']).toString().trim()===oldHead,'PREP_HEAD_MOVED');
+ g(['merge-base','--is-ancestor',SOURCE_SHA,'refs/remotes/origin/main']);
+ const approval=JSON.parse(g(['show',SOURCE_SHA+':'+APPROVAL]).toString());
+ validateApproval(approval);
  verifyCas(approval,read,stat);
  check(!exists(STAGE),'PREP_STAGE_ALREADY_EXISTS');
  mkdir(path.dirname(STAGE),{recursive:true});
