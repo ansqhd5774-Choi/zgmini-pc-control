@@ -37,3 +37,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node tools/c996-source-checks.mjs
+      # Reuse the existing isolated source-only Windows job; no new Runner or timer.
+      - name: Validate pinned workflow security scanner
+        run: node --test tests/ci-zizmor-pr.test.mjs
+      - name: Audit changed GitHub Actions workflow security
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node tools/ci-zizmor-pr.mjs
