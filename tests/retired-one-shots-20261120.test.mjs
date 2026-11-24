@@ -69,6 +69,18 @@ test('terminal EIA-only B Issue intake is retired while private source and appro
    'pc-job.yml','pc-writer-b-source-once.yml'])
   assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
 });
+// #248 was blocked and #251 was partial: FRED and EIA independently
+// recovered under separate later requests, not a composite false PASS.
+test('superseded fixed gas-electric dual-source Issue intake is retired',()=>{
+ assert.equal(existsSync(path.join(root,'.github/workflows','pc-inflation-gas-electric-approved-once.yml')),false);
+ for(const name of ['inflation-gas-electric-b-once.mjs','INFLATION_GAS_ELECTRIC_B_APPROVAL.json',
+   'tests/inflation-gas-electric-b-once.test.mjs'])
+  assert.equal(existsSync(path.join(root,name)),true,name);
+ for(const name of ['pc-inflation-19-inventory-b-once.yml','pc-approved-runtime-a-once.yml',
+   'pc-approved-runtime-b-once.yml','pc-job.yml','pc-writer-b-source-once.yml',
+   'pc-inflation-gas-refresh-approved-once.yml'])
+  assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
+});
 test('common A/B and unfinished inflation and R54 readers are preserved',()=>{
  for(const name of kept)assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
 });
