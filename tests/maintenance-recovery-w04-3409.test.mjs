@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {installedRecoveryCase,classifyInstalledReconciliationProof}
+import {installedRecoveryCase,installedRecoveryProtectionAllowed,
+ classifyInstalledReconciliationProof}
  from '../tools/maintenance-recovery.mjs';
 
 const oldId='pc-update-e8767e20-6bad-4418-97c6-561cf79a8213';
@@ -44,4 +45,18 @@ test('reconciliation requires all independent live, CAS and operator checks',()=
   assert.equal(failed.checks[
    Object.keys(failed.checks).find(n=>!failed.checks[n])],false,key);
  }
+});
+
+test('W04 unchanged protected snapshot accepted, but any Writer drift is rejected',()=>{
+ const w04=installedRecoveryCase(w04Id),legacy=installedRecoveryCase(oldId);
+ const unchanged={allowed:true,code:'RECOVERY_ORIGINAL_PROTECTION_UNCHANGED',
+  preservedWriterConfig:false};
+ const writerDelta={allowed:true,code:'RECOVERY_CURRENT_WRITER_CONFIG_PRESERVED',
+  preservedWriterConfig:true};
+ assert.equal(installedRecoveryProtectionAllowed(w04,unchanged),true);
+ assert.equal(installedRecoveryProtectionAllowed(w04,writerDelta),false);
+ assert.equal(installedRecoveryProtectionAllowed(legacy,unchanged),false);
+ assert.equal(installedRecoveryProtectionAllowed(legacy,writerDelta),true);
+ assert.equal(installedRecoveryProtectionAllowed(w04,{...unchanged,allowed:false}),false);
+ assert.equal(installedRecoveryProtectionAllowed(null,unchanged),false);
 });
