@@ -412,7 +412,7 @@ export function project3409MaintenanceStatus(raw){
   raw.recoveryEvidence?.backlog?.pauseWindow:null;
  const utc=v=>typeof v==='string'&&
   /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/.test(v)&&
-  Number.isFinite(Date.parse(v))?v:null;
+  Number.isFinite(Date.parse(v))&&new Date(Date.parse(v)).toISOString().slice(0,19)===v.slice(0,19)?v:null;
  const paused=utc(w?.pausedAt),resumed=utc(w?.resumedAt);
  // The window alone is observational evidence, never an install-recovery GO.
  if(b)b.pauseWindow=b.windows===1&&b.openWindows===0&&paused&&resumed&&
