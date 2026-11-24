@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync,mkdtempSync,mkdirSync,writeFileSync,rmSync} from 'node:fs';
+import {readFileSync,mkdtempSync,mkdirSync,writeFileSync,rmSync,realpathSync} from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {
@@ -144,17 +144,18 @@ test('invalid data root and missing config fail closed without touching provider
  const invalid=await inspectW05FiveKeyD1ApiReadback('not-absolute');
  assert.equal(invalid.code,'W05_DATA_ROOT_INVALID');
  const dir=mkdtempSync(path.join(os.tmpdir(),'zgmini-w05-five-key-'));
+ const verified=realpathSync.native(dir);
  try{
-  const absent=await inspectW05FiveKeyD1ApiReadback(dir);
+  const absent=await inspectW05FiveKeyD1ApiReadback(verified);
   assert.equal(absent.status,'STATE_UNKNOWN');
   assert.equal(absent.code,'W05_WRITER_CONFIG_NOT_AVAILABLE');
   mkdirSync(path.join(dir,'pc-writer'),{recursive:true});
   writeFileSync(path.join(dir,'pc-writer','config.json'),'{bad');
-  const malformed=await inspectW05FiveKeyD1ApiReadback(dir);
+  const malformed=await inspectW05FiveKeyD1ApiReadback(verified);
   assert.equal(malformed.code,'W05_WRITER_CONFIG_INVALID');
   writeFileSync(path.join(dir,'pc-writer','config.json'),JSON.stringify({
    source:SOURCE,account:'b'.repeat(32),core:'123e4567-e89b-12d3-a456-426614174000'}));
-  const absentSource=await inspectW05FiveKeyD1ApiReadback(dir);
+  const absentSource=await inspectW05FiveKeyD1ApiReadback(verified);
   assert.equal(absentSource.status,'STATE_UNKNOWN');
   assert.equal(absentSource.code,'W05_SOURCE_CHECKOUT_UNVERIFIED');
   assert.equal(absentSource.deploymentIdentityVerified,false);
