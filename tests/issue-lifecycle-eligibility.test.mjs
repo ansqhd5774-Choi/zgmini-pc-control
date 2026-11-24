@@ -5,7 +5,7 @@ import {classifyIssueCompletion} from '../controller/issue-lifecycle-eligibility
 const good = () => ({
   issue: {state:'open',number:3336},
   request: {schema:'ZGMINI_PC_PROCESS_INVENTORY_REQUEST_V1',requestId:'verified-request-id',operation:'process-inventory-readonly'},
-  result: {requestId:'verified-request-id',operation:'process-inventory-readonly',runId:'45405985982',status:'PASS',
+  result: {requestId:'verified-request-id',operation:'process-inventory-readonly',jobId:'run-45405985982-1-seat-1',status:'PASS',
     code:'PROCESS_INVENTORY_COLLECTED',firstFail:null,protectedStateUnchanged:true,
     operationalWrites:0,providerCalls:0,d1Writes:0},
   evidence: {issueNumber:3336,requestId:'verified-request-id',runId:'45405985982',attempt:1,seat:1,
