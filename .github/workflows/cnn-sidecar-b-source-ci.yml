@@ -5,6 +5,7 @@ on:
     paths:
       - 'sidecar-b/**'
       - '.github/workflows/cnn-sidecar-b-source-ci.yml'
+      - '.github/workflows/cnn-sidecar-b-once.yml'
 permissions:
   contents: read
 concurrency:
@@ -40,4 +41,11 @@ jobs:
         run: |
           node --check sidecar-b/windows-file-adapter.mjs
           node --check sidecar-b/admission.mjs
+          node --check sidecar-b/receiver.mjs
+          node --check sidecar-b/trusted-approval.mjs
+          node --check sidecar-b/operating-probe.mjs
+          node --check sidecar-b/pinned-candidate.mjs
+          node --check sidecar-b/preflight.mjs
+          node --check sidecar-b/entry.mjs
+          node --check sidecar-b/report.mjs
           node --test sidecar-b/*.test.mjs
