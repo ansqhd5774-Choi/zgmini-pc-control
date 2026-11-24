@@ -275,3 +275,23 @@
 - 기존 #12·#19·#1·#29의 4종 main 반영 및 유효 검증을 보존한다. **R2 누적 실제 코드 고도화 4/12**, #8·#24 신규 고도화 채택 0건. 실패한 실험의 CI를 6/12 실구현이나 웹 운영 성능 개선으로 계산하지 않는다.
 - 무작정 타임아웃을 늘리거나 실패한 검사를 `continue-on-error`로 숨기거나 사용자 Production을 일반 성능 fixture로 삼지 않는다. 외부 Lighthouse 임시 서버 업로드·유료 서비스·Runner/cron 추가 금지 유지.
 - 다음 독립 후보는 #25 Accessibility CI 또는 #23 Cross-browser CI. 현 정상 Playwright와 기존 모바일/데스크톱 검사 재사용을 우선하며, 경량·실행비용·접근성 오류 유효 증거가 있는 변경만 정규 병합한다. #8/#24는 로컬 Workers Browser 탐색의 실제 원인이 **새 증거**로 확인되기 전 동일 조건을 반복하지 않는다.
+
+
+## R2 #8/#24 후속 격리 성능 측정 성공 보정 — 2026-11-25
+
+위 PR #1587의 Lighthouse/기존 실험 실패 판정은 당시 조건의 역사적 증거로 보존한다. 이후 **별도 구현·실행 환경**의 [본체 PR #1593](https://github.com/ansqhd5774-Choi/zgmini/pull/1593)에서 실제 동작 검증·main 병합을 완료했다. #1587이 성공했다고 소급하지 않는다.
+
+- 변경 브랜치: codex/ci-performance-lab-r2-20261125. 변경 3파일: 기존 Browser Workflow, 신규 scripts/ci-performance-lab.mjs, tests/ci-performance-lab.test.mjs. main 병합 SHA: d9d335388c584cf496aa2cd1dd3842732fe3e5cf. 정확 main 파일 readback 성공.
+- 기존 Browser CI의 Playwright/Chromium+로컬 npm run dev 서버 재사용, 18개 기존 UI 검사 **전부 SUCCESS** 후 성능 단계 실행. 별도 Lighthouse 설치·운영 Cloudflare 변경·Runner·예약·새 Workflow·AI API·유료 서비스 없음.
+- 신규 실험 브라우저는 127.0.0.1:5173 로컬 origin만 허용하고 사이트 API는 503 UNAVAILABLE로 명시적 격리. 실제 금융 관측이나 성공 응답을 위조하지 않음.
+- [Node CI #45491019155](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45491019155): 신규 7회귀시험 PASS. [CodeQL #45491019318](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45491019318), [Secret #45491019055](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45491019055), [Playwright #45491019203](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45491019203): 모두 SUCCESS. 신규 성능 측정 단계 4초(초 단위 Job timing).
+- 실제 회수한 Artifact: community-chat-browser-r1 / id 14965854319 / performance-lab/report.json. 관측 시각 2026-11-24T21:32:40.521Z, Chrome 141.0.7390.37.
+
+| 로컬 실험 viewport | responseEnd(ms) | DOMContentLoaded(ms) | FCP(ms) | LCP(ms) | CLS | LongTask(ms) |
+|---|---:|---:|---:|---:|---:|---:|
+| 390x844 | 137.3 | 261 | 296 | 296 | 0.03 | 148 |
+| 1440x900 | 39.3 | 134.1 | 212 | 212 | 0 | 133 |
+
+**판정 조정:** #24 Performance CI의 **제한된 로컬 격리 측정·아티팩트**는 구현·실제 실행·main 반영 완료. #8 Performance Budget은 동일 브라우저·fixture·viewport·URL을 요구하는 비교 함수와 사전 승인 정책 계약은 구현했으나 실제 임계치 정책/차단은 NOT_CONFIGURED로 보류. 따라서 R2 누적 소스 적용 **기존 4종 + #24 1종 = 5종**, #8 부분 구현으로 집계. 앞선 Lighthouse/preview timeout의 근본 원인을 입증했다고 주장하지 않는다.
+
+**제약:** 단일 로컬 API UNAVAILABLE 회차로 실제 Production 방문자 성능, Lighthouse 점수, Core Web Vitals 현장 데이터, 전후 개선율은 검증 불가. 정책 Gate를 허가 없이 신설하지 않으며 비교 가능한 반복 실측과 승인된 성능 임계치만 후속 검토한다.
