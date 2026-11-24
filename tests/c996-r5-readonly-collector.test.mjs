@@ -41,8 +41,11 @@ import {spawnSync} from 'node:child_process';
 test('CNN #1521 b9 known Sidecar hash allowlist focused regression on isolated Windows',()=>{
  const target=fileURLToPath(new URL('./fear-greed-archive-status.test.mjs',import.meta.url));
  const exact='^read-only Sidecar diagnosis accepts only explicitly pinned source generations, never unknown bytes$';
- const run=spawnSync(process.execPath,['--test','--test-name-pattern='+exact,target],{
-  encoding:'utf8',windowsHide:true,timeout:60000,maxBuffer:1024*1024,
+ // Node's outer test worker marks child processes with NODE_TEST_CONTEXT.
+ // Clear that marker so this independent focused child prints its TAP receipt.
+ const childEnv={...process.env};delete childEnv.NODE_TEST_CONTEXT;
+ const run=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern='+exact,target],{
+  encoding:'utf8',windowsHide:true,timeout:60000,maxBuffer:1024*1024,env:childEnv,
  });
  assert.equal(run.error,undefined,String(run.error));
  assert.equal(run.status,0,(run.stdout??'')+'\\n'+(run.stderr??''));
