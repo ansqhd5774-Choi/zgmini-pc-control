@@ -2176,8 +2176,21 @@ async function main(){
   [stem+'.txt',targeted?w05OperatorTopologyText(result):toText(result)]];
  const headers={authorization:'Bearer '+env.GITHUB_TOKEN,accept:'application/vnd.github+json',
   'X-GitHub-Api-Version':'2022-11-28','content-type':'application/json'};
- const uploaded=await uploadResultPairAtomic({outputs,headers,
-  message:'results(ops): fixed process snapshot '+role+' '+ctx.runId});
+ let uploaded;
+ try{
+  uploaded=await uploadResultPairAtomic({outputs,headers,
+   message:'results(ops): fixed process snapshot '+role+' '+ctx.runId});
+ }catch(error){
+  // Sanitized transport diagnosis only; the result pair is not declared
+  // uploaded, and the original fail-closed behavior is preserved.
+  if(error?.message==='CONFIG_B_PAIR_REMOTE_STOP'){
+   console.error('PROCESS_RESULT_PAIR_REMOTE_STOP stage='+
+    (typeof error.remoteStage==='string'&&/^(GET|POST)_[A-Z_]{2,40}$/.test(error.remoteStage)?
+     error.remoteStage:'UNKNOWN')+' httpStatus='+
+    (Number.isInteger(error.remoteStatus)?error.remoteStatus:'UNKNOWN'));
+  }
+  throw error;
+ }
  if(uploaded.delivery!=='RESULT_PAIR_READBACK_VERIFIED')fail(uploaded.delivery);
  const ack=await fetch('https://api.github.com/repos/'+REPO+'/issues/'+ctx.issueNumber+'/comments',
   {method:'POST',headers,body:JSON.stringify({body:
