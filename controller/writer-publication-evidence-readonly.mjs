@@ -59,11 +59,53 @@ function readLedger(dataRoot,filename,{fileSystem=fs}={}){
   return {state:'READY',value:o};
  }catch{return {state:'INVALID'};}
 }
+// Reuse the installed A reader for the three W05 informational sidecars.
+// Only project exact-key, bounded receipt metadata from the existing Writer
+// report. A Writer receipt is not a fresh independent D1/API query.
+const W05_KEYS=Object.freeze({
+ wpsfd42:'detail:earnings-recession-indicators:bls-wpsfd42:v1',
+ qfr:'detail:earnings-recession-indicators:census-qfr-mfg-margin:v1',
+ bea:'detail:earnings-bea-unit-profit:v1',
+});
+const W05_OK=new Set(['READBACK_VERIFIED','ALREADY_STORED']);
+export function projectW05SavedSidecars(writer){
+ const source=SHA40.test(writer?.source??'')?writer.source:null;
+ const at=safeTime(writer?.at);
+ const validRun=Boolean(source&&at&&writer?.mode==='PUBLISH'&&
+  ['VERIFIED','VERIFIED_WITH_GAPS'].includes(writer?.status));
+ const report=writer?.w05SavedSidecars;
+ const validReport=report&&typeof report==='object'&&!Array.isArray(report);
+ const failures=Array.isArray(writer?.failures)?writer.failures:[];
+ const keys={};
+ for(const [id,key] of Object.entries(W05_KEYS)){
+  const r=validReport?report[id]:null;
+  const row=r&&typeof r==='object'&&!Array.isArray(r)?r:null;
+  const status=safeStatus(row?.status);
+  const version=SHA64.test(row?.sourceVersion??'')?row.sourceVersion:null;
+  const sourceStoredAt=Number.isSafeInteger(row?.sourceStoredAt)&&
+   row.sourceStoredAt>0?row.sourceStoredAt:null;
+  const publishedAt=safeStoredAt(row?.publishedAt);
+  const error=failures.find(f=>f?.id===`w05-saved-sidecar:${id}`);
+  const failedReason=safeStatus(error?.reason);
+  const readback=Boolean(validRun&&row?.key===key&&W05_OK.has(status)&&
+   version&&sourceStoredAt);
+  keys[id]={key,status:status??(failedReason?'FAILED':null),
+   evidence:readback?'WRITER_READBACK_RECORDED':
+    failedReason?'WRITER_FAILED':status?.startsWith('SKIPPED_')?'SKIPPED':
+    row?'UNVERIFIED':'NOT_RECORDED',
+   sourceVersion:version,sourceStoredAt,publishedAt,
+   failureReason:failedReason,readbackAtWriter:readback};
+ }
+ return {evidenceLevel:'SAVED_LOCAL_WRITER_REPORT_NOT_FRESH_D1_API',
+  writerSource:source,writerAt:at,keys,providerCalls:0,
+  productionVerified:false,publicApiUiVerified:false};
+}
+
 export function inspectWriterPublicationEvidence(dataRoot,{fileSystem=fs,
  readOutput=readER1LocalOutput}={}){
  const result={status:'STATE_UNKNOWN',code:'ER1_WRITER_EVIDENCE_UNAVAILABLE',
   observedAt:new Date().toISOString(),evidenceLevel:'LOCAL_WRITER_AND_OUTPUT_READONLY',
-  writer:null,er1Future:null,ledger:null,
+  writer:null,er1Future:null,ledger:null,w05Sidecars:null,
   output:{key:null,state:'NOT_OBSERVED',storedAt:null,bodySha256:null},
   d1:{perKeyReadback:'NOT_RECORDED',matchedToLocal:false,
    productionVerified:false,publicApiUiVerified:false,
@@ -94,6 +136,7 @@ export function inspectWriterPublicationEvidence(dataRoot,{fileSystem=fs,
   mode:w.mode==='PUBLISH'?'PUBLISH':w.mode==='DRY_RUN'?'DRY_RUN':null,
   status:safeStatus(w.status)};
  result.er1Future={status:safeStatus(w.er1Future?.status),months,failures:failed};
+ result.w05Sidecars=projectW05SavedSidecars(w);
  if(ledger.state==='READY'){
   const l=ledger.value;
   result.ledger={state:'READY',status:safeStatus(l.status),
