@@ -1,0 +1,20 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "a427c671-befb-4758-8a3c-5b3272c076c3",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "24077edc2fb4196e83ba202fdd9681b1fe841447",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "15f65455bbe44cef76f87a3f589ad08f94359184",
+  "candidateSourceSha": "4499e801d88484cafe6aaf28b1246a5e72ae06ec",
+  "manifestSha256": "b02cb462d2848fbecd43ba2233ca6a3dece4d74334ddb846b5ea4f72845ae091",
+  "baseTreeOid": "d6c4d093d67ffc92e070b85595bfd31ab52f8de7",
+  "preparedTreeOid": "5d7a7f98f7a4f8c7fea02b4f0168faa402bc781b",
+  "provenanceSha256": "f954d610bd019eb7873d8c9c056992da7e2a189e6d867edaebf158de96574e2d",
+  "runId": "45343937221",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/w05-stored-sidecar-publication-r1.mjs"
+  ]
+}
