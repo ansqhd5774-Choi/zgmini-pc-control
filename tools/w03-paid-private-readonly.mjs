@@ -140,7 +140,7 @@ const d05Unknown=code=>UNKNOWN(code,{scope:'PAID_PUBLIC_FINAL_OUTPUTS_ONLY',
  expectedPublicThemeCount:null,dashboardTargetThemeCount:30,
  publicFinalOutputCoverageVerified:false,full30FinalOutputCoverageVerified:false,
  oneYearComplete:false});
-const d05ExpectedPublicIds=ids=>Array.isArray(ids)&&ids.length>0&&ids.length<=30&&
+const d05ExpectedPublicIds=ids=>Array.isArray(ids)&&ids.length>0&&
  ids.every(id=>typeof id==='string'&&/^[a-z][a-z0-9-]*$/.test(id))&&
  new Set(ids).size===ids.length?new Set(ids.map(id=>'theme:'+id)):null;
 const d05Iso=x=>typeof x==='string'&&Number.isFinite(Date.parse(x))&&
