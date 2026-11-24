@@ -24,9 +24,9 @@ jobs:
       cancel-in-progress: false
       queue: max
     runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
-    # Existing requests retain 12-minute cap. The new longer window requires
-    # both an exact B manifest and an explicitly matching request label.
-    timeout-minutes: ${{ contains(github.event.issue.labels.*.name, 'pc-writer-b-extended-drain-2400') && 50 || 12 }}
+    # Default 12m; separately authorized exact 1200s/2400s modes get
+    # bounded 30m/50m jobs. Labels alone never authorize an install.
+    timeout-minutes: ${{ contains(github.event.issue.labels.*.name, 'pc-writer-b-extended-drain-2400') && 50 || contains(github.event.issue.labels.*.name, 'pc-writer-b-extended-drain-1200') && 30 || 12 }}
     defaults:
       run:
         shell: cmd

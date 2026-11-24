@@ -6,9 +6,9 @@ import {validateInsertions} from './insert-only-patch.mjs';
 export const OPERATION='pc-writer-source-install';
 export const ISSUE_TITLE='pc-writer-source-install';
 export const ISSUE_LABEL='pc-writer-b-install';
-// Label selects the GitHub job's extended deadline; exact approved manifest
-// must independently select the identical 2400-second mode.
+// Long-deadline labels must independently match the exact approved B manifest.
 export const EXTENDED_DRAIN_LABEL='pc-writer-b-extended-drain-2400';
+export const DRAIN_1200_LABEL='pc-writer-b-extended-drain-1200';
 export const REQUEST_SCHEMA='ZGMINI_PC_WRITER_SOURCE_B_REQUEST_V1';
 export const APPROVAL_SCHEMA='ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1';
 export const CONTROL_REPO='ansqhd5774-Choi/zgmini-pc-control';
@@ -55,6 +55,7 @@ export const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
 // a longer Core pause requires a NEW hash-bound approved manifest.
 const RESERVED_CORE_DRAIN_WINDOWS_MS=Object.freeze({
  PAUSE_NEW_STARTS_DRAIN_360S_V1:360000,
+ PAUSE_NEW_STARTS_DRAIN_1200S_V1:1200000,
  PAUSE_NEW_STARTS_DRAIN_2400S_V1:2400000,
 });
 export const approvedCoreDrainWindowMs=mode=>
@@ -176,6 +177,10 @@ export function authorizeWriterBIssue({event,env,manifestBytes}){
  need(issueExtended===
    (manifest.coreMaintenance==='PAUSE_NEW_STARTS_DRAIN_2400S_V1'),
   'WRITER_B_EXTENDED_DRAIN_LABEL_STOP');
+ const issue1200=event.issue.labels.some(x=>x?.name===DRAIN_1200_LABEL);
+ need(issue1200===
+   (manifest.coreMaintenance==='PAUSE_NEW_STARTS_DRAIN_1200S_V1'),
+  'WRITER_B_1200_DRAIN_LABEL_STOP');
  for(const entry of manifest.files){
   if(Object.hasOwn(entry,'insertions')){
    for(const insertion of entry.insertions)Object.freeze(insertion);

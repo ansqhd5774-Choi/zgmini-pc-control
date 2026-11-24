@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {sha256,authorizeWriterBIssue,APPROVAL_SCHEMA,SCOPE,SOURCE_REPO,
  REQUEST_SCHEMA,OPERATION,CONTROL_REPO,ISSUE_LABEL,ISSUE_TITLE,
- EXTENDED_DRAIN_LABEL} from './contract.mjs';
+ EXTENDED_DRAIN_LABEL,DRAIN_1200_LABEL} from './contract.mjs';
 import {performWriterBInstall,verifyWriterBPreimage,
   verifyWriterBCandidate,verifyPreparedWriterCommit} from './installer.mjs';
 
@@ -47,7 +47,9 @@ const auth=(overrides={})=>{
    sender:{login:'ansqhd5774-Choi'},issue:{user:{login:'ansqhd5774-Choi'},
     title:ISSUE_TITLE,number:777,labels:[{name:ISSUE_LABEL},
     ...((overrides.coreMaintenance==='PAUSE_NEW_STARTS_DRAIN_2400S_V1')?
-    [{name:EXTENDED_DRAIN_LABEL}]:[])],
+    [{name:EXTENDED_DRAIN_LABEL}]:[]),
+    ...((overrides.coreMaintenance==='PAUSE_NEW_STARTS_DRAIN_1200S_V1')?
+    [{name:DRAIN_1200_LABEL}]:[])],
     body:JSON.stringify({schema:REQUEST_SCHEMA,requestId:RID,
      chatId:'11234567-89ab-4cde-8fab-1123456789ab',operation:OPERATION,
      controlRepository:CONTROL_REPO,
@@ -157,6 +159,32 @@ test('new hash-bound 2400s maintenance mode retains safe ordering',async()=>{
  assert.equal(state.steps.some(x=>x.startsWith('window')),false);
  assert.equal(state.head!==manifest().baseHead,true);
  assert.equal(state.coreEnabled,true);
+ assert.equal(state.retained,false);
+});
+test('1200s maintenance waits for natural Core finish before installation',async()=>{
+ const {io,state}=mockIO({failAt:'window'});
+ io.waitForCoreDrain=async()=>{
+  assert.equal(state.coreEnabled,false);
+  assert.equal(state.head,manifest().baseHead);
+  state.steps.push('natural-1200-finish');
+ };
+ const out=await performWriterBInstall(
+  maintenanceAuth('PAUSE_NEW_STARTS_DRAIN_1200S_V1'),io);
+ assert.equal(out.status,'WRITER_B_INSTALLED_VERIFIED');
+ assert.ok(state.steps.indexOf('natural-1200-finish')<state.steps.indexOf('switch'));
+ assert.equal(state.coreEnabled,true);
+ assert.equal(state.retained,false);
+});
+test('1200s maintenance timeout restores originals without changing source',async()=>{
+ const {io,state}=mockIO({failAt:'drain'});
+ const out=await performWriterBInstall(
+  maintenanceAuth('PAUSE_NEW_STARTS_DRAIN_1200S_V1'),io);
+ assert.equal(out.status,'WRITER_B_INSTALL_STOP_RESTORED');
+ assert.equal(out.recovery,'ORIGINAL_VERIFIED');
+ assert.equal(state.head,manifest().baseHead);
+ assert.equal(state.config,manifest().baseHead);
+ assert.equal(state.coreEnabled,true);
+ assert.equal(state.steps.includes('switch'),false);
  assert.equal(state.retained,false);
 });
 test('2400s reserved maintenance timeout restores original without switch',async()=>{
