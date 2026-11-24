@@ -14,7 +14,7 @@ import {inspectSidecarSourceGate} from '../controller/fear-greed-archive-readonl
 import {inspectCnnGitPredicatesReadonly} from '../controller/cnn-sidecar-git-predicates-readonly.mjs';
 import {inspectSidecarBManifestPreimageReadonly,inspectSidecarBResourceFlagsReadonly,inspectSidecarBCoreReadinessReadonly} from '../sidecar-b/operating-probe.mjs';
 import {maintenanceLockStatus} from './maintenance-lock.mjs';
-import {readMaintenanceRecoveryStatus,protectedSnapshot} from './update.mjs';
+import {readMaintenanceRecoveryStatus,protectedSnapshot,backlogPauseWindows} from './update.mjs';
 import {readFixedReadonlyBytes} from '../controller/fixed-readonly-bytes.mjs';
 import {createHash} from 'node:crypto';
 import {inspectTask as inspectMarketParquetTask} from './marketparquet-task-source-readonly.mjs';
@@ -479,10 +479,19 @@ export function assess3409OriginalLeaseLineage(ledger,owner,marker){
   requestId:TARGET3409,issueNumber:3409,postIssueNumber:3410,
   targetSha:'6b3c9c0ce77354d81babe4c9ea7785663c6c2cb4'});
 }
+/** Only exact #3409 intake pause windows; never raw backlog or credentials. */
+export function project3409PauseWindows(backlog){
+ if(backlog?.schema!=='ZGMINI_PC_BACKLOG_V1'||backlog.requestId!==TARGET3409)return null;
+ try{return backlogPauseWindows(backlog).map(window=>({
+  pausedAtUtc:new Date(Date.parse(window.pausedAt)).toISOString(),
+  resumedAtUtc:window.resumedAt===null?null:
+   new Date(Date.parse(window.resumedAt)).toISOString()
+ }));}catch{return null;}
+}
 // CAS digests are for a separately approved independent recovery manifest.
 // Only hashes/booleans leave the Windows host; neither lease identity values
 // nor raw Writer configuration, snapshots, keys or Task XML are published.
-function inspectFixedRecoveryCasReadonly(requestId,assessLineage,expectedBeforeSha=null){
+function inspectFixedRecoveryCasReadonly(requestId,assessLineage,expectedBeforeSha=null,include3409Windows=false){
  const unknown=code=>({status:'UNVERIFIED',code,leaseLineageCorrelated:null,
   ownerAlive:null,casDigests:null,recoveryEligible:false});
  const maintenance='E:/ZGmini/automation/pc-maintenance';
@@ -534,7 +543,9 @@ function inspectFixedRecoveryCasReadonly(requestId,assessLineage,expectedBeforeS
   originalLedgerMatches:lineage.originalLedgerMatches,
   ownerMarkerMatches:lineage.ownerMarkerMatches,
   recoveryTimelineMatches:lineage.recoveryTimelineMatches,
-  ownerAlive,casDigests,recoveryEligible:false};
+  ownerAlive,casDigests,
+  ...(include3409Windows?{pauseWindows:project3409PauseWindows(backlog)}:{}),
+  recoveryEligible:false};
 }
 
 function inspect2960RecoveryCasReadonly(){
@@ -542,7 +553,7 @@ function inspect2960RecoveryCasReadonly(){
 }
 function inspect3409RecoveryCasReadonly(){
  return inspectFixedRecoveryCasReadonly(TARGET3409,assess3409OriginalLeaseLineage,
-  '3c20e036ffa56a9a9670916d68c30451d6a699bc');
+  '3c20e036ffa56a9a9670916d68c30451d6a699bc',true);
 }
 
 /** Exact #2960 receipt only: skip 32-KiB general inventory payload. */
@@ -2210,7 +2221,8 @@ export function toText(r){
    'w043409LeaseHeld='+(r.w043409MaintenanceStatus.recoveryEvidence?.leaseHeld??'UNKNOWN'),
    'w043409RecoveryRequired='+(r.w043409MaintenanceStatus.recoveryEvidence?.recoveryRequired??'UNKNOWN'),
    'w043409Protection='+(r.w043409MaintenanceStatus.protectedDifferenceClass??'UNVERIFIED'),
-   'w043409LeaseCorrelation='+(r.w043409MaintenanceStatus.recoveryCas?.status??'UNVERIFIED')]:[]),
+   'w043409LeaseCorrelation='+(r.w043409MaintenanceStatus.recoveryCas?.status??'UNVERIFIED'),
+   'w043409PauseWindows='+(r.w043409MaintenanceStatus.recoveryCas?.pauseWindows?.length??'UNVERIFIED')]:[]),
   'c2505Recovery='+(r.c2505RecoveryCheckpoint?.status??'NOT_APPLICABLE'),
   'c2505RecoveryCode='+(r.c2505RecoveryCheckpoint?.code??'NOT_APPLICABLE'),
   'c2505ByteProof='+(r.c2505ByteProof?.status??'NOT_APPLICABLE'),
