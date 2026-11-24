@@ -122,7 +122,8 @@ test('actual Git worktree with injected config cannot run active post-checkout h
  assert.deepEqual(args.slice(0,5),['--no-optional-locks','-c',
   'core.hooksPath='+safe,'-C',repo]);
  git(args);
- assert.equal(fs.readFileSync(path.join(stage,'source.txt'),'utf8'),'fixed source\n');
+ assert.equal(fs.readFileSync(path.join(stage,'source.txt'),'utf8').replace(/\r\n/g,'\n'),
+  'fixed source\n');
  assert.equal(fs.existsSync(path.join(stage,'hook-triggered.txt')),false);
  assert.equal(fs.existsSync(path.join(repo,'hook-triggered.txt')),false);
 });
