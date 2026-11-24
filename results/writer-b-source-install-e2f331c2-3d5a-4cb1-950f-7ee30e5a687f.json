@@ -1,0 +1,20 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "e2f331c2-3d5a-4cb1-950f-7ee30e5a687f",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "4cdf4727e59a0667d641354bb5b3e7ede761daf7",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "e4b768530335182f422ebd51d163a6f5b754361c",
+  "candidateSourceSha": "48034ae3481192a519e6c472aac40f9a7272451f",
+  "manifestSha256": "7671e047f41a34685a4b9ddbbe472b578bac37a0742b771be418ae243020763a",
+  "baseTreeOid": "411588863fcfe6d37883e7c70b621e8f14a5fd96",
+  "preparedTreeOid": "7173f5ad44877b75b96483b200f64605a7c1736b",
+  "provenanceSha256": "16e1fcdec884385093374c4b658e9f20dca4d66196d7d3d53d040ea220363752",
+  "runId": "45405598458",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/employment-r6-auto-collection.mjs"
+  ]
+}
