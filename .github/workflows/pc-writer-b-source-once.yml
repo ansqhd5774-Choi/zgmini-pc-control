@@ -24,7 +24,9 @@ jobs:
       cancel-in-progress: false
       queue: max
     runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
-    timeout-minutes: 12
+    # Existing requests retain 12-minute cap. The new longer window requires
+    # both an exact B manifest and an explicitly matching request label.
+    timeout-minutes: ${{ contains(github.event.issue.labels.*.name, 'pc-writer-b-extended-drain-2400') && 50 || 12 }}
     defaults:
       run:
         shell: cmd

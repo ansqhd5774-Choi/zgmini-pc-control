@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {sha256,authorizeWriterBIssue,validateWriterBManifest,
   isScopedWriterPath,REQUEST_SCHEMA,APPROVAL_SCHEMA,OPERATION,SCOPE,
-  CONTROL_REPO,SOURCE_REPO,ISSUE_TITLE,ISSUE_LABEL} from './contract.mjs';
+  CONTROL_REPO,SOURCE_REPO,ISSUE_TITLE,ISSUE_LABEL,
+  approvedCoreDrainWindowMs,EXTENDED_DRAIN_LABEL} from './contract.mjs';
 
 const H=value=>sha256(Buffer.from(value));
 const A='a'.repeat(40),B='b'.repeat(40);
@@ -59,7 +60,13 @@ test('3-file Inflation19 manifest validates without hard-coded filename values',
 test('reserved maintenance is exact opt-in bound to approved original Task XML',()=>{
  const m={...manifest(),coreMaintenance:'PAUSE_NEW_STARTS_DRAIN_360S_V1'};
  assert.equal(validateWriterBManifest(m),m);
- for(const coreMaintenance of [true,'DISABLE','PAUSE_NEW_STARTS_DRAIN_999S_V1',null])
+ assert.equal(approvedCoreDrainWindowMs(m.coreMaintenance),360000);
+ const long={...m,coreMaintenance:'PAUSE_NEW_STARTS_DRAIN_2400S_V1'};
+ assert.equal(validateWriterBManifest(long),long);
+ assert.equal(approvedCoreDrainWindowMs(long.coreMaintenance),2400000);
+ assert.equal(approvedCoreDrainWindowMs(undefined),null);
+ for(const coreMaintenance of [true,'DISABLE','PAUSE_NEW_STARTS_DRAIN_999S_V1',
+  'PAUSE_NEW_STARTS_DRAIN_2401S_V1',null])
   assert.throws(()=>validateWriterBManifest({...m,coreMaintenance}),
    {code:'WRITER_B_MAINTENANCE_APPROVAL_STOP'});
  assert.throws(()=>validateWriterBManifest({...m,runtimeDependencies:{
@@ -67,6 +74,24 @@ test('reserved maintenance is exact opt-in bound to approved original Task XML',
   {code:'WRITER_B_MAINTENANCE_APPROVAL_STOP'});
 });
 
+test('extended drain requires matching GitHub job label and exact signed manifest',()=>{
+ const a=authFixture();
+ const long={...a.manifest,coreMaintenance:'PAUSE_NEW_STARTS_DRAIN_2400S_V1'};
+ const raw=Buffer.from(JSON.stringify(long));
+ const request={...a.request,approvalManifestSha256:sha256(raw)};
+ const withLabel={...a.event,issue:{...a.event.issue,
+  labels:[{name:ISSUE_LABEL},{name:EXTENDED_DRAIN_LABEL}],
+  body:JSON.stringify(request)}};
+ const valid=authorizeWriterBIssue({...a,event:withLabel,manifestBytes:raw});
+ assert.equal(valid.manifest.coreMaintenance,'PAUSE_NEW_STARTS_DRAIN_2400S_V1');
+ assert.throws(()=>authorizeWriterBIssue({...a,manifestBytes:raw,event:{
+  ...withLabel,issue:{...withLabel.issue,labels:[{name:ISSUE_LABEL}]}}}),
+  {code:'WRITER_B_EXTENDED_DRAIN_LABEL_STOP'});
+ assert.throws(()=>authorizeWriterBIssue({...a,event:{
+  ...a.event,issue:{...a.event.issue,
+   labels:[{name:ISSUE_LABEL},{name:EXTENDED_DRAIN_LABEL}]}}}),
+  {code:'WRITER_B_EXTENDED_DRAIN_LABEL_STOP'});
+});
 test('strict path scope and duplicate names prevent traversal and accidental targets',()=>{
  for(const candidate of ['../.env','scripts/pc-writer/../../secrets.mjs',
   'scripts/pc-writer/evil.cmd','E:\\ZGmini\\secrets.mjs','scripts/pc-writer/.hidden.mjs',

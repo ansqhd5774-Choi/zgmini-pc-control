@@ -91,3 +91,9 @@
 **로컬 합성 SHA의 추적:** Writer B는 기존 R17 선례처럼 승인 파일만 격리 Git overlay로 합성한다. 생성된 `preparedLocalSha`는 **PC 로컬 커밋이며 GitHub에 push하지 않는다.** Task 일시 중지 *이전*에 `E:\ZGmini\data\pc-writer\writer-b-install-once\<requestId>\provenance.json`에 `LOCAL_OVERLAY`, 승인 manifest 해시, base/candidate SHA, base/prepared tree OID, 로컬 ref, 파일별 원본·목표 해시를 일회 기록·fsync·재조회한다. 원격 TXT/JSON의 `LOCAL_ONLY=true`·`PROVENANCE_SHA256`은 이 로컬 증거를 지칭하며 GitHub 커밋 URL 존재의 증거가 아니다. **다음 B·후속 A에서는 GitHub SHA 조회로 로컬 HEAD를 추정하지 말고**, 실제 PC checkout HEAD·config.source·해당 로컬 Git object/ref·manifest/원장 SHA를 다시 읽기 전용으로 확인한 뒤 다음 적용 기준을 확정한다.
 
 **프로세스 총괄**은 공통 계약·수신기·충돌·복구 경로를 맡고, **기능 원담당**은 기능 코드/manifest 검토·승인된 B 신청·실제 기능 게시 검증을 맡는다. Issue 댓글은 다른 ChatGPT 대화의 수신 증거가 아니다. 전용 R17·캘린더 고정 B 및 Controller-only 유지보수기를 기능별 Writer 변경에 우회 사용하지 않는다.
+
+### 길게 실행 중인 Core의 승인된 종료 대기 — 별도 선택형 계약 (2026-11-24)
+
+#3116·#3133에서 기존 `PAUSE_NEW_STARTS_DRAIN_360S_V1`의 360초 종료 대기 초과 후 원본 복구를 실측했다. Core의 당시 실행 중인 자식은 미확인이고 본체 소스에는 개별 `run-local.mjs`의 최대 30분 경로가 있다. **기존 360초 승인/manifest의 효과는 늘리지 않는다.**
+
+별도 명시 승인과 **새로운** 원본 Task XML SHA/CAS·파일별 해시·승인 manifest·requestId가 있을 때만 `coreMaintenance: "PAUSE_NEW_STARTS_DRAIN_2400S_V1"` 모드를 선택할 수 있다. 이 모드는 신규 시작만 억제한 뒤 최대 **2400초** 실제 Task/자식/lock의 자연 종료를 기다리며, 연속 2회 quiet·source/config CAS·Task 복원·journal/lease 보호를 그대로 적용한다. timeout 후에는 원본 복구를 검증하고, 복구 미확정 시 claim·lease를 보존한다. **기존 Writer B의 12분 Job 상한은 유지**하며, 새 모드의 정확 승인 manifest와 Issue 라벨 `pc-writer-b-extended-drain-2400`가 일치할 때만 50분 Job 상한을 사용한다. 라벨만 넣거나 manifest만 바꾸면 설치 전 거부한다. 소스/CI/병합은 PC 운영 설치나 성공의 증거가 아니다. 2400초 안의 정상 종료가 보장되지 않으므로 실패 시 동일 설치를 무조건 재요청하지 않는다. 기존 자연 유휴·360초 모드·예약·원자료/DB/D1·Runner 수는 변경하지 않는다.

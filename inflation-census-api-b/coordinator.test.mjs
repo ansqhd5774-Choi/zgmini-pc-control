@@ -184,7 +184,8 @@ test('Census-specific B natural-owner and idle waits leave time for two official
  const workflow=fs.readFileSync(path.join(root,'.github','workflows','pc-writer-b-source-once.yml'),'utf8');
  assert.match(code,/maxObservationMs:5\*60_000/);
  assert.match(code,/windowMs:3\*60_000/);
- assert.match(workflow,/timeout-minutes: 12/);
+ assert.ok(workflow.includes("timeout-minutes: ${{ contains(github.event.issue.labels.*.name, 'pc-writer-b-extended-drain-2400') && 50 || 12 }}"));
+ assert.doesNotMatch(workflow,/^\s*timeout-minutes:\s*50\s*$/m);
  assert.ok(5*60_000+3*60_000+2*20_000<12*60_000);
 });
 
