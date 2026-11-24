@@ -44,10 +44,14 @@ export async function runChangedLint(){
    '--max-time','90','--output',zip,DOWNLOAD]);
   verifyArchive(fs.readFileSync(zip));
   checkedRun('tar.exe',['-xf',zip,'-C',folder]);
-  const rel=fs.readdirSync(folder,{recursive:true}).find(p=>
-   typeof p==='string'&&path.basename(p).toLowerCase()==='oxlint.exe');
-  if(!rel)throw Error('OXLINT_BINARY_MISSING');
-  const exe=path.join(folder,rel);
+  // Official ZIP file names/layouts differ by platform and release.
+  // Identify its single Windows PE executable by magic bytes, not a guessed name.
+  const executables=fs.readdirSync(folder,{recursive:true})
+   .map(relative=>path.join(folder,relative))
+   .filter(file=>fs.statSync(file).isFile()
+     &&fs.readFileSync(file).subarray(0,2).toString('ascii')==='MZ');
+  if(executables.length!==1)throw Error('OXLINT_BINARY_MISSING');
+  const exe=executables[0];
   // Do not echo source snippets or credential-looking literals to CI logs.
   const p=spawnSync(exe,files.map(s=>'./'+s),{
    windowsHide:true,stdio:'pipe',encoding:'utf8',
