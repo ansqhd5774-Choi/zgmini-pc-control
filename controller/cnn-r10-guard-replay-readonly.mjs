@@ -40,7 +40,8 @@ export function classifyPinnedCnnR10Line19Readonly(source) {
   'NESTED_COMPARISON':'OTHER';
  const prior=lines.slice(0,18).join('\n');
  const assignments=[...prior.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([^\n;]{1,240})/g)];
- const referenced=assignments.filter(m=>new RegExp('(^|[^\\w$])'+m[1]+'(?![\\w$])').test(expr));
+ const identifiers=new Set(expr.match(/[A-Za-z_$][\w$]*/g)??[]);
+ const referenced=assignments.filter(m=>identifiers.has(m[1]));
  const all=[expr,...referenced.map(m=>m[2])].join(' ');
  const head=/\brev-parse\b/.test(all)&&/\bHEAD\b/.test(all);
  const status=/\bstatus\b/.test(all)&&/porcelain|--untracked-files/.test(all);
