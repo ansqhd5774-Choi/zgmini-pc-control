@@ -186,6 +186,14 @@ export function fixedInstalledRecoveryCase(id){
   proof:proof3409,allowUnchangedBaseline:true});
  return null;
 }
+// Preserve #2960's approved Writer-only delta; #3409 is attested as
+// unchanged, so reject even a separately valid Writer-only deviation.
+export function permittedInstalledRecoveryProtection(fixed,choice){
+ return choice?.allowed===true&&(
+  fixed?.allowUnchangedBaseline===true?
+   choice.code==='RECOVERY_ORIGINAL_PROTECTION_UNCHANGED':
+   fixed?.allowUnchangedBaseline===false&&choice.preservedWriterConfig===true);
+}
 export function classifyInstalledReconciliationProof(proof){
  const checks={
   ORIGINAL_LEDGER:proof?.originalLedger===true,
@@ -375,10 +383,7 @@ async function reconcileInstalledRecoveryFixed({id,source,g,before}){
   workflowActive:before.state.workflow==='active',
   backlogReconciled:pending,
   supervisorVerified:verifyInstalledRecoverySupervisor(targetSha),
-  protectedWriterPreserved:protectedChoice.allowed===true&&
-   (protectedChoice.preservedWriterConfig===true||
-    (fixed.allowUnchangedBaseline&&
-     protectedChoice.code==='RECOVERY_ORIGINAL_PROTECTION_UNCHANGED')),
+  protectedWriterPreserved:permittedInstalledRecoveryProtection(fixed,protectedChoice),
   sourceAndCasVerified:true,currentAReceiptVerified:success,
   operatorVerified:true
  };
