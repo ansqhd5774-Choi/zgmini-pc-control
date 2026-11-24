@@ -147,6 +147,15 @@ export async function runInstalledDolManual({auth,pcHome=R6_B_HOME,
  const {installLocalRuntime}=await mod('local-env.mjs');
  const {runEmploymentR6CollectionStep}=await import(pathToFileURL(path.join(
   sourceRoot,'lib','market-score','employment-r6-collector.mjs')).href);
+ const pdfMode=isPdfApproval(auth.approval);
+ let providerFactory=null;
+ if(pdfMode){
+  const providerModule=await import(pathToFileURL(path.join(sourceRoot,
+   'lib','market-score','employment-r6-dol-eta538-provider.mjs')).href);
+  providerFactory=({fetchImpl,now})=>providerModule.createEmploymentR6DolEta538Provider({
+   fetchImpl,now,sourceConfig:auth.approval.pdfArchive,
+  });
+ }
  onStage('LOCAL_RUNTIME_SETUP');
  const originalFetch=globalThis.fetch;
  const quota=createQuotaFetch({base:pcHome,originalFetch,mode:'enforce'});
@@ -157,7 +166,7 @@ export async function runInstalledDolManual({auth,pcHome=R6_B_HOME,
  try{
   onStage('COLLECTOR_EXECUTION');
   output=await runEmploymentR6CollectionStep(createApprovedDolManualCollectorOptions({
-   auth,db,fetchImpl:(url,init)=>quota.fetch(url,init),
+   auth,db,fetchImpl:(url,init)=>quota.fetch(url,init),providerFactory,
   }));
   need(lock.held(),'R6_DOL_CORE_LOCK_LOST');
   const groups=output.groupResults??[];
@@ -177,8 +186,9 @@ export async function runInstalledDolManual({auth,pcHome=R6_B_HOME,
       SELECT 1 FROM market_score_employment_r6_raw_snapshot_v1 s
       WHERE s.body_sha256=json_extract(c.provenance_json,'$.responseHash')
        AND s.release_group='DOL_UI_WEEKLY_CLAIMS'
-       AND s.request_key LIKE 'DOL_NATIONAL:%'
-    )`).bind(start).first();
+       AND s.request_key ${pdfMode?"=?":"LIKE 'DOL_NATIONAL:%'"}
+       ${pdfMode?"AND s.snapshot_id=json_extract(c.provenance_json,'$.rawSnapshotId')":""}
+    )`).bind(start,...(pdfMode?['DOL_ETA538_PDF:'+auth.approval.pdfArchive.releaseDate]:[])).first();
   const state=await db.prepare(`
    SELECT COUNT(*) AS n FROM market_score_employment_r4_shadow_current_v1
    WHERE provider='DOL_ETA' AND geography_type='STATE'
@@ -191,6 +201,30 @@ export async function runInstalledDolManual({auth,pcHome=R6_B_HOME,
    Number.isSafeInteger(nationalRows)&&nationalRows>=0&&
    Number.isSafeInteger(stateRows)&&stateRows>=0&&stateRows<=35000,
    'R6_DOL_READBACK_INVALID');
+  if(pdfMode&&output.status==='SUCCESS'){
+   // Full PDF bytes and four National observations must read back as linked.
+   const found=await db.prepare(`
+    SELECT json_extract(c.provenance_json,'$.rawSnapshotId') AS id
+    FROM market_score_employment_r4_shadow_current_v1 c
+    WHERE c.provider='DOL_ETA' AND c.geography_type='NATIONAL'
+     AND c.retrieved_at>=?
+     AND json_extract(c.provenance_json,'$.rawSnapshotId') IS NOT NULL
+     AND json_extract(c.provenance_json,'$.originalPdfSha256')=?
+    LIMIT 1`).bind(start,auth.approval.pdfArchive.originalPdfSha256).first();
+   const chunks=found?.id?(await db.prepare(`
+     SELECT * FROM market_score_employment_r6_raw_snapshot_v1
+     WHERE snapshot_id=? ORDER BY chunk_index`).bind(found.id).all()).results??[]:[];
+   const {verifyStoredDolAdvancePdfRawSnapshot}=await import(pathToFileURL(
+    path.join(sourceRoot,'lib','market-score','employment-r6-dol-pdf-raw-envelope.mjs')).href);
+   const attested=verifyStoredDolAdvancePdfRawSnapshot(chunks,{
+    releaseDate:auth.approval.pdfArchive.releaseDate,
+    expectedInitialWeekEnd:auth.approval.pdfArchive.expectedInitialWeekEnd,
+   });
+   need(nationalSeries===4&&nationalRows===4&&
+    attested.status==='CANDIDATE_ONLY'&&
+    attested.evidence?.originalBodySha256===auth.approval.pdfArchive.originalPdfSha256,
+    'R6_DOL_PDF_READBACK_INVALID');
+  }
   const safeGroups=groups.map(x=>({
    groupName:GROUP,status:x.status,providerRequests:x.providerRequests,
    ...(CODE.test(x.failureCode??'')?{failureCode:x.failureCode}:{}),
@@ -233,8 +267,11 @@ export async function performDolManual({auth,sourceRoot=R6_B_SOURCE,
  let lock=null,claimed=false,claimAttempted=false,lastPass='SOURCE_UNVERIFIED',outcome;
  let failureStage='PREFLIGHT';
  try{
-  const overlay={files:FILES.map(p=>({path:p,afterSha256:auth.approval.fileHashes[p]}))};
-  verify({sourceRoot,pcHome,approvedSha:auth.approval.installedSourceSha,overlay});
+  const overlay={files:scopedFiles(auth.approval).map(p=>({
+   path:p,afterSha256:auth.approval.fileHashes[p],
+  }))};
+  verify({sourceRoot,pcHome,approvedSha:auth.approval.installedSourceSha,overlay,
+   pdfApproved:isPdfApproval(auth.approval)});
   lastPass='SOURCE_VERIFIED';
   lock=await acquire(pcHome,auth.request.requestId);
   need(lock.held(),'R6_DOL_CORE_LOCK_LOST');
