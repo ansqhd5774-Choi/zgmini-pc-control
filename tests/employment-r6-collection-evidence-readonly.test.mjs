@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
-import {inspectEmploymentR6CollectionEvidence,R6_READONLY_STAGES} from '../controller/employment-r6-collection-evidence-readonly.mjs';
+import {inspectEmploymentR6CollectionEvidence,R6_READONLY_STAGES,auditStoredEta538PdfRawLinkage} from '../controller/employment-r6-collection-evidence-readonly.mjs';
 
 const STATES=['AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'];
 const sha=file=>createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -773,4 +773,64 @@ test('R6 diagnostic callback failure cannot turn a previously passing readonly q
  assert.equal(result.status,'PASS',JSON.stringify(result));
  assert.equal(result.code,'R6_DOL_BED_STORED_EVIDENCE_READONLY');
  assert.equal(sha(file),before);
+});
+
+test('W04 ETA538 saved-only audit checks binary PDF, Base64 and all four National row hashes',()=>{
+ const digest=v=>createHash('sha256').update(v).digest('hex');
+ const db=new DatabaseSync(':memory:');
+ try{
+  db.exec('CREATE TABLE market_score_employment_r6_raw_snapshot_v1 ('+
+   'snapshot_id TEXT,chunk_index INTEGER,chunk_count INTEGER,release_group TEXT,'+
+   'provider TEXT,request_key TEXT,retrieved_at TEXT,body_sha256 TEXT,'+
+   'body_chunk TEXT,detail_json TEXT,content_type TEXT);'+
+   'CREATE TABLE market_score_employment_r4_shadow_current_v1 ('+
+   'provider TEXT,geography_type TEXT,geography_code TEXT,logical_series_id TEXT,'+
+   'observation_date TEXT,provider_series_id TEXT,unit TEXT,value REAL,'+
+   'source_hash TEXT,provenance_json TEXT)');
+  const releaseDate='2026-11-19',retrievedAt='2026-11-24T16:03:21.789Z';
+  const bytes=Buffer.from('%PDF-1.4\n'+'demo-binary-archive-'.repeat(8)+'\n%%EOF');
+  const original=digest(bytes),encoded=bytes.toString('base64'),textHash=digest(encoded);
+  const requestKey='DOL_ETA538_PDF:'+releaseDate;
+  const snapshotId=digest('DOL_UI_WEEKLY_CLAIMS|DOL_ETA|'+requestKey+'|'+textHash);
+  const observationWeeks={INITIAL_CLAIMS:'2026-11-14',
+   INITIAL_CLAIMS_4W:'2026-11-14',CONTINUED_CLAIMS:'2026-11-07',
+   INSURED_UNEMPLOYMENT_RATE:'2026-11-07'};
+  const metadata={schema:'W04_DOL_ETA538_PDF_BASE64_SNAPSHOT_V1',
+   bodyEncoding:'BASE64_PDF_BYTES',originalContentType:'application/pdf',
+   originalBodySha256:original,originalBodyBytes:bytes.length,bodyTextSha256:textHash,
+   sourceReleaseDate:releaseDate,
+   sourceUrl:'https://oui.doleta.gov/press/2026/111926.pdf',
+   sourceObservationWeeks:observationWeeks};
+  db.prepare('INSERT INTO market_score_employment_r6_raw_snapshot_v1 VALUES(?,?,?,?,?,?,?,?,?,?,?)')
+   .run(snapshotId,0,1,'DOL_UI_WEEKLY_CLAIMS','DOL_ETA',requestKey,
+    retrievedAt,textHash,encoded,JSON.stringify(metadata),'application/pdf');
+  const series=[
+   ['INITIAL_CLAIMS','DOL:ETA538:InitialClaims:SA',203000,'CLAIMS_COUNT'],
+   ['INITIAL_CLAIMS_4W','DOL:ETA538:InitialClaims:SA4WK',197750,'CLAIMS_COUNT'],
+   ['CONTINUED_CLAIMS','DOL:ETA538:ContinuedClaims:SA',1763000,'CLAIMS_COUNT'],
+   ['INSURED_UNEMPLOYMENT_RATE','DOL:ETA538:IUR:SA',1.1,'PERCENT'],
+  ];
+  const insert=db.prepare('INSERT INTO market_score_employment_r4_shadow_current_v1 VALUES(?,?,?,?,?,?,?,?,?,?)');
+  for(const [id,providerSeriesId,value,unit] of series){
+   const observationDate=observationWeeks[id];
+   const sourceHash=digest(JSON.stringify({logicalSeriesId:id,observationDate,
+    providerSeriesId,value,unit,releaseDate}));
+   insert.run('DOL_ETA','NATIONAL','US',id,observationDate,providerSeriesId,
+    unit,value,sourceHash,JSON.stringify({rawSnapshotId:snapshotId,
+     originalPdfSha256:original,responseHash:textHash,rawRecordHash:sourceHash,
+     sourceKind:'ETA538_ADVANCE_RELEASE_PDF'}));
+  }
+  const verified=auditStoredEta538PdfRawLinkage(db);
+  assert.equal(verified.status,'PDF_BYTES_AND_FOUR_ROW_HASH_LINKS_VERIFIED_NOT_VALUE_REPARSE');
+  assert.equal(verified.verifiedNationalRows,4);
+  assert.equal(verified.originalPdfSha256Matched,true);
+  assert.equal(verified.valuesReparsed,false);
+  assert.deepEqual(verified.observationWeeks,observationWeeks);
+  assert.doesNotMatch(JSON.stringify(verified),/demo-binary-archive|203000|1763000/);
+  db.prepare("UPDATE market_score_employment_r4_shadow_current_v1 SET value=999 WHERE logical_series_id='INITIAL_CLAIMS'").run();
+  assert.equal(auditStoredEta538PdfRawLinkage(db).status,'PDF_NATIONAL_ROW_HASH_LINK_INVALID');
+  db.prepare("UPDATE market_score_employment_r4_shadow_current_v1 SET value=203000 WHERE logical_series_id='INITIAL_CLAIMS'").run();
+  db.prepare('UPDATE market_score_employment_r6_raw_snapshot_v1 SET body_chunk=?').run(encoded.slice(0,-3)+'AAA');
+  assert.equal(auditStoredEta538PdfRawLinkage(db).status,'PDF_BYTES_OR_HASH_MISMATCH');
+ }finally{db.close();}
 });
