@@ -7,6 +7,7 @@ import {inspectWriterInstallPreimage} from './writer-install-preimage-readonly.m
 import {inspectWriterPublicationEvidence} from './writer-publication-evidence-readonly.mjs';
 import {inspectEmploymentR6D1Readback} from './employment-r6-d1-readback-readonly.mjs';
 import {inspectR54PublicReadback} from './market-r54-d1-api-readback-readonly.mjs';
+import {inspectW05FiveKeyD1ApiReadback} from './w05-five-key-d1-api-readback-readonly.mjs';
 import {inspectInflation7D1Readback} from './inflation7-d1-readback-readonly.mjs';
 import {inspectInflation19D1Readback} from './inflation19-d1-readback-readonly.mjs';
 import {inspectCoreRuntimeSource} from './core-runtime-source-readonly.mjs';
@@ -239,6 +240,7 @@ export async function runOperation(request,context){
  if(request.operation==='writer-publication-evidence-readonly')return inspectWriterPublicationEvidence(dataRoot);
  if(request.operation==='employment-r6-d1-readback-readonly')return inspectEmploymentR6D1Readback(dataRoot);
  if(request.operation==='market-r54-d1-api-readback-readonly')return inspectR54PublicReadback(dataRoot);
+ if(request.operation==='w05-five-key-d1-api-readback-readonly')return await inspectW05FiveKeyD1ApiReadback(dataRoot);
  if(request.operation==='inflation7-d1-readback-readonly')return inspectInflation7D1Readback(dataRoot);
  if(request.operation==='inflation19-d1-readback-readonly')return inspectInflation19D1Readback(dataRoot);
  if(request.operation==='r17-268-postcancel-readonly'){
