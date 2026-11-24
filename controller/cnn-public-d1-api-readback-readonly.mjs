@@ -87,7 +87,10 @@ export function compareCnnPublicReadback(local,rows,replies,{day}={}){
  for(const period of PERIODS){
   const response=replies?.[period];
   const actual=response?.body,valid=response?.httpStatus===200&&
-   actual?.period===period&&Array.isArray(actual.points)&&Array.isArray(actual.checkedPoints);
+   actual?.period===period&&actual?.status==='READY'&&
+   typeof actual?.range?.start==='string'&&typeof actual?.range?.end==='string'&&
+   actual.range.start<=day&&day<=actual.range.end&&
+   Array.isArray(actual.points)&&Array.isArray(actual.checkedPoints);
   const observedMatch=valid&&d1observed.status==='READ'&&
    digest(actual.points,'observedAt',day)===digest(d1observed.points,'observedAt',day);
   const checksMatch=valid&&d1checks.status==='READ'&&
@@ -114,7 +117,7 @@ async function readD1(dataRoot,fileSystem,day){
   {fileSystem,verifiedRoot:dataRoot,minBytes:2,maxBytes:131072});
  if(!cfg.ok)throw Error('CNN_CONFIG_MISSING');
  const c=JSON.parse(cfg.bytes.toString('utf8'));
- if(!SHA40.test(c?.source??'')||!/^\w{32}$/.test(c?.account??'')||
+ if(!SHA40.test(c?.source??'')||!/^[a-f0-9]{32}$/.test(c?.account??'')||
   !/^[a-f0-9-]{36}$/.test(c?.core??''))throw Error('CNN_CONFIG_INVALID');
  const checkout=path.resolve(dataRoot,'..','projects','zgmini-earnings-history-pc-release');
  const root=(fileSystem.realpathSync.native??fileSystem.realpathSync)(checkout);
@@ -153,7 +156,7 @@ async function readApi(period,fetcher=fetch){
  catch{return {httpStatus,body:null};}
 }
 export async function inspectCnnPublicReadback(dataRoot,{
- localProbe=inspectFearGreedArchive,queryFixed=null,fetchFixed=null,fileSystem=fs
+ localProbe=inspectFearGreedArchive,queryFixed=null,fetchFixed=null,fileSystem=fs,clock=Date.now
 }={}){
  const out=base('CNN_PUBLIC_READBACK_UNVERIFIED');
  if(typeof dataRoot!=='string'||!path.isAbsolute(dataRoot))
@@ -164,7 +167,7 @@ export async function inspectCnnPublicReadback(dataRoot,{
  if(!iso(current?.observedAt))return {...out,code:'CNN_CURRENT_SOURCE_UNVERIFIED'};
  const day=current.observedAt.slice(0,10);
  // Fixed 1D/1W windows only; source dates outside both are reported stale.
- if(Date.now()-Date.parse(current.observedAt)>2*86400000)
+ if(clock()-Date.parse(current.observedAt)>2*86400000)
   return {...out,code:'CNN_CURRENT_STALE_FOR_1D',local:{status:'STALE',date:day}};
  let rows;
  try{rows=queryFixed?await queryFixed(day):await readD1(dataRoot,fileSystem,day);}
