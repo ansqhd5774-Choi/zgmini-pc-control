@@ -1834,7 +1834,7 @@ export function readControllerUpdateArtifacts(requestId,{
  const backlogBaseState=entry(backlogBase,'directory');
  const backlogPath=path.join(backlogBase,requestId+'.json');
  const backlogFile=child(backlogBaseState,backlogPath,'file');
- let backlog={file:backlogFile,windows:null,openWindows:null,replayCount:null};
+ let backlog={file:backlogFile,windows:null,openWindows:null,replayCount:null,pauseWindow:null};
  if(backlogFile==='PRESENT'){
   try{
    const bytes=fsImpl.readFileSync(backlogPath);
@@ -1850,10 +1850,19 @@ export function readControllerUpdateArtifacts(requestId,{
       &&Date.parse(w.resumedAt)>=Date.parse(w.pausedAt)))
     &&data.replays&&typeof data.replays==='object'&&!Array.isArray(data.replays),
     'MAINTENANCE_BACKLOG_READBACK_INVALID');
+   // A single verified window is sufficient to correlate #3409's historical
+   // Issue opened timestamp. Do not expose unbounded private backlog history.
+   const utc=v=>typeof v==='string'&&
+    /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/.test(v)&&
+    Number.isFinite(Date.parse(v))?v:null;
+   const only=data.windows.length===1?data.windows[0]:null;
+   const paused=utc(only?.pausedAt),resumed=only?.resumedAt===null?null:utc(only?.resumedAt);
    backlog={file:'PRESENT',windows:data.windows.length,
     openWindows:data.windows.filter(w=>w.resumedAt===null).length,
-    replayCount:Object.keys(data.replays).length};
-  }catch{backlog={file:'UNVERIFIED',windows:null,openWindows:null,replayCount:null};}
+    replayCount:Object.keys(data.replays).length,
+    pauseWindow:only&&paused&&(only.resumedAt===null||resumed)?
+     {pausedAt:paused,resumedAt:resumed}:null};
+  }catch{backlog={file:'UNVERIFIED',windows:null,openWindows:null,replayCount:null,pauseWindow:null};}
  }
  const leaseBaseState=entry(leaseBase,'directory');
  const leasePath=path.join(leaseBase,'controller-install');
