@@ -46,8 +46,11 @@ export function classifyIssueCompletion({issue,request,result,evidence,intent} =
     return deny('UNSAFE_SIDE_EFFECTS');
   if (result.reportTransfer?.status === 'SUMMARY_ONLY' || evidence.reportTransfer === 'SUMMARY_ONLY')
     return deny('PARTIAL_EVIDENCE');
+  // The deployed PC result contract carries jobId=run-<run>-<attempt>-seat-<seat>, not runId.
+  const canonicalJobId = `run-${evidence.runId}-${evidence.attempt}-seat-${evidence.seat}`;
   if (evidence.issueNumber !== issue.number || evidence.requestId !== request.requestId ||
-      evidence.runId !== result.runId || !Number.isSafeInteger(evidence.attempt) ||
+      !/^[0-9]{1,20}$/.test(String(evidence.runId ?? '')) ||
+      result.jobId !== canonicalJobId || !Number.isSafeInteger(evidence.attempt) ||
       evidence.attempt < 1 || !Number.isSafeInteger(evidence.seat) || evidence.seat < 1 ||
       evidence.seat > 6) return deny('PROVENANCE_MISMATCH');
   if (evidence.jsonVerified !== true || evidence.txtVerified !== true ||
