@@ -54,3 +54,8 @@
 - 독립 PC Source CI와 실제 운영 B/A, private data, installed Controller/Writer를 엄격히 구분. 격리 CI 실행기를 운영 변경 경로로 재사용 금지.
 - Unit IMPLEMENTED, Integration PARTIAL(격리 계약/Mock 중심), E2E PARTIAL(운영 PC 흐름은 승인 별도), Type NOT_APPLICABLE 또는 PARTIAL 후보(JS/MJS의 구문/타입 적용성 확인), Build NOT_APPLICABLE 가능(배포용 빌드가 아닌 소스 검증; 실제 인계 패키지 무결성 분리), Lint NOT_CONFIGURED in workflows, Security/Secret workflow UNVERIFIED.
 - 첫 수정 후보: 기존 source-only CI의 소스 정적 검증/secret 검사. Node/Windows 호환·보안 출력을 먼저 확인. 불필요한 새로운 PC 예약·운영 설치 생성 금지.
+
+### 2026-11-25 보안 도구 및 CI 호환 점검
+- 저장소 PRIVATE (GitHub metadata). 공개 CodeQL 무료 혜택이 private에 자동 적용된다고 가정하지 않음; 유료 GitHub Code Security 도입 금지.
+- 공식 gitleaks/gitleaks-action README: 구형 v2는 2026-09 Node20 지원 종료로 부적합, v3는 Node24 및 최신 Runner를 요구; 개인/조직 라이선스와 민감한 소스 처리 조건 검토 필요.
+- 기존 C996·Controller Maintenance는 격리 Windows source-only 시험. 공개 CI를 운영 Runner 권한과 결합하지 않음.
