@@ -37,15 +37,18 @@ test('manifest disallows GET, stored raw writes and D1 public publication',()=>{
    /NOV30_READONLY_APPROVAL_STOP/);
  }
 });
-test('A workflow is isolated from B and checks fixed SHA/hash',()=>{
- const workflow=fs.readFileSync(path.join(folder,
-  '.github/workflows/pc-er1-nov30-saved15-recovery-readonly.yml'),'utf8');
+test('retired frozen asOf entrypoint preserves its read-only source hash and approval',()=>{
+ assert.equal(fs.existsSync(path.join(folder,'.github/workflows','pc-er1-nov30-saved15-recovery-readonly.yml')),false);
  const entry=fs.readFileSync(path.join(folder,'er1-nov30-saved15-recovery-readonly-entry.mjs'),'utf8');
- assert.ok(workflow.includes('ref: '+source));
- assert.ok(workflow.includes('ref: $'+'{{ github.sha }}'));
- assert.ok(workflow.includes('shell: cmd'));
- assert.ok(workflow.includes('persist-credentials: false'));
- assert.ok(!workflow.includes('schedule:'));
+ assert.equal(approval.sourceSha,source);
+ assert.equal(approval.asOf,'2026-11-04');
+ assert.equal(approval.sourceRepository,'ansqhd5774-Choi/zgmini');
+ assert.equal(approval.maxProviderRequests,0);
+ assert.equal(approval.allowPrivateDataWrites,false);
+ assert.equal(approval.allowD1Writes,false);
+ assert.equal(approval.allowCoreWrites,false);
+ assert.equal(approval.allowSchedulerChanges,false);
+ assert.ok(entry.includes(source));
  assert.ok(entry.includes(approval.sourceFileSha256));
  assert.ok(entry.includes(approval.dependentSourceSha256));
  assert.ok(!entry.includes('ONE_SHOT_STARTED'));
