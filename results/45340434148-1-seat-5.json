@@ -1,0 +1,134 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-45340434148-1-seat-5",
+  "requestId": "pc-68d8e832-bb18-4a55-8e36-36669e1ad020",
+  "startedAt": "2026-11-24T06:26:26.121Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "7c6cecfd9f5e81759d90dc927265c9442acd4237",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "55f27815fbd877a1a27a2f9f8027bde92d7b4f99",
+  "sourceBranch": "main",
+  "operation": "writer-publication-evidence-readonly",
+  "seat": 5,
+  "status": "PASS",
+  "code": "ER1_WRITER_METADATA_READONLY",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": true,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-w05-three-key-writer-readback-postinstall-20261124",
+  "effectClass": "REGISTERED_OPERATION",
+  "pcOperationalApprovedSha": "15f65455bbe44cef76f87a3f589ad08f94359184",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "ER1_WRITER_METADATA_READONLY",
+    "observedAt": "2026-11-24T06:26:28.438Z",
+    "evidenceLevel": "LOCAL_WRITER_AND_OUTPUT_READONLY",
+    "writer": {
+      "at": "2026-11-24T06:22:33.391Z",
+      "source": "15f65455bbe44cef76f87a3f589ad08f94359184",
+      "mode": "PUBLISH",
+      "status": "VERIFIED"
+    },
+    "er1Future": {
+      "status": "NO_NEW_OUTPUT",
+      "months": [
+        {
+          "month": "2026-11",
+          "status": "UNCHANGED",
+          "sqliteDays": null,
+          "privateDays": null,
+          "scoreableIssuers": 105
+        },
+        {
+          "month": "2026-12",
+          "status": "SAVED_MONTH_INCOMPLETE",
+          "sqliteDays": null,
+          "privateDays": null,
+          "scoreableIssuers": null
+        }
+      ],
+      "failures": []
+    },
+    "ledger": {
+      "state": "READY",
+      "status": "VERIFIED",
+      "at": "2026-11-24T06:24:55.378Z",
+      "sourceMatchesWriter": true
+    },
+    "w05Sidecars": {
+      "evidenceLevel": "SAVED_LOCAL_WRITER_REPORT_NOT_FRESH_D1_API",
+      "writerSource": "15f65455bbe44cef76f87a3f589ad08f94359184",
+      "writerAt": "2026-11-24T06:22:33.391Z",
+      "keys": {
+        "wpsfd42": {
+          "key": "detail:earnings-recession-indicators:bls-wpsfd42:v1",
+          "status": "ALREADY_STORED",
+          "evidence": "WRITER_READBACK_RECORDED",
+          "sourceVersion": "a28e8c4a8a1074fbb6fb4affa0156b99d094c5c8e5e6f02dbaac6ee2986fe3ed",
+          "sourceStoredAt": 1795351641253,
+          "publishedAt": 1795419894399,
+          "failureReason": null,
+          "readbackAtWriter": true
+        },
+        "qfr": {
+          "key": "detail:earnings-recession-indicators:census-qfr-mfg-margin:v1",
+          "status": "ALREADY_STORED",
+          "evidence": "WRITER_READBACK_RECORDED",
+          "sourceVersion": "0cf9d0e4bced96b300810a448bf67be3b663252178f15853f103561d876ddeb3",
+          "sourceStoredAt": 1793112733108,
+          "publishedAt": 1795351947735,
+          "failureReason": null,
+          "readbackAtWriter": true
+        },
+        "bea": {
+          "key": "detail:earnings-bea-unit-profit:v1",
+          "status": "ALREADY_STORED",
+          "evidence": "WRITER_READBACK_RECORDED",
+          "sourceVersion": "ff5a5a3a88cfc2f8758d8cd1369818eff1f9875e6df70e81caef4baf119273c3",
+          "sourceStoredAt": 1795435085956,
+          "publishedAt": 1795447220060,
+          "failureReason": null,
+          "readbackAtWriter": true
+        }
+      },
+      "providerCalls": 0,
+      "productionVerified": false,
+      "publicApiUiVerified": false
+    },
+    "output": {
+      "key": "market-calendar:earnings-er1-score-2026-11-public",
+      "state": "READ",
+      "storedAt": 1795496546045,
+      "bodySha256": "d26962a3ccc642d8031ac96b28a59c225487b8e7dd99945f53d3feee9dd2602e"
+    },
+    "d1": {
+      "perKeyReadback": "VERIFIED",
+      "matchedToLocal": true,
+      "productionVerified": false,
+      "publicApiUiVerified": false,
+      "verificationScope": "AT_WRITER_PUBLISH_TIME",
+      "evidenceState": "VERIFIED",
+      "observedAt": "2026-11-24T06:24:05.481Z",
+      "d1StoredAt": 1795496546045,
+      "d1BodySha256": "d26962a3ccc642d8031ac96b28a59c225487b8e7dd99945f53d3feee9dd2602e"
+    },
+    "localOutputVerified": true,
+    "globalLedgerVerified": true,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "operationalWrites": 0,
+    "sqliteOpened": true
+  },
+  "protectedBeforeSha256": "d5c2b4bfd450647a97102a096a3ffb02175c65f95e7696987194d59566294591",
+  "protectedAfterSha256": "d5c2b4bfd450647a97102a096a3ffb02175c65f95e7696987194d59566294591",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "7c6cecfd9f5e81759d90dc927265c9442acd4237",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-24T06:26:30.803Z",
+  "durationMs": 4682
+}
