@@ -152,6 +152,11 @@ test('actual Git worktree with injected config cannot run active post-checkout h
 
 test('trusted system Git selection rejects arbitrary PATH Git executable',()=>{
  const fixture={isFile:()=>true,isSymbolicLink:()=>false,nlink:1,size:1000};
+ const realHardlink={...fixture,nlink:2};
+ assert.equal(chooseTrustedGitExecutable({readStat:()=>realHardlink}),
+  'C:/Program Files/Git/cmd/git.exe');
+ assert.throws(()=>chooseTrustedGitExecutable({readStat:()=>({...fixture,nlink:0})}),
+  /OPERATOR_TRUSTED_GIT_MISSING/);
  assert.equal(chooseTrustedGitExecutable({readStat:filepath=>{
   if(filepath==='C:/Program Files/Git/cmd/git.exe')return fixture;
   throw Object.assign(Error('missing'),{code:'ENOENT'});
