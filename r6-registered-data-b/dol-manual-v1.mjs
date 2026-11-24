@@ -144,6 +144,15 @@ export function createApprovedDolManualCollectorOptions({auth,db,fetchImpl,provi
  };
 }
 
+// Enforce the exact current SQLite result for the PDF+ETA539 V2 success path.
+// Legacy XML V1 and explicitly partial runs retain their existing semantics.
+export function verifyDolEta539StateReadback({pdfMode=false,collectorStatus,stateRows}={}){
+ if(pdfMode&&collectorStatus==='SUCCESS')
+  need(Number.isSafeInteger(stateRows)&&stateRows===51,
+   'R6_DOL_ETA539_STATE_READBACK_INVALID');
+ return true;
+}
+
 export async function runInstalledDolManual({auth,pcHome=R6_B_HOME,
  sourceRoot=R6_B_SOURCE,lock,onStage=()=>{}}={}){
  need(lock.held(),'R6_DOL_CORE_LOCK_LOST');
@@ -209,6 +218,7 @@ export async function runInstalledDolManual({auth,pcHome=R6_B_HOME,
    Number.isSafeInteger(nationalRows)&&nationalRows>=0&&
    Number.isSafeInteger(stateRows)&&stateRows>=0&&stateRows<=35000,
    'R6_DOL_READBACK_INVALID');
+  verifyDolEta539StateReadback({pdfMode,collectorStatus:output.status,stateRows});
   if(pdfMode&&output.status==='SUCCESS'){
    // Full PDF bytes and four National observations must read back as linked.
    const found=await db.prepare(`
