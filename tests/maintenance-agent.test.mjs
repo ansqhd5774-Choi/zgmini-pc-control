@@ -713,6 +713,22 @@ test('safe measured idle retry survives final maintenance result normalization',
  assert.equal(Object.hasOwn(normalizedResult(request,{...sample,status:'RECOVERY_REQUIRED'}),'supervisorIdleWait'),false);
 });
 
+test('bounded Busy refusal telemetry survives normalization without implying success',()=>{
+ const request={requestId:REQUEST_ID,targetControllerSha:TARGET,operation:'controller-update'};
+ const sample={status:'BLOCKED',code:'RUNNERS_NOT_IDLE',failureOperation:'stopOwnSupervisor',
+  supervisorIdleWait:{retryCount:10,elapsedMs:30000,observedBusy:true}};
+ const out=normalizedResult(request,sample);
+ assert.equal(out.status,'BLOCKED');
+ assert.deepEqual(out.supervisorIdleWait,sample.supervisorIdleWait);
+ assert.equal(Object.hasOwn(normalizedResult(request,{...sample,code:'SUPERVISOR_OWNER_CHANGED'}),
+  'supervisorIdleWait'),false);
+ assert.equal(Object.hasOwn(normalizedResult(request,{...sample,
+  supervisorIdleWait:{retryCount:-1,elapsedMs:30000,observedBusy:true}}),
+  'supervisorIdleWait'),false);
+ assert.deepEqual(normalizedResult(request,{...sample,status:'RECOVERY_REQUIRED',
+  firstFail:'BACKED_UP'}).supervisorIdleWait,sample.supervisorIdleWait);
+});
+
 test('unknown controller recovery does not assert disabled workflow',()=>{
  const request={requestId:REQUEST_ID,targetControllerSha:TARGET,operation:'controller-update'};
  const raw={status:'RECOVERY_REQUIRED',code:'BACKLOG_ORIGINAL_REQUEST_INVALID',
