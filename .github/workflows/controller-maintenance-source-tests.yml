@@ -59,6 +59,11 @@ on:
       - 'tests/controller-core-lock-source-contract.test.mjs'
       - 'tests/theme-l7-runtime-readonly.test.mjs'
       - 'tests/supervisor-status-write.test.mjs'
+      # Existing integration/contract suites must run when their owning sources change.
+      - 'tools/maintenance-agent.mjs'
+      - 'tools/source-bundle-register.mjs'
+      - 'controller/engine.mjs'
+      - 'controller/memory-admission.mjs'
       - 'tools/maintenance-contract.mjs'
       - 'tools/maintenance-recovery.mjs'
       - 'tests/maintenance-recovery.test.mjs'
