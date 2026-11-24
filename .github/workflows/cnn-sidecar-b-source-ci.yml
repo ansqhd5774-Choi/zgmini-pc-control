@@ -1,0 +1,40 @@
+name: ZGMINI CNN Sidecar B Source Contract CI
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'sidecar-b/**'
+      - '.github/workflows/cnn-sidecar-b-source-ci.yml'
+permissions:
+  contents: read
+concurrency:
+  group: zgmini-cnn-sidecar-b-source-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  isolated-source:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Assert isolated host
+        run: |
+          if /I "%COMPUTERNAME%"=="DESKTOP-N62L0NG" (
+            echo CNN_SIDECAR_B_SOURCE_ONLY_ISOLATED=TRUE
+          ) else (
+            exit /b 5
+          )
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Validate fixed target, fail-closed install and rollback source tests
+        run: node --test sidecar-b/contract.test.mjs
