@@ -1,6 +1,6 @@
 import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';import {need,writeJson,errorCode,digest,validateRequest} from './common.mjs';
 const controller=path.dirname(fileURLToPath(import.meta.url)),root=path.dirname(controller);
-let policy,event;
+let policy,event,importFailureStage='EVENT_OR_REQUEST_VALIDATION';
 const seat=Number(process.env.RUNNER_NAME?.match(/^zgmini-pc-0([1-6])$/)?.[1]);const runId=process.env.GITHUB_RUN_ID,attempt=Number(process.env.GITHUB_RUN_ATTEMPT||1);
 const pointer=path.join(root,'reports',`${runId}-${attempt}-${seat}.json`);fs.mkdirSync(path.dirname(pointer),{recursive:true});
 try{
@@ -51,14 +51,17 @@ try{
   'controller/preimage-manifest-contract.mjs'].every(x=>
    /^[0-9a-f]{64}$/.test(host.controllerFiles?.[x]??'')),
   'PREIMAGE_STAGE_SOURCE_NOT_ATTESTED');
+ // Distinguish the optional preimage import from the engine in failure receipts.
+ importFailureStage='PREIMAGE_STAGE_IMPORT';
  const {readStagedPreimageScope}=await import('./preimage-manifest-contract.mjs');
  const approvedPreimageScope=readStagedPreimageScope({env:process.env,request:raw});
  // Delay engine/operations loading until inside the error receipt boundary.
  // Missing selective-overlay imports must still produce an uploadable BLOCKED result.
+ importFailureStage='ENGINE_IMPORT';
  const {executeJob}=await import('./engine.mjs');
  const result=await executeJob(raw,{root,policy,host,seat,runId,attempt,approvedPreimageScope});
  writeJson(pointer,{...result,issueNumber:event.issue.number});console.log(JSON.stringify(result.report));process.exitCode=result.report.status==='FAIL'?1:0;
 }catch(error){
  const missingModule=error?.code==='ERR_MODULE_NOT_FOUND'||error?.code==='MODULE_NOT_FOUND';
  const code=missingModule?'CONTROLLER_IMPORT_MISSING':errorCode(error);
- writeJson(pointer,{issueNumber:event?.issue?.number,report:{schema:'ZGMINI_PC_RESULT_V1',jobId:`run-${runId}-${attempt}-seat-${seat}`,status:'BLOCKED',code,lastPass:'EVENT_RECEIVED',firstFail:missingModule?'ENGINE_IMPORT':code==='CONTROLLER_HOST_MANIFEST_UNAVAILABLE'?'HOST_MANIFEST_READ':'EVENT_OR_REQUEST_VALIDATION',operationalWrites:0,providerCalls:0,d1Writes:0}});console.log(JSON.stringify({status:'BLOCKED',code}));process.exitCode=1;}
+ writeJson(pointer,{issueNumber:event?.issue?.number,report:{schema:'ZGMINI_PC_RESULT_V1',jobId:`run-${runId}-${attempt}-seat-${seat}`,status:'BLOCKED',code,lastPass:'EVENT_RECEIVED',firstFail:missingModule?importFailureStage:code==='CONTROLLER_HOST_MANIFEST_UNAVAILABLE'?'HOST_MANIFEST_READ':'EVENT_OR_REQUEST_VALIDATION',operationalWrites:0,providerCalls:0,d1Writes:0}});console.log(JSON.stringify({status:'BLOCKED',code}));process.exitCode=1;}

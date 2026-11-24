@@ -117,6 +117,8 @@ test('missing engine dependency or host manifest yields uploadable BLOCKED point
   assert.equal(receipt.issueNumber,2506);
   assert.equal(receipt.report.status,'BLOCKED');
   assert.equal(receipt.report.code,'CONTROLLER_IMPORT_MISSING');
+  // This is the preimage helper import, not a failure to load the engine.
+  assert.equal(receipt.report.firstFail,'PREIMAGE_STAGE_IMPORT');
   assert.equal(receipt.report.operationalWrites,0);
   assert.equal(receipt.report.providerCalls,0);
   assert.equal(receipt.report.d1Writes,0);
