@@ -68,18 +68,54 @@ export async function uploadResultPairAtomic({outputs,headers,fetchApi=fetch,
  const tree=await json(fetchApi,`${api}/git/trees`,{method:'POST',headers,
   body:JSON.stringify({base_tree:baseTree,tree:entries})},201);
  need(SHA40.test(tree?.sha??''),'CONFIG_B_PAIR_TREE_STOP');
- const commit=await json(fetchApi,`${api}/git/commits`,{method:'POST',headers,
+ let commit=await json(fetchApi,`${api}/git/commits`,{method:'POST',headers,
   body:JSON.stringify({message,tree:tree.sha,parents:[base]})},201);
  need(SHA40.test(commit?.sha??''),'CONFIG_B_PAIR_COMMIT_STOP');
- // One compare/fast-forward operation. Never use force or retry ambiguity.
+ // A definite 422 can be a concurrent main advance. Rebuild at most once,
+ // only after proving a descendant HEAD and both destination paths absent.
+ // Never replay an ambiguous PATCH outcome or replace existing evidence.
  let updated=null,moved=null;
- try{
-  updated=await fetchApi(`${api}/git/refs/heads/main`,{method:'PATCH',headers,
-   body:JSON.stringify({sha:commit.sha,force:false})});
-  if(updated?.status===200)moved=await updated.json();
- }catch{/* Ambiguous response: reconcile by reads only, never PATCH again. */}
- if(updated?.status===422)return{created:0,verified:0,
-  delivery:'RESULT_PAIR_REF_CONFLICT_UNTOUCHED'};
+ const patch=async sha=>{
+  try{
+   const response=await fetchApi(`${api}/git/refs/heads/main`,{method:'PATCH',headers,
+    body:JSON.stringify({sha,force:false})});
+   if(response?.status===200){
+    let value=null;
+    try{value=await response.json();}catch{/* Readback below resolves ambiguity. */}
+    return {response,moved:value};
+   }
+   return {response,moved:null};
+  }catch{return {response:null,moved:null};}
+ };
+ ({response:updated,moved}=await patch(commit.sha));
+ if(updated?.status===422){
+  let live;
+  try{
+   const now=await json(fetchApi,`${api}/git/ref/heads/main`,get,200);
+   live=now?.object?.sha;
+   if(!SHA40.test(live??'')||live===base)
+    return{created:0,verified:0,delivery:'RESULT_PAIR_REF_CONFLICT_UNTOUCHED'};
+   const compared=await json(fetchApi,`${api}/compare/${base}...${live}`,get,200);
+   if(compared?.status!=='ahead')
+    return{created:0,verified:0,delivery:'RESULT_PAIR_REF_CONFLICT_UNTOUCHED'};
+   for(const [filePath] of outputs){
+    const found=await fetchApi(`${api}/contents/${filePath}?ref=${live}`,get);
+    if(found?.status!==404)return{created:0,verified:0,
+     delivery:'RESULT_PAIR_ALREADY_EXISTS_OR_PREFLIGHT_UNVERIFIED'};
+   }
+   const head=await json(fetchApi,`${api}/git/commits/${live}`,get,200);
+   need(SHA40.test(head?.tree?.sha??''),'CONFIG_B_PAIR_TREE_STOP');
+   const newerTree=await json(fetchApi,`${api}/git/trees`,{method:'POST',headers,
+    body:JSON.stringify({base_tree:head.tree.sha,tree:entries})},201);
+   need(SHA40.test(newerTree?.sha??''),'CONFIG_B_PAIR_TREE_STOP');
+   commit=await json(fetchApi,`${api}/git/commits`,{method:'POST',headers,
+    body:JSON.stringify({message,tree:newerTree.sha,parents:[live]})},201);
+   need(SHA40.test(commit?.sha??''),'CONFIG_B_PAIR_COMMIT_STOP');
+  }catch{return{created:0,verified:0,delivery:'RESULT_PAIR_REF_CONFLICT_UNTOUCHED'};}
+  ({response:updated,moved}=await patch(commit.sha));
+  if(updated?.status===422)return{created:0,verified:0,
+   delivery:'RESULT_PAIR_REF_CONFLICT_UNTOUCHED'};
+ }
  let branchContainsCommit=updated?.status===200&&moved?.object?.sha===commit.sha;
  if(!branchContainsCommit){
   try{
