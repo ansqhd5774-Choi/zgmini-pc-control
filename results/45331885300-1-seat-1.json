@@ -1,0 +1,480 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-45331885300-1-seat-1",
+  "requestId": "pc-66985b9b-4624-456a-812c-9356f932ecc4",
+  "startedAt": "2026-11-24T05:14:32.589Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "4396d2bb326d86b8ce9e27c528519bf0090b8e9e",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "55f27815fbd877a1a27a2f9f8027bde92d7b4f99",
+  "sourceBranch": "main",
+  "operation": "writer-install-preimage-readonly",
+  "seat": 1,
+  "status": "PASS",
+  "code": "WRITER_APPROVED_PREIMAGE_READONLY",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-w05-3190-installed-16file-readback-20261124",
+  "effectClass": "FIXED_READONLY_NO_PROVIDER_NO_DB",
+  "pcOperationalApprovedSha": "15f65455bbe44cef76f87a3f589ad08f94359184",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "WRITER_APPROVED_PREIMAGE_READONLY",
+    "observedAt": "2026-11-24T05:14:34.866Z",
+    "evidenceLevel": "FIXED_CHECKOUT_NOT_LIVE_CORE_PROCESS",
+    "runtimeSourceVerified": false,
+    "sourceRoot": "projects/zgmini-earnings-history-pc-release",
+    "sourceRootAbsolute": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+    "sourceHead": "15f65455bbe44cef76f87a3f589ad08f94359184",
+    "approvedConfigSource": "15f65455bbe44cef76f87a3f589ad08f94359184",
+    "checkpointSource": "0fe9996a9694a89245709327b3cc3c5f1a4a174a",
+    "sourceIdentityConsistent": false,
+    "coreTaskSourceLinked": false,
+    "taskLaunchers": [
+      {
+        "path": "data/pc-writer/archive-sidecar-r7/run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c"
+      },
+      {
+        "path": "data/pc-writer/cutover-evidence/inflation-r37-2026-10-20T19-39-19-549Z/run-local-core.vbs",
+        "sha256": "bb3e11c0b5c8da07162b1c824e7b52e7a7c2f987c079f29713211a2413932b01"
+      },
+      {
+        "path": "data/pc-writer/archive-sidecar-r7/archive-run.mjs",
+        "sha256": "ce07af0b5e8d17625644e204f2815c1f754aff2468bc5434ac13c0dadcecd907"
+      },
+      {
+        "path": "data/pc-writer/earnings-risk-provisional-r23/ZGMINI_EARNINGS_R38_AUTO_DISPATCH.mjs",
+        "sha256": "4346e5e4406f893ede75e994e3a1e7253bde2bb8eacd7656b365e3a82e3704f1"
+      },
+      {
+        "path": "data/pc-writer/archive-sidecar-r7/archive-core-r10.mjs",
+        "sha256": "e96d9ba669ee053d0b3558db36f1f5f7a28648b8ea26b7937f62a19bb4495c84"
+      },
+      {
+        "path": "data/pc-writer/archive-sidecar-r7/verified-checks-r10.mjs",
+        "sha256": "f88f7b25a1a6f9157e1e7b23901a30076927f0a63e98e9aff88643a02854a02f"
+      },
+      {
+        "path": "data/pc-writer/earnings-risk-provisional-r23/ZGMINI_EARNINGS_R31_SCOPED_PUBLICATION.mjs",
+        "sha256": "ffa71643748e79eedacf26b72880804cbab0edfb2eb32435da2346ec4bd0ad19"
+      },
+      {
+        "path": "data/pc-writer/earnings-risk-provisional-r23/ZGMINI_EARNINGS_R33_OBSERVE_PUBLISH_CYCLE.mjs",
+        "sha256": "7bd792d1ed84067846ca3ef0748b4a5eac8e5ba78feb18c9a3fcaf46b58ee58b"
+      }
+    ],
+    "r6Config": {
+      "status": "PASS",
+      "configSha256": "1567707c73c9359362fbdca8ab943344c1f7affa923a6451a5b7e3333b91f062",
+      "keys": {
+        "employmentR6AutoCollection": "ENABLED",
+        "employmentR6OneYearAutoPublication": "ENABLED"
+      },
+      "reason": null
+    },
+    "calendar": [
+      {
+        "path": "lib/market-calendar-company-ko.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-calendar-issuer-alias-coverage.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/market-calendar-er1-auto-output.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      }
+    ],
+    "employmentR6": [
+      {
+        "path": "lib/market-score/employment-r4-bed-provider.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r4-shadow-store.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-collector.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-contract.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-feature-engine.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-observation-reader.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-provider.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-scheduler.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-store.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/collect-local.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/run-local.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-one-year-read-model.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-window.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/employment-r6-auto-collection.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/employment-r6-auto-publication.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/employment-r6-candidate-locator.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/employment-r6-one-year-stage.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/employment-r6-pit-coverage.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "worker/employment-r6-public-display.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      }
+    ],
+    "operationalWrites": 0,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "sqliteOpened": false,
+    "scopedPreimage": {
+      "manifestPath": "approvals/writer-preimage/w05-three-sidecar-dependencies-20file-20261124.json",
+      "manifestSha256": "1678644ff6aa2d8419e28ff7e387126338455cf63c4dd0dbd2e74952216d5551",
+      "files": [
+        {
+          "path": "scripts/pc-writer/run-local.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "a96c0c7c3513fda6f9d51b35caee7d634e2a05c69ff3575d3b99c37072a60ec6",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "scripts/pc-writer/w05-stored-sidecar-publication-r1.mjs",
+          "expectedEffect": "A",
+          "exists": true,
+          "sha256": "63c26de726ec47bc4c998a1fed6b8d717d8d38c560d407810a2b38165ec68d0a",
+          "state": "PRESENT",
+          "trackedDirty": null,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": true
+        },
+        {
+          "path": "worker/earnings-companion-c-r4.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "23cede94ca1d6d1a32b77e1ecb0838bd46a2d6b697e8cf0ad117c7e69533912a",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "worker/earnings-companion-c-qfr-r1.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "990e9bb88c607cfa5400160398e6322b30e0b18103cea5302408bfb0a83a38fe",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "worker/earnings-bea-unit-profit-r1.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "174080dcb994119a997aed86bcaf0ca6a44ecf5c0a1368e4c4ea507c91d4f5ba",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "scripts/pc-writer/EARNINGS_R4_C_READ_MODEL_PREVIEW_READONLY.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "341a62faa459f31bcc72107bdf0be6d1b0ba835a8e069dbd24bfe604ccd581fc",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "scripts/pc-writer/EARNINGS_CENSUS_QFR_R3_STORED_PREVIEW_READONLY.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "4119bba808819a71f58b6d76ccb3872b5151c7c80df666b483f4f871bc075933",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "scripts/pc-writer/EARNINGS_CENSUS_QFR_R4_D1_ONCE.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "7b08d799dfce2c5ab720dd69791d727834c2c5c83ed365c39fd89cd3c7853005",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "scripts/pc-writer/EARNINGS_BEA_UNIT_NIPA_ARCHIVE_R1.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "58c3f81a2361ab3465a5b68b97bdc293ed94fafa19753b4de949d1bcfb4a7f88",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "scripts/pc-writer/EARNINGS_BEA_UNIT_NIPA_PUBLIC_PROJECTION_R1.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "1a3e45c5c77b4673f8bdb23d01586bc0842e2673b53c4ee7349665354623032d",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "scripts/pc-writer/EARNINGS_R3D_STORED_BLS_CALC_READONLY.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "b441a52551a015ab9522280ee7c3f620fc8efd967c8dd0e6e04865bb72c97b31",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "scripts/pc-writer/EARNINGS_CENSUS_QFR_R1_READONLY.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "5286287be8773dd8d2d4bdc943e7ee40131d88669c1ec981f4be68a34025879a",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "scripts/pc-writer/EARNINGS_CENSUS_QFR_R2_SQLITE_APPEND.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "9d3cd0296d41baa9d6deb12897b164fe13115eada4df17ed14196d89ed9273d0",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "scripts/pc-writer/EARNINGS_CENSUS_QFR_R4_PROJECTION_DRAFT_READONLY.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "59e4303e2135bfad20b9e51c6e48763be655fad5d2f00eb1e9d50b5cb0e3c002",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "scripts/pc-writer/EARNINGS_R4_C_D1_DUAL_SOURCE_GATES.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "6106ff55993324b905186330163692f8918f3f49354f266cae430b50093a9377",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "scripts/pc-writer/d1.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "10beefecc524b569eba9abf826036fc8e069b4b6f0c3b3340a7bd6a5ab6353a5",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "scripts/pc-writer/EARNINGS_BEA_UNIT_NIPA_EQUIVALENCE_R1.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "b3a745bcf773dae56dca19179cd8fbc931c7c05e2f13c15634f191c25c38e36c",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "scripts/pc-writer/d1-transient.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "5fd4be11dc4a671a9634757bb449807e497a7974c5fd061faa06b455dd0d253e",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "scripts/pc-writer/d1-diagnostics.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "eb5ffbcdb56805ca15affac876493217de52b21e0f90f99976bbcff8ddc13037",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "lib/market-score/earnings-bea-unit-profit-source-r1.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "c76cfbc3b228ecea5de766f45789309cb452f77003bc63604afc6aae4ba1943b",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        }
+      ]
+    }
+  },
+  "protectedBeforeSha256": "d5c2b4bfd450647a97102a096a3ffb02175c65f95e7696987194d59566294591",
+  "protectedAfterSha256": "d5c2b4bfd450647a97102a096a3ffb02175c65f95e7696987194d59566294591",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "4396d2bb326d86b8ce9e27c528519bf0090b8e9e",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-24T05:14:37.856Z",
+  "durationMs": 5267
+}
