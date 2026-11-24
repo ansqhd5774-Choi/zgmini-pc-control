@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {HANDOFF_REPOSITORY, HANDOFF_OWNER, processQueue} from './queue-selector.mjs';
-import {collectBoard} from './queue-board-runner.mjs';
+import {collectBoard,validateDirectIntakeFollowup} from './queue-board-runner.mjs';
 import {ownerExecutionPlan} from './queue-board.mjs';
 import {readIssueCommentLedger} from './comment-ledger.mjs';
 
@@ -18,6 +18,10 @@ export function validateTrigger(event, env) {
       !env.GITHUB_EVENT_PATH || event?.repository?.private !== true ||
       event.repository.full_name !== HANDOFF_REPOSITORY)
     throw Error('HANDOFF_SELECTOR_EVENT_REJECTED');
+  if (env.GITHUB_JOB === 'verify-and-select-after-intake') {
+    validateDirectIntakeFollowup(event,env,'verify-and-select-after-intake');
+    return;
+  }
   if (env.GITHUB_EVENT_NAME === 'workflow_run') {
     if (event.action !== 'completed' ||
         !SOURCE_WORKFLOWS.has(event.workflow_run?.name) ||

@@ -447,3 +447,31 @@ test('after-selection board accepts only the reviewed main job and authorized se
   assert.throws(()=>validateBoardEvent(push,{...pushEnv,GITHUB_ACTOR:'other'}),/AFTER_SELECTION_PUSH_STOP/);
   assert.throws(()=>validateBoardEvent({...run,repository:{...repository,private:false}},env),/EVENT_SCOPE_STOP/);
 });
+
+
+test('direct intake board preserves original event scope after selection',()=>{
+  const repository={full_name:HANDOFF_REPOSITORY,private:true};
+  const owner=HANDOFF_OWNER;
+  const issue={labels:[{name:'agent-handoff'},{name:'handoff-agent-pending'}]};
+  const event={repository,issue,action:'opened'};
+  const env={GITHUB_REPOSITORY:HANDOFF_REPOSITORY,GITHUB_EVENT_PATH:'event.json',
+    GITHUB_WORKFLOW_REF:HANDOFF_REPOSITORY+'/.github/workflows/agent-handoff.yml@refs/heads/main',
+    GITHUB_REF:'refs/heads/main',GITHUB_ACTOR:owner,GITHUB_EVENT_NAME:'issues',
+    GITHUB_JOB:'authenticated-readonly-board-after-selection'};
+  assert.doesNotThrow(()=>validateBoardEvent(event,env));
+  assert.doesNotThrow(()=>validateBoardEvent({...event,action:'labeled',label:{name:'agent-handoff'}},env));
+  assert.throws(()=>validateBoardEvent({...event,action:'labeled',label:{name:'other'}},env));
+  assert.throws(()=>validateBoardEvent({...event,issue:{labels:[]}},env));
+  assert.throws(()=>validateBoardEvent(event,{...env,GITHUB_ACTOR:'other'}));
+  assert.throws(()=>validateBoardEvent(event,{...env,GITHUB_REF:'refs/heads/dev'}));
+  assert.throws(()=>validateBoardEvent(event,{...env,GITHUB_WORKFLOW_REF:env.GITHUB_WORKFLOW_REF.replace('agent-handoff.yml','other.yml')}));
+  assert.throws(()=>validateBoardEvent(event,{...env,GITHUB_JOB:'unrelated-job'}));
+  assert.throws(()=>validateBoardEvent({...event,repository:{...repository,private:false}},env));
+  const commentEnv={...env,GITHUB_EVENT_NAME:'issue_comment'};
+  for(const body of ['ZGMINI_AGENT_HANDOFF_RESULT_V1','ZGMINI_AGENT_HANDOFF_DIAGNOSIS_V1','ZGMINI_HANDOFF_WORK_UPDATE_V1'])
+    assert.doesNotThrow(()=>validateBoardEvent({...event,action:'created',comment:{body}},commentEnv));
+  assert.throws(()=>validateBoardEvent({...event,action:'created',comment:{body:'ordinary comment'}},commentEnv));
+  assert.throws(()=>validateBoardEvent({...event,action:'created',issue:{...issue,pull_request:{}},comment:{body:'ZGMINI_AGENT_HANDOFF_RESULT_V1'}},commentEnv));
+  assert.throws(()=>validateBoardEvent({...event,action:'created',issue:{labels:[{name:'agent-handoff'}]},comment:{body:'ZGMINI_HANDOFF_WORK_UPDATE_V1'}},commentEnv));
+  assert.throws(()=>validateBoardEvent({...event,action:'edited',comment:{body:'ZGMINI_AGENT_HANDOFF_RESULT_V1'}},commentEnv));
+});

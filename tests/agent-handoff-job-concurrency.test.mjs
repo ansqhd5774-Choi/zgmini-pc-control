@@ -79,7 +79,9 @@ test('completed-run fanout ends at selector; full board is a success-dependent r
   const board=read('agent-handoff-queue-board.yml');
   assert.match(intake,/^  issue_comment:/m);
   assert.match(selector,/^  workflow_run:/m);
-  assert.match(selector,/- ZGMINI Agent Handoff Intake/);
+  assert.doesNotMatch(selector,/- ZGMINI Agent Handoff Intake\s*$/m);
+  assert.match(selector,/- ZGMINI Agent Handoff PC Failure Intake/);
+  assert.match(selector,/- ZGMINI Agent Handoff Writer B Failure Intake/);
   assert.doesNotMatch(board,/^  workflow_run:/m);
   assert.doesNotMatch(board,/github\.event\.workflow_run/);
   assert.match(board,/^  schedule:/m);
@@ -117,8 +119,33 @@ test('009 admits only relevant events and serializes actual issue writers withou
  for(const job of ['route-sanitized-incident','record-verified-return','record-work-progress']){
    assert.ok(yaml.includes('  '+job+':\n    concurrency:\n      group: agent-handoff-${{ github.event.issue.number }}\n      cancel-in-progress: false\n      queue: max'));
  }
- assert.equal((yaml.match(/^      queue: max$/gm)||[]).length,3);
+ assert.equal((yaml.match(/^      queue: max$/gm)||[]).length,5);
  assert.match(yaml,/github\.event\.action == 'opened'/);
  assert.match(yaml,/github\.event\.action == 'labeled' && github\.event\.label\.name == 'agent-handoff'/);
  assert.doesNotMatch(yaml,/cancel-in-progress: true/);
+});
+
+
+test('direct intake selection requires a successful original job, not merely a completed event',()=>{
+ const intake=read('agent-handoff.yml');
+ const follow=intake.slice(intake.indexOf('  verify-and-select-after-intake:'));
+ const selection=follow.slice(0,follow.indexOf('  authenticated-readonly-board-after-selection:'));
+ const board=follow.slice(follow.indexOf('  authenticated-readonly-board-after-selection:'));
+ assert.match(selection,/needs: \[route-sanitized-incident, record-verified-return, record-work-progress\]/);
+ assert.match(selection,/!cancelled\(\) && !failure\(\)/);
+ for(const job of ['route-sanitized-incident','record-verified-return','record-work-progress'])
+   assert.ok(selection.includes("needs."+job+".result == 'success'"));
+ assert.match(selection,/github\.ref == 'refs\/heads\/main'/);
+ assert.match(selection,/github\.actor == 'ansqhd5774-Choi'/);
+ assert.match(selection,/vars\.ZGMINI_AGENT_HANDOFF_ENABLED == 'true'/);
+ assert.match(selection,/group: zgmini-handoff-candidate-selector\s*\n\s*cancel-in-progress: false\s*\n\s*queue: max/);
+ assert.match(board,/needs: verify-and-select-after-intake/);
+ assert.match(board,/needs\.verify-and-select-after-intake\.result == 'success'/);
+ assert.match(board,/permissions:\s*\n\s*contents: read\s*\n\s*issues: read\s*\n\s*pull-requests: read/);
+ assert.doesNotMatch(board,/issues: write|contents: write|always\(\)|continue-on-error/);
+ assert.match(board,/group: zgmini-handoff-control-board/);
+ const source=read('agent-handoff-candidate-selector.yml');
+ const sourceSelection=source.slice(source.indexOf('    runs-on:'),source.indexOf('  # Preserve full board readback'));
+ assert.equal(selection.slice(selection.indexOf('    runs-on:')),sourceSelection);
+ assert.equal(board.slice(board.indexOf('    runs-on:')),read('agent-handoff-queue-board.yml').slice(read('agent-handoff-queue-board.yml').indexOf('    runs-on:')));
 });

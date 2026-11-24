@@ -315,3 +315,30 @@ test('001 activation matches 009 and 006 without adding a global queue',()=>{
    assert.ok(intake.includes("contains(github.event.comment.body, '"+name+"'"));
 
 });
+
+
+test('direct intake selection accepts exact owner workflow and original admissible events',()=>{
+  const repository={full_name:HANDOFF_REPOSITORY,private:true};
+  const issue={labels:[{name:'agent-handoff'},{name:'handoff-agent-pending'}]};
+  const event={repository,issue,action:'opened'};
+  const env={GITHUB_REPOSITORY:HANDOFF_REPOSITORY,GITHUB_EVENT_PATH:'event.json',
+    GITHUB_WORKFLOW_REF:HANDOFF_REPOSITORY+'/.github/workflows/agent-handoff.yml@refs/heads/main',
+    GITHUB_REF:'refs/heads/main',GITHUB_ACTOR:owner,GITHUB_EVENT_NAME:'issues',
+    GITHUB_JOB:'verify-and-select-after-intake'};
+  assert.doesNotThrow(()=>validateTrigger(event,env));
+  assert.doesNotThrow(()=>validateTrigger({...event,action:'labeled',label:{name:'agent-handoff'}},env));
+  assert.throws(()=>validateTrigger({...event,action:'labeled',label:{name:'other'}},env));
+  assert.throws(()=>validateTrigger({...event,issue:{labels:[]}},env));
+  assert.throws(()=>validateTrigger(event,{...env,GITHUB_ACTOR:'other'}));
+  assert.throws(()=>validateTrigger(event,{...env,GITHUB_REF:'refs/heads/dev'}));
+  assert.throws(()=>validateTrigger(event,{...env,GITHUB_WORKFLOW_REF:env.GITHUB_WORKFLOW_REF.replace('agent-handoff.yml','other.yml')}));
+  assert.throws(()=>validateTrigger(event,{...env,GITHUB_JOB:'unrelated-job'}));
+  assert.throws(()=>validateTrigger({...event,repository:{...repository,private:false}},env));
+  const commentEnv={...env,GITHUB_EVENT_NAME:'issue_comment'};
+  for(const body of ['ZGMINI_AGENT_HANDOFF_RESULT_V1','ZGMINI_AGENT_HANDOFF_DIAGNOSIS_V1','ZGMINI_HANDOFF_WORK_UPDATE_V1'])
+    assert.doesNotThrow(()=>validateTrigger({...event,action:'created',comment:{body}},commentEnv));
+  assert.throws(()=>validateTrigger({...event,action:'created',comment:{body:'ordinary comment'}},commentEnv));
+  assert.throws(()=>validateTrigger({...event,action:'created',issue:{...issue,pull_request:{}},comment:{body:'ZGMINI_AGENT_HANDOFF_RESULT_V1'}},commentEnv));
+  assert.throws(()=>validateTrigger({...event,action:'created',issue:{labels:[{name:'agent-handoff'}]},comment:{body:'ZGMINI_HANDOFF_WORK_UPDATE_V1'}},commentEnv));
+  assert.throws(()=>validateTrigger({...event,action:'edited',comment:{body:'ZGMINI_AGENT_HANDOFF_RESULT_V1'}},commentEnv));
+});

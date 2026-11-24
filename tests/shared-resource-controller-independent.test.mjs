@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs';
 const workflow = (name) => readFileSync(new URL(`../.github/workflows/${name}`, import.meta.url), 'utf8');
 
 const independentJobs = [
-  ['agent-handoff.yml', 3, ['agent-handoff/issue-broker.mjs', 'agent-handoff/result-entry.mjs', 'agent-handoff/work-progress-broker.mjs']],
+  ['agent-handoff.yml', 5, ['agent-handoff/issue-broker.mjs', 'agent-handoff/result-entry.mjs', 'agent-handoff/work-progress-broker.mjs', 'agent-handoff/queue-dispatcher.mjs', 'agent-handoff/queue-board-runner.mjs']],
   ['agent-handoff-pc-failure-intake.yml', 1, ['agent-handoff/pc-failure-producer.mjs']],
   ['agent-handoff-writer-b-failure-intake.yml', 1, ['agent-handoff/writer-b-failure-producer.mjs']],
 ];
