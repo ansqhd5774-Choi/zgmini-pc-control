@@ -12,7 +12,7 @@
 - `IMPLEMENTED`는 **지정된 범위**의 기존 소스와 관련 CI 유효 실행 증거. 공용 기능 전부에서 보편적 완료를 뜻하지 않는다.
 - `PARTIAL`: 실제 관련 기능이 있으나 제품 전체·실제 서비스·원하는 수준 미달. `NOT_CONFIGURED`: 적용 가능한 자동 검사가 현재 확인한 소스에서 없음. `DUPLICATED`: 신규 제품이 실질적으로 기존 기능을 반복. `NOT_APPLICABLE`: 현재 구조/권리/공식 제공 조건상 부적합.
 - 상태와 최종 조치(유지·고도화·보류·제외)는 다른 기준이다. 본 문서의 점수는 **정성적 채택 적합도 사전 평가**, 성능 개선율이나 운영 보증 수치가 아니다.
-- 점수는 요청한 가중치 20/20/15/10/10/10/10/5(구조/효과/완성도/유지보수/호환/보안/비용/라이선스) 각각을 0–5 등급으로 평가해 `Σ(등급×배점/5)`로 계산했다. 비용·라이선스·현행 소스 등 추가 확인이 필요한 건 **최종 채택 승인 아님**. 개별 8항목 기초 점수는 아래 재현 가능한 grade에서 계산하며, 점수 자체는 측정값이 아님.
+- 점수는 요청한 가중치 20/20/15/10/10/10/10/5(구조/효과/완성도/유지보수/호환/보안/비용/라이선스) 각각을 0–5 등급으로 평가해 `Σ(등급×배점/5)`로 계산했다. 비용·라이선스·현행 소스 등 추가 확인이 필요한 건 **최종 채택 승인 아님**. 개별 8항목 기초 등급은 본 문서의 평가등급 원장에서 재현할 수 있으며, 점수 자체는 측정값이 아님.
 
 ## 1. 양대 저장소 기존 CI·Runner·IssueOps 실사
 
@@ -31,37 +31,37 @@
 | 3 | Test Impact Analysis | PARTIAL | [nrwl/nx](https://github.com/nrwl/nx) | 74/100 | 보류 | PC changed-source 시험 선택 있음; Nx 영향그래프 없는 양대 저장소 | [PC C996](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/41f38edfd7cc568632ec2641c85e709d1564cd8e/.github/workflows/c996-r5-readonly-source-checks.yml) |
 | 4 | Distributed CI | NOT_APPLICABLE | [nrwl/nx](https://github.com/nrwl/nx) | 52/100 | 제외 | Nx Cloud 분산 Workers는 현 격리 Windows Runner 계약·비용과 충돌 | [PC C996](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/41f38edfd7cc568632ec2641c85e709d1564cd8e/.github/workflows/c996-r5-readonly-source-checks.yml) |
 | 5 | Mutation Testing | NOT_CONFIGURED | [stryker-mutator/stryker-js](https://github.com/stryker-mutator/stryker-js) | 69/100 | 보류 | 순수 함수 소수에만 격리 파일럿 가능; 전체 Suite는 고비용 | [웹 Node CI](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/node.js.yml) |
-| 6 | Architecture Testing | NOT_CONFIGURED | [sverweij/dependency-cruiser](https://github.com/sverweij/dependency-cruiser) | 90/100 | 고도화 | 웹 lib/worker 경계 또는 PC controller/writer 의존성의 기존 계약 위반 탐지 후보 | [웹 Node CI](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/node.js.yml), [PC C996](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/41f38edfd7cc568632ec2641c85e709d1564cd8e/.github/workflows/c996-r5-readonly-source-checks.yml) |
+| 6 | Architecture Testing | NOT_CONFIGURED | [sverweij/dependency-cruiser](https://github.com/sverweij/dependency-cruiser) | 81/100 | 고도화 | 웹 lib/worker 경계 또는 PC controller/writer 의존성의 기존 계약 위반 탐지 후보 | [웹 Node CI](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/node.js.yml), [PC C996](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/41f38edfd7cc568632ec2641c85e709d1564cd8e/.github/workflows/c996-r5-readonly-source-checks.yml) |
 | 7 | Contract Testing | PARTIAL | [pact-foundation/pact-js](https://github.com/pact-foundation/pact-js) | 85/100 | 유지 | 기존 Projection·Writer JSON/TXT 계약 시험 존재; Pact 별도 도입 중복 우려 | [웹 Node CI](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/node.js.yml), [PC C996](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/41f38edfd7cc568632ec2641c85e709d1564cd8e/.github/workflows/c996-r5-readonly-source-checks.yml) |
-| 8 | Performance Budget | NOT_CONFIGURED | [GoogleChrome/lighthouse-ci](https://github.com/GoogleChrome/lighthouse-ci) | 94/100 | 고도화 | 사이트 성능 상한·렌더링 회귀 자동 수치 부족; 무료 격리 브라우저 우선 | [웹 Playwright](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/community-chat-browser.yml) |
+| 8 | Performance Budget | NOT_CONFIGURED | [GoogleChrome/lighthouse-ci](https://github.com/GoogleChrome/lighthouse-ci) | 83/100 | 고도화 | 사이트 성능 상한·렌더링 회귀 자동 수치 부족; 무료 격리 브라우저 우선 | [웹 Playwright](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/community-chat-browser.yml) |
 | 9 | Policy as Code | PARTIAL | [open-policy-agent/opa](https://github.com/open-policy-agent/opa) | 86/100 | 유지 | 기존 CAS/승인·원자료 보호 정책 검사 유지; OPA 엔진 중복 도입 보류 | [PC C996](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/41f38edfd7cc568632ec2641c85e709d1564cd8e/.github/workflows/c996-r5-readonly-source-checks.yml) |
 | 10 | Merge Queue | NOT_APPLICABLE | [GitHub Docs](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue) | 42/100 | 제외 | 두 저장소 모두 개인 User 소유; 공식 Merge Queue 조직 소유만 지원 | [본체 저장소](https://github.com/ansqhd5774-Choi/zgmini) |
 | 11 | Centralized CI | DUPLICATED | [actions/starter-workflows](https://github.com/actions/starter-workflows) | 65/100 | 제외 | 기존 공식 CI 참고해 구성; 이질적인 Linux/Windows 공통 워크플로 강제 비효율 | [기존 8영역 정본](https://github.com/ansqhd5774-Choi/zgmini/blob/main/docs/CI_EIGHT_AREA_STANDARD_R1.md) |
-| 12 | Workflow Governance | PARTIAL | [rhysd/actionlint](https://github.com/rhysd/actionlint) | 95/100 | 고도화 | PC Zizmor는 보안 감사; Actions YAML 정적 문법·표현식 검증은 별개 | [PC C996](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/41f38edfd7cc568632ec2641c85e709d1564cd8e/.github/workflows/c996-r5-readonly-source-checks.yml) |
+| 12 | Workflow Governance | PARTIAL | [rhysd/actionlint](https://github.com/rhysd/actionlint) | 87/100 | 고도화 | PC Zizmor는 보안 감사; Actions YAML 정적 문법·표현식 검증은 별개 | [PC C996](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/41f38edfd7cc568632ec2641c85e709d1564cd8e/.github/workflows/c996-r5-readonly-source-checks.yml) |
 | 13 | Evidence-based CI | IMPLEMENTED | [actions/upload-artifact](https://github.com/actions/upload-artifact) | 100/100 | 유지 | 본체 CSS/JS·브라우저 아티팩트, PC JSON/TXT readback 증거 존재 | [웹 Node CI](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/node.js.yml), [웹 Playwright](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/community-chat-browser.yml), [PC C996](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/41f38edfd7cc568632ec2641c85e709d1564cd8e/.github/workflows/c996-r5-readonly-source-checks.yml) |
 | 14 | Artifact Attestation | NOT_CONFIGURED | [actions/attest-build-provenance](https://github.com/actions/attest-build-provenance) | 70/100 | 보류 | GitHub 산출물 서명과 PC 원자료 해시 감사를 혼동 금지; id-token 권한 확인 | [웹 Node CI](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/node.js.yml) |
 | 15 | Supply Chain Security | PARTIAL | [actions/dependency-review-action](https://github.com/actions/dependency-review-action) | 86/100 | 고도화 | 본체 npm audit·CodeQL·Secret 이미 있음; PR 의존성 diff는 별도 | [웹 Node CI](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/node.js.yml) |
 | 16 | Security Scorecard | NOT_CONFIGURED | [ossf/scorecard](https://github.com/ossf/scorecard) | 82/100 | 보류 | 공개 본체의 보안 태세 평가 가능; 새 전역 차단 없이 읽기 전용 우선 | [웹 CodeQL](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/codeql-source.yml) |
 | 17 | Continuous Verification | PARTIAL | [upptime/upptime](https://github.com/upptime/upptime) | 86/100 | 유지 | Production SEO Health 및 기존 PC 감시/진단 존재; 예약 추가 금지 | [Production SEO](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/seo-production-health.yml), [PC 장애 인계](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/41f38edfd7cc568632ec2641c85e709d1564cd8e/.github/workflows/agent-handoff-pc-failure-intake.yml) |
 | 18 | Drift Detection | PARTIAL | [suzuki-shunsuke/tfaction](https://github.com/suzuki-shunsuke/tfaction) | 70/100 | 유지 | PC watchdog·CAS 드리프트 검증 존재; Terraform 전용 tfaction은 미적합 | [PC watchdog 원본](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/watchdog-b/protected-drift-readonly.mjs) |
-| 19 | CI Observability | PARTIAL | [open-telemetry/opentelemetry-collector](https://github.com/open-telemetry/opentelemetry-collector) | 92/100 | 고도화 | GitHub API 자체 메타데이터로 대기·실행·실패 관측 가능; Collector 신규 배포는 보류 | [웹 Actions 실행 목록](https://github.com/ansqhd5774-Choi/zgmini/actions) |
-| 20 | Data CI | PARTIAL | [fivetran/great_expectations](https://github.com/fivetran/great_expectations) | 86/100 | 고도화 | 기존 저장 데이터 계약 검사 존재; Python 도구보다 현재 Node SQLite readback 확장 우선 | [웹 Node CI](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/node.js.yml), [PC C996](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/41f38edfd7cc568632ec2641c85e709d1564cd8e/.github/workflows/c996-r5-readonly-source-checks.yml) |
-| 21 | Visual Regression CI | PARTIAL | [primer/react](https://github.com/primer/react) | 75/100 | 보류 | 스크린샷 증거는 존재; Primer는 디자인 시스템이지 비교 엔진 아님 | [웹 Playwright](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/community-chat-browser.yml) |
+| 19 | CI Observability | PARTIAL | [open-telemetry/opentelemetry-collector](https://github.com/open-telemetry/opentelemetry-collector) | 88/100 | 고도화 | GitHub API 자체 메타데이터로 대기·실행·실패 관측 가능; Collector 신규 배포는 보류 | [웹 Actions 실행 목록](https://github.com/ansqhd5774-Choi/zgmini/actions) |
+| 20 | Data CI | PARTIAL | [fivetran/great_expectations](https://github.com/fivetran/great_expectations) | 79/100 | 고도화 | 기존 저장 데이터 계약 검사 존재; Python 도구보다 현재 Node SQLite readback 확장 우선 | [웹 Node CI](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/node.js.yml), [PC C996](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/41f38edfd7cc568632ec2641c85e709d1564cd8e/.github/workflows/c996-r5-readonly-source-checks.yml) |
+| 21 | Visual Regression CI | PARTIAL | [primer/react](https://github.com/primer/react) | 59/100 | 보류 | 스크린샷 증거는 존재; Primer는 디자인 시스템이지 비교 엔진 아님 | [웹 Playwright](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/community-chat-browser.yml) |
 | 22 | Responsive CI | IMPLEMENTED | [microsoft/playwright](https://github.com/microsoft/playwright) | 98/100 | 유지 | Chromium Playwright 390/768/1440/1920 및 실제 모바일 touch 테스트 | [웹 Playwright](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/community-chat-browser.yml) |
-| 23 | Cross-browser CI | NOT_CONFIGURED | [microsoft/playwright](https://github.com/microsoft/playwright) | 88/100 | 고도화 | 현재 Chromium만 설치; Firefox/WebKit은 핵심화면에 한정 파일럿 | [웹 Playwright](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/community-chat-browser.yml) |
-| 24 | Performance CI | NOT_CONFIGURED | [GoogleChrome/lighthouse-ci](https://github.com/GoogleChrome/lighthouse-ci) | 94/100 | 고도화 | 기존 빌드·브라우저 검증과 별개로 LCP/CLS 회귀 측정 필요 | [웹 Node CI](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/node.js.yml), [웹 Playwright](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/community-chat-browser.yml) |
-| 25 | Accessibility CI | PARTIAL | [dequelabs/axe-core](https://github.com/dequelabs/axe-core) | 96/100 | 고도화 | 기존 접근성 일부 계약시험; 브라우저 axe 실제 탐지 통합은 미확인 | [웹 Playwright](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/community-chat-browser.yml) |
+| 23 | Cross-browser CI | NOT_CONFIGURED | [microsoft/playwright](https://github.com/microsoft/playwright) | 84/100 | 고도화 | 현재 Chromium만 설치; Firefox/WebKit은 핵심화면에 한정 파일럿 | [웹 Playwright](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/community-chat-browser.yml) |
+| 24 | Performance CI | NOT_CONFIGURED | [GoogleChrome/lighthouse-ci](https://github.com/GoogleChrome/lighthouse-ci) | 83/100 | 고도화 | 기존 빌드·브라우저 검증과 별개로 LCP/CLS 회귀 측정 필요 | [웹 Node CI](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/node.js.yml), [웹 Playwright](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/community-chat-browser.yml) |
+| 25 | Accessibility CI | PARTIAL | [dequelabs/axe-core](https://github.com/dequelabs/axe-core) | 86/100 | 고도화 | 기존 접근성 일부 계약시험; 브라우저 axe 실제 탐지 통합은 미확인 | [웹 Playwright](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/community-chat-browser.yml) |
 | 26 | Component CI | PARTIAL | [storybookjs/storybook](https://github.com/storybookjs/storybook) | 72/100 | 보류 | 컴포넌트 경로 단위 테스트 일부, Storybook 도입은 별도 번들/유지 비용 | [웹 Node CI](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/node.js.yml) |
-| 27 | Interaction CI | IMPLEMENTED | [grafana/grafana](https://github.com/grafana/grafana) | 58/100 | 유지 | 상호작용 Playwright 이미 수행; Grafana는 테스트 엔진이 아님 | [웹 Playwright](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/community-chat-browser.yml) |
+| 27 | Interaction CI | IMPLEMENTED | [grafana/grafana](https://github.com/grafana/grafana) | 44/100 | 유지 | 상호작용 Playwright 이미 수행; Grafana는 테스트 엔진이 아님 | [웹 Playwright](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/community-chat-browser.yml) |
 | 28 | SEO CI | IMPLEMENTED | [GoogleChrome/lighthouse-ci](https://github.com/GoogleChrome/lighthouse-ci) | 90/100 | 유지 | SEO Production Health/메타 검증 이미 있음; Lighthouse 점수는 별도 성능 | [Production SEO](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/seo-production-health.yml) |
-| 29 | Bundle Size CI | NOT_CONFIGURED | [ai/size-limit](https://github.com/ai/size-limit) | 100/100 | 고도화 | 빌드 CSS/JS 아티팩트 존재하나 byte budget 자동 회귀는 없음 | [웹 Node CI](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/node.js.yml) |
-| 30 | Preview CI | NOT_CONFIGURED | [modelcontextprotocol/actions](https://github.com/modelcontextprotocol/actions) | 44/100 | 보류 | MCP repo 관리용 Actions이며 일반 Preview 플랫폼 아님; Cloudflare 변경 승인 별도 | [웹 Node CI](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/node.js.yml) |
+| 29 | Bundle Size CI | NOT_CONFIGURED | [ai/size-limit](https://github.com/ai/size-limit) | 81/100 | 고도화 | 빌드 CSS/JS 아티팩트 존재하나 byte budget 자동 회귀는 없음 | [웹 Node CI](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/node.js.yml) |
+| 30 | Preview CI | NOT_CONFIGURED | [modelcontextprotocol/actions](https://github.com/modelcontextprotocol/actions) | 31/100 | 보류 | MCP repo 관리용 Actions이며 일반 Preview 플랫폼 아님; Cloudflare 변경 승인 별도 | [웹 Node CI](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/node.js.yml) |
 | 31 | IssueOps | IMPLEMENTED | [github/command](https://github.com/github/command) | 100/100 | 유지 | PC Issue→Actions→Controller 요청/증거 수집 운영 경로 이미 검증 | [PC Job](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/.github/workflows/pc-job.yml) |
 | 32 | ChatOps | PARTIAL | [peter-evans/slash-command-dispatch](https://github.com/peter-evans/slash-command-dispatch) | 70/100 | 유지 | 기존 댓글 기반 인증 접수·인계 있음; 범용 slash 명령은 권한 확대 | [PC 장애 인계](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/41f38edfd7cc568632ec2641c85e709d1564cd8e/.github/workflows/agent-handoff-pc-failure-intake.yml) |
 | 33 | Multi-Repo Automation | PARTIAL | [peter-evans/repository-dispatch](https://github.com/peter-evans/repository-dispatch) | 72/100 | 보류 | 본체·PC 인계/원장 연계는 있으나 신규 cross repo dispatch 권한 재승인 필요 | [PC 장애 인계](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/41f38edfd7cc568632ec2641c85e709d1564cd8e/.github/workflows/agent-handoff-pc-failure-intake.yml) |
 | 34 | Git Scraping | NOT_APPLICABLE | [simonw/git-scraper-template](https://github.com/simonw/git-scraper-template) | 38/100 | 제외 | 금융 원자료는 승인 공급자→PC SQLite 계약; Git에 원자료 게시 금지 | [PC 정본](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/docs/PC_AUTOMATION_STANDARD.md) |
 | 35 | Continuous Monitoring | IMPLEMENTED | [upptime/upptime](https://github.com/upptime/upptime) | 86/100 | 유지 | 기존 workflow_run 실패 자동 Issue+PC 장애 인계/감시; Upptime 중복 | [CI 실패 Issue intake](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/41f38edfd7cc568632ec2641c85e709d1564cd8e/.github/workflows/ci-failure-issue-intake.yml), [PC 장애 인계](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/41f38edfd7cc568632ec2641c85e709d1564cd8e/.github/workflows/agent-handoff-pc-failure-intake.yml) |
-| 36 | Continuous Benchmarking | NOT_CONFIGURED | [benchmark-action/github-action-benchmark](https://github.com/benchmark-action/github-action-benchmark) | 86/100 | 고도화 | 현재 CI job 메타데이터 기반 read-only 추세선 우선, 신규 배포 페이지 불필요 | [웹 Actions 실행 목록](https://github.com/ansqhd5774-Choi/zgmini/actions) |
+| 36 | Continuous Benchmarking | NOT_CONFIGURED | [benchmark-action/github-action-benchmark](https://github.com/benchmark-action/github-action-benchmark) | 82/100 | 고도화 | 현재 CI job 메타데이터 기반 read-only 추세선 우선, 신규 배포 페이지 불필요 | [웹 Actions 실행 목록](https://github.com/ansqhd5774-Choi/zgmini/actions) |
 | 37 | Continuous Maintenance | PARTIAL | [renovatebot/renovate](https://github.com/renovatebot/renovate) | 64/100 | 보류 | npm audit 등 검사 있음; 자동 업데이트/PR 빈도·권한·라이선스 별도 | [웹 Node CI](https://github.com/ansqhd5774-Choi/zgmini/blob/30f4ff22255f5b91f21424c6a5a6471356579728/.github/workflows/node.js.yml) |
 | 38 | Continuous Release | NOT_APPLICABLE | [googleapis/release-please-action](https://github.com/googleapis/release-please-action) | 54/100 | 제외 | 사이트 main→Cloudflare Git Integration 배포; 버전 릴리스 자동화 요청 없음 | [기존 8영역 정본](https://github.com/ansqhd5774-Choi/zgmini/blob/main/docs/CI_EIGHT_AREA_STANDARD_R1.md) |
 | 39 | Self-Service Operations | IMPLEMENTED | [issue-ops/self-service](https://github.com/issue-ops/self-service) | 79/100 | 유지 | 승인 pc-job IssueOps 운영 존재; 외부 Github Pages 포털은 보안 위험·중복 | [PC Job](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/.github/workflows/pc-job.yml) |
@@ -137,3 +137,51 @@
 **계획상의 20/40/60/80/100%는 단계 완료 기준이지 조사만으로 전체 작업 60%를 선언하는 숫자가 아니다. 현재 신규 도입 구현은 0건이며 단계 4–5는 완료 처리하지 않는다.**
 
 **다음 필수 행동:** #19 read-only 측정 소스/시험 설계를 최신 main과 병렬 운영 작업 영향이 없는 경로에 분리해 실행; 실제 기여가 없다면 새 코드 추가 없이 현재 GitHub GET 관측을 재사용한다. #12/25/29는 현재 CI에 검증된 누락만 최소 변경으로 연결하며 새 운영 승인/유료 권한은 별도 판단한다. 기존 자동화 담당 전용 브랜치와 최신 main의 커밋 이력 차이는 통째 PR/강제 리베이스하지 않고 정확 파일 단위로만 추후 통합한다.
+
+## 부록: 40종 8항목 등급 원장 (계산 재현용)
+
+각 등급은 0–5의 정성 평가다. 열 순서: 기술 구조 적합성, 실제 개선 효과, 안정성, 유지보수, 호환성, 보안, 비용, 라이선스. **이 등급은 실측 성과가 아니다.**
+
+```csv
+번호,구조,효과,완성도,유지,호환,보안,비용,라이선스,점수
+1,4,4,5,5,4,4,5,5,88
+2,2,3,5,5,2,4,3,5,68
+3,3,3,5,5,3,4,3,5,74
+4,1,2,5,5,1,3,1,5,52
+5,3,3,4,4,3,4,3,5,69
+6,4,4,4,4,4,4,4,5,81
+7,4,4,5,5,4,5,4,2,85
+8,4,4,4,5,4,4,4,5,83
+9,3,4,5,5,4,5,5,5,86
+10,0,1,5,5,0,3,1,5,42
+11,2,2,5,5,2,5,4,2,65
+12,5,4,4,4,4,4,5,5,87
+13,5,5,5,5,5,5,5,5,100
+14,3,3,5,4,3,3,3,5,70
+15,4,4,5,5,4,4,4,5,86
+16,4,3,5,5,4,4,4,5,82
+17,4,4,5,5,4,4,4,5,86
+18,2,3,5,5,2,4,4,5,70
+19,4,4,5,5,4,4,5,5,88
+20,4,4,4,5,3,4,3,5,79
+21,2,2,4,4,2,4,3,5,59
+22,5,5,5,5,5,5,4,5,98
+23,4,4,5,5,4,4,3,5,84
+24,4,4,4,5,4,4,4,5,83
+25,4,4,5,5,4,4,4,5,86
+26,3,3,5,5,3,4,2,5,72
+27,1,1,5,5,1,3,1,1,44
+28,5,4,5,5,4,4,4,5,90
+29,4,4,4,4,4,4,4,5,81
+30,0,0,2,3,0,3,4,5,31
+31,5,5,5,5,5,5,5,5,100
+32,3,2,5,5,3,3,4,5,70
+33,3,4,5,5,2,2,3,5,72
+34,1,1,4,3,1,1,3,2,38
+35,4,4,5,5,4,4,4,5,86
+36,4,3,5,5,4,4,4,5,82
+37,3,3,5,5,2,3,2,1,64
+38,1,1,5,5,1,3,4,5,54
+39,4,3,4,4,4,4,5,5,79
+40,3,3,5,5,3,4,3,5,74
+```
