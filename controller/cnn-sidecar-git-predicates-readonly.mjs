@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
+import {projectCnnR10ThreeGuardsReadonly} from './cnn-r10-guard-replay-readonly.mjs';
 
 const ARCHIVE_SHA='ce07af0b5e8d17625644e204f2815c1f754aff2468bc5434ac13c0dadcecd907';
 const CHECKOUT='zgmini-earnings-history-pc-release';
@@ -175,7 +176,8 @@ export function inspectCnnGitPredicatesReadonly(dataRoot,{strictPlatform=true,
  const empty={sourcePin:false,ledgerStable:false,ledgerStatus:null,head:null,
   approved:null,checkpoint:null,gitVerified:false,trackedClean:null,
   mentionsCheckout:null,guardSites:false,wholeTreeClean:null,
-  sourceStatusGuardClass:'UNVERIFIED',sourceShaLiterals:null};
+  sourceStatusGuardClass:'UNVERIFIED',sourceShaLiterals:null,
+  gitExit:{head:null,tracked:null,whole:null}};
  if((strictPlatform&&(process.platform!=='win32'||
       path.normalize(root).toLowerCase()!==path.normalize('E:\\ZGmini\\data').toLowerCase()))
     ||typeof git!=='function')return projectCnnGitEvidence(empty);
@@ -230,12 +232,17 @@ export function inspectCnnGitPredicatesReadonly(dataRoot,{strictPlatform=true,
    fs.lstatSync(real).isSymbolicLink()||
    (!mark.isDirectory()&&!mark.isFile())||mark.isSymbolicLink()||
    !sourceFile.isFile()||sourceFile.isSymbolicLink())throw Error('UNVERIFIED_CHECKOUT');
-  const head=git(real,['rev-parse','--verify','HEAD']).trim();
-  const status=git(real,['status','--porcelain','--untracked-files=no']);
+  const traceGit=(key,args)=>{
+   try{const result=git(real,args);empty.gitExit[key]=0;return result;}
+   catch(error){empty.gitExit[key]=Number.isSafeInteger(error?.status)&&
+    error.status>=0&&error.status<=255?error.status:null;throw error;}
+  };
+  const head=traceGit('head',['rev-parse','--verify','HEAD']).trim();
+  const status=traceGit('tracked',['status','--porcelain','--untracked-files=no']);
   // Compare the exact same fixed checkout with untracked content included.
   // Never return status text or filenames.
   let wholeTreeStatus=null;
-  try{wholeTreeStatus=git(real,['status','--porcelain','--untracked-files=all']);}
+  try{wholeTreeStatus=traceGit('whole',['status','--porcelain','--untracked-files=all']);}
   catch{}
   if(safeSha(head)&&typeof status==='string'&&status.length<=65536){
    empty.gitVerified=true;empty.head=head;
@@ -244,5 +251,7 @@ export function inspectCnnGitPredicatesReadonly(dataRoot,{strictPlatform=true,
     empty.wholeTreeClean=wholeTreeStatus.trim().length===0;
   }
  }catch{}
- return projectCnnGitEvidence(empty);
+ const projected=projectCnnGitEvidence(empty);
+ return {...projected,guardReplay:projectCnnR10ThreeGuardsReadonly(
+  initial.toString('utf8'),empty)};
 }
