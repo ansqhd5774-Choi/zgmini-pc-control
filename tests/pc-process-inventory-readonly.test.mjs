@@ -1589,7 +1589,7 @@ test('D05 #3178 private final receipt probe is exact, operating-only and refuses
 test('D05 #3178 actual private receipt validates both immutable bytes and run linkage',()=>{
  
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'d05-private-receipt-'));
- const dir=path.join(root,'marketparquet-paid'),derived=path.join(dir,'derived');
+ const dir=path.join(root,'pc-writer','marketparquet-paid'),derived=path.join(dir,'derived');
  const calc='2026-11-24T05:01:30.000Z',confirmedDate='2026-11-24',
   privateSha='a'.repeat(64);
  const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -1613,6 +1613,9 @@ test('D05 #3178 actual private receipt validates both immutable bytes and run li
   const report=path.join(dir,'theme-last-run.json');
   fs.writeFileSync(report,JSON.stringify(run));
   const ok=inspectD05PrivateFinalReceiptReadonly({root,now:Date.parse(calc)+90000});
+  // The incorrect parent-level lookup must remain absent; the production
+  // pc-writer subdirectory is the only accepted fixed path.
+  assert.equal(fs.existsSync(path.join(root,'marketparquet-paid','theme-last-run.json')),false);
   assert.equal(ok.status,'PASS');
   assert.equal(ok.receiptMatched,true);
   assert.equal(ok.scoreCount,1);
