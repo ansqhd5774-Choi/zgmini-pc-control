@@ -127,16 +127,20 @@ export function selectGroups(paths){
  }
  return ALL.filter(g=>chosen.has(g));
 }
-// Any newly introduced top-level regression must actually run, even before
-// a scoped group explicitly includes it. Deletions and renamed old paths
-// are absent from the checked-out tree and cannot be executed.
+// A changed regression under tests/ must execute even if a new nested suite
+// has not yet been added to a static group. Deletions are absent from HEAD.
+// Reject traversal, backslashes and non-test files before passing paths to Node.
 export function ungroupedChangedTests(paths,exists=fs.existsSync){
  if(!Array.isArray(paths))return [];
  const registered=new Set(Object.values(GROUPS).flat());
- return [...new Set(paths)].filter(p=>
-   typeof p==='string'&&p.startsWith('tests/')&&
-   /^[A-Za-z0-9][A-Za-z0-9._-]*[.]test[.]mjs$/.test(p.slice(6))&&
-   !registered.has(p)&&exists(p));
+ return [...new Set(paths)].filter(p=>{
+   if(typeof p!=='string'||!p.startsWith('tests/')||
+      !p.endsWith('.test.mjs')||registered.has(p))return false;
+   const segments=p.slice(6).split('/');
+   if(!segments.every(s=>/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(s)&&
+     s!=='.'&&s!=='..'))return false;
+   return exists(p);
+ });
 }
 export async function changedFiles(env=process.env,fetcher=fetch){
  try{

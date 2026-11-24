@@ -90,6 +90,25 @@ test('unmapped changed test executes instead of CI success with zero regressions
  assert.deepEqual(ungroupedChangedTests(null,()=>true),[]);
 });
 
+test('nested new regression is selected without path traversal or duplicate execution',()=>{
+ const paths=[
+  'tests/integration/adapter.test.mjs','tests/integration/adapter.test.mjs',
+  'tests/integration/deep/writer.test.mjs',
+  'tests/integration/removed.test.mjs',
+  'tests/../secret.test.mjs','tests/integration/../secret.test.mjs',
+  'tests/integration/.hidden.test.mjs',
+  'tests/integration\\windows.test.mjs',
+  'tests/integration/readme.md'
+ ];
+ const existing=p=>p!=='tests/integration/removed.test.mjs';
+ assert.deepEqual(ungroupedChangedTests(paths,existing),[
+  'tests/integration/adapter.test.mjs',
+  'tests/integration/deep/writer.test.mjs'
+ ]);
+ assert.deepEqual(ungroupedChangedTests(['tests/nested/feature.test.mjs'],
+  ()=>false),[]);
+});
+
 test('011 incomplete PR file retrieval retains full regression coverage',async()=>{
  const env={GITHUB_EVENT_PATH:'not-real-path',GITHUB_REPOSITORY:'ansqhd5774-Choi/zgmini-pc-control',GITHUB_TOKEN:'unit-test'};
  assert.equal(await changedFiles(env),null);
