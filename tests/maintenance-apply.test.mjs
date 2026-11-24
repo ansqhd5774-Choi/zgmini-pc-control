@@ -376,6 +376,35 @@ test('BACKED_UP runner busy after backup preserves the proven previous runtime a
  for(const forbidden of ['stop','switch','restore','reconnectPrevious'])
   assert.ok(!f.events.includes(forbidden),forbidden);
 });
+test('BACKED_UP Busy refusal preserves failure telemetry and prior live controller',async()=>{
+ const measured={retryCount:10,elapsedMs:30000,observedBusy:true};
+ const f=fixture({
+  stopOwnSupervisor:async()=>{throw Object.assign(Error('RUNNERS_NOT_IDLE'),{
+   code:'RUNNERS_NOT_IDLE',supervisorIdleWait:measured});},
+  verifyRestoredPrevious:async sha=>sha===previous,
+  verifyPrevious:async({installedSha,requireRunning,requireIdle})=>
+   installedSha===previous&&requireRunning===true&&requireIdle===false,
+  restore:async()=>{throw Error('must never restore running old Controller');}
+ });
+ const r=await applyApprovedUpdate(request,f.port);
+ assert.equal(r.status,'BLOCKED');assert.equal(r.code,'RUNNERS_NOT_IDLE');
+ assert.equal(r.firstFail,'BACKED_UP');assert.equal(r.actualInstalledSha,previous);
+ assert.equal(r.workflowEnabled,true);assert.equal(f.installed,previous);
+ assert.deepEqual(r.supervisorIdleWait,measured);
+ assert.deepEqual(f.records.get(request.requestId).supervisorIdleWait,measured);
+ assert.ok(!f.events.includes('switch'));
+ assert.ok(!f.events.includes('reconnectPrevious'));
+});
+
+test('other stop failures cannot forge Busy telemetry',async()=>{
+ const f=fixture({stopOwnSupervisor:async()=>{throw Object.assign(Error('SUPERVISOR_OWNER_CHANGED'),{
+  code:'SUPERVISOR_OWNER_CHANGED',
+  supervisorIdleWait:{retryCount:10,elapsedMs:30000,observedBusy:true}});}});
+ const r=await applyApprovedUpdate(request,f.port);
+ assert.equal(r.code,'SUPERVISOR_OWNER_CHANGED');
+ assert.equal(Object.hasOwn(r,'supervisorIdleWait'),false);
+});
+
 test('BACKED_UP rejected previous-runtime proof freezes before destructive rollback',async()=>{
  const f=fixture({
   stopOwnSupervisor:async()=>{throw Object.assign(Error('busy'),{code:'RUNNERS_NOT_IDLE'});},
@@ -946,7 +975,11 @@ test('a persistently Busy runner is refused after at most 30 seconds',async()=>{
  await assert.rejects(waitForSupervisorStopIdle({
   readRunners:()=>{const rows=idleRaceSeats();reads++;rows[0].busy=true;return rows;},
   verifySafety:()=>{},now:()=>clock,pause:async ms=>{clock+=ms;}
- }),{code:'RUNNERS_NOT_IDLE'});
+ }),error=>{
+  assert.equal(error.code,'RUNNERS_NOT_IDLE');
+  assert.deepEqual(error.supervisorIdleWait,{retryCount:10,elapsedMs:30000,observedBusy:true});
+  return true;
+ });
  assert.equal(clock,30000);
  assert.equal(reads,11);
 });

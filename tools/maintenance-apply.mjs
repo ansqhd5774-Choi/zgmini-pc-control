@@ -139,6 +139,16 @@ export async function applyApprovedUpdate(request, port) {
     return {...ledger};
   } catch(error) {
     const firstFail=ledger.phase,reason=maintenanceFailureCode(error,failureOperation);
+    // Only a positively observed bounded Busy refusal may carry failure telemetry.
+    // This is not evidence that the old supervisor stopped or recovery succeeded.
+    const idleFailure=error?.supervisorIdleWait;
+    if(failureOperation==='stopOwnSupervisor'&&reason==='RUNNERS_NOT_IDLE'
+      &&idleFailure&&Number.isSafeInteger(idleFailure.retryCount)
+      &&idleFailure.retryCount>=0&&Number.isSafeInteger(idleFailure.elapsedMs)
+      &&idleFailure.elapsedMs>=0&&idleFailure.observedBusy===true){
+      ledger.supervisorIdleWait={retryCount:idleFailure.retryCount,
+       elapsedMs:idleFailure.elapsedMs,observedBusy:true};
+    }
     const details=(status,nextAction)=>failureDetails({status,failureOperation,
       intakeAttempted,backup,supervisorStopped,switched,nextAction});
     // Once the new six-Runner tree has reconnected, an intake API timeout
