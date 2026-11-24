@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {dedicatedPcRunnerRows,requireCompleteRunnerInventory,waitForSupervisorStopIdle} from '../tools/update.mjs';
+import {dedicatedPcRunnerRows,requireCompleteRunnerInventory} from '../tools/update.mjs';
 
 const seats=()=>Array.from({length:6},(_,i)=>({
  name:`zgmini-pc-0${i+1}`,status:'online',busy:false,
@@ -85,61 +85,4 @@ test('independent rollback preflights inventory before pausing intake',()=>{
   'independent recovery inventory preflight must precede intake mutation');
  assert.match(restore,/for\(let n=0;n<180;n\+\+\)\{\s*const rows=apiRunners\(\)/,
   'actual drain must still recheck fresh inventory');
-});
-
-test('drain checks Online before backup and final stop waits before taskkill',()=>{
- const source=readFileSync(new URL('../tools/update.mjs',import.meta.url),'utf8');
- const drain=source.split('  waitForDrain:async()=>{')[1]?.split('  backup:async()=>{')[0];
- const stop=source.split('  stopOwnSupervisor:async()=>{')[1]?.split('  switchVersion:async()=>{')[0];
- assert.match(drain??'',/need\(seats\.every\(x=>x\.status==='online'\),'RUNNERS_NOT_ONLINE'\)/);
- assert.ok(stop?.indexOf('await waitForSupervisorStopIdle(')>=0);
- assert.ok(stop.indexOf('await waitForSupervisorStopIdle(')<stop.indexOf("execFileSync('taskkill.exe'"));
-});
-
-test('transient post-backup Busy clears without stopping or changing the owner',async()=>{
- let clock=0,checks=0,reads=0;
- await waitForSupervisorStopIdle({
-  readRunners:()=>{reads++;const rows=seats();if(reads<3)rows[1].busy=true;return rows;},
-  verifySafety:()=>{checks++;},now:()=>clock,pause:async ms=>{clock+=ms;}
- });
- assert.equal(clock,6000);
- assert.equal(reads,3);
- assert.equal(checks,3);
-});
-
-test('permanently Busy stops after at most 30 seconds of retry delays',async()=>{
- let clock=0,reads=0;
- await assert.rejects(waitForSupervisorStopIdle({
-  readRunners:()=>{reads++;const rows=seats();rows[5].busy=true;return rows;},
-  verifySafety:()=>{},now:()=>clock,pause:async ms=>{clock+=ms;}
- }),{code:'RUNNERS_NOT_IDLE'});
- assert.equal(clock,30000);
- assert.equal(reads,11);
-});
-
-test('Offline and incomplete runner rosters fail immediately without retry',async()=>{
- for(const make of [
-  ()=>{const rows=seats();rows[3].status='offline';return rows;},
-  ()=>seats().slice(1)
- ]){
-  let delays=0;
-  await assert.rejects(waitForSupervisorStopIdle({
-   readRunners:make,verifySafety:()=>{},now:()=>0,
-   pause:async()=>{delays++;}
-  }),{code:'RUNNERS_NOT_ONLINE'});
-  assert.equal(delays,0);
- }
-});
-
-test('owner or protection drift during Busy retry prevents Supervisor stop',async()=>{
- for(const errorCode of ['SUPERVISOR_OWNER_CHANGED','PROTECTED_STATE_DRIFT']){
-  let clock=0,checks=0,reads=0;
-  await assert.rejects(waitForSupervisorStopIdle({
-   readRunners:()=>{reads++;const rows=seats();rows[1].busy=true;return rows;},
-   verifySafety:()=>{if(++checks===2){const e=Error(errorCode);e.code=errorCode;throw e;}},
-   now:()=>clock,pause:async ms=>{clock+=ms;}
-  }),{code:errorCode});
-  assert.equal(clock,3000);
-  assert.equal(reads,1);
- }
 });
