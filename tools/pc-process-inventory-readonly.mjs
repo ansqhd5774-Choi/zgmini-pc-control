@@ -10,6 +10,7 @@ import {uploadResultPairAtomic} from '../writer-config-b/result-pair-atomic.mjs'
 import {collectAutomationStatus} from './automation-status.mjs';
 import {inspectProviderActivity} from '../controller/provider-activity-runtime-readonly.mjs';
 import {inspectHttp32TwoHostCheckpoints} from '../controller/http32-two-host-checkpoints-readonly.mjs';
+import {inspectSidecarSourceGate} from '../controller/fear-greed-archive-readonly.mjs';
 import {maintenanceLockStatus} from './maintenance-lock.mjs';
 import {readMaintenanceRecoveryStatus,protectedSnapshot} from './update.mjs';
 import {readFixedReadonlyBytes} from '../controller/fixed-readonly-bytes.mjs';
@@ -29,6 +30,7 @@ const D05_PRIVATE_RECEIPT_PROBE='d05-private-final-events-readonly';
 const D05_THEME_PROBE='d05-theme-final-outputs-readonly';
 const D05_REGISTERED_PROBE='d05-configured-registration-readonly';
 const C3160_PROBE='c3160-rollback-cas-readonly';
+const CNN_STATIC_GUARD_PROBE='cnn-sidecar-static-guard-readonly';
 const MAX_BYTES=32768;
 const KNOWN_PROCESSES=new Set([
  'runner.listener.exe','runner.worker.exe','node.exe','wscript.exe','cscript.exe',
@@ -95,10 +97,11 @@ export function authenticateProcess(event,env,role){
   const isD05Theme=withW05&&raw.probe===D05_THEME_PROBE;
   const isD05Registration=withW05&&raw.probe===D05_REGISTERED_PROBE;
   const is3160=withW05&&raw.probe===C3160_PROBE;
+   const isCnnStaticGuard=withW05&&raw.probe===CNN_STATIC_GUARD_PROBE;
  if(!raw||(!basic&&!withJobs&&!withW05)||
    raw.schema!==SCHEMA||raw.operation!==ROLE_OPERATION||raw.role!==role||
    (withJobs&&role!=='operating')||
-   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!isD05Writer&&!isD05PrivateReceipt&&!isD05Theme&&!isD05Registration&&!is3160))))
+   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!isD05Writer&&!isD05PrivateReceipt&&!isD05Theme&&!isD05Registration&&!is3160&&!isCnnStaticGuard))))
   fail('REQUEST_SCOPE_INVALID');
  const runnerJobRefs=withJobs?validateRunnerJobRefs(raw.runnerJobRefs):null;
  const normalized=structuredClone(event);
@@ -114,7 +117,8 @@ export function authenticateProcess(event,env,role){
    ...(isD05PrivateReceipt?{d05PrivateFinalReceipt:true}:{}),
    ...(isD05Theme?{d05ThemeFinalOutputs:true}:{}),
    ...(isD05Registration?{d05ConfiguredRegistrations:true}:{}),
-   ...(is3160?{c3160RecoveryCas:true}:{})};
+   ...(is3160?{c3160RecoveryCas:true}:{}),
+   ...(isCnnStaticGuard?{cnnSidecarStaticGuard:true}:{})};
 }
 export function sanitizeProbe(raw){
  if(!raw||raw.schema!=='ZGMINI_PC_PROCESS_PROBE_V1')fail('PROBE_SCHEMA_INVALID');
@@ -1951,6 +1955,55 @@ export function w05OperatorTopologyText(r){
   'operationalWrites=0','automaticRetries=0',''].join('\r\n');
 }
 
+// Reuse the reviewed Controller's bounded static inspection through this existing
+// operating-PC read-only workflow. The installed Controller is not modified.
+// Never return raw private Sidecar code, ledger failure messages, paths or hashes.
+const CNN_SIDECAR_DATA_ROOT='E:/ZGmini/data';
+const CNN_STATIC_FILES=new Set([
+ 'archive-run.mjs','run-original-then-archive.vbs',
+ 'archive-core-r10.mjs','verified-checks-r10.mjs']);
+const CNN_STATIC_KINDS=new Set([
+ 'SOURCE_APPROVAL_REFERENCE','GIT_REFERENCE','CLEAN_TREE_REFERENCE',
+ 'ARCHIVE_LAUNCH_REFERENCE']);
+const CNN_STATIC_CONCEPTS=new Set([
+ 'SOURCE','APPROVAL','APPROVED','CONFIG','GIT','HEAD','SHA','DIRTY',
+ 'BRANCH','MISMATCH','MISSING','UNAVAILABLE','DRIFT','REPO','PATH',
+ 'CHECKOUT','WORKTREE','ARCHIVE','LOCK','PERMISSION','CLEAN']);
+export function projectCnnSidecarStaticGuard(raw){
+ const rows=raw?.scriptStatus;
+ const scriptPinsVerified=raw?.ledgerStatus==='READ'&&Array.isArray(rows)&&
+  rows.length===CNN_STATIC_FILES.size&&
+  new Set(rows.map(x=>x?.file)).size===CNN_STATIC_FILES.size&&
+  rows.every(x=>CNN_STATIC_FILES.has(x?.file)&&x?.status==='MATCH'&&
+   x?.modifiedAfterLedger===false);
+ const validCandidates=Array.isArray(raw?.sourceGuardCandidates)&&
+  raw.sourceGuardCandidates.length<=16&&raw.sourceGuardCandidates.every(x=>
+   CNN_STATIC_FILES.has(x?.file)&&Number.isSafeInteger(x?.line)&&
+   x.line>=1&&x.line<=10000&&CNN_STATIC_KINDS.has(x?.kind));
+ const validOrigins=Array.isArray(raw?.ledgerOriginCandidates)&&
+  raw.ledgerOriginCandidates.length<=4&&
+  raw.ledgerOriginCandidates.every(name=>CNN_STATIC_FILES.has(name));
+ const validReason=Array.isArray(raw?.reasonConcepts)&&
+  raw.reasonConcepts.length<=12&&
+  raw.reasonConcepts.every(v=>CNN_STATIC_CONCEPTS.has(v));
+ const validSite=['NONE','UNIQUE','MULTIPLE','NOT_CHECKED'].includes(raw?.matchingErrorSite);
+ const verified=scriptPinsVerified&&validCandidates&&validOrigins&&validReason&&validSite;
+ return {schema:'ZGMINI_CNN_SIDECAR_STATIC_GUARD_READONLY_V1',
+  status:verified?'PASS':'STATE_UNKNOWN',
+  code:verified?'CNN_STATIC_GUARD_CANDIDATES_COLLECTED':'CNN_STATIC_GUARD_UNVERIFIED',
+  evidence:'PINNED_STATIC_CANDIDATES_NOT_RUNTIME_CAUSAL_PROOF',
+  scriptPinsVerified:Boolean(scriptPinsVerified),ledgerStatus:
+   raw?.ledgerStatus==='READ'?'READ':'UNVERIFIED',
+  matchingErrorSite:verified?raw.matchingErrorSite:'NOT_CHECKED',
+  ledgerOriginCandidates:verified?[...new Set(raw.ledgerOriginCandidates)]:[],
+  sourceGuardCandidates:verified?raw.sourceGuardCandidates.map(x=>
+   ({file:x.file,line:x.line,kind:x.kind})):[],
+  reasonConcepts:verified?[...new Set(raw.reasonConcepts)]:[],
+  // Without a second verified ledger byte snapshot no temporal stability claim.
+  sameLedgerSnapshotVerified:false,sidecarFailureResolved:false,
+  operationalWrites:0,providerCalls:0,d1Writes:0};
+}
+
 export function collect(role,ctx,env=process.env){
  const host=os.hostname().toUpperCase();
  const runnerName=String(env.RUNNER_NAME||'');
@@ -1965,7 +2018,13 @@ export function collect(role,ctx,env=process.env){
  if(identity!=='MATCH'||(role==='operating'&&host!=='PC')){
   return {...base,status:'BLOCKED',code:identity==='MATCH'?'HOST_NOT_CANONICAL':identity};
  }
- if(ctx.c3160RecoveryCas===true){
+ if(ctx.cnnSidecarStaticGuard===true){
+   const observed=projectCnnSidecarStaticGuard(
+    inspectSidecarSourceGate(CNN_SIDECAR_DATA_ROOT));
+   return {...base,status:observed.status,code:observed.code,
+    cnnSidecarStaticGuard:observed};
+  }
+  if(ctx.c3160RecoveryCas===true){
   const result=inspect3160RecoveryCasReadonly();
   const preflight=inspect3160RollbackPreflightReadonly();
   return {...base,c3160LocalPreflight:preflight,status:result.status==='READ_ONLY_OBSERVED'?'PASS':'PARTIAL',
@@ -2066,7 +2125,11 @@ export function toText(r){
    'd05ConfiguredRegistry='+r.d05ConfiguredRegistrations.code,
    'd05ConfiguredDefinitionCount='+(r.d05ConfiguredRegistrations.registeredDefinitionCount??'UNKNOWN'),
    'd05ConfiguredInventoryHash='+(r.d05ConfiguredRegistrations.registryManifestSha256??'UNKNOWN')]:[]),
-  ...(r.c3160RecoveryCas?[
+  ...(r.cnnSidecarStaticGuard?[
+    'cnnSidecarStaticGuard='+r.cnnSidecarStaticGuard.code,
+    'cnnSourceGuardCandidates='+r.cnnSidecarStaticGuard.sourceGuardCandidates.length,
+    'cnnSidecarFailureResolved=false']:[]),
+   ...(r.c3160RecoveryCas?[
    'c3160RecoveryCas='+r.c3160RecoveryCas.code,
    'c3160BacklogOpen='+(r.c3160RecoveryCas.backlog?.openWindows??'UNKNOWN')]:[]),
   ...(r.c3160LocalPreflight?[
