@@ -16,7 +16,6 @@ const WRAPPER=path.win32.join(WRITER,'archive-sidecar-r7','run-original-then-arc
 const TASK='ZGMINI-PC-Local-Core';
 const CORE_LOCK=path.win32.join(WRITER,'local-cycle.lock');
 const SHARED_LOCK=path.win32.join(WRITER,'writer-source-install.lock');
-const CPROBE=path.resolve(new URL('../r17-writer-b/r17-b-windows-probe.js',import.meta.url).pathname);
 const STOP=code=>{throw Object.assign(Error(code),{code});};
 const need=(ok,code)=>{if(!ok)STOP(code);};
 const SHA40=/^[0-9a-f]{40}$/;
@@ -92,9 +91,12 @@ function sidecarActive(){
  const exe=path.win32.join(process.env.SystemRoot??String.raw`C:\Windows`,
   'System32','WindowsPowerShell','v1.0','powershell.exe');
  const script=String.raw`$ErrorActionPreference='Stop';`+
-  String.raw`$p=@(Get-CimInstance Win32_Process -ErrorAction Stop | `+
-  String.raw`Where-Object {($_.Name -in @('node.exe','wscript.exe','cscript.exe')) -and `+
-  String.raw`($_.CommandLine -match '(?i)archive-run\.mjs|run-original-then-archive\.vbs')}); `+
+  String.raw`$all=@(Get-CimInstance Win32_Process -ErrorAction Stop | `+
+  String.raw`Where-Object { $_.Name -in @('node.exe','wscript.exe','cscript.exe') }); `+
+  String.raw`if(@($all | Where-Object { -not $_.CommandLine }).Count -gt 0) `+
+  String.raw`{ Write-Output 'UNKNOWN'; exit 7 }; `+
+  String.raw`$p=@($all | Where-Object `+
+  String.raw`{ $_.CommandLine -match '(?i)archive-run\.mjs|run-original-then-archive\.vbs' }); `+
   String.raw`Write-Output $p.Count`;
  const raw=exec(exe,['-NoProfile','-NonInteractive','-Command',script],'utf8').trim();
  need(/^\d{1,5}$/.test(raw),'SIDECAR_B_PROBE_PROCESS_STOP');
