@@ -43,11 +43,11 @@ const negatives=[
  ['missing result txt',a=>a.evidence.txtVerified=false,'RECEIPT_NOT_VERIFIED'],
  ['comment not independently verified',a=>a.evidence.commentVerified=false,'RECEIPT_NOT_VERIFIED'],
  ['cancelled run',a=>a.evidence.runConcludedSuccessfully=false,'RECEIPT_NOT_VERIFIED'],
- ['Core lock remains (#1010)',a=>{a.intent.requiresCoreLockReleased=true;a.result.result={core:{lockPresent:true}};},'CORE_LOCK_NOT_RELEASED'],
- ['runtime source unknown (#936)',a=>{a.intent.requiresRuntimeSourceVerified=true;a.result.result={runtimeSourceVerified:false};},'RUNTIME_SOURCE_UNVERIFIED'],
+ ['Core lock remains (#1010)',a=>{a.intent.requiresCoreLockReleased=true;a.result.result={...a.result.result,core:{lockPresent:true}};},'CORE_LOCK_NOT_RELEASED'],
+ ['runtime source unknown (#936)',a=>{a.intent.requiresRuntimeSourceVerified=true;a.result.result={...a.result.result,code:'CORE_RUNTIME_SOURCE_VERIFIED',runtimeSourceVerified:false};a.issue.body=JSON.stringify(a.request);},'RUNTIME_SOURCE_UNVERIFIED'],
  ['failure flow not proved (#1033)',a=>a.intent.objectiveSatisfied=false,'OBJECTIVE_UNVERIFIED'],
  ['D1 readback unverified (#930)',a=>a.intent.objectiveSatisfied=false,'OBJECTIVE_UNVERIFIED'],
- ['unsupported inventory schema',a=>{a.request.schema='ZGMINI_PC_PROCESS_INVENTORY_REQUEST_V1';a.request.operation='process-inventory-readonly';a.result.operation='process-inventory-readonly';a.result.code='PROCESS_INVENTORY_COLLECTED';},'SCHEMA_NOT_APPROVED'],
+ ['unsupported inventory schema',a=>{a.request.schema='ZGMINI_PC_PROCESS_INVENTORY_REQUEST_V1';a.request.operation='process-inventory-readonly';a.result.operation='process-inventory-readonly';a.result.code='PROCESS_INVENTORY_COLLECTED';a.issue.body=JSON.stringify(a.request);},'SCHEMA_NOT_APPROVED'],
  ['runtime source not verified even with permissive intent',a=>{a.request.operation='core-runtime-source-readonly';a.result.operation='core-runtime-source-readonly';a.result.code='CORE_RUNTIME_SOURCE_VERIFIED';a.result.result={runtimeSourceVerified:false};},'RUNTIME_SOURCE_UNVERIFIED']
 ];
 for(const [name,mutate,reason] of negatives){
