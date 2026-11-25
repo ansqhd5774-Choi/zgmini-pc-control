@@ -115,3 +115,8 @@ A는 기존 정규 접수/판정에 필요한 확인만 재사용한다. B는 �
 - 본체 실제 Node CI 45583189319 / job 139098078904의 push head 249dd6ab57561fe3a512906a770f402918e8c376, workflow ID 377770281, repo ID 1398455648, checkout log의 git log -1 --format=%H 직후 동일 SHA를 확인. Writer는 Controller CI 결과를 재사용하지 않는다.
 - writer-candidate-review.mjs: 본체 정확 push CI 및 workflow blob pin, 원격 diff, 로컬 HEAD/config·파일별 preimage·보호 파일, 후보 SHA256을 대조한다. 원격 diff base와 운영 로컬 overlay base는 분리한다. 초기 신규 자동화 후보는 자연 유휴 전체 파일 overlay에 한정하고 기존 승인된 insertion/유지보수 창 경로는 그대로 유지한다. 실제 자동 발행 없음. 12건 추가(총 172건 준비), 신규 Node 시험 미확인.
 - 실질 차단: 구조화 위임 원본/독립 pin, 검증된 상시 제출 주체와 실제 PC 상태가 아직 미확보. 추가 모의 시험 수로 진행률을 올리지 않는다. 기존 승인 범위/실행기/운영 PC/main 변경 없음. 자동화 권한이 자체적으로 자신을 승인하지 않도록 한다.
+
+### 2026-11-25 후속 — 기존 Controller 단회 제출기 연결
+- 89934759816e48b9f4ded66d4af7fcfa3896bc15 Controller job 139167908223의 Writer 후보 검증 단계 16 SUCCESS 관측. 전체 CI 종료는 별도 확인한다.
+- 기존 tools/maintenance-request.mjs에 opt-in submit-prepared 경로 및 submitPreparedMaintenanceIssue를 추가한다. 기존 정확 requestId/제목/라벨/본문을 변경하지 않고 Owner 인증·비공개 저장소·main 승인 manifest raw bytes·실제 설치 SHA를 기존 validateUpdateRequest로 재검증한 뒤 기존 submitMaintenanceIssue의 영수증/단회 POST/readback을 사용한다. 후보 wrapper나 모의 판정 자체는 허용하지 않는다. 실패/응답 불명은 기존 동일 receipt reconcile, 새 POST 금지. 기존 prepare/submit/reconcile/verify 및 운영 실행기는 유지한다.
+- 기존 maintenance-request 회귀시험에 6건 추가. 실제 네트워크 제출·운영 설치·권한 변경 없이 fixture로 검증한다. 기존 승인 원본이 main에 존재하는 Controller B 요청에만 해당한다. 신규 자동 승인 발행 권한이나 무인 CI Owner 인증은 생성하지 않는다. 기존 CI 결과 보존을 위해 준비 브랜치에서 검증 대기. 사용 가능한 CLI 경로와 실제 자동 실행 활성화를 구분한다.

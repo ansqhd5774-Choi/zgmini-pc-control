@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
-import {prepareControllerUpdateRequest,validateMaintenanceRequest,
+import {prepareControllerUpdateRequest,validateMaintenanceRequest,validateUpdateRequest,
  CONTROL_ACTOR,CONTROL_REPOSITORY} from './maintenance-contract.mjs';
 
 const TITLE='pc-controller-update',LABEL='pc-maintenance';
@@ -52,6 +52,20 @@ export async function submitMaintenanceIssue(expected,{createIssue,readIssue,sav
    issueNumber:receipt.issueNumber,next:'RECONCILE_SAME_RECEIPT_NO_NEW_POST'};
  }
 }
+// Owner-side bridge for an exact prepared envelope. The existing main approval
+// and current installed SHA are revalidated before the existing one-shot POST.
+// CI candidates and preview status alone are not approval or actor identity.
+export async function submitPreparedMaintenanceIssue(expected,{installedSha,readIdentity,readRepository,readManifest,...ports}){
+ if(!expected||Object.keys(expected).length!==4||!['repository_full_name','title','labels','body'].every(k=>Object.hasOwn(expected,k)))fail('MAINTENANCE_PREPARED_ENVELOPE_INVALID');
+ const snapshot=structuredClone(expected);
+ const request=requestOf(snapshot);
+ if((await readIdentity())?.login!==CONTROL_ACTOR||
+    (await readRepository())?.private!==true)fail('MAINTENANCE_SUBMIT_IDENTITY_DENIED');
+ const bytes=await readManifest(request.targetControllerSha);
+ if(!Buffer.isBuffer(bytes))fail('MAINTENANCE_REMOTE_MANIFEST_BYTES_MISSING');
+ validateUpdateRequest(request,bytes,{actor:CONTROL_ACTOR,installedSha});
+ return submitMaintenanceIssue(snapshot,ports);
+}
 export async function reconcileMaintenanceIssue(receipt,{findIssues,readIssue,saveReceipt}){
  if(receipt?.schema!=='ZGMINI_MAINTENANCE_SUBMISSION_V1')fail('MAINTENANCE_RECEIPT_INVALID');
  const request=requestOf(receipt.expected);
@@ -78,14 +92,15 @@ function github(endpoint,{body}={}){
 }
 function argsOf(argv){
  const [mode,...rest]=argv;
- if(!['prepare','submit','reconcile','verify'].includes(mode)||rest.length%2)fail('MAINTENANCE_REQUEST_USAGE');
+ if(!['prepare','submit','submit-prepared','reconcile','verify'].includes(mode)||rest.length%2)fail('MAINTENANCE_REQUEST_USAGE');
  const options={};
  for(let i=0;i<rest.length;i+=2){
-  if(!['--manifest-file','--target-sha','--installed-sha','--chat-id','--receipt-file','--issue-number'].includes(rest[i])||
+  if(!['--manifest-file','--target-sha','--installed-sha','--chat-id','--receipt-file','--issue-number','--prepared-file'].includes(rest[i])||
    Object.hasOwn(options,rest[i])||!rest[i+1]||rest[i+1].startsWith('--'))fail('MAINTENANCE_REQUEST_USAGE');
   options[rest[i]]=rest[i+1];
  }
  const allowed=mode==='verify'?['--issue-number']:mode==='reconcile'?['--receipt-file']:
+  mode==='submit-prepared'?['--prepared-file','--installed-sha','--receipt-file']:
   ['--manifest-file','--target-sha','--installed-sha','--chat-id',...(mode==='submit'?['--receipt-file']:[])];
  if(Object.keys(options).some(k=>!allowed.includes(k)))fail('MAINTENANCE_REQUEST_USAGE');
  return {mode,options};
@@ -115,14 +130,23 @@ export async function main(argv=process.argv.slice(2)){
     return result.items;
    }});
  }
- if(!o['--installed-sha']||Boolean(o['--manifest-file'])===Boolean(o['--target-sha']))fail('MAINTENANCE_REQUEST_USAGE');
- if(o['--target-sha']&&!/^[a-f0-9]{40}$/.test(o['--target-sha']))fail('MAINTENANCE_REQUEST_USAGE');
  // Prefer immutable GitHub blob bytes to avoid Windows checkout CRLF drift.
  const readRemote=sha=>{
   const found=github(`repos/${CONTROL_REPOSITORY}/contents/approvals/controller-updates/${sha}.json?ref=main`);
   if(found.encoding!=='base64'||typeof found.content!=='string')fail('MAINTENANCE_REMOTE_MANIFEST_BYTES_MISSING');
   return Buffer.from(found.content,'base64');
  };
+ if(mode==='submit-prepared'){
+  if(!o['--prepared-file']||!o['--installed-sha']||!receiptPath)fail('MAINTENANCE_REQUEST_USAGE');
+  if(fs.existsSync(receiptPath))fail('MAINTENANCE_RECEIPT_EXISTS_USE_RECONCILE');
+  const expected=JSON.parse(fs.readFileSync(path.resolve(o['--prepared-file']),'utf8'));
+  return submitPreparedMaintenanceIssue(expected,{installedSha:o['--installed-sha'],
+   readIdentity:()=>github('user'),readRepository:()=>github(`repos/${CONTROL_REPOSITORY}`),
+   readManifest:readRemote,saveReceipt,readIssue,
+   createIssue:e=>github(`repos/${CONTROL_REPOSITORY}/issues`,{body:{title:e.title,labels:e.labels,body:e.body}})});
+ }
+ if(!o['--installed-sha']||Boolean(o['--manifest-file'])===Boolean(o['--target-sha']))fail('MAINTENANCE_REQUEST_USAGE');
+ if(o['--target-sha']&&!/^[a-f0-9]{40}$/.test(o['--target-sha']))fail('MAINTENANCE_REQUEST_USAGE');
  const bytes=o['--target-sha']?readRemote(o['--target-sha']):fs.readFileSync(path.resolve(o['--manifest-file']));
  const expected=prepareMaintenanceIssue(bytes,{installedSha:o['--installed-sha'],chatId:o['--chat-id']});
  if(o['--target-sha']&&JSON.parse(expected.body).targetControllerSha!==o['--target-sha'])fail('MAINTENANCE_TARGET_MANIFEST_MISMATCH');

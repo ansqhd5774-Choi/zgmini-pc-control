@@ -5,7 +5,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {test} from 'node:test';
 import {manifestFingerprint,validateControllerImportClosure,controllerImportScanRoots} from '../tools/maintenance-contract.mjs';
-import {prepareMaintenanceIssue,verifyMaintenanceIssue,submitMaintenanceIssue,reconcileMaintenanceIssue,main} from '../tools/maintenance-request.mjs';
+import {prepareMaintenanceIssue,verifyMaintenanceIssue,submitMaintenanceIssue,submitPreparedMaintenanceIssue,reconcileMaintenanceIssue,main} from '../tools/maintenance-request.mjs';
 const OLD='a'.repeat(40),NEXT='b'.repeat(40),OWNER='ansqhd5774-Choi';
 function manifest(){
  const allowFiles=[{path:'controller/operations.mjs',sha256:'c'.repeat(64)}];
@@ -92,4 +92,45 @@ test('actual TEMP package missing dependency fails before simulated switch; comp
  assert.notEqual(missing.status,0);assert.match(missing.stderr,/ERR_MODULE_NOT_FOUND/);
  fs.writeFileSync(path.join(root,'required.mjs'),'export const ready=true;\n');
  assert.equal(spawnSync(process.execPath,[path.join(root,'entry.mjs')],{encoding:'utf8',windowsHide:true,timeout:5000}).status,0);
+});
+
+function preparedPorts(f){
+ return {...f.ports,installedSha:OLD,readIdentity:async()=>({login:OWNER}),readRepository:async()=>({private:true}),
+ readManifest:async target=>{assert.equal(target,NEXT);return manifest();}};
+}
+test('prepared owner submission preserves exact request id and existing one-shot receipt',async()=>{
+ const f=setup(),ports=preparedPorts(f);
+ const original=JSON.parse(f.expected.body).requestId;
+ assert.equal((await submitPreparedMaintenanceIssue(f.expected,ports)).requestId,original);
+ assert.equal(f.saved.expected.body,f.expected.body);assert.equal(f.posts,1);
+ await assert.rejects(()=>submitPreparedMaintenanceIssue(f.expected,ports),/EEXIST/);assert.equal(f.posts,1);
+});
+test('prepared bridge refuses non-owner and nonprivate repository without POST',async()=>{
+ const f=setup(),p=preparedPorts(f);
+ await assert.rejects(()=>submitPreparedMaintenanceIssue(f.expected,{...p,readIdentity:async()=>({login:'github-actions[bot]'})}),/IDENTITY_DENIED/);
+ await assert.rejects(()=>submitPreparedMaintenanceIssue(f.expected,{...p,readRepository:async()=>({private:false})}),/IDENTITY_DENIED/);
+ assert.equal(f.posts,0);assert.equal(f.saved,null);
+});
+test('prepared bridge refuses remote raw manifest mismatch and installation drift',async()=>{
+ const f=setup(),p=preparedPorts(f);
+ await assert.rejects(()=>submitPreparedMaintenanceIssue(f.expected,{...p,readManifest:async()=>Buffer.from(manifest().toString()+' ')}),/MANIFEST_PIN_MISMATCH/);
+ await assert.rejects(()=>submitPreparedMaintenanceIssue(f.expected,{...p,installedSha:NEXT}),/INSTALLED_SOURCE_DRIFT/);
+ assert.equal(f.posts,0);assert.equal(f.saved,null);
+});
+test('prepared bridge refuses candidate wrapper and invalid request shape',async()=>{
+ const f=setup(),p=preparedPorts(f);
+ await assert.rejects(()=>submitPreparedMaintenanceIssue({...f.expected,canPublish:false},p),/PREPARED_ENVELOPE_INVALID/);
+ await assert.rejects(()=>submitPreparedMaintenanceIssue({...f.expected,body:'{}'},p));
+ assert.equal(f.posts,0);
+});
+test('prepared bridge preserves unknown POST and uses same reconciliation',async()=>{
+ const f=setup(),p=preparedPorts(f);let attempts=0;
+ p.createIssue=async()=>{attempts++;throw Error('unknown response')};
+ assert.equal((await submitPreparedMaintenanceIssue(f.expected,p)).code,'MAINTENANCE_CREATE_OUTCOME_UNKNOWN');
+ assert.equal((await reconcileMaintenanceIssue(f.saved,{...p,findIssues:async()=>[f.actual]})).requestId,JSON.parse(f.expected.body).requestId);
+ assert.equal(attempts,1);
+});
+test('prepared CLI rejects incomplete or mixed mode before IO',async()=>{
+ await assert.rejects(()=>main(['submit-prepared','--prepared-file','x','--installed-sha',OLD]),/USAGE/);
+ await assert.rejects(()=>main(['submit-prepared','--prepared-file','x','--target-sha',NEXT]),/USAGE/);
 });
