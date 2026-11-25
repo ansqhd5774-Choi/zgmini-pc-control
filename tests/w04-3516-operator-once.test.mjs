@@ -127,3 +127,16 @@ test('exact recovery packet is single attempt and never executes arbitrary shell
   src.indexOf("'reconcile-installed','--request-id'"));
  assert.doesNotMatch(src,/\['reset'|\['clean'|fs\.rmSync|fs\.unlinkSync|shell:\s*true/);
 });
+
+test('one-click CMD authenticates the exact JS Git blob and refuses Runner execution',()=>{
+ const js=fs.readFileSync(new URL('../tools/operator-packets/w04-3516-recovery-once.mjs',import.meta.url));
+ const cmd=fs.readFileSync(new URL('../tools/operator-packets/W04_3516_INDEPENDENT_RECOVERY_ONCE_V1.cmd',import.meta.url),'utf8');
+ const blob=createHash('sha1').update(Buffer.from('blob '+js.length+'\\0')).update(js).digest('hex');
+ assert.match(cmd,new RegExp('set "ZG_JS_BLOB='+blob+'"'));
+ assert.match(cmd,/if defined GITHUB_ACTIONS goto :no_runner/);
+ assert.match(cmd,/if defined RUNNER_NAME goto :no_runner/);
+ assert.match(cmd,/--once/);
+ assert.match(cmd,/set "NODE_OPTIONS="/);
+ assert.doesNotMatch(cmd,/--force|reset --hard|git clean|powershell|RUNNER_NAME=|GITHUB_ACTIONS=/i);
+ assert.doesNotMatch(cmd,/3409/);
+});
