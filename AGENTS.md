@@ -4,6 +4,8 @@
 
 # ZGMINI PC 자동 실행 공통 기준
 
+**CI 1·2차 채택 19개 사용 기준(2026-11-26):** 기존 R1 **8개 검사 영역**(Lint·Type Check·Build·Unit·Integration·E2E·Security·Secret)과 R2 **11개 기술**(#1·#6·#12·#15·#19·#20·#23·#24·#25·#29·#36)은 변경 영향에 맞춰 기존 워크플로/검사를 선택 사용한다. 적용 대상·N/A·트리거·정확 PR HEAD CI·병합 SHA 확인 기준은 [공통 작업 표준의 CI 19개 사용 계약](docs/PC_AUTOMATION_STANDARD.md#ci-19개-공통-사용-계약--2026-11-26-사용자-확정)과 [최종 19개 목록](docs/CI_R1_R2_FINAL_LIST_20261126.md)을 따른다. R2 **#8 웹 Good/P75 Performance Budget은 사용자 제외·삭제**(성공으로 집계하지 않음)이며 #24 격리 Chromium Lab은 유지한다. 19종을 모든 PR/조회/설치의 신규 전역 Gate로 만들거나 CI PASS를 운영 완료로 표현하지 않는다.
+
 **Cloudflare 공식 PC 조회 경로(2026-11-24):** 기존 운영 PC Wrangler OAuth와 등록된 A급 `w05-cloudflare-deployment-readonly`를 재사용하는 고정 Cloudflare 공식 API GET이 [#3306 실제 PC PASS](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3306)로 검증됐다. Cloudflare 활성 배포·Version·트래픽·도메인 **읽기 확인의 1차 표준 경로**는 [공식 PC 읽기 절차](docs/CLOUDFLARE_OFFICIAL_PC_READONLY_STANDARD.md)다. 웹 디버그·수동 Cloudflare 대시보드·유료 브라우저를 필수조건으로 두지 않는다. 다른 Worker 조회나 배포/DNS/D1 쓰기 권한은 자동 확대하지 않고, 기존 유효 증거를 반복 실행하지 않는다. GitHub 기록은 다른 대화·PC를 자동 변경하지 않는다.
 
 **자동화 프로세스 전문가 작업 기준(2026-11-22):** [AUTOMATION_PROCESS_EXPERT_WORK_STANDARD.md](docs/AUTOMATION_PROCESS_EXPERT_WORK_STANDARD.md)를 공통 실행 기준의 보완 지침으로 적용한다. 기존 승인·안전 보호를 유지하면서 실제 실패 조건 → 최소 수정 → 범위에 맞는 결과 검증을 우선한다. 조회 가시성·idle·실패를 구분하고 092의 이미 완료된 운영 증거를 재사용한다. 새 승인 Gate·무관한 기능 변경·반복 진단을 만들지 않는다.

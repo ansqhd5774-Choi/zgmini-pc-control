@@ -1,5 +1,7 @@
 # 일반챗 작업 전 공통 지침
 
+**CI 19개 실제 사용(2026-11-26):** 소스·Workflow·데이터·브라우저 변경은 [R1 8영역 + R2 11기술 사용 기준](PC_AUTOMATION_STANDARD.md#ci-19개-공통-사용-계약--2026-11-26-사용자-확정)에서 영향받는 기존 검사만 선택하고 정확 HEAD 실행 증거·누락 트리거를 확인한다. 적용 불가/N/A 이유를 남기며, 기존 유효 성공은 재사용한다. R2 #8 웹 Good/P75는 제외(삭제), #24 격리 성능 CI는 유지. 19개 전부를 매번 실행하는 새 Gate, 예약/유료 서비스/운영 승인 확대는 금지한다.
+
 **Cloudflare 공식 조회(2026-11-24):** Cloudflare 활성 배포·트래픽·Version·도메인 검증은 웹 디버그나 사용자 수동 조작 대신, 이미 운영 PC에 설치돼 실제 [#3306 PASS](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3306)한 허용 A급 `w05-cloudflare-deployment-readonly`와 기존 Wrangler OAuth의 고정 공식 GET을 1차 경로로 사용한다. 먼저 유효한 JSON/TXT 결과를 재사용하며, 필요한 새 읽기만 고유 `pc-job`으로 단회 실행·회수한다. [표준 절차](CLOUDFLARE_OFFICIAL_PC_READONLY_STANDARD.md). 읽기 성공을 Cloudflare 배포·DNS·D1 쓰기 승인이나 Git source SHA 독립 attestation으로 확대하지 않는다.
 
 **Controller 요청 누락 방지(2026-11-23):** [기존 단회 제출 도구](CONTROLLER_AUTO_UPDATE.md)의 생성·제출·원본 readback을 사용한다. 제목/라벨을 수동으로 따로 붙이지 않는다. 응답 불명은 기존 영수증 `reconcile`로 조회하며 재제출하지 않는다. 이 도구는 승인이나 설치 완료를 대신하지 않는다.

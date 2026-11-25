@@ -3,6 +3,13 @@ name: ZGMINI ER1 December Symbol Batch A
 on:
   issues:
     types: [opened]
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'er1-dec31-symbol-batch-a-entry.mjs'
+      - 'er1-dec31-symbol-pair-resume-entry.test.mjs'
+      - 'ER1_DEC31_SYMBOL_PAIR_RESUME_B_APPROVAL.json'
+      - '.github/workflows/pc-er1-dec31-symbol-batch-a.yml'
 permissions:
   contents: read
   issues: write
@@ -54,3 +61,71 @@ jobs:
           GITHUB_EVENT_ACTION: ${{ github.event.action }}
           GITHUB_TOKEN: ${{ github.token }}
         run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\er1-dec31-symbol-batch-a-entry.mjs" --upload'
+
+  # One separately user-approved TOL/CASY pair-only recovery. The original
+  # immutable 40-call job above remains intact and is never re-opened.
+  resume-pair:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-er1-dec31-symbol-pair-resume-once' &&
+      contains(github.event.issue.labels.*.name, 'pc-er1-approved')
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 12
+    env:
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.autocrlf
+      GIT_CONFIG_VALUE_0: 'false'
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Checkout exact approved control revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: control
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Checkout exact approved pair-resume source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: e9895abee60bc74e30380372143daf10cb3333ee
+          path: source
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Execute original-preserving pair-only private action without token
+        env:
+          GITHUB_EVENT_ACTION: ${{ github.event.action }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\er1-dec31-symbol-batch-a-entry.mjs" --pair-resume'
+      - name: Upload counts only to new request Issue
+        if: always()
+        env:
+          GITHUB_EVENT_ACTION: ${{ github.event.action }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\er1-dec31-symbol-batch-a-entry.mjs" --upload-pair'
+
+  # PR-only offline validation. No operational PC, provider, token, or stored raw.
+  pair-contract-tests:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source for offline validation
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Setup Node without extra tooling
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify bounded pair contract and original one-shot preservation
+        run: |
+          node --check er1-dec31-symbol-batch-a-entry.mjs
+          node --test er1-dec31-symbol-pair-resume-entry.test.mjs
