@@ -168,6 +168,11 @@ const REC3409='pc-update-71ea39dc-7048-4e10-9d11-d4be7f6c3ec0';
 const TARGET3409='6b3c9c0ce77354d81babe4c9ea7785663c6c2cb4';
 const proof3409={issueNumber:3438,runId:45457196689,jobId:138669741465,
  runnerName:'zgmini-pc-03',resultPath:'results/45457196689-1-seat-3.json'};
+const REC3516='pc-update-c087fa10-88e2-42e3-bc60-c758ab93f0c1';
+const TARGET3516='83679b013ac9a9820331d93311ec97e572b18e13';
+const proof3516={issueNumber:3528,runId:45579963186,jobId:139087219551,
+ runnerName:'zgmini-pc-03',
+ resultPath:'results/pc-process-inventory-45579963186-1-operating.json'};
 // Exact, fixed historical contracts only. This table grants no execution
 // right: the independent Windows operator, committed approved manifest, live
 // seven-file CAS, protected baseline and A receipt checks remain mandatory.
@@ -184,6 +189,15 @@ export function fixedInstalledRecoveryCase(id){
   proofSourceBranch:'main',
   proofSourceSha:'8410a857d2d8cd47beae811152a676c6eee07a75',
   proof:proof3409,allowUnchangedBaseline:true});
+ // #3516 original postcheck remains UNKNOWN; a separately approved installed
+ // reconciliation may instead pin the independent Windows #3528 A inventory.
+ if(id===REC3516)return Object.freeze({issueNumber:3516,postIssueNumber:3519,
+  targetSha:TARGET3516,postSourceBranch:'main',
+  postSourceSha:'b6049aac81b3442a58b08050ee138921f87a09e6',
+  proofSourceBranch:'main',
+  proofSourceSha:'8bd11c9a396e19e7881ce7d21cd52c3cb520f6e2',
+  proof:proof3516,proofMode:'EXACT_W04_3516_OPERATING_INVENTORY',
+  allowUnchangedBaseline:true});
  return null;
 }
 // #3409's original recovery approval and its Writer preimage remain immutable.
