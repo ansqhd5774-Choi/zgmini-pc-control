@@ -7,7 +7,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {decideStandbyPromotion as decide,watchdogIdentityMatches,
  verifyStandbySource} from '../controller/standby.mjs';
 import {assertSupervisorOwner} from '../controller/common.mjs';
-import {provenOldRunnerExit,classifyRunnerExecutableProof} from '../tools/runner-watchdog.mjs';
+import {provenOldRunnerExit,classifyRunnerExecutableProof,verifiedColdStandbyStart} from '../tools/runner-watchdog.mjs';
 
 const eligible=()=>({
  sourceVerified:true,watchdogBound:true,supervisorLeasePresent:false,
@@ -220,4 +220,19 @@ test('lease-absent clean startup still requires old heartbeat and WMI absence',(
   executablePath:'E:\\ZGmini\\automation\\pc-control\\runners\\03\\bin\\Runner.Worker.exe'}];
  assert.equal(classifyRunnerExecutableProof(others,{
   controllerRoot,canonicalize:p=>p}),'ACTIVE_RUNNER_PROCESS');
+});
+
+test('Standby initial boot permits only true absent owner and heartbeat pair',()=>{
+ assert.equal(verifiedColdStandbyStart({owner:null,heartbeat:null}),true);
+ for(const pair of [
+  {owner:undefined,heartbeat:null},{owner:null,heartbeat:undefined},
+  {owner:{pid:1},heartbeat:null},{owner:null,heartbeat:{pid:1}},
+  {owner:{pid:1},heartbeat:{pid:1}},{}
+ ])assert.equal(verifiedColdStandbyStart(pair),false);
+ // No old owner or heartbeat is not an unconditional promotion:
+ // the independent WMI check and Standby's atomic lease still gate it.
+ const src=fs.readFileSync(new URL('../tools/runner-watchdog.mjs',import.meta.url),'utf8');
+ assert.match(src,/if\(standbyMode&&!verifiedColdStandbyStart\(\{owner,heartbeat:hb\}\)&&/);
+ assert.match(src,/scanControllerRunnersReadOnly\(\)!=='NO_CONTROLLER_RUNNER_PROCESS'/);
+ assert.match(src,/archiveDeadLease\(path\.join\(control,'leases\/supervisor'\)/);
 });
