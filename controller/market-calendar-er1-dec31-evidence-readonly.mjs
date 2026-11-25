@@ -52,7 +52,6 @@ function sqliteDay(row,day,now){
 }
 function readSqlite(home,now,openDatabase){
  const filename=path.join(home,'storage','core.sqlite');
- const check=safeRead.bind(null);
  let stat;try{stat=fs.lstatSync(filename)}catch(e){
   return {state:e?.code==='ENOENT'?'DB_MISSING':'DB_UNAVAILABLE',
    validDays:null,missingDays:null,invalidDays:null};}
