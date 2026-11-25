@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {observeCompletedRun,observePublishedControllerApprovals,createControllerPublicationPorts,publishExistingControllerApprovals,createAutoApprovalContextReader,ciPublicationExitCode} from '../ci-approval/completed-run-intake.mjs';
+import {observeCompletedRun,observePublishedControllerApprovals,createControllerPublicationPorts,publishExistingControllerApprovals,createAutoApprovalContextReader,ciPublicationExitCode,publishConfiguredControllerApproval} from '../ci-approval/completed-run-intake.mjs';
 
 const repository={id:1442936296,full_name:'ansqhd5774-Choi/zgmini-pc-control',private:true};
 const event=()=>({action:'completed',repository:{...repository},workflow_run:{
@@ -219,4 +219,39 @@ test('CI publisher process exit fails on withheld or uncertain effects, not reus
  assert.equal(ciPublicationExitCode({state:'IGNORED'}, {publish:true}),0);
  const moduleText=readFileSync(new URL('../ci-approval/completed-run-intake.mjs',import.meta.url),'utf8');
  assert.match(moduleText,/process\.exitCode=ciPublicationExitCode\(result,\{publish:process\.argv\[2\]===\'--publish-existing\'\}\)/);
+});
+
+test('configured source event rejects unrelated or unmerged source before any write',async()=>{
+ const e=event(),policy={targetSha:'c'.repeat(40),approvalPrNumber:29,sourcePrNumber:28};
+ const base={number:28,merged:true,merge_commit_sha:'b'.repeat(40),base:{ref:'main',repo:repository},
+  head:{repo:repository,sha:'d'.repeat(40)}};
+ const opts={policy,runId:123,attempt:1,emitReceipt:()=>assert.fail('receipt'),
+  ports:{readRepository:()=>assert.fail('unrelated event reached publisher')}};
+ const getJson=async route=>route==='pulls/28'?base:e.workflow_run;
+ assert.equal((await publishConfiguredControllerApproval(e,{...opts,getJson})).code,'CONFIGURED_SOURCE_EVENT_NOT_MATCHED');
+ assert.equal((await publishConfiguredControllerApproval(e,{...opts,getJson:async()=>({...base,merged:false})})).code,'CONFIGURED_SOURCE_NOT_MERGED');
+});
+test('configured exact merge API receives immutable head CAS',async()=>{
+ const calls=[],policy={approvalPrNumber:29,targetSha:'a'.repeat(40),sourcePrNumber:28,
+  sourceWorkflowBlobSha:'b'.repeat(40),businessApprovalSha256:'c'.repeat(64),policyRevision:'d'.repeat(40),
+  sourceBranch:'codex/example-selective',delegationPin:{issueNumber:1,commentId:2,bodySha256:'e'.repeat(64)}};
+ const ports=createControllerPublicationPorts({autoApprovalPolicy:policy,getJson:async()=>[],readJobLogs:async()=>'',store:{},
+  putMerge:async(n,body)=>{calls.push([n,body]);return {merged:true}}});
+ assert.throws(()=>ports.mergeApprovalPr(30,'f'.repeat(40)),/PR_INVALID/);
+ assert.throws(()=>ports.mergeApprovalPr(29,'invalid'),/PR_INVALID/);
+ await ports.mergeApprovalPr(29,'f'.repeat(40));
+ assert.deepEqual(calls,[[29,{sha:'f'.repeat(40),merge_method:'merge'}]]);
+});
+test('matched source event enters existing merge and submit path, not generic push intake',async()=>{
+ const e=event(),policy={targetSha:'c'.repeat(40),approvalPrNumber:29,sourcePrNumber:28};
+ const source={number:28,merged:true,merge_commit_sha:'b'.repeat(40),base:{ref:'main',repo:repository},
+  head:{repo:repository,sha:e.workflow_run.head_sha}};
+ const reads=[];
+ const result=await publishConfiguredControllerApproval(e,{policy,runId:123,attempt:1,
+  getJson:async route=>route==='pulls/28'?source:e.workflow_run,
+  ports:{readAutoApprovalContext:()=>{},readApprovalPrFiles:()=>{},mergeApprovalPr:()=>assert.fail('merge'),
+   readRepository:async()=>{reads.push('repo');return null;}},emitReceipt:()=>assert.fail('receipt')});
+ assert.deepEqual(reads,['repo']);
+ assert.equal(result.results[0].code,'MAINTENANCE_CI_REPOSITORY_DENIED');
+ assert.equal(ciPublicationExitCode(result,{publish:true}),1);
 });

@@ -5,7 +5,7 @@ import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import os from 'node:os';
 import {pathToFileURL} from 'node:url';
-import {resolveControllerApprovalCI,createCiEffectReceiptStore,submitExistingControllerApprovalFromCi} from '../tools/maintenance-request.mjs';
+import {resolveControllerApprovalCI,createCiEffectReceiptStore,submitExistingControllerApprovalFromCi,mergeAndSubmitPreparedControllerApproval} from '../tools/maintenance-request.mjs';
 import {manifestFingerprint} from '../tools/maintenance-contract.mjs';
 
 const repo='ansqhd5774-Choi/zgmini-pc-control';
@@ -154,7 +154,7 @@ export function createAutoApprovalContextReader({policy,getJson,readJobLogs}={})
    }};
  };
 }
-export function createControllerPublicationPorts({getJson,postIssue,store,autoApprovalPolicy,readJobLogs}){
+export function createControllerPublicationPorts({getJson,postIssue,store,autoApprovalPolicy,readJobLogs,putMerge}){
  const readBytes=async(target,revision)=>{
   if(!sha(target)||!(revision==='main'||sha(revision)))throw Error('CI_PUBLICATION_SOURCE_INVALID');
   const path='approvals/controller-updates/'+target+'.json';
@@ -196,6 +196,11 @@ export function createControllerPublicationPorts({getJson,postIssue,store,autoAp
   },
   createIssue:expected=>postIssue({title:expected.title,body:expected.body,labels:expected.labels}),
   loadReceipt:store.loadReceipt,saveReceipt:store.saveReceipt,
+  ...(autoApprovalPolicy&&typeof putMerge==='function'?{mergeApprovalPr:(n,head)=>{
+   if(!id(n)||n!==autoApprovalPolicy.approvalPrNumber||!sha(head))
+    throw Error('CI_PUBLICATION_PR_INVALID');
+   return putMerge(n,{sha:head,merge_method:'merge'});
+  }}:{}),
   ...(autoApprovalPolicy?{readAutoApprovalContext:createAutoApprovalContextReader({policy:autoApprovalPolicy,getJson,readJobLogs})}:{}),
  };
 }
@@ -222,15 +227,55 @@ export async function publishExistingControllerApprovals(event,{getJson,ports,ru
  // This is the outcome of the publishing step, not a PC execution PASS.
  return {state:'PUBLICATION_PROCESSED',results};
 }
+// A single independently configured prepared effect, not a free-form event
+// target. Source completion and source merge can arrive in either order.
+// No subsequent bot-generated PR CI or push event is required for submission.
+export async function publishConfiguredControllerApproval(event,{getJson,ports,policy,runId,attempt,emitReceipt}={}){
+ if(!policy||!sha(policy.targetSha)||!id(policy.sourcePrNumber)||!id(policy.approvalPrNumber)||
+    !id(runId)||!id(attempt)||typeof emitReceipt!=='function')
+  throw Error('CI_PUBLICATION_AUTO_POLICY_UNVERIFIED');
+ const source=await getJson('pulls/'+policy.sourcePrNumber);
+ if(source?.number!==policy.sourcePrNumber||source.base?.ref!=='main'||
+    source.base?.repo?.full_name!==repo||source.head?.repo?.full_name!==repo||
+    !sha(source.head?.sha))
+  return {state:'EVIDENCE_MISSING',code:'CONFIGURED_SOURCE_PR_UNVERIFIED',results:[]};
+ if(source.merged!==true||!sha(source.merge_commit_sha))
+  return {state:'IGNORED',code:'CONFIGURED_SOURCE_NOT_MERGED',results:[]};
+ let matched=false;
+ if(event?.action==='completed'){
+  const seen=await observeCompletedRun(event,{getRun:n=>getJson('actions/runs/'+n)});
+  if(seen.state==='EVIDENCE_MISSING')return {state:seen.state,code:seen.reason,results:[]};
+  matched=seen.state==='CI_COMPLETION_OBSERVED_ONLY'&&seen.headSha===source.head.sha;
+ }else if(sameRepo(event?.repository)&&event.ref==='refs/heads/main'&&event.deleted===false&&event.forced===false&&
+   sha(event.before)&&sha(event.after)&&event.before!==event.after){
+  // Observe source merge becoming reachable on main, not an arbitrary push.
+  const [before,after]=await Promise.all([getJson('compare/'+source.merge_commit_sha+'...'+event.before),
+   getJson('compare/'+source.merge_commit_sha+'...'+event.after)]);
+  const contains=(v,h)=>v?.base_commit?.sha===source.merge_commit_sha&&v.merge_base_commit?.sha===source.merge_commit_sha&&
+   v.behind_by===0&&(h===source.merge_commit_sha?v.status==='identical':v.status==='ahead');
+  matched=!contains(before,event.before)&&contains(after,event.after);
+ }
+ if(!matched)return {state:'IGNORED',code:'CONFIGURED_SOURCE_EVENT_NOT_MATCHED',results:[]};
+ try{
+  const result=await mergeAndSubmitPreparedControllerApproval({targetSha:policy.targetSha,
+   approvalPrNumber:policy.approvalPrNumber,runId,attempt},ports);
+  if(result.status==='REQUEST_READBACK_VERIFIED')emitReceipt(result.receiptMarker);
+  const {receiptMarker,...safe}=result;
+  return {state:'PUBLICATION_PROCESSED',results:[{targetSha:policy.targetSha,...safe}]};
+ }catch(error){
+  const code=/^(?:MAINTENANCE|CI_PUBLICATION)_[A-Z0-9_]+$/.test(error?.message??'')?error.message:'CI_PUBLICATION_ADAPTER_FAILED';
+  return {state:'PUBLICATION_PROCESSED',results:[{targetSha:policy.targetSha,status:'STATE_UNKNOWN',code}]};
+ }
+}
 export async function main({eventPath=process.env.GITHUB_EVENT_PATH,token=process.env.GITHUB_TOKEN,publish=false}={}){
  const eventName=process.env.GITHUB_EVENT_NAME;
  if(!eventPath||!token||!['workflow_run','push'].includes(eventName)||process.env.GITHUB_REPOSITORY!==repo)
   return out('EVIDENCE_MISSING','WORKFLOW_CONTEXT_UNVERIFIED');
  let event;
  try{event=JSON.parse(readFileSync(eventPath,'utf8'));}catch{return out('EVIDENCE_MISSING','EVENT_READ_FAILED')}
- const github=async(route,body)=>{
+ const github=async(route,body,method=body?'POST':'GET')=>{
   const res=await fetch('https://api.github.com/repos/'+repo+(route?'/'+route:''),{
-   method:body?'POST':'GET',redirect:'error',signal:AbortSignal.timeout(15000),
+   method,redirect:'error',signal:AbortSignal.timeout(15000),
    headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+token,'X-GitHub-Api-Version':'2022-11-28',...(body?{'Content-Type':'application/json'}:{})},
    ...(body?{body:JSON.stringify(body)}:{})});
   if(!res.ok)throw Error(body?'CI_PUBLICATION_POST_FAILED':'READ_HTTP_FAILED');
@@ -238,14 +283,36 @@ export async function main({eventPath=process.env.GITHUB_EVENT_PATH,token=proces
  };
  const getJson=route=>github(route);
  if(publish){
-  if(process.env.ZGMINI_CI_CONTROLLER_B_ENABLED!=='true'||eventName!=='push'||
-     process.env.GITHUB_REF!=='refs/heads/main'||process.env.GITHUB_SHA!==event.after||
+  if(process.env.ZGMINI_CI_CONTROLLER_B_ENABLED!=='true'||
+     process.env.GITHUB_REF!=='refs/heads/main'||(eventName==='push'&&process.env.GITHUB_SHA!==event.after)||
      process.env.RUNNER_NAME!=='zgmini-handoff-ci-spare-01'||os.hostname().toUpperCase()!=='DESKTOP-N62L0NG')
    return {state:'DISABLED',code:'CI_PUBLICATION_CONTEXT_DENIED',results:[]};
   const store=createCiEffectReceiptStore(process.env.ZGMINI_CI_CONTROLLER_B_RECEIPT_ROOT);
-  const ports=createControllerPublicationPorts({getJson,postIssue:body=>github('issues',body),store});
-  return publishExistingControllerApprovals(event,{getJson,ports,runId:Number(process.env.GITHUB_RUN_ID),
-   attempt:Number(process.env.GITHUB_RUN_ATTEMPT),emitReceipt:marker=>console.log(marker)});
+  let policy;
+  try{if(process.env.ZGMINI_CI_CONTROLLER_B_POLICY)policy=JSON.parse(process.env.ZGMINI_CI_CONTROLLER_B_POLICY);}
+  catch{return {state:'EVIDENCE_MISSING',code:'CI_PUBLICATION_AUTO_POLICY_UNVERIFIED',results:[]};}
+  // GitHub supplies a temporary signed log URL. Fetch follows the standard
+  // cross-origin redirect without forwarding the Authorization header.
+  const readJobLogs=async n=>{
+   if(!id(n))throw Error('CI_PUBLICATION_RUN_INVALID');
+   const response=await fetch('https://api.github.com/repos/'+repo+'/actions/jobs/'+n+'/logs',{
+    method:'GET',redirect:'follow',signal:AbortSignal.timeout(60000),
+    headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+token,'X-GitHub-Api-Version':'2022-11-28'}});
+   if(!response.ok)throw Error('CI_PUBLICATION_CI_LOG_UNVERIFIED');
+   const bytes=await response.text();
+   if(bytes.length>16000000)throw Error('CI_PUBLICATION_CI_LOG_UNVERIFIED');
+   return bytes;
+  };
+  const ports=createControllerPublicationPorts({getJson,postIssue:body=>github('issues',body),store,
+   autoApprovalPolicy:policy,readJobLogs,putMerge:(n,body)=>github('pulls/'+n+'/merge',body,'PUT')});
+  const opts={getJson,ports,runId:Number(process.env.GITHUB_RUN_ID),
+   attempt:Number(process.env.GITHUB_RUN_ATTEMPT),emitReceipt:marker=>console.log(marker)};
+  if(policy){
+   const result=await publishConfiguredControllerApproval(event,{...opts,policy});
+   if(result.state!=='IGNORED')return result;
+  }
+  if(eventName==='push')return publishExistingControllerApprovals(event,opts);
+  return {state:'IGNORED',code:'NO_CONFIGURED_SOURCE_EVENT',results:[]};
  }
  if(eventName==='push')return observePublishedControllerApprovals(event,{getJson});
  return observeCompletedRun(event,{getRun:async runId=>{
