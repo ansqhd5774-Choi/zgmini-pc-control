@@ -20,12 +20,15 @@ jobs:
         shell: cmd
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        id: checkout
         with:
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        id: node_setup
         with:
           node-version: '22'
       - name: Identify exact permitted queue PC without WIM access
+        id: queue_host
         run: |
           if /I "%COMPUTERNAME%"=="DESKTOP-N62L0NG" (
             echo C996_QUEUE_HOST_MATCH=TRUE
@@ -39,8 +42,10 @@ jobs:
         run: node tools/c996-source-checks.mjs
       # Reuse the existing isolated source-only Windows job; no new Runner or timer.
       - name: Validate pinned workflow security scanner
+        if: ${{ !cancelled() && steps.checkout.outcome == 'success' && steps.node_setup.outcome == 'success' && steps.queue_host.outcome == 'success' }}
         run: node --test tests/ci-zizmor-pr.test.mjs
       - name: Audit changed GitHub Actions workflow security
+        if: ${{ !cancelled() && steps.checkout.outcome == 'success' && steps.node_setup.outcome == 'success' && steps.queue_host.outcome == 'success' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node tools/ci-zizmor-pr.mjs
