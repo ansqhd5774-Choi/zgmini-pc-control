@@ -3,7 +3,7 @@ import {publishExactControllerApprovalPair} from '../ci-approval/approval-pr-pub
 import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {observeCompletedRun,observePublishedControllerApprovals,createControllerPublicationPorts,publishExistingControllerApprovals,createAutoApprovalContextReader,ciPublicationExitCode,publishConfiguredControllerApproval,createConfiguredSelectivePreparer,createControllerPrPublicationIo} from '../ci-approval/completed-run-intake.mjs';
+import {observeCompletedRun,observePublishedControllerApprovals,createControllerPublicationPorts,publishExistingControllerApprovals,createAutoApprovalContextReader,ciPublicationExitCode,publishConfiguredControllerApproval,createConfiguredSelectivePreparer,createControllerPrPublicationIo,initialControllerPublicationPolicy} from '../ci-approval/completed-run-intake.mjs';
 
 const repository={id:1442936296,full_name:'ansqhd5774-Choi/zgmini-pc-control',private:true};
 const event=()=>({action:'completed',repository:{...repository},workflow_run:{
