@@ -23,6 +23,7 @@ validateControllerConfigTransition,controllerAdmissionForPurpose,
  R6_HOST_SOURCE_SHA,R6_HOST_SOURCE_MANIFEST_SHA256,
  selectPreservedRecoveryProtection,recoveryProtectedSnapshotStillPinned,
  verifiedRunningPostcheckFailure,classifyMaintenancePostcheckLink,
+ summarizeMaintenancePostcheckLocalPointer,
  R6_HOST_CANDIDATE_SHA256,validateR54BIssueEnvelope,
  validateR54BManifestRequest,R54_B_ISSUE_TITLE,R54_B_OPERATION,
  R54_B_SOURCE_FILES,SOURCE_BUNDLE_OPERATION,SOURCE_BUNDLE_ISSUE_TITLE,
@@ -1637,6 +1638,34 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
        requestId:issue.requestId,issueNumber:postIssueNumber,
        operation:manifest.postOperation,sourceBranch:manifest.postSourceBranch,
        sourceSha:manifest.postSourceSha,issue:liveIssue,runs,jobs});
+      // Only an exactly correlated Run/attempt/PC seat can select a local
+      // pointer. A missing/partial or redirected file is never treated as PASS.
+      if(['ENTRY_REJECT','UPLOAD_MISSING'].includes(link.state)&&selected){
+       const matched=jobs?.filter(j=>j.run_id===selected.id&&j.name==='approved-pc-job')??[];
+       const seatNumber=matched.length===1?
+        Number(matched[0].runner_name?.match(/^zgmini-pc-0([1-6])$/)?.[1]):null;
+       const attempt=selected.run_attempt;
+       if(Number.isSafeInteger(seatNumber)&&seatNumber>=1&&seatNumber<=6&&
+        Number.isSafeInteger(attempt)&&attempt>=1&&attempt<=999){
+        const file=path.join(controlRoot,'reports',
+         `${selected.id}-${attempt}-${seatNumber}.json`);
+        try{
+         const stat=fs.lstatSync(file);
+         need(stat.isFile()&&!stat.isSymbolicLink()&&stat.nlink===1&&
+          stat.size>0&&stat.size<=131072,'POSTCHECK_LOCAL_POINTER_UNSAFE');
+         const pointer=json(file);
+         const local=summarizeMaintenancePostcheckLocalPointer({
+          pointer,requestId:issue.requestId,issueNumber:postIssueNumber,
+          runId:selected.id,attempt,seat:seatNumber,operation:manifest.postOperation,
+          sourceBranch:manifest.postSourceBranch,sourceSha:manifest.postSourceSha,
+          controllerSha:manifest.targetSha});
+         if(local.status==='LOCAL_RESULT_MATCHED'){
+          link.localResult=local;
+          link.next='VERIFY_AND_UPLOAD_EXISTING_RESULT_NO_REEXECUTION';
+         }
+        }catch{/* The local receipt remains unverified; no new PC job. */}
+       }
+      }
       const liveLedger=json(ledgerFile);
       // Store a bounded, nonsecret observation only when the evidence moves.
       // A temporarily failed GitHub lookup must not erase earlier evidence.
