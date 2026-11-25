@@ -7,7 +7,7 @@ const from=rows=>({data:{viewer:{accounts:[{rumWebVitalsEventsAdaptiveGroups:row
 const row=(path='/',device='mobile',q={
  largestContentfulPaintP75:2400000,interactionToNextPaintP75:180000,
  cumulativeLayoutShiftP75:0.08},count=1234)=>({count,dimensions:{
- requestHost:RUM_HOST,requestPath:path,deviceType:device},quantiles:q});
+ requestHost:RUM_HOST,requestPath:path,deviceType:device,bot:0},quantiles:q});
 const all=()=>['/','/economic-indicators/'].flatMap(path=>
  ['mobile','desktop'].map(device=>row(path,device)));
 const parse=r=>parseRumGraphql(r,{startUtc,endUtc});
@@ -16,6 +16,9 @@ test('static query is host-scoped, account-scoped, bounded, and not executable i
  assert.equal(x.endpoint,GRAPHQL_ENDPOINT);assert.equal(x.method,'POST');
  assert.equal(x.networkExecuted,false);assert.equal(x.registeredOperation,false);
  assert.match(GRAPHQL_QUERY,/requestHost: "zgmini.kr"/);
+ assert.match(GRAPHQL_QUERY,/requestPath_in: \["\/", "\/economic-indicators\/"\]/);
+ assert.match(GRAPHQL_QUERY,/bot: 0/);
+ assert.match(GRAPHQL_QUERY,/dimensions \{requestHost requestPath deviceType bot\}/);
  // Cloudflare's Analytics schema uses the custom lowercase `string` scalar.
  assert.match(GRAPHQL_QUERY,/\$account: string!/);
  assert.doesNotMatch(GRAPHQL_QUERY,/\$account: String!/);
@@ -81,11 +84,11 @@ test('GraphQL HTTP 200 carrying errors is UNVERIFIED even with measurements',()=
 test('untrusted other-host, path, device fields cannot enter the report',()=>{
  const rows=all();
  rows.push({...row(),dimensions:{requestHost:'attacker.example',
-  requestPath:'/',deviceType:'mobile'}});
+  requestPath:'/',deviceType:'mobile',bot:0}});
  rows.push({...row(),dimensions:{requestHost:RUM_HOST,
-  requestPath:'/admin/private',deviceType:'mobile'}});
+  requestPath:'/admin/private',deviceType:'mobile',bot:0}});
  rows.push({...row(),dimensions:{requestHost:RUM_HOST,
-  requestPath:'/',deviceType:'tablet'}});
+  requestPath:'/',deviceType:'tablet',bot:0}});
  const x=parse(from(rows));
  assert.equal(x.observations.length,4);
  assert(x.observations.every(y=>['/','/economic-indicators/'].includes(y.route)));
@@ -104,4 +107,26 @@ test('missing all field observations remains UNVERIFIED, never synthetic Good',(
  assert.equal(x.observations.length,4);
  assert.equal(x.code,'CF_RUM_FIELD_INCOMPLETE');
  assert(x.observations.every(z=>z.metrics.inpMs.p75===null));
+});
+
+test('bot-classified events never influence field P75 even if API returns them',()=>{
+ const observed=parse(from([...all(),{...row('/other','mobile'),
+  dimensions:{requestHost:RUM_HOST,requestPath:'/',deviceType:'tablet',bot:1}}]));
+ assert.equal(observed.observations.length,4);
+ assert.equal(observed.code,'CF_RUM_ALL_SCOPED_METRICS_WITHIN_REFERENCE');
+ const botOnly=parse(from([row('/', 'mobile',undefined,1234)]));
+ assert.equal(botOnly.observations[0].metrics.lcpMs.p75,2400);
+ const allBot=all().map(x=>({...x,dimensions:{...x.dimensions,bot:1}}));
+ const denied=parse(from(allBot));
+ assert.equal(denied.fieldP75ValuesPresent,false);
+ assert.equal(denied.code,'CF_RUM_FIELD_INCOMPLETE');
+});
+
+test('zero page views never turn quantiles into a verified Good reading',()=>{
+ const zero=all().map(x=>({...x,count:0}));
+ const out=parse(from(zero));
+ assert.equal(out.status,'FIELD_VALUES_INCOMPLETE');
+ assert.equal(out.fieldP75ValuesPresent,false);
+ assert(out.observations.every(o=>o.groupEventCount===0));
+ assert(out.observations.every(o=>o.metrics.cls.p75===null));
 });
