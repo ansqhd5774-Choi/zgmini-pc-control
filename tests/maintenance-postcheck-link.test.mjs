@@ -84,6 +84,7 @@ test('real updater persists exact Issue link through coordinator failure phase',
  assert.match(src,/classifyMaintenancePostcheckLink\(\{/);
  assert.match(src,/\{maxPages:3\}/);
  assert.match(src,/verifiedRunningPostcheckFailure\(\{/);
+ assert.match(src,/state:'RESULT_REPORTED',code:'POSTCHECK_BOT_RESULT_OBSERVED'/);
 });
 
 test('workflow late-label branch stays opt-in and matches source entry contract',()=>{
