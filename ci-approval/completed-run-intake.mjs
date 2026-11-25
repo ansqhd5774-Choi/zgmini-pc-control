@@ -3,8 +3,9 @@
 // exact effect and live preconditions before any operational submission.
 import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
+import os from 'node:os';
 import {pathToFileURL} from 'node:url';
-import {resolveControllerApprovalCI} from '../tools/maintenance-request.mjs';
+import {resolveControllerApprovalCI,createCiEffectReceiptStore,submitExistingControllerApprovalFromCi} from '../tools/maintenance-request.mjs';
 
 const repo='ansqhd5774-Choi/zgmini-pc-control';
 const repositoryId=1442936296;
@@ -90,19 +91,96 @@ export async function observePublishedControllerApprovals(event,{getJson}={}){
  }catch{return out('EVIDENCE_MISSING','PUBLICATION_READ_FAILED')}
 }
 
-export async function main({eventPath=process.env.GITHUB_EVENT_PATH,token=process.env.GITHUB_TOKEN}={}){
+// Connect the existing approval publication intake to the existing submitter.
+// The production workflow must pin this code and separately configure its
+// durable receipt root and the installed receiver policy. No candidate code,
+// arbitrary request input, new business approval, or PC-side write here.
+export function createControllerPublicationPorts({getJson,postIssue,store}){
+ const readBytes=async(target,revision)=>{
+  if(!sha(target)||!(revision==='main'||sha(revision)))throw Error('CI_PUBLICATION_SOURCE_INVALID');
+  const path='approvals/controller-updates/'+target+'.json';
+  const f=await getJson('contents/'+path+'?ref='+revision);
+  if(f?.type!=='file'||f.path!==path||f.encoding!=='base64'||typeof f.content!=='string'||f.content.length>65536)
+   throw Error('CI_PUBLICATION_SOURCE_UNVERIFIED');
+  const bytes=Buffer.from(f.content,'base64');
+  const blob=createHash('sha1').update(Buffer.concat([Buffer.from('blob '+bytes.length+'\0'),bytes])).digest('hex');
+  if(!bytes.length||bytes.length>32768||blob!==f.sha)throw Error('CI_PUBLICATION_SOURCE_UNVERIFIED');
+  return bytes;
+ };
+ return {
+  readRepository:()=>getJson(''),readManifest:target=>readBytes(target,'main'),
+  readMergedManifest:readBytes,readApprovalPr:n=>{if(!id(n))throw Error('CI_PUBLICATION_PR_INVALID');return getJson('pulls/'+n);},
+  listRuns:head=>{if(!sha(head))throw Error('CI_PUBLICATION_SOURCE_INVALID');return getJson('actions/workflows/'+workflowId+'/runs?head_sha='+head+'&event=pull_request&status=success&per_page=100');},
+  readRun:n=>{if(!id(n))throw Error('CI_PUBLICATION_RUN_INVALID');return getJson('actions/runs/'+n);},
+  readIssue:n=>{if(!id(n))throw Error('CI_PUBLICATION_ISSUE_INVALID');return getJson('issues/'+n);},
+  async findPriorRequests(target){
+   if(!sha(target))throw Error('CI_PUBLICATION_SOURCE_INVALID');
+   const matches=[];
+   // Direct paginated issue inventory avoids search-index lag. Only return
+   // relevant request envelopes; incomplete reads stop new submissions.
+   for(let page=1;page<=100;page++){
+    const rows=await getJson('issues?state=all&labels=pc-maintenance&per_page=100&page='+page);
+    if(!Array.isArray(rows))throw Error('CI_PUBLICATION_PRIOR_READ_UNVERIFIED');
+    for(const row of rows){
+     if(row?.pull_request||row?.title!=='pc-controller-update')continue;
+     try{if(JSON.parse(row.body).targetControllerSha===target)matches.push(row);}catch{}
+    }
+    if(rows.length<100)return matches;
+   }
+   throw Error('CI_PUBLICATION_PRIOR_READ_INCOMPLETE');
+  },
+  createIssue:expected=>postIssue({title:expected.title,body:expected.body,labels:expected.labels}),
+  loadReceipt:store.loadReceipt,saveReceipt:store.saveReceipt,
+ };
+}
+export async function publishExistingControllerApprovals(event,{getJson,ports,runId,attempt,emitReceipt}={}){
+ if(!id(runId)||!id(attempt)||typeof emitReceipt!=='function')throw Error('CI_PUBLICATION_RUN_INVALID');
+ const seen=await observePublishedControllerApprovals(event,{getJson});
+ if(seen.state!=='APPROVAL_PUBLICATION_OBSERVED_ONLY')return {state:seen.state,code:seen.reason,results:[]};
+ const results=[];
+ for(const entry of seen.entries){
+  if(entry.state!=='EXISTING_MANIFEST_OBSERVED_ONLY'||entry.ciState!=='SOURCE_CI_MATCH_ONLY'){
+   results.push({targetSha:entry.targetSha,status:'NOT_SUBMITTED',code:entry.ciCode??entry.state});continue;
+  }
+  try{
+   const outcome=await submitExistingControllerApprovalFromCi({targetSha:entry.targetSha,
+    approvalSha256:entry.manifestSha256,runId,attempt},ports);
+   if(outcome.status==='REQUEST_READBACK_VERIFIED')emitReceipt(outcome.receiptMarker);
+   const {receiptMarker,...result}=outcome;results.push({targetSha:entry.targetSha,...result});
+  }catch(error){
+   const code=/^(?:MAINTENANCE|CI_PUBLICATION)_[A-Z0-9_]+$/.test(error?.message??'')?error.message:'CI_PUBLICATION_ADAPTER_FAILED';
+   results.push({targetSha:entry.targetSha,status:'STATE_UNKNOWN',code});
+  }
+ }
+ // A per-effect failure must not erase another successfully emitted receipt.
+ // This is the outcome of the publishing step, not a PC execution PASS.
+ return {state:'PUBLICATION_PROCESSED',results};
+}
+export async function main({eventPath=process.env.GITHUB_EVENT_PATH,token=process.env.GITHUB_TOKEN,publish=false}={}){
  const eventName=process.env.GITHUB_EVENT_NAME;
  if(!eventPath||!token||!['workflow_run','push'].includes(eventName)||process.env.GITHUB_REPOSITORY!==repo)
   return out('EVIDENCE_MISSING','WORKFLOW_CONTEXT_UNVERIFIED');
  let event;
  try{event=JSON.parse(readFileSync(eventPath,'utf8'));}catch{return out('EVIDENCE_MISSING','EVENT_READ_FAILED')}
- const getJson=async route=>{
-  const res=await fetch('https://api.github.com/repos/'+repo+'/'+route,{
-   method:'GET',redirect:'error',signal:AbortSignal.timeout(15000),
-   headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+token,'X-GitHub-Api-Version':'2022-11-28'}});
-  if(!res.ok)throw Error('READ_HTTP_FAILED');
+ const github=async(route,body)=>{
+  const res=await fetch('https://api.github.com/repos/'+repo+(route?'/'+route:''),{
+   method:body?'POST':'GET',redirect:'error',signal:AbortSignal.timeout(15000),
+   headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+token,'X-GitHub-Api-Version':'2022-11-28',...(body?{'Content-Type':'application/json'}:{})},
+   ...(body?{body:JSON.stringify(body)}:{})});
+  if(!res.ok)throw Error(body?'CI_PUBLICATION_POST_FAILED':'READ_HTTP_FAILED');
   return res.json();
  };
+ const getJson=route=>github(route);
+ if(publish){
+  if(process.env.ZGMINI_CI_CONTROLLER_B_ENABLED!=='true'||eventName!=='push'||
+     process.env.GITHUB_REF!=='refs/heads/main'||process.env.GITHUB_SHA!==event.after||
+     process.env.RUNNER_NAME!=='zgmini-handoff-ci-spare-01'||os.hostname().toUpperCase()!=='DESKTOP-N62L0NG')
+   return {state:'DISABLED',code:'CI_PUBLICATION_CONTEXT_DENIED',results:[]};
+  const store=createCiEffectReceiptStore(process.env.ZGMINI_CI_CONTROLLER_B_RECEIPT_ROOT);
+  const ports=createControllerPublicationPorts({getJson,postIssue:body=>github('issues',body),store});
+  return publishExistingControllerApprovals(event,{getJson,ports,runId:Number(process.env.GITHUB_RUN_ID),
+   attempt:Number(process.env.GITHUB_RUN_ATTEMPT),emitReceipt:marker=>console.log(marker)});
+ }
  if(eventName==='push')return observePublishedControllerApprovals(event,{getJson});
  return observeCompletedRun(event,{getRun:async runId=>{
   if(!id(runId))throw Error('RUN_ID_INVALID');
@@ -110,7 +188,7 @@ export async function main({eventPath=process.env.GITHUB_EVENT_PATH,token=proces
  }});
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
- const result=await main();
+ const result=await main({publish:process.argv[2]==='--publish-existing'});
  console.log(JSON.stringify(result));
  if(result.state==='EVIDENCE_MISSING')process.exitCode=1;
 }

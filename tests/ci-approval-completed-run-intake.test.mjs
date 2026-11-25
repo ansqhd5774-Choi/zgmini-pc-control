@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {observeCompletedRun,observePublishedControllerApprovals} from '../ci-approval/completed-run-intake.mjs';
+import {observeCompletedRun,observePublishedControllerApprovals,createControllerPublicationPorts,publishExistingControllerApprovals} from '../ci-approval/completed-run-intake.mjs';
 
 const repository={id:1442936296,full_name:'ansqhd5774-Choi/zgmini-pc-control',private:true};
 const event=()=>({action:'completed',repository:{...repository},workflow_run:{
@@ -115,4 +115,37 @@ test('unavailable source CI preserves observed manifest but does not claim succe
  assert.equal(r.entries[0].ciState,'SOURCE_CI_UNVERIFIED');
  assert.equal(r.entries[0].sourceCI,undefined);
  assert.equal(r.canPublish,false);assert.equal(r.canExecute,false);
+});
+
+test('publication adapter verifies blob and uses exact fixed Issue endpoint payload',async()=>{
+ const v=publicationFixture(),writes=[];
+ const ports=createControllerPublicationPorts({getJson:async route=>{
+  assert.equal(route,'contents/'+v.path+'?ref=main');return v.record;
+ },postIssue:async body=>{writes.push(body);return {number:42}},store:{loadReceipt:()=>null,saveReceipt:()=>{}}});
+ assert.deepEqual(await ports.readManifest(v.target),v.bytes);
+ await assert.rejects(()=>ports.readManifest('../bad'),/SOURCE_INVALID/);
+ const body={title:'pc-controller-update',body:'fixture',labels:['pc-maintenance']};
+ assert.equal((await ports.createIssue({...body,repository_full_name:'ignored'})).number,42);
+ assert.deepEqual(writes,[body]);
+ v.record.sha='d'.repeat(40);await assert.rejects(()=>ports.readManifest(v.target),/SOURCE_UNVERIFIED/);
+});
+test('prior inventory adapter includes closed requests and reads all pages without search index',async()=>{
+ const v=publicationFixture(),calls=[];
+ const ports=createControllerPublicationPorts({getJson:async route=>{
+  calls.push(route);if(route.endsWith('page=1'))return Array.from({length:100},()=>({title:'other'}));
+  return [{number:42,title:'pc-controller-update',state:'closed',body:JSON.stringify({targetControllerSha:v.target})}];
+ },postIssue:()=>assert.fail('POST'),store:{}});
+ assert.equal((await ports.findPriorRequests(v.target))[0].number,42);assert.equal(calls.length,2);
+});
+test('publication without a matched source CI cannot call write ports',async()=>{
+ const v=publicationFixture();
+ const result=await publishExistingControllerApprovals(v.event,{getJson:v.getJson,ports:{
+  readRepository:()=>assert.fail('publisher called')},runId:123,attempt:1,emitReceipt:()=>assert.fail('receipt')});
+ assert.equal(result.state,'PUBLICATION_PROCESSED');assert.equal(result.results[0].status,'NOT_SUBMITTED');
+});
+test('non-main publication cannot call publisher even if caller supplies ports',async()=>{
+ const v=publicationFixture();v.event.ref='refs/heads/codex/test';
+ const result=await publishExistingControllerApprovals(v.event,{getJson:()=>assert.fail('read'),ports:{},
+  runId:123,attempt:1,emitReceipt:()=>assert.fail('receipt')});
+ assert.equal(result.state,'IGNORED');assert.deepEqual(result.results,[]);
 });
