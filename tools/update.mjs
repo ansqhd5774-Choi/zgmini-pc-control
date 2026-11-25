@@ -1635,8 +1635,8 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
        {maxPages:3}):null;
       const link=classifyMaintenancePostcheckLink({
        requestId:issue.requestId,issueNumber:postIssueNumber,
-       operation:manifest.postOperation,sourceSha:manifest.postSourceSha,
-       issue:liveIssue,runs,jobs});
+       operation:manifest.postOperation,sourceBranch:manifest.postSourceBranch,
+       sourceSha:manifest.postSourceSha,issue:liveIssue,runs,jobs});
       const liveLedger=json(ledgerFile);
       // Store a bounded, nonsecret observation only when the evidence moves.
       // A temporarily failed GitHub lookup must not erase earlier evidence.
