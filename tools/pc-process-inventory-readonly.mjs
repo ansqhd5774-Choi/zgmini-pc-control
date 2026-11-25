@@ -126,7 +126,7 @@ export function inspectR3RunnerWmiReadonly({
  if(result.error||result.status!==0||typeof result.stdout!=='string'||
     Buffer.byteLength(result.stdout)>65536)
   return unknown('STANDBY_WMI_PROBE_UNAVAILABLE');
- try{return classifyR3RunnerWmiRows(JSON.parse(result.stdout.replace(/^\\uFEFF/,'').trim()),
+ try{return classifyR3RunnerWmiRows(JSON.parse(result.stdout.replace(/^\uFEFF/,'').trim()),
     {controllerRoot});}
  catch{return unknown('STANDBY_WMI_RESULT_UNVERIFIED');}
 }
