@@ -120,13 +120,13 @@ test('R3 immutable target has installed parent, six exact bytes and full import 
 test('R3 operations overlay is only the minimal constant export, no R6/other behavior',()=>{
  const previous=gitBytes('show',installed+':controller/operations.mjs').toString('utf8');
  const next=gitBytes('show',target+':controller/operations.mjs').toString('utf8');
- const exact=\`// R3 engine optional Worker timeout stage names; preserve installed operation behavior.
+ const exact=`// R3 engine optional Worker timeout stage names; preserve installed operation behavior.
 export const CORE_STATUS_STAGES=Object.freeze([
  'CORE_STATUS_ENTERED','CORE_LOCK_READ','CORE_CHECKPOINT_CYCLE',
  'CORE_CHECKPOINT_COLLECTION','CORE_CHECKPOINT_WRITER','CORE_CONFIG',
  'CORE_TASK_HASHES','CORE_STATUS_DONE'
 ]);
-\`;
+`;
  assert.ok(next.includes(exact));
  assert.equal(next.replace(exact,''),previous);
 });
