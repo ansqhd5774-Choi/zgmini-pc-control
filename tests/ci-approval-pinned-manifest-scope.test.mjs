@@ -70,8 +70,9 @@ for(const [name,change,expected] of [
 test('selective config remains outside delegation pilot',()=>{const r=inspect(selectiveFixture({config:true}).v);assert.equal(r.state,'OUT_OF_SCOPE');assert.equal(r.canPublish,false);assert.equal(r.canExecute,false);});
 test('nonselective request rejects unexpected selective pin',()=>{const v=make('B_CONTROLLER_INSTALL');v.selectivePin=selectiveFixture().v.selectivePin;assert.equal(inspect(v).state,'REJECTED');});
 
-function treeFixture(){
+function treeFixture(postOperation='core-status'){
  const {v,s,source}=selectiveFixture(),m=JSON.parse(v.observation.bytes),file=Buffer.from('export const value=1;\n');
+ m.postOperation=postOperation;
  m.allowFiles[0].sha256=hash('sha256',file);m.checks.manifestSha256=manifestFingerprint(m.allowFiles).sha256;
  s.allowFiles=m.allowFiles;
  [v.pin,v.observation]=source(v.pin.path,m);v.request.approvalManifestSha256=v.pin.sha256;
@@ -92,10 +93,12 @@ function treeFixture(){
  const f={v,m,s,root,merge,rev,overlay,data,file,ports:{getJson:async p=>{if(!Object.hasOwn(data,p))throw Error('missing');return structuredClone(data[p]);},readFileBytes:async (r,sha,p)=>sha===merge&&p===v.pin.path?v.observation.bytes:sha===merge&&p===v.selectivePin.path?v.selectiveObservation.bytes:file}};
  return f;
 }
-for(const [name,edit,state] of [
+for(const [name,edit,state,postOperation] of [
  ['exact selective tree',()=>{},'SELECTIVE_TREE_MATCH_ONLY'],
- ['postcheck source missing in app repo',f=>{delete f.data['repos/ansqhd5774-Choi/zgmini/commits/'+f.m.postSourceSha]},'EVIDENCE_MISSING'],
- ['postcheck source wrong app SHA',f=>{f.data['repos/ansqhd5774-Choi/zgmini/commits/'+f.m.postSourceSha].sha='e'.repeat(40)},'REJECTED'],
+ ['fixed core-status does not need app commit',f=>{delete f.data['repos/ansqhd5774-Choi/zgmini/commits/'+f.m.postSourceSha]},'SELECTIVE_TREE_MATCH_ONLY'],
+ ['source-audit matching app SHA',()=>{},'SELECTIVE_TREE_MATCH_ONLY','source-audit'],
+ ['source-audit source missing in app repo',f=>{delete f.data['repos/ansqhd5774-Choi/zgmini/commits/'+f.m.postSourceSha]},'EVIDENCE_MISSING','source-audit'],
+ ['source-audit source wrong app SHA',f=>{f.data['repos/ansqhd5774-Choi/zgmini/commits/'+f.m.postSourceSha].sha='e'.repeat(40)},'REJECTED','source-audit'],
  ['wrong parent',f=>{f.data[f.root+'/git/commits/'+f.m.targetSha].parents.push({sha:f.rev})},'REJECTED'],
  ['extra diff path',f=>{f.overlay.files.push({filename:'docs/extra.md',status:'added'})},'REJECTED'],
  ['incomplete compare',f=>{f.overlay.total_commits=2},'EVIDENCE_MISSING'],
@@ -108,4 +111,4 @@ for(const [name,edit,state] of [
  ['source bytes mismatch',f=>{const read=f.ports.readFileBytes;f.ports.readFileBytes=async(r,s,p)=>s===f.m.selectiveSource.mainSha?Buffer.from('wrong'):read(r,s,p)},'REJECTED'],
  ['branch moves during read',f=>{const read=f.ports.getJson;let count=0;f.ports.getJson=async p=>{const v=await read(p);if(p===f.root+'/branches/main'&&++count===2)v.commit.sha='e'.repeat(40);return v}},'EVIDENCE_MISSING'],
  ['unknown request',f=>{f.v.requestState='UNKNOWN'},'WAIT_RESOURCE']
-])test('tree '+name,async()=>{const f=treeFixture();edit(f);const r=await inspectSelectiveTree(f.v,f.ports);assert.equal(r.state,state);assert.equal(r.canPublish,false);assert.equal(r.canExecute,false);});
+])test('tree '+name,async()=>{const f=treeFixture(postOperation);edit(f);const r=await inspectSelectiveTree(f.v,f.ports);assert.equal(r.state,state);assert.equal(r.canPublish,false);assert.equal(r.canExecute,false);});
