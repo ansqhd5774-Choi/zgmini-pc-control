@@ -7,7 +7,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {decideStandbyPromotion as decide,watchdogIdentityMatches,
  verifyStandbySource} from '../controller/standby.mjs';
 import {assertSupervisorOwner} from '../controller/common.mjs';
-import {provenOldRunnerExit} from '../tools/runner-watchdog.mjs';
+import {provenOldRunnerExit,classifyRunnerExecutableProof} from '../tools/runner-watchdog.mjs';
 
 const eligible=()=>({
  sourceVerified:true,watchdogBound:true,supervisorLeasePresent:false,
@@ -157,4 +157,47 @@ test('promoted Supervisor cannot leak Watchdog IPC nonce to Runner job environme
  assert.ok(authenticated>=0&&clearNonce>authenticated);
  assert.ok(clearPid>authenticated&&clearPid<importSupervisor);
  assert.ok(clearNonce<importSupervisor);
+});
+
+test('dead six cmd launchers do not prove that actual Runner.Listener stopped',()=>{
+ const root='E:\\ZGmini\\automation\\pc-control';
+ const canonicalize=p=>p;
+ const options={controllerRoot:root,canonicalize};
+ const old={pid:7240};
+ const children=Array.from({length:6},(_,i)=>({seat:i+1,pid:9400+i}));
+ const heartbeat={pid:7240,children};
+ assert.equal(provenOldRunnerExit({owner:old,heartbeat,pidAlive:()=>false}),true);
+ const oldListener=[{pid:19001,name:'Runner.Listener.exe',
+  executablePath:'E:\\ZGmini\\automation\\pc-control\\runners\\01\\bin\\Runner.Listener.exe'}];
+ assert.equal(classifyRunnerExecutableProof(oldListener,options),'ACTIVE_RUNNER_PROCESS');
+ assert.equal(classifyRunnerExecutableProof([],options),'NO_CONTROLLER_RUNNER_PROCESS');
+});
+test('WMI executable proof is scoped to approved Controller runners with alias resolution',()=>{
+ const root='E:\\ZGmini\\automation\\pc-control';
+ const options={controllerRoot:root,canonicalize:p=>
+  p.replace(/^C:\\Junction\\pc-control/i,root)};
+ assert.equal(classifyRunnerExecutableProof([{pid:199,name:'Runner.Listener.exe',
+  executablePath:'C:\\Junction\\pc-control\\runners\\06\\bin\\Runner.Listener.exe'}],options),
+  'ACTIVE_RUNNER_PROCESS');
+ assert.equal(classifyRunnerExecutableProof([{pid:299,name:'Runner.Worker.exe',
+  executablePath:'E:\\ZGmini\\automation\\pc-control\\runners\\03\\bin\\Runner.Worker.exe'}],options),
+  'ACTIVE_RUNNER_PROCESS');
+ assert.equal(classifyRunnerExecutableProof([{pid:900,name:'Runner.Listener.exe',
+  executablePath:'D:\\OtherApp\\runner\\bin\\Runner.Listener.exe'}],options),
+  'NO_CONTROLLER_RUNNER_PROCESS');
+});
+test('WMI source missing, inaccessible or untrusted process identity never certifies exit',()=>{
+ const options={controllerRoot:'E:\\ZGmini\\automation\\pc-control',canonicalize:p=>p};
+ for(const rows of [null,{},[{pid:1,name:'Runner.Listener.exe',executablePath:''}],
+  [{pid:0,name:'Runner.Listener.exe',executablePath:'C:\\other.exe'}],
+  [{pid:1,name:'not-a-runner.exe',executablePath:'C:\\other.exe'}],
+  Array.from({length:257},(_,i)=>({pid:i+1,name:'Runner.Listener.exe',
+   executablePath:'D:\\OtherApp\\runner\\bin\\Runner.Listener.exe'}))]){
+  assert.equal(classifyRunnerExecutableProof(rows,options),'UNVERIFIED');
+ }
+ assert.equal(classifyRunnerExecutableProof([{pid:1,name:'Runner.Listener.exe',
+  executablePath:'D:\\OtherApp\\runner\\bin\\Runner.Listener.exe'}],
+  {...options,canonicalize:()=>{throw Error('ACCESS_DENIED');}}),'UNVERIFIED');
+ const source=fs.readFileSync(new URL('../tools/runner-watchdog.mjs',import.meta.url),'utf8');
+ assert.match(source,/if\(standbyMode&&scanControllerRunnersReadOnly\(\)!=='NO_CONTROLLER_RUNNER_PROCESS'\)/);
 });
