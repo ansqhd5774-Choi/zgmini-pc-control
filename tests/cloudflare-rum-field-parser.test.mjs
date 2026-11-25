@@ -25,6 +25,7 @@ test('static query is host-scoped, account-scoped, bounded, and not executable i
  assert.doesNotMatch(GRAPHQL_QUERY,/\$account: String!/);
  assert.match(GRAPHQL_QUERY,/rumWebVitalsEventsAdaptiveGroups/);
  assert.match(GRAPHQL_QUERY,/largestContentfulPaintP75/);
+ assert.match(GRAPHQL_QUERY,/sum \\{lcpTotal inpTotal clsTotal\\}/);
  assert.doesNotMatch(GRAPHQL_QUERY,/mutation|subscription/i);
 });
 test('invalid account, windows, dates and future horizon are rejected',()=>{
@@ -195,6 +196,46 @@ test('missing metric origin stays distinct from real zero without claiming a cau
  assert.equal(x.metricSampleSizesVerified,false);
 });
 
+test('Cloudflare metric totals distinguish no INP observations from page view count',()=>{
+ const data=all().map(r=>({...r,sum:{lcpTotal:2,inpTotal:1,clsTotal:2}}));
+ data[2]={...data[2],count:2,
+  quantiles:{largestContentfulPaintP75:712000,
+   interactionToNextPaintP75:-1,cumulativeLayoutShiftP75:0.002},
+  sum:{lcpTotal:2,inpTotal:0,clsTotal:2}};
+ const x=parse(from(data));
+ const mobile=x.observations.find(o=>
+  o.route==='/economic-indicators/'&&o.device==='mobile');
+ assert.equal(mobile.groupEventCount,2);
+ assert.deepEqual(mobile.metricReportedTotals,{lcpMs:2,inpMs:0,cls:2});
+ assert.equal(mobile.metrics.inpMs.p75,null);
+ assert.equal(mobile.metrics.inpMs.missingKind,'PROVIDER_NEGATIVE');
+ assert.equal(mobile.metricSpecificSampleCounts,'UNAVAILABLE');
+ assert.equal(x.metricSampleSizesVerified,false);
+ assert.equal(x.siteGoodCertified,false);
+ assert.equal(x.fieldP75ValuesPresent,false);
+ assert.equal(x.observations[0].metricReportedTotals.inpMs,1);
+});
+test('provider metric totals never turn negative P75 into Good or certified samples',()=>{
+ const withTotal={...row(),quantiles:{
+  largestContentfulPaintP75:1500000,interactionToNextPaintP75:-1,
+  cumulativeLayoutShiftP75:0.01},sum:{lcpTotal:30,inpTotal:5,clsTotal:30}};
+ const observed=parse(from([withTotal]));
+ assert.equal(observed.observations[0].metricReportedTotals.inpMs,5);
+ assert.equal(observed.observations[0].metrics.inpMs.p75,null);
+ assert.equal(observed.observations[0].metrics.inpMs.missingKind,
+  'PROVIDER_NEGATIVE');
+ assert.equal(observed.siteGoodCertified,false);
+ assert.equal(observed.metricSampleSizesVerified,false);
+ for(const sum of [{lcpTotal:1,inpTotal:-1,clsTotal:2},
+  {lcpTotal:1,inpTotal:'2',clsTotal:2},
+  {lcpTotal:1,clsTotal:2},{lcpTotal:NaN,inpTotal:2,clsTotal:2}]){
+  assert.throws(()=>parse(from([{...row(),sum}])),
+   /CF_RUM_METRIC_TOTALS_INVALID/);
+ }
+ const legacy=parse(from([row()]));
+ assert.equal(legacy.observations[0].metricReportedTotals,'UNAVAILABLE');
+ assert.equal(legacy.siteGoodCertified,false);
+});
 test('normal four-group response has zero non-target device groups',()=>{
  const out=parse(from(all()));
  assert.deepEqual(out.nonTargetDeviceGroups,{tablet:0,unrecognized:0});
