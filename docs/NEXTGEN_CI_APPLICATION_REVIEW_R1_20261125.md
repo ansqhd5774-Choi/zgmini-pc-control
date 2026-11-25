@@ -1,6 +1,51 @@
 
 # ZGMINI 차세대 CI 및 GitHub Actions 40종 도입 검토 R1
 
+<!-- ZGMINI_CI_R1_8_R2_12_HISTORY_CORRECTION_20261125 -->
+## 0. CI 도입 계보 정본 — 최초 R1 8개 영역 → 후속 R2 12종 기술 (2026-11-25 정정)
+
+**사용자 확정 분류:** ① **R1 최초 CI 8개 검사 영역 구축** → ② **R2 차세대 CI 12종 추가 도입 진행**. 이 두 단계를 분리해 누적 이력을 설명한다. 이 문서의 아래 **40종 후보 표는 기술 조사·평가의 R1 시점 상태표**이며 최초 CI 8개 영역 구축 원장 자체가 아니다. R1 후보 표의 `IMPLEMENTED=7종`은 당시 이미 적용된 기술의 스냅샷이지, R1에서 신규 도입한 CI의 건수나 R2 신규 도입 건수가 **아니다**. 따라서 **R1 신규 도입 0건** 또는 **최근 신규 도입 7건**이라는 보고는 잘못된 분류로 폐기한다.
+
+### A. 최초 구축 R1 — CI 8개 검사 영역 (원래 설치·구현·검증 이력 보존)
+
+| 최초 R1 영역 | 웹 본체 `zgmini` | PC 제어 `zgmini-pc-control` |
+|---|---|---|
+| 1. Lint | 변경 소스 ESLint IMPLEMENTED | 변경 소스 Oxlint IMPLEMENTED |
+| 2. Type Check | TypeScript `tsc --noEmit` IMPLEMENTED | TS 소스/빌드 체계 부재에 따라 NOT_APPLICABLE |
+| 3. Build | `npm ci`·웹 Build·자산 증거 IMPLEMENTED | 웹 빌드/lockfile 부재에 따라 NOT_APPLICABLE (배포 소스는 SHA/manifest/CAS별 계약 검사) |
+| 4. Unit | Node 테스트 IMPLEMENTED | C996 변경 소스 Node 테스트 IMPLEMENTED |
+| 5. Integration | 격리 계약 IMPLEMENTED | Controller/Writer 격리 계약 IMPLEMENTED |
+| 6. E2E | 지정 Chromium/Playwright 브라우저 경로 IMPLEMENTED | 합성 요청→Controller/Writer→정확 JSON/TXT 영수증의 대표 격리 E2E IMPLEMENTED |
+| 7. Security | CodeQL·npm audit IMPLEMENTED | 변경 Workflow Zizmor IMPLEMENTED |
+| 8. Secret | Gitleaks IMPLEMENTED | Gitleaks IMPLEMENTED |
+
+**R1 구축 기록과 병합 원본:** PC [#3384 Gitleaks](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3384), [#3396 Oxlint](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3396), [#3400 Zizmor](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3400), [#3445 8영역 표준 및 회귀](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3445), [#3448 대표 격리 E2E](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3448), 웹 [#1566 Playwright 트리거 보완](https://github.com/ansqhd5774-Choi/zgmini/pull/1566). 이 변경은 전부 해당 PR 병합 및 정확 HEAD 관련 CI PASS로 확인. 두 저장소의 [웹 CI 8영역 정본](https://github.com/ansqhd5774-Choi/zgmini/blob/main/docs/CI_EIGHT_AREA_STANDARD_R1.md) 및 [PC CI 8영역 정본](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/docs/CI_EIGHT_AREA_STANDARD_R1.md)을 기준으로 삼는다.
+
+**집계 의미:** 최초 **8개는 검사 '영역'**이고 8개 모두가 새로운 Workflow 8개 또는 외부 도구 8개라는 뜻이 아니다. 웹은 범위 내 8/8 IMPLEMENTED, PC는 6 IMPLEMENTED + 2 근거 있는 NOT_APPLICABLE이다. 격리 Integration/E2E 성공을 운영 데이터·배포 성공으로 혼동하지 않는다.
+
+### B. 후속 고도화 R2 — 차세대 CI 12종 도입 진행
+
+| R2 기술 번호·영역 | 구현·검증 상태 | 정규 병합 PR |
+|---|---|---|
+| #1 Dynamic CI | 지정 범위 DONE | [웹 #1584](https://github.com/ansqhd5774-Choi/zgmini/pull/1584) |
+| #6 Architecture Testing | 지정 범위 DONE | [웹 #1595](https://github.com/ansqhd5774-Choi/zgmini/pull/1595) |
+| #8 Performance Budget / 웹 Good | PARTIAL: 로컬 Good 기준·계측·비교 소스 병합, 실사용자 P75/INP·Production Good 미확인, 새 전역 차단 Gate 없음 | [웹 #1602](https://github.com/ansqhd5774-Choi/zgmini/pull/1602), [#1603](https://github.com/ansqhd5774-Choi/zgmini/pull/1603) |
+| #12 Workflow Governance | 지정 범위 DONE | [웹 #1581](https://github.com/ansqhd5774-Choi/zgmini/pull/1581), [#1583](https://github.com/ansqhd5774-Choi/zgmini/pull/1583) |
+| #15 Supply Chain Security | 지정 범위 DONE, 로컬 lockfile 계약 중심 | [웹 #1596](https://github.com/ansqhd5774-Choi/zgmini/pull/1596) |
+| #19 CI Observability | 지정 범위 DONE, 읽기 전용 Job 메트릭 CLI; 자동 예약 아님 | [PC #3483](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3483) |
+| #20 Data CI | 지정 범위 DONE, 합성 데이터 계약; 운영 D1 readback 보증 아님 | [웹 #1600](https://github.com/ansqhd5774-Choi/zgmini/pull/1600) |
+| #23 Cross-browser CI | 지정 범위 DONE, Firefox/WebKit 격리 8조합 | [웹 #1594](https://github.com/ansqhd5774-Choi/zgmini/pull/1594) |
+| #24 Performance CI | 지정 범위 DONE, 로컬 Chromium Lab | [웹 #1593](https://github.com/ansqhd5774-Choi/zgmini/pull/1593) |
+| #25 Accessibility CI | 지정 범위 DONE, 지정 axe-core 검사 | [웹 #1592](https://github.com/ansqhd5774-Choi/zgmini/pull/1592) |
+| #29 Bundle Size CI | 지정 범위 DONE, 빌드 자산 측정/아티팩트 | [웹 #1585](https://github.com/ansqhd5774-Choi/zgmini/pull/1585) |
+| #36 Continuous Benchmarking | 지정 범위 DONE, 기존 Actions 메타데이터 관측 | [웹 #1601](https://github.com/ansqhd5774-Choi/zgmini/pull/1601) |
+
+**R2 이력 판정:** 12종 중 **11종은 지정된 소스 구현·정확 HEAD CI 성공·main 병합 완료**; **#8은 일부 구현·CI 연결 완료이나 운영 실사용자 성능 및 전체 Budget 판정은 미완료**. 엄격한 구현 완료 진행률은 **11/12 = 91.7%**, 부분 포함 소스 연결은 12종에 달한다. 12종을 전부 운영 완료, 실사용자 성능 합격 또는 자동 PR 차단 적용으로 보고하지 않는다.
+
+**계보 집계 규칙:** **R1 최초 8개 '영역' + R2 추가 12종 '기술'**은 서로 다른 단위이므로 산술적으로 20개 신규 Workflow나 20개 외부 제품 도입으로 환산하지 않는다. R1 최초 구성과 R2 후속 개선의 성공 근거는 각 PR/정확 SHA 및 아래 후속 실행 원장에서 각각 추적한다. 이 정정은 기존 유효 성공 기록·실제 운영 승인/설치/원장에 변경을 주지 않는다.
+
+---
+
 기준일: 2026-11-25 (Asia/Seoul). 담당: 자동화 프로세스 전문가.
 저장소: `ansqhd5774-Choi/zgmini`, `ansqhd5774-Choi/zgmini-pc-control`.
 검토 기준 source: 본체 `main@30f4ff22255f5b91f21424c6a5a6471356579728`, PC 제어 `main@41f38edfd7cc568632ec2641c85e709d1564cd8e`. 런이 갱신되면 별도 기준시각 적용.
