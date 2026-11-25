@@ -75,7 +75,7 @@ test('incomplete GitHub Job inventory is rejected rather than undercounted',asyn
   if(path.startsWith('actions/workflows/'))return namedRuns([run(123,'success')]);
   return {total_count:1,jobs:[]};
  }}),/CI_METRICS_JOB_INVENTORY_INCOMPLETE/);
- assert.equal(calls.length,2);
+ assert.equal(calls.length,3);
 });
 
 test('invalid Run timestamps, negative durations and missing times fail closed',()=>{
