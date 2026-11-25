@@ -6,6 +6,7 @@ import {readFileSync} from 'node:fs';
 import os from 'node:os';
 import {pathToFileURL} from 'node:url';
 import {resolveControllerApprovalCI,createCiEffectReceiptStore,submitExistingControllerApprovalFromCi} from '../tools/maintenance-request.mjs';
+import {manifestFingerprint} from '../tools/maintenance-contract.mjs';
 
 const repo='ansqhd5774-Choi/zgmini-pc-control';
 const repositoryId=1442936296;
@@ -95,7 +96,65 @@ export async function observePublishedControllerApprovals(event,{getJson}={}){
 // The production workflow must pin this code and separately configure its
 // durable receipt root and the installed receiver policy. No candidate code,
 // arbitrary request input, new business approval, or PC-side write here.
-export function createControllerPublicationPorts({getJson,postIssue,store}){
+// Read the original, independently configured delegation pin. This configuration
+// is never obtained from the candidate PR, manifest, event payload or Issue.
+// The existing delegation validator still authenticates the direct owner and
+// exact grant bytes; this adapter is not an approval issuer.
+export function createAutoApprovalContextReader({policy,getJson,readJobLogs}={}){
+ const validDigest=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
+ const root='repos/'+repo+'/';
+ const config=structuredClone(policy);
+ if(!config||!sha(config.targetSha)||!id(config.approvalPrNumber)||!id(config.sourcePrNumber)||
+    config.approvalPrNumber===config.sourcePrNumber||!sha(config.sourceWorkflowBlobSha)||
+    !validDigest(config.businessApprovalSha256)||!sha(config.policyRevision)||
+    !id(config.delegationPin?.issueNumber)||!id(config.delegationPin?.commentId)||
+    !validDigest(config.delegationPin?.bodySha256)||
+    typeof config.sourceBranch!=='string'||!/^codex\/[a-z0-9][a-z0-9-]{3,94}$/.test(config.sourceBranch)||
+    typeof getJson!=='function'||typeof readJobLogs!=='function')
+  throw Error('CI_PUBLICATION_AUTO_POLICY_UNVERIFIED');
+ const readFileBytes=async(repository,revision,path)=>{
+  if(repository!==repo||!(revision==='main'||sha(revision))||typeof path!=='string'||
+     !(/^(?:controller\/[a-z][a-z0-9-]*\.mjs|approvals\/(?:controller-updates|controller-selective-targets)\/[a-f0-9]{40}\.json|\.github\/workflows\/controller-maintenance-source-tests\.yml)$/.test(path)))
+   throw Error('CI_PUBLICATION_SOURCE_INVALID');
+  const f=await getJson('contents/'+path+'?ref='+revision);
+  if(f?.type!=='file'||f.path!==path||f.encoding!=='base64'||typeof f.content!=='string'||
+     f.content.length>3000000||!sha(f.sha))throw Error('CI_PUBLICATION_SOURCE_UNVERIFIED');
+  const bytes=Buffer.from(f.content,'base64');
+  if(!bytes.length||bytes.length>2*1024*1024||
+     createHash('sha1').update(Buffer.from('blob '+bytes.length+'\0')).update(bytes).digest('hex')!==f.sha)
+   throw Error('CI_PUBLICATION_SOURCE_UNVERIFIED');
+  return bytes;
+ };
+ return async(targetSha,approvalPrNumber)=>{
+  if(targetSha!==config.targetSha||approvalPrNumber!==config.approvalPrNumber)
+   throw Error('CI_PUBLICATION_AUTO_POLICY_SCOPE_MISMATCH');
+  const pr=await getJson('pulls/'+approvalPrNumber);
+  if(pr?.number!==approvalPrNumber||pr.base?.ref!=='main'||pr.base?.repo?.full_name!==repo||
+     pr.head?.repo?.full_name!==repo||!sha(pr.head?.sha))throw Error('CI_PUBLICATION_PR_INVALID');
+  const bytes=await readFileBytes(repo,pr.head.sha,'approvals/controller-updates/'+targetSha+'.json');
+  const m=JSON.parse(bytes.toString('utf8'));
+  if(m.targetSha!==targetSha||m.purpose!=='pc-controller-maintenance'||
+     m.selectiveSource?.branch!==config.sourceBranch||!sha(m.installedSha))
+   throw Error('CI_PUBLICATION_AUTO_POLICY_SCOPE_MISMATCH');
+  const fp=manifestFingerprint(m.allowFiles);
+  const delegation={pin:structuredClone(config.delegationPin),baseSha:m.installedSha,
+   scope:{effect:'B_CONTROLLER_INSTALL',businessApprovalSha256:config.businessApprovalSha256,
+    policyRevision:config.policyRevision,sourceRepository:repo,sourceBranch:config.sourceBranch,
+    purpose:m.purpose,changedPaths:fp.files.map(f=>f.path),targetSha,scopeDigest:fp.sha256,
+    // This flag is supplied by the independently configured business scope,
+    // not inferred from the path names or candidate-provided evidence.
+    authorityChangesExcluded:config.authorityChangesExcluded===true}};
+  return {policy:structuredClone(config),delegation,readFileBytes,readJobLogs,
+   getJson:route=>{
+    if(route==='repos/'+repo)return getJson('');
+    if(typeof route!=='string'||!route.startsWith(root)||route.includes('..')||
+       !/^(?:issues\/\d+|issues\/comments\/\d+|branches\/(?:main|codex%2F[a-z0-9-]+)|compare\/[a-f0-9]{40}\.\.\.[a-f0-9]{40}|git\/commits\/[a-f0-9]{40}|pulls\/\d+|actions\/runs\/\d+(?:\/attempts\/\d+\/jobs\?per_page=100)?|actions\/workflows\/416355595\/runs\?head_sha=[a-f0-9]{40}&event=pull_request&status=success&per_page=100)$/.test(route.slice(root.length)))
+     throw Error('CI_PUBLICATION_SOURCE_INVALID');
+    return getJson(route.slice(root.length));
+   }};
+ };
+}
+export function createControllerPublicationPorts({getJson,postIssue,store,autoApprovalPolicy,readJobLogs}){
  const readBytes=async(target,revision)=>{
   if(!sha(target)||!(revision==='main'||sha(revision)))throw Error('CI_PUBLICATION_SOURCE_INVALID');
   const path='approvals/controller-updates/'+target+'.json';
@@ -131,6 +190,7 @@ export function createControllerPublicationPorts({getJson,postIssue,store}){
   },
   createIssue:expected=>postIssue({title:expected.title,body:expected.body,labels:expected.labels}),
   loadReceipt:store.loadReceipt,saveReceipt:store.saveReceipt,
+  ...(autoApprovalPolicy?{readAutoApprovalContext:createAutoApprovalContextReader({policy:autoApprovalPolicy,getJson,readJobLogs})}:{}),
  };
 }
 export async function publishExistingControllerApprovals(event,{getJson,ports,runId,attempt,emitReceipt}={}){
