@@ -173,3 +173,41 @@ test('approval drift during CI handoff stops regular submission',async()=>{
  await assert.rejects(()=>submitCiPreparedMaintenanceIssue(f.expected,p),/MANIFEST_PIN_MISMATCH/);
  assert.equal(f.posts,0);assert.equal(f.saved,null);
 });
+
+test('CI CLI calls the existing owner submitter using the exact original receipt',async t=>{
+ const f=setup(),p=ciPorts(f);
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-ci-submit-test-'));
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const prepared=path.join(dir,'prepared.json'),receipt=path.join(dir,'receipt.json');
+ fs.writeFileSync(prepared,JSON.stringify(f.expected));
+ const repo='repos/ansqhd5774-Choi/zgmini-pc-control';
+ let posts=0;
+ const githubApi=(route,options)=>{
+  if(route==='user')return {login:OWNER};
+  if(route===repo)return {private:true};
+  if(route===repo+'/pulls/28')return p.pr;
+  if(route===repo+'/actions/runs/123')return p.run;
+  if(route.startsWith(repo+'/contents/approvals/controller-updates/'))return {encoding:'base64',content:manifest().toString('base64')};
+  if(route===repo+'/issues'&&options?.body){
+   posts++;assert.equal(JSON.parse(fs.readFileSync(receipt,'utf8')).phase,'CREATING');
+   assert.deepEqual(options.body,{title:f.expected.title,labels:f.expected.labels,body:f.expected.body});
+   return {number:42};
+  }
+  if(route===repo+'/issues/42')return f.actual;
+  throw Error('unexpected API route');
+ };
+ const argv=['submit-ci-prepared','--prepared-file',prepared,'--installed-sha',OLD,'--receipt-file',receipt,'--run-id','123'];
+ const result=await main(argv,{githubApi});
+ assert.equal(result.status,'REQUEST_READBACK_VERIFIED');
+ assert.equal(posts,1);
+ assert.equal(JSON.parse(fs.readFileSync(receipt,'utf8')).expected.body,f.expected.body);
+ await assert.rejects(()=>main(argv,{githubApi}),/RECEIPT_EXISTS_USE_RECONCILE/);
+ assert.equal(posts,1);
+});
+test('CI CLI rejects absent, malformed and oversized run id before IO',async()=>{
+ const args=['submit-ci-prepared','--prepared-file','missing','--installed-sha',OLD,'--receipt-file','missing'];
+ const githubApi=()=>{throw Error('unexpected API call')};
+ for(const suffix of [[],['--run-id','1;bad'],['--run-id','9007199254740992']]){
+  await assert.rejects(()=>main([...args,...suffix],{githubApi}),/MAINTENANCE_REQUEST_USAGE/);
+ }
+});
