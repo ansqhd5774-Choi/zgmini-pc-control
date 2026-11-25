@@ -1635,13 +1635,19 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
      let confirmed=null;
      try{
       const liveIssue=github('issues/'+postIssueNumber);
+      // Same 15-minute event window as the existing proven-failure
+      // predicate. Avoid an open-ended scan of unrelated future runs.
+      const openedAt=Date.parse(liveIssue.created_at??'');
+      need(Number.isFinite(openedAt),'POSTCHECK_ISSUE_TIME_UNVERIFIED');
+      const untilAt=openedAt+900000;
+      const window=`${new Date(openedAt).toISOString()}..${new Date(untilAt).toISOString()}`;
       const runs=readAllMaintenancePages(page=>github(
-       `actions/workflows/pc-job.yml/runs?event=issues&created=${encodeURIComponent('>='+liveIssue.created_at)}&per_page=100&page=${page}`).workflow_runs,
+       `actions/workflows/pc-job.yml/runs?event=issues&created=${encodeURIComponent(window)}&per_page=100&page=${page}`).workflow_runs,
        {maxPages:3});
       const expectedTitle=`PC Update ${issue.requestId} postcheck`;
       const linkedRuns=runs.filter(r=>r.event==='issues'&&r.display_title===expectedTitle&&
        Number.isFinite(Date.parse(r.created_at))&&
-       Date.parse(r.created_at)>=Date.parse(liveIssue.created_at));
+       Date.parse(r.created_at)>=openedAt&&Date.parse(r.created_at)<=untilAt);
       const selected=linkedRuns.length===1?linkedRuns[0]:null;
       const jobs=selected?readAllMaintenancePages(page=>github(
        `actions/runs/${selected.id}/jobs?per_page=100&page=${page}`).jobs,
