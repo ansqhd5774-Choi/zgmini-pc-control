@@ -96,22 +96,26 @@ function readDays(input){
 function readSymbols(input){
  const rows={};
  for(const symbol of SYMBOLS){
-  const validFolders=[],invalidFolders=[];
+  const validFolders=[],emptyFolders=[],invalidFolders=[];
   for(const folder of FOLDERS){
    const dir=path.join(input,folder);
    if(!safeFolder(dir))continue;
    const item=safeRead(path.join(dir,symbol+'.json'),input);
    if(item.state==='MISSING')continue;
    const v=item.body;
+   // The approved /v1/earnings parser accepts an empty result array.
+   // An empty saved response proves a file exists, not an actual event.
    if(item.state==='READ'&&validTime(v?.storedAt)&&Array.isArray(v?.body)&&
-     v.body.length>0&&v.body.length<=1000&&
-     v.body.every(x=>x?.symbol===symbol&&validDate(x.date)))
+     v.body.length<=1000&&
+     v.body.every(x=>x?.symbol===symbol&&validDate(x.date))){
      validFolders.push(folder);
-   else invalidFolders.push(folder);
+     if(v.body.length===0)emptyFolders.push(folder);
+   }else invalidFolders.push(folder);
   }
   rows[symbol]={state:invalidFolders.length?'INVALID_ARCHIVE':
-   validFolders.length?'SHAPE_VALID':'NOT_FOUND_IN_FIXED_FOLDERS',
-   validFolders,invalidFolders};
+   validFolders.length===0?'NOT_FOUND_IN_FIXED_FOLDERS':
+   validFolders.length===emptyFolders.length?'SHAPE_VALID_EMPTY':'SHAPE_VALID',
+   validFolders,emptyFolders,invalidFolders};
  }
  return rows;
 }

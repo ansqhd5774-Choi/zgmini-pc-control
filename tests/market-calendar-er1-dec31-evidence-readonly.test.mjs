@@ -136,3 +136,38 @@ test('existing registered Writer A result includes bounded December metadata',()
   assert.equal(r.er1DecemberInput.sourceEligibilityVerified,false);
  }finally{f.close();}
 });
+
+
+test('vendor-valid empty symbol arrays are preserved as no-row snapshots, not invalid',()=>{
+ const f=fixture();try{
+  symbol(f,'dec31-symbol-batch-a','TOL',[]);
+  symbol(f,'nov30-er1-probe','CASY',[]);
+  let r=inspectER1DecemberSavedEvidence(f.root,{now:clock});
+  assert.equal(r.symbols.TOL.state,'SHAPE_VALID_EMPTY');
+  assert.deepEqual(r.symbols.TOL.validFolders,['dec31-symbol-batch-a']);
+  assert.deepEqual(r.symbols.TOL.emptyFolders,['dec31-symbol-batch-a']);
+  assert.equal(r.symbols.CASY.state,'SHAPE_VALID_EMPTY');
+  assert.deepEqual(r.symbols.CASY.emptyFolders,['nov30-er1-probe']);
+  assert.equal(r.actualValuesVerified,false);
+  // A separate saved nonempty history must not be erased by an empty cache.
+  symbol(f,'nov30-er1-full','TOL',[{symbol:'TOL',date:'2026-09-01'}]);
+  r=inspectER1DecemberSavedEvidence(f.root,{now:clock});
+  assert.equal(r.symbols.TOL.state,'SHAPE_VALID');
+  assert.deepEqual(r.symbols.TOL.emptyFolders,['dec31-symbol-batch-a']);
+  assert.deepEqual(r.symbols.TOL.validFolders,
+   ['dec31-symbol-batch-a','nov30-er1-full']);
+ }finally{f.close();}
+});
+
+test('empty array is distinct from invalid symbol/date and missing file',()=>{
+ const f=fixture();try{
+  symbol(f,'dec31-symbol-batch-a','TOL',[]);
+  symbol(f,'nov30-er1-full','TOL',[{symbol:'CASY',date:'2026-09-01'}]);
+  const r=inspectER1DecemberSavedEvidence(f.root,{now:clock});
+  assert.equal(r.symbols.TOL.state,'INVALID_ARCHIVE');
+  assert.deepEqual(r.symbols.TOL.emptyFolders,['dec31-symbol-batch-a']);
+  assert.deepEqual(r.symbols.TOL.invalidFolders,['nov30-er1-full']);
+  assert.equal(r.symbols.CASY.state,'NOT_FOUND_IN_FIXED_FOLDERS');
+  assert.deepEqual(r.symbols.CASY.emptyFolders,[]);
+ }finally{f.close();}
+});
