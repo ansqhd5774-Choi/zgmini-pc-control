@@ -15,6 +15,10 @@ on:
       - 'tests/ci-approval-delegation-evidence-reader.test.mjs'
       - 'tests/ci-approval-controller-candidate-review.test.mjs'
       - 'tests/ci-approval-writer-candidate-review.test.mjs'
+      - 'tools/writer-request.mjs'
+      - 'tests/writer-request.test.mjs'
+      - 'writer-b/contract.mjs'
+      - 'writer-b/contract.test.mjs'
       - 'controller/common.mjs'
       - 'controller/entry.mjs'
       - 'controller/upload.mjs'
@@ -288,6 +292,9 @@ jobs:
       - name: Verify Writer candidate review and independent source CI evidence
         if: hashFiles('ci-approval/writer-candidate-review.mjs', 'tests/ci-approval-writer-candidate-review.test.mjs') != ''
         run: node --test --test-concurrency=1 tests/ci-approval-writer-candidate-review.test.mjs
+      - name: Verify Writer owner submission contract without operational requests
+        if: hashFiles('tools/writer-request.mjs', 'tests/writer-request.test.mjs') != ''
+        run: node --test --test-concurrency=1 tests/writer-request.test.mjs writer-b/contract.test.mjs
       - name: Verify W05 independent operator receipt without operational access
         # Historical PR integration trees can predate this W05 fixture.
         # Test it whenever it is present; do not fail unrelated older heads.

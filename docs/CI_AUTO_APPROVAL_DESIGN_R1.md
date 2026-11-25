@@ -120,3 +120,7 @@ A는 기존 정규 접수/판정에 필요한 확인만 재사용한다. B는 �
 - 89934759816e48b9f4ded66d4af7fcfa3896bc15 Controller job 139167908223의 Writer 후보 검증 단계 16 SUCCESS 관측. 전체 CI 종료는 별도 확인한다.
 - 기존 tools/maintenance-request.mjs에 opt-in submit-prepared 경로 및 submitPreparedMaintenanceIssue를 추가한다. 기존 정확 requestId/제목/라벨/본문을 변경하지 않고 Owner 인증·비공개 저장소·main 승인 manifest raw bytes·실제 설치 SHA를 기존 validateUpdateRequest로 재검증한 뒤 기존 submitMaintenanceIssue의 영수증/단회 POST/readback을 사용한다. 후보 wrapper나 모의 판정 자체는 허용하지 않는다. 실패/응답 불명은 기존 동일 receipt reconcile, 새 POST 금지. 기존 prepare/submit/reconcile/verify 및 운영 실행기는 유지한다.
 - 기존 maintenance-request 회귀시험에 6건 추가. 실제 네트워크 제출·운영 설치·권한 변경 없이 fixture로 검증한다. 기존 승인 원본이 main에 존재하는 Controller B 요청에만 해당한다. 신규 자동 승인 발행 권한이나 무인 CI Owner 인증은 생성하지 않는다. 기존 CI 결과 보존을 위해 준비 브랜치에서 검증 대기. 사용 가능한 CLI 경로와 실제 자동 실행 활성화를 구분한다.
+
+### 2026-11-25 후속 — Writer 정규 소유자 제출 연결
+- 8993475의 CI 3종 SUCCESS(45603404536/45603404651/45603404701), 172건 PASS. Controller 제출기 2abe746을 기존 PR #3545에 통합했다.
+- tools/writer-request.mjs: 이미 승인된 main 원본과 정확 requestId/본문을 사용하는 opt-in submit-prepared 및 reconcile. 기존 Writer 수신기에서 순수 요청/manifest/라벨 검증만 분리하여 동일 계약 재사용. 실제 opened event/owner 인증 및 process-local seal은 수신기에서만 생성한다. 소유자 인증, 비공개 repo, raw hash, PC HEAD/config 대조, requestId 고정 receipt 및 단회 POST/readback을 적용한다. 무인 승인 발행이나 CI의 소유자 권한은 부여하지 않는다. 8건 신규 시험 및 기존 Writer 계약 시험 연결. 실제 제출/설치 없음. 운영자 receipt-directory는 고정된 기존 신뢰 실행 주체에서 관리해야 하며 다른 디렉터리 사용에 의한 중복 제출은 별도 원장 검증이 필요하다. 새 CI 결과 확인 전 준비 브랜치에 보존한다.
