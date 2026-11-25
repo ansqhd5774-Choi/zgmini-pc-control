@@ -41,3 +41,35 @@ export function prepareScopedRequestPreview(input){
    bodySha256:digest(body),preview});
  }catch{return out('INVALID','PREVIEW_INPUT_INVALID')}
 }
+
+// Convert a preallocated request identity into the existing exact envelope.
+// The identity must come from the existing durable request/claim, not the CI
+// run number or a newly generated UUID on each retry. This is preparation only;
+// the trusted submitter still owns authority, live CAS and the one-shot ledger.
+export function prepareExistingApprovalRequest(input){
+ try{
+  if(!input||Object.hasOwn(input,'request'))return out('INVALID','AMBIGUOUS_REQUEST_IDENTITY');
+  const {requestIdentity,...scope}=input;
+  if(!requestIdentity||Object.keys(requestIdentity).length!==2||
+     !Object.hasOwn(requestIdentity,'requestId')||!Object.hasOwn(requestIdentity,'chatId'))
+   return out('EVIDENCE_MISSING','EXISTING_REQUEST_IDENTITY_REQUIRED');
+  if(!['B_CONTROLLER_INSTALL','B_WRITER_SOURCE'].includes(scope.effect))
+   return out('OUT_OF_SCOPE','EFFECT_NOT_IN_PILOT');
+  if(scope.requestState==='CONSUMED'||scope.requestState==='UNKNOWN')
+   return out('WAIT_RESOURCE','RECONCILE_EXISTING_REQUEST');
+  if(!Buffer.isBuffer(scope.observation?.bytes)||!scope.pin)
+   return out('EVIDENCE_MISSING','SOURCE_BYTES_REQUIRED');
+  const {requestId,chatId}=requestIdentity;
+  const writer=scope.effect==='B_WRITER_SOURCE';
+  const request=writer?{
+   schema:'ZGMINI_PC_WRITER_SOURCE_B_REQUEST_V1',requestId,chatId,
+   operation:'pc-writer-source-install',controlRepository:repo,
+   approvalManifestPath:scope.pin.path,approvalManifestSha256:scope.pin.sha256
+  }:{
+   schema:'ZGMINI_PC_MAINTENANCE_REQUEST_V1',requestId,chatId,
+   operation:'controller-update',controlRepository:repo,
+   targetControllerSha:scope.targetSha,approvalManifestSha256:scope.pin.sha256
+  };
+  return prepareScopedRequestPreview({...scope,request});
+ }catch{return out('INVALID','EXISTING_APPROVAL_REQUEST_INVALID')}
+}
