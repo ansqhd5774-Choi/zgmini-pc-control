@@ -289,11 +289,57 @@ test('CI publisher creates exact existing B request once and records request-bou
  assert.equal(retry.code,'MAINTENANCE_CI_EXISTING_RECEIPT_NO_REPOST');assert.equal(f.posts,1);
  assert.equal(retry.effectKey,result.effectKey);assert.equal(retry.receiptMarker,undefined);
 });
-test('existing manual request is reused without issuing a CI receipt',async()=>{
+test('existing manual request with matching manifest is reused without issuing a CI receipt',async()=>{
  const f=workloadPublisherFixture();
- f.prior=[{number:123,state:'closed',user:f.owner,title:'pc-controller-update',body:JSON.stringify({targetControllerSha:NEXT})}];
+ const original=prepareMaintenanceIssue(f.bytes,{installedSha:OLD,chatId:'chat-ci-123-1'});
+ f.prior=[{number:123,state:'closed',user:f.owner,title:'pc-controller-update',
+  body:original.body,labels:[{name:'pc-maintenance'}]}];
  const result=await submitExistingControllerApprovalFromCi(f.input,f.ports);
  assert.equal(result.status,'EXISTING_REQUEST_REUSED');assert.deepEqual(result.issueNumbers,[123]);assert.equal(f.posts,0);
+});
+test('CI reuse accepts legacy pc-UUID using the established envelope schema',async()=>{
+ const f=workloadPublisherFixture();
+ const previous=JSON.parse(prepareMaintenanceIssue(f.bytes,{installedSha:OLD,chatId:'chat-ci-123-1'}).body);
+ previous.requestId=previous.requestId.replace(/^pc-update-/,'pc-');
+ f.prior=[{number:123,state:'closed',user:f.owner,title:'pc-controller-update',
+  body:JSON.stringify(previous),labels:[{name:'pc-maintenance'}]}];
+ const result=await submitExistingControllerApprovalFromCi(f.input,f.ports);
+ assert.equal(result.status,'EXISTING_REQUEST_REUSED');assert.deepEqual(result.issueNumbers,[123]);assert.equal(f.posts,0);
+});
+test('CI reuse rejects malformed historical request identity without a new POST',async()=>{
+ const f=workloadPublisherFixture();
+ const previous=JSON.parse(prepareMaintenanceIssue(f.bytes,{installedSha:OLD,chatId:'chat-ci-123-1'}).body);
+ previous.requestId='pc-update-unsafe';
+ f.prior=[{number:123,state:'closed',user:f.owner,title:'pc-controller-update',
+  body:JSON.stringify(previous),labels:[{name:'pc-maintenance'}]}];
+ const result=await submitExistingControllerApprovalFromCi(f.input,f.ports);
+ assert.equal(result.status,'STATE_UNKNOWN');
+ assert.equal(result.code,'MAINTENANCE_CI_PRIOR_EFFECT_UNVERIFIED_NO_REPOST');
+ assert.equal(f.posts,0);assert.equal(f.saved,null);
+});
+test('CI reuse never reports success for a different manifest with the same target SHA',async()=>{
+ const f=workloadPublisherFixture();
+ const original=JSON.parse(prepareMaintenanceIssue(f.bytes,{installedSha:OLD,chatId:'chat-ci-123-1'}).body);
+ original.approvalManifestSha256='f'.repeat(64);
+ f.prior=[{number:123,state:'closed',user:f.owner,title:'pc-controller-update',
+  body:JSON.stringify(original),labels:[{name:'pc-maintenance'}]}];
+ const result=await submitExistingControllerApprovalFromCi(f.input,f.ports);
+ assert.equal(result.status,'STATE_UNKNOWN');
+ assert.equal(result.code,'MAINTENANCE_CI_PRIOR_EFFECT_UNVERIFIED_NO_REPOST');
+ assert.deepEqual(result.issueNumbers,[123]);assert.equal(f.posts,0);assert.equal(f.saved,null);
+});
+test('CI reuse does not submit or falsely succeed on incomplete or mixed prior Issues',async()=>{
+ const f=workloadPublisherFixture();
+ const valid=prepareMaintenanceIssue(f.bytes,{installedSha:OLD,chatId:'chat-ci-123-1'});
+ const original={number:123,state:'closed',user:f.owner,title:'pc-controller-update',
+  body:valid.body,labels:[{name:'pc-maintenance'}]};
+ const incomplete={...original,number:124,body:JSON.stringify({targetControllerSha:NEXT})};
+ for(const list of [[incomplete],[original,incomplete],[{...original,labels:[]}]]) {
+  f.prior=list;
+  const result=await submitExistingControllerApprovalFromCi(f.input,f.ports);
+  assert.equal(result.status,'STATE_UNKNOWN');assert.equal(result.code,'MAINTENANCE_CI_PRIOR_EFFECT_UNVERIFIED_NO_REPOST');
+  assert.equal(f.posts,0);assert.equal(f.saved,null);
+ }
 });
 test('unknown CI POST preserves original durable receipt and forbids retry',async()=>{
  const f=workloadPublisherFixture();f.ports.createIssue=async()=>{f.posts++;throw Error('lost response');};
