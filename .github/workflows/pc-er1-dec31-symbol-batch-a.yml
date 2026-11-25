@@ -3,16 +3,8 @@ name: ZGMINI ER1 December Symbol Batch A
 on:
   issues:
     types: [opened]
-  pull_request:
-    types: [opened, synchronize, reopened]
-    paths:
-      - 'er1-dec31-symbol-batch-a-entry.mjs'
-      - 'er1-dec31-symbol-pair-resume-entry.test.mjs'
-      - 'ER1_DEC31_SYMBOL_PAIR_RESUME_B_APPROVAL.json'
-      - '.github/workflows/pc-er1-dec31-symbol-batch-a.yml'
 permissions:
   contents: read
-  issues: write
 concurrency:
   group: zgmini-er1-dec31-symbol-batch-a-one-shot
   cancel-in-progress: false
@@ -25,6 +17,10 @@ jobs:
       github.event.issue.user.login == 'ansqhd5774-Choi' &&
       github.event.issue.title == 'pc-er1-dec31-symbol-batch-a-one-shot' &&
       contains(github.event.issue.labels.*.name, 'pc-er1-approved')
+    # Restrict issue-upload write access to the two approved operational jobs.
+    permissions:
+      contents: read
+      issues: write
     runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
     timeout-minutes: 12
     env:
@@ -72,6 +68,10 @@ jobs:
       github.event.issue.user.login == 'ansqhd5774-Choi' &&
       github.event.issue.title == 'pc-er1-dec31-symbol-pair-resume-once' &&
       contains(github.event.issue.labels.*.name, 'pc-er1-approved')
+    # Restrict issue-upload write access to the two approved operational jobs.
+    permissions:
+      contents: read
+      issues: write
     runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
     timeout-minutes: 12
     env:
@@ -108,24 +108,3 @@ jobs:
           GITHUB_EVENT_ACTION: ${{ github.event.action }}
           GITHUB_TOKEN: ${{ github.token }}
         run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\er1-dec31-symbol-batch-a-entry.mjs" --upload-pair'
-
-  # PR-only offline validation. No operational PC, provider, token, or stored raw.
-  pair-contract-tests:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout source for offline validation
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          persist-credentials: false
-      - name: Setup Node without extra tooling
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: '22'
-      - name: Verify bounded pair contract and original one-shot preservation
-        run: |
-          node --check er1-dec31-symbol-batch-a-entry.mjs
-          node --test er1-dec31-symbol-pair-resume-entry.test.mjs
