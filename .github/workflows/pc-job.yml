@@ -1,6 +1,7 @@
 name: ZGMINI PC Job
-# Refresh GitHub's registration of the existing issues trigger after the
-# approved maintenance disable/enable interval. No policy or command changes.
+# Reconcile GitHub's issues-trigger registration after W04 #3516
+# paused/resumed intake on 2026-11-25; prior #3433 ran successfully afterward.
+# Comment-only reindex probe. Existing admission and execution stay unchanged.
 on:
   issues:
     types: [opened, labeled]
