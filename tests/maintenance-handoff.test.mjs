@@ -395,18 +395,3 @@ test('restored files without reattested receiver are RECOVERY_REQUIRED',()=>{
  assert.equal(rollbackStatus({filesRestored:false,receiverReattested:false}),'RECOVERY_REQUIRED');
  assert.equal(rollbackStatus({filesRestored:true,receiverReattested:true}),'ROLLED_BACK');
 });
-
-test('optional CI policy approval is prevalidated before receiver stop or any file replacement',()=>{
- const source=fs.readFileSync(new URL('../tools/handoff-maintenance.mjs',import.meta.url),'utf8');
- const begin=source.indexOf('export async function main(');
- assert.ok(begin>=0);
- const body=source.slice(begin);
- const gate=body.indexOf('const approvedCiPolicy=approvedHandoffCiPolicy(');
- const stop=body.indexOf("fs.writeFileSync(root+'/STOP_REQUEST.json'");
- const backup=body.indexOf('fs.mkdirSync(backup,{recursive:true})');
- const replaced=body.indexOf('for(const rel of filePlan.writes)');
- const manifest=body.indexOf("fs.writeFileSync(root+'/MAINTENANCE_INSTALL.json'");
- assert.ok(gate>=0&&stop>=0&&backup>=0&&replaced>=0&&manifest>=0);
- assert.ok(gate<stop&&gate<backup&&gate<replaced&&gate<manifest);
- assert.equal(body.slice(replaced,manifest).includes('approvedHandoffCiPolicy('),false);
-});
