@@ -190,8 +190,10 @@ export async function main({eventPath=process.env.GITHUB_EVENT_PATH,token=proces
 // Keep CI's exit status aligned with the individual submission outcomes.
 // A completed step is not a successful request when an eligible effect was
 // withheld or its creation/readback remains unknown. Never retry the POST.
-export function ciPublicationExitCode(result){
- if(result?.state==='EVIDENCE_MISSING')return 1;
+export function ciPublicationExitCode(result,{publish=false}={}){
+ // An explicitly invoked submission on an untrusted host or without its
+ // configured identity must fail, not produce an apparently green CI job.
+ if(result?.state==='EVIDENCE_MISSING'||(publish&&result?.state==='DISABLED'))return 1;
  if(result?.state!=='PUBLICATION_PROCESSED')return 0;
  if(!Array.isArray(result.results)||result.results.length===0)return 1;
  return result.results.every(item=>item?.status==='REQUEST_READBACK_VERIFIED'||
@@ -200,5 +202,5 @@ export function ciPublicationExitCode(result){
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  const result=await main({publish:process.argv[2]==='--publish-existing'});
  console.log(JSON.stringify(result));
- process.exitCode=ciPublicationExitCode(result);
+ process.exitCode=ciPublicationExitCode(result,{publish:process.argv[2]==='--publish-existing'});
 }
