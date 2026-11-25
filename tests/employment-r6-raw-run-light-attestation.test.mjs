@@ -325,14 +325,64 @@ test('W04 state claims bounded weekly missing History is not PIT attestation',()
  assert.equal(group.earliestMissingWeek,weeks.at(-1));
  assert.equal(group.latestMissingWeek,'2026-11-14');
  assert.deepEqual(group.latestMissingWeekCounts[0],{week:'2026-11-14',missingKeys:1});
- assert.equal(group.latestMissingWeekCounts.length,16);
+ assert.equal(group.latestMissingWeekCounts.length,20);
  assert.equal(group.latestMissingWeekCounts[1].missingKeys,2);
- assert.equal(group.missingWeekCountsTruncated,true);
+ assert.equal(group.missingWeekCountsTruncated,false);
  assert.equal(group.invalidWeekDateKeys,1);
  assert.equal(group.weekScope,'CURRENT_ONLY_KEYS_NOT_PIT');
  assert.equal(report.missingHistoryLineage.pitAttested,false);
  assert.equal(report.missingHistoryLineage.repairAuthorized,false);
  assert.doesNotMatch(JSON.stringify(group),
   /PRIVATE_|geography_code|provenance_json|responseHash|snapshotId|body_sha256/);
+ db.close();
+});
+
+test('W04 57 weekly bins return exact 2,880-key aggregate and stay capped at 64',()=>{
+ const db=new DatabaseSync(':memory:');schema(db);
+ const raw=snapshot(db,{requestKey:'wk57',
+  body:'RAW_FIXTURE_ONLY'});run(db,raw);
+ const cols='logical_series_id TEXT,geography_type TEXT,geography_code TEXT,observation_date TEXT,'+
+  'provider TEXT,source_hash TEXT,retrieved_at TEXT,available_at TEXT,provenance_json TEXT';
+ db.exec('CREATE TABLE market_score_employment_r4_shadow_current_v1('+cols+');'+
+  'CREATE TABLE market_score_employment_r4_shadow_history_v1('+cols+');');
+ const insert=db.prepare('INSERT INTO market_score_employment_r4_shadow_current_v1 VALUES(?,?,?,?,?,?,?,?,?)');
+ const hash='a'.repeat(64),meta=JSON.stringify({rawRecordHash:hash,
+  responseHash:raw.hash,fixtureMarker:'DUMMY'});
+ const date=i=>new Date(Date.UTC(2025,6,26+7*i)).toISOString().slice(0,10);
+ const regions=Array.from({length:51},(_,i)=>'REGION_'+String(i).padStart(2,'0'));
+ for(let w=0;w<57;w++){
+  for(const region of regions.slice(0,w===56?24:51))
+   insert.run('STATE_INITIAL_CLAIMS','STATE',region,date(w),'DOL_ETA',hash,
+    '2026-11-18T01:00:00.000Z',null,meta);
+ }
+ const report=auditFixedR6RawRunSnapshot(db,{checkedAt:AT,includeInvalidLineage:true});
+ const v=report.missingHistoryLineage,group=v.groups.find(x=>
+  x.provider==='DOL_ETA'&&x.logicalSeriesId==='STATE_INITIAL_CLAIMS');
+ assert.equal(v.missingHistoryKeys,2880);
+ assert.equal(group.missingHistoryKeys,2880);
+ assert.equal(group.observedMissingWeeks,57);
+ assert.equal(group.earliestMissingWeek,'2025-07-26');
+ assert.equal(group.latestMissingWeek,'2026-08-22');
+ assert.equal(group.missingWeekCountsTruncated,false);
+ assert.deepEqual(group.latestMissingWeekCounts,Array.from({length:57},(_,i)=>({
+  week:date(56-i),missingKeys:i===0?24:51,
+ })));
+ assert.equal(group.latestMissingWeekCounts.reduce((n,x)=>n+x.missingKeys,0),2880);
+ assert.equal(v.pitAttested,false);assert.equal(v.repairAuthorized,false);
+ assert.ok(Buffer.byteLength(JSON.stringify(report))<32768);
+ assert.doesNotMatch(JSON.stringify(report),/wk57|RAW_FIXTURE_ONLY|DUMMY|REGION_\d\d|geography_code|provenance_json/);
+ // Output remains bounded when the SQLite query observes more than 64 weeks.
+ for(let w=-13;w<0;w++)
+  insert.run('STATE_INITIAL_CLAIMS','STATE','REGION_00',date(w),'DOL_ETA',hash,
+   '2026-11-18T01:00:00.000Z',null,meta);
+ const more=auditFixedR6RawRunSnapshot(db,{checkedAt:AT,includeInvalidLineage:true});
+ const bounded=more.missingHistoryLineage.groups.find(x=>
+  x.provider==='DOL_ETA'&&x.logicalSeriesId==='STATE_INITIAL_CLAIMS');
+ assert.equal(bounded.observedMissingWeeks,70);
+ assert.equal(bounded.latestMissingWeekCounts.length,64);
+ assert.equal(bounded.missingWeekCountsTruncated,true);
+ assert.deepEqual(bounded.latestMissingWeekCounts[0],{week:'2026-08-22',missingKeys:24});
+ assert.equal(more.missingHistoryLineage.pitAttested,false);
+ assert.ok(Buffer.byteLength(JSON.stringify(more))<32768);
  db.close();
 });
