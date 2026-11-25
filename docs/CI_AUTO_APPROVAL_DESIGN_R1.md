@@ -46,3 +46,10 @@ A는 기존 정규 접수/판정에 필요한 확인만 재사용한다. B는 �
 - 근거: .github/workflows/pc-job.yml, tools/maintenance-request.mjs(요청 생성/제출이며 승인 주체 아님), tools/maintenance-contract.mjs, writer-b/README.md, PC_AUTOMATION_STANDARD.md §5.
 - 전체 6단계 중 설계 1단계만 완료(약 17%, 단계 기준; 운영 0%). 구현/CI/통합/실PC 검증 미실행.
 - 다음 필수 행동: 기존 A/B 승인 검증 코드와 스키마의 입력/출력 매핑, 보호된 승인 출처 검증의 설계 및 순수 판정기/회귀 테스트 작성. main 및 운영 Workflow/PC/Task/DB/Writer/Controller는 이번 설계 작업에서 변경하지 않는다.
+
+### 2026-11-25 후속 — 순수 모의 판정기 구현
+- `ci-approval/shadow-decision.mjs` 및 `tests/ci-approval-shadow-decision.test.mjs` 추가. 기존 Controller/Writer 계약의 효과, SHA/범위, CI, preimage, 복귀, 중복 조건을 모델링했다. 모든 판정 결과는 SHADOW_ONLY이며 canPublish/canExecute는 항상 false다.
+- 동일 함수와 30개 fixture를 JavaScript V8 환경에서 실행: 30/30 PASS. 저장소 파일 두 개를 원격 재조회했다. 저장소 Node CI 및 실제 검증기 연동 시험은 아직 미실행이다.
+- 신뢰 출처 및 CI provenance는 현재 합성 fixture로만 표현한다. 실제 증거 인증이 아니며 자동 승인 권한은 생성하지 않았다. 새 운영 정책/Workflow/Issue 실행/PC 변경 없음.
+- 단계 2는 순수 모의 판정기 구현 완료, 실제 보호된 근거 수집 및 기존 검증기 연동 미완료. 6단계 기준 1단계 완료 + 2단계 진행 중(약 25%, 추정). 운영 적용 0%.
+- 다음: 기존 validateRequest / validateUpdateRequest / validateWriterBManifest에 대응하는 읽기 전용 증거/후보 어댑터를 구현하고 실제 Node 회귀 및 격리 CI 실행 경로를 검토한다. 권한 발행이나 실행 연결은 하지 않는다.
