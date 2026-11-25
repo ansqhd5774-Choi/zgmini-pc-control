@@ -2368,7 +2368,7 @@ export function toText(r){
    'er1ReportedRunJobLinked='+(r.er1PostcheckLink.reportedRunJobLinked??'UNVERIFIED'),
    'er1ExactRunJobMatched='+r.er1PostcheckLink.exactRunJobMatched]:[]),
   ...(r.w043409MaintenanceStatus?[
-   'w043409Status=+r.w043409MaintenanceStatus.status,
+   'w043409Status='+r.w043409MaintenanceStatus.status,
    'w043409HistoricalPhase='+(r.w043409MaintenanceStatus.historicalRequest?.phase??'UNKNOWN'),
    'w043409LeaseHeld='+(r.w043409MaintenanceStatus.recoveryEvidence?.leaseHeld??'UNKNOWN'),
    'w043409RecoveryRequired='+(r.w043409MaintenanceStatus.recoveryEvidence?.recoveryRequired??'UNKNOWN'),
