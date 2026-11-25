@@ -429,6 +429,42 @@ test('two-stage exact approval publisher creates one PR and only two final files
  assert.equal(second.existing,true);assert.equal(f.state.created,1);
  assert.equal(f.state.updates,1);
 });
+test('merged original exact approval PR is reused read-only by a later event',async()=>{
+ const f=exactPrPublisherFixture(),args={targetSha:f.target,sourcePrNumber:15,
+  sourceMainSha:f.main,prepare:f.prepare,io:f.io};
+ const initial=await publishExactControllerApprovalPair(args);
+ assert.equal(initial.state,'EXACT_APPROVAL_PR_READY');
+ const before=f.events.length;
+ f.state.pr.state='closed';f.state.pr.merged=true;
+ f.state.pr.merge_commit_sha='f'.repeat(40);
+ const observed=await publishExactControllerApprovalPair(args);
+ assert.equal(observed.state,'EXACT_APPROVAL_PR_READY');
+ assert.equal(observed.prNumber,42);assert.equal(observed.existing,true);
+ assert.equal(f.events.length,before);assert.equal(f.state.created,1);
+});
+test('previous PR with deleted branch never triggers another seed or PR POST',async()=>{
+ const f=exactPrPublisherFixture(),args={targetSha:f.target,sourcePrNumber:15,
+  sourceMainSha:f.main,prepare:f.prepare,io:f.io};
+ await publishExactControllerApprovalPair(args);
+ f.state.pr.state='closed';f.state.pr.merged=true;
+ f.state.pr.merge_commit_sha='f'.repeat(40);
+ f.state.branchSha=null;
+ const before=f.events.length;
+ const observed=await publishExactControllerApprovalPair(args);
+ assert.equal(observed.state,'STATE_UNKNOWN');
+ assert.equal(observed.code,'CI_APPROVAL_PRIOR_PR_WITHOUT_BRANCH_NO_REPOST');
+ assert.equal(observed.prNumber,42);
+ assert.equal(f.events.length,before);assert.equal(f.state.created,1);
+});
+test('closed unmerged approval PR is not treated as approved or rewritten',async()=>{
+ const f=exactPrPublisherFixture(),args={targetSha:f.target,sourcePrNumber:15,
+  sourceMainSha:f.main,prepare:f.prepare,io:f.io};
+ await publishExactControllerApprovalPair(args);
+ f.state.pr.state='closed';f.state.pr.merged=false;
+ const before=f.events.length;
+ await assert.rejects(()=>publishExactControllerApprovalPair(args),/CI_APPROVAL_PR_IDENTITY_DENIED/);
+ assert.equal(f.events.length,before);
+});
 test('publisher never writes a branch when independent approval preparation fails',async()=>{
  const f=exactPrPublisherFixture();
  await assert.rejects(()=>publishExactControllerApprovalPair({
