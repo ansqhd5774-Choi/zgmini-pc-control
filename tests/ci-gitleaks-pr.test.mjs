@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {GITLEAKS_ZIP_SHA256,GITLEAKS_FINDINGS_EXIT_CODE,prCommitRange,requireExactSha256,requireGitleaksClean} from '../tools/ci-gitleaks-pr.mjs';
+import {GITLEAKS_ZIP_SHA256,GITLEAKS_FINDINGS_EXIT_CODE,prCommitRange,requireExactSha256,requireGitleaksClean,summarizeRuleOnlyOutput} from '../tools/ci-gitleaks-pr.mjs';
 const base='a'.repeat(40),head='b'.repeat(40);
 test('validate exact PR base/head with no ambiguous ref',()=>{
  assert.deepEqual(prCommitRange({pull_request:{base:{sha:base},head:{sha:head}}},head),
@@ -25,5 +25,14 @@ test('gitleaks scanner failure remains fail-closed with sanitized distinct class
  }
  for(const result of [null,{status:null},{status:0,error:Error('INTERNAL_REDACTED')},{status:0,signal:'SIGKILL'}]){
   assert.throws(()=>requireGitleaksClean(result),/GITLEAKS_EXECUTION_FAILED/);
+ }
+});
+
+test('gitleaks template metadata strips matches and fails closed on unexpected output',()=>{
+ const summary=summarizeRuleOnlyOutput('generic-api-key\\naws-access-token\\ngeneric-api-key\\n');
+ assert.deepEqual(summary,{findingCount:3,ruleIds:['aws-access-token','generic-api-key']});
+ for(const bad of ['', 'generic-api-key\\nUNEXPECTED_OR_RAW', 'unexpected=value',
+  'aws-access-token\\nnot usable', 1, null]){
+  assert.throws(()=>summarizeRuleOnlyOutput(bad),/GITLEAKS_REPORT_UNSAFE/);
  }
 });
