@@ -66,6 +66,44 @@ export async function submitPreparedMaintenanceIssue(expected,{installedSha,read
  validateUpdateRequest(request,bytes,{actor:CONTROL_ACTOR,installedSha});
  return submitMaintenanceIssue(snapshot,ports);
 }
+// CI submission integration for an explicitly selected, already-approved
+// Controller request. Runs only through an independently authenticated owner
+// submitter; never use the PR runner token as owner or infer authority from CI.
+// The source approval and final PC-side CAS/effect claim remain unchanged.
+export async function submitCiPreparedMaintenanceIssue(expected,{runId,readRun,...ports}={}){
+ if(!Number.isSafeInteger(runId)||runId<=0||typeof readRun!=='function')
+  fail('MAINTENANCE_CI_RUN_REQUIRED');
+ const snapshot=structuredClone(expected);
+ const request=requestOf(snapshot);
+ if((await ports.readIdentity())?.login!==CONTROL_ACTOR||
+    (await ports.readRepository())?.private!==true)
+  fail('MAINTENANCE_SUBMIT_IDENTITY_DENIED');
+ const bytes=await ports.readManifest(request.targetControllerSha);
+ if(!Buffer.isBuffer(bytes))fail('MAINTENANCE_REMOTE_MANIFEST_BYTES_MISSING');
+ const {manifest}=validateUpdateRequest(request,bytes,{actor:CONTROL_ACTOR,installedSha:ports.installedSha});
+ // The relevant CI run must be tied to the exact approved source PR.
+ // Selective install target is not itself a PR HEAD. Its existing manifest
+ // and pin checks stay with the independent maintenance receiver.
+ const number=Number(manifest.approval.ref.split('/').at(-1));
+ if(!Number.isSafeInteger(number)||number<=0||typeof ports.readApprovalPr!=='function')
+  fail('MAINTENANCE_CI_APPROVAL_PR_REQUIRED');
+ const pr=await ports.readApprovalPr(number);
+ const run=await readRun(runId);
+ if(pr?.number!==number||pr.merged!==true||pr.base?.ref!=='main'||
+    pr.base?.repo?.full_name!==CONTROL_REPOSITORY||
+    pr.head?.repo?.full_name!==CONTROL_REPOSITORY||
+    !/^[a-f0-9]{40}$/.test(pr.head?.sha??'')||
+    run?.id!==runId||run.workflow_id!==416355595||
+    run.path!=='.github/workflows/controller-maintenance-source-tests.yml'||
+    run.event!=='pull_request'||run.status!=='completed'||run.conclusion!=='success'||
+    run.repository?.id!==1442936296||run.repository?.full_name!==CONTROL_REPOSITORY||
+    run.head_repository?.id!==1442936296||run.head_sha!==pr.head.sha)
+  fail('MAINTENANCE_CI_APPROVAL_SOURCE_MISMATCH');
+ // Existing submitter re-reads main manifest and checks owner identity and
+ // exact request before its original atomic receipt and only POST.
+ // A moved or altered approval cannot reuse the prior CI evidence.
+ return submitPreparedMaintenanceIssue(snapshot,ports);
+}
 export async function reconcileMaintenanceIssue(receipt,{findIssues,readIssue,saveReceipt}){
  if(receipt?.schema!=='ZGMINI_MAINTENANCE_SUBMISSION_V1')fail('MAINTENANCE_RECEIPT_INVALID');
  const request=requestOf(receipt.expected);
