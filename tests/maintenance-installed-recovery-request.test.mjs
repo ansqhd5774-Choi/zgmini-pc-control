@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -354,8 +355,11 @@ test('committed #3516 recovery manifest pins exact source, seven CAS and indepen
   const bytes=fs.readFileSync(new URL('../'+rel,import.meta.url));
   assert.equal(digest(bytes),sha256,rel);
  }
- const proofBytes=fs.readFileSync(
-  new URL('../'+canonical.proof.resultPath,import.meta.url));
+ // The Git repository raw blob is the approved provenance. Windows
+ // checkout may convert JSON text line endings (LF -> CRLF), which must
+ // neither silently rewrite the approved SHA nor be called data corruption.
+ const proofBytes=execFileSync('git',['show','HEAD:'+canonical.proof.resultPath],{
+  cwd:new URL('..',import.meta.url),windowsHide:true,maxBuffer:1024*1024});
  assert.equal(digest(proofBytes),canonical.proof.resultSha256);
  const observed=JSON.parse(proofBytes).w043516MaintenanceStatus;
  assert.equal(observed.historicalRequest.status,'RECOVERY_REQUIRED');
