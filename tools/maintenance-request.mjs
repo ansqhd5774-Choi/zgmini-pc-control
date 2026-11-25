@@ -70,8 +70,9 @@ export async function submitPreparedMaintenanceIssue(expected,{installedSha,read
 // Controller request. Runs only through an independently authenticated owner
 // submitter; never use the PR runner token as owner or infer authority from CI.
 // The source approval and final PC-side CAS/effect claim remain unchanged.
-export async function submitCiPreparedMaintenanceIssue(expected,{runId,readRun,...ports}={}){
- if(!Number.isSafeInteger(runId)||runId<=0||typeof readRun!=='function')
+export async function submitCiPreparedMaintenanceIssue(expected,{runId,readRun,listRuns,...ports}={}){
+ if((runId!==undefined&&(!Number.isSafeInteger(runId)||runId<=0))||typeof readRun!=='function'||
+    (runId===undefined&&typeof listRuns!=='function'))
   fail('MAINTENANCE_CI_RUN_REQUIRED');
  const snapshot=structuredClone(expected);
  const request=requestOf(snapshot);
@@ -88,16 +89,27 @@ export async function submitCiPreparedMaintenanceIssue(expected,{runId,readRun,.
  if(!Number.isSafeInteger(number)||number<=0||typeof ports.readApprovalPr!=='function')
   fail('MAINTENANCE_CI_APPROVAL_PR_REQUIRED');
  const pr=await ports.readApprovalPr(number);
- const run=await readRun(runId);
  if(pr?.number!==number||pr.merged!==true||pr.base?.ref!=='main'||
     pr.base?.repo?.full_name!==CONTROL_REPOSITORY||
     pr.head?.repo?.full_name!==CONTROL_REPOSITORY||
-    !/^[a-f0-9]{40}$/.test(pr.head?.sha??'')||
-    run?.id!==runId||run.workflow_id!==416355595||
-    run.path!=='.github/workflows/controller-maintenance-source-tests.yml'||
-    run.event!=='pull_request'||run.status!=='completed'||run.conclusion!=='success'||
-    run.repository?.id!==1442936296||run.repository?.full_name!==CONTROL_REPOSITORY||
-    run.head_repository?.id!==1442936296||run.head_sha!==pr.head.sha)
+    !/^[a-f0-9]{40}$/.test(pr.head?.sha??''))
+  fail('MAINTENANCE_CI_APPROVAL_SOURCE_MISMATCH');
+ const matches=run=>Number.isSafeInteger(run?.id)&&run.id>0&&run.workflow_id===416355595&&
+    run.path==='.github/workflows/controller-maintenance-source-tests.yml'&&
+    run.event==='pull_request'&&run.status==='completed'&&run.conclusion==='success'&&
+    run.repository?.id===1442936296&&run.repository?.full_name===CONTROL_REPOSITORY&&
+    run.head_repository?.id===1442936296&&run.head_sha===pr.head.sha;
+ // A main approval publication may not carry a source CI run ID. Find
+ // positive evidence for its exact PR head, then independently re-read it.
+ if(runId===undefined){
+  const listing=await listRuns(pr.head.sha);
+  if(!Array.isArray(listing?.workflow_runs))fail('MAINTENANCE_CI_RUN_LIST_UNVERIFIED');
+  const selected=listing.workflow_runs.filter(matches).sort((a,b)=>b.id-a.id)[0];
+  if(!selected)fail('MAINTENANCE_CI_SUCCESS_NOT_FOUND');
+  runId=selected.id;
+ }
+ const run=await readRun(runId);
+ if(!matches(run)||run.id!==runId)
   fail('MAINTENANCE_CI_APPROVAL_SOURCE_MISMATCH');
  // Existing submitter re-reads main manifest and checks owner identity and
  // exact request before its original atomic receipt and only POST.
@@ -178,8 +190,8 @@ export async function main(argv=process.argv.slice(2),{githubApi=github}={}){
  if(['submit-prepared','submit-ci-prepared'].includes(mode)){
   if(!o['--prepared-file']||!o['--installed-sha']||!receiptPath)fail('MAINTENANCE_REQUEST_USAGE');
   const ci=mode==='submit-ci-prepared';
-  if(ci&&(!/^[1-9]\d*$/.test(o['--run-id']??'')||
-   !Number.isSafeInteger(Number(o['--run-id']))||!/^[a-f0-9]{40}$/.test(o['--installed-sha'])))
+  if(ci&&((o['--run-id']!==undefined&&(!/^[1-9]\d*$/.test(o['--run-id'])||
+   !Number.isSafeInteger(Number(o['--run-id']))))||!/^[a-f0-9]{40}$/.test(o['--installed-sha'])))
    fail('MAINTENANCE_REQUEST_USAGE');
   if(fs.existsSync(receiptPath))fail('MAINTENANCE_RECEIPT_EXISTS_USE_RECONCILE');
   const expected=JSON.parse(fs.readFileSync(path.resolve(o['--prepared-file']),'utf8'));
@@ -187,8 +199,10 @@ export async function main(argv=process.argv.slice(2),{githubApi=github}={}){
    readIdentity:()=>githubApi('user'),readRepository:()=>githubApi(`repos/${CONTROL_REPOSITORY}`),
    readManifest:readRemote,saveReceipt,readIssue,
    createIssue:e=>githubApi(`repos/${CONTROL_REPOSITORY}/issues`,{body:{title:e.title,labels:e.labels,body:e.body}})};
-  if(ci)return submitCiPreparedMaintenanceIssue(expected,{...ports,runId:Number(o['--run-id']),
+  if(ci)return submitCiPreparedMaintenanceIssue(expected,{...ports,
+   runId:o['--run-id']===undefined?undefined:Number(o['--run-id']),
    readApprovalPr:n=>githubApi(`repos/${CONTROL_REPOSITORY}/pulls/${n}`),
+   listRuns:head=>githubApi(`repos/${CONTROL_REPOSITORY}/actions/workflows/416355595/runs?head_sha=${head}&event=pull_request&status=success&per_page=100`),
    readRun:n=>githubApi(`repos/${CONTROL_REPOSITORY}/actions/runs/${n}`)});
   return submitPreparedMaintenanceIssue(expected,ports);
  }
