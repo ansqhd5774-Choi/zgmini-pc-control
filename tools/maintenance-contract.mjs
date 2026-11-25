@@ -1000,3 +1000,28 @@ export function classifyMaintenancePostcheckLink({requestId,issueNumber,operatio
   return out('SKIPPED_GATE','POSTCHECK_ENTRY_NOT_EXECUTED',runId,jobId);
  return out('UPLOAD_MISSING','POSTCHECK_RESULT_RECEIPT_NOT_OBSERVED',runId,jobId);
 }
+
+// Accept only the exact pre-existing fixed Controller pointer. This is not
+// remote JSON/TXT verification and cannot promote a postcheck to PASS.
+export function summarizeMaintenancePostcheckLocalPointer({pointer,requestId,issueNumber,
+ runId,attempt,seat,operation,sourceBranch,sourceSha,controllerSha}={}){
+ const unknown={status:'LOCAL_RESULT_UNVERIFIED',code:'POSTCHECK_LOCAL_RECEIPT_NOT_ATTESTED'};
+ if(!pointer||typeof pointer!=='object'||Array.isArray(pointer))return unknown;
+ if(!Number.isSafeInteger(runId)||runId<1||!Number.isSafeInteger(attempt)||
+  attempt<1||attempt>999||!Number.isSafeInteger(seat)||seat<1||seat>6||
+  !Number.isSafeInteger(issueNumber)||issueNumber<1||
+  !/^[a-f0-9]{40}$/.test(controllerSha??''))return unknown;
+ const report=pointer.report;
+ if(pointer.issueNumber!==issueNumber||!report||typeof report!=='object'||
+  report.schema!=='ZGMINI_PC_RESULT_V1'||
+  report.jobId!==`run-${runId}-${attempt}-seat-${seat}`||
+  report.requestId!==requestId+'-postcheck'||
+  report.operation!==operation||report.sourceBranch!==sourceBranch||
+  report.requestedSourceSha!==sourceSha||
+  report.controlSourceSha!==controllerSha||
+  !['PASS','FAIL','BLOCKED'].includes(report.status)||
+  !/^[A-Z0-9_]{1,96}$/.test(report.code??''))
+  return unknown;
+ return {status:'LOCAL_RESULT_MATCHED',code:'POSTCHECK_EXISTING_LOCAL_RESULT_MATCHED',
+  resultStatus:report.status,resultCode:report.code};
+}
