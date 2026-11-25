@@ -26,6 +26,43 @@ test('backup failure prevents claim and DB write',async()=>{
  const {calls,deps}=fixture();deps.snapshot=async()=>{throw Error('W04_REPAIR_BACKUP_CHECK_STOP');};
  const r=await performHistoryRepair(deps);assert.equal(r.status,'BLOCKED');assert.ok(!calls.includes('claim'));assert.ok(!calls.includes('apply'));
 });
+test('bounded foreign Core lock is classified and leaves claim/DB untouched',async()=>{
+ const {calls,deps}=fixture();
+ deps.acquire=async()=>{throw Object.assign(Error('local lock details must remain private'),
+  {code:'R6_B_CORE_LOCK_OCCUPIED'});};
+ const r=await performHistoryRepair(deps);
+ assert.equal(r.status,'BLOCKED');
+ assert.equal(r.code,'W04_REPAIR_CORE_LOCK_OCCUPIED');
+ assert.equal(r.firstFail,'CORE_LOCK');
+ assert.equal(r.lastPass,null);
+ assert.deepEqual(calls,[]);
+ const request={requestId:'fixture',approvalManifestSha256:'b'.repeat(64)};
+ const report=sanitizeR6BResult(r,request,{R6_B_EFFECT_OUTCOME:'failure',GITHUB_RUN_ID:'13'});
+ assert.equal(report.status,'BLOCKED');
+ assert.equal(report.code,'W04_REPAIR_CORE_LOCK_OCCUPIED');
+ assert.equal(report.firstFail,'CORE_LOCK');
+ assert.equal(report.sqlite,'UNVERIFIED');
+ assert.ok(!JSON.stringify(report).includes('local lock details'));
+ assert.ok(r6BTextResult(report).includes('FIRST_FAIL=CORE_LOCK'));
+});
+
+test('unexpected exception stays opaque; W04 stage remains bounded',async()=>{
+ const {calls,deps}=fixture();
+ deps.acquire=async()=>{throw Error('PRIVATE_LOCAL_UNEXPECTED_ERROR');};
+ const r=await performHistoryRepair(deps);
+ assert.equal(r.status,'BLOCKED');
+ assert.equal(r.code,'W04_REPAIR_EXECUTION_STOP');
+ assert.equal(r.firstFail,'HISTORY_REPAIR');
+ assert.deepEqual(calls,[]);
+ const request={requestId:'fixture',approvalManifestSha256:'b'.repeat(64)};
+ const report=sanitizeR6BResult(r,request,{R6_B_EFFECT_OUTCOME:'failure',GITHUB_RUN_ID:'14'});
+ assert.equal(report.firstFail,'HISTORY_REPAIR');
+ assert.ok(!JSON.stringify(report).includes('PRIVATE_LOCAL_UNEXPECTED_ERROR'));
+ const other=sanitizeR6BResult({...r,code:'R6_B_D1_AUTH_UNAVAILABLE'},
+   request,{R6_B_EFFECT_OUTCOME:'failure',GITHUB_RUN_ID:'14'});
+ assert.equal(other.firstFail,null);
+});
+
 test('post-claim exception is unknown, not retryable success',async()=>{
  const {calls,deps}=fixture();const load=deps.load;deps.load=async()=>({...await load(),apply:()=>{throw Error('W04_REPAIR_SELECTION_DRIFT');}});
  const r=await performHistoryRepair(deps);assert.equal(r.status,'STATE_UNKNOWN');assert.ok(calls.includes('claim'));assert.ok(!calls.includes('COMMITTED_VERIFIED'));
