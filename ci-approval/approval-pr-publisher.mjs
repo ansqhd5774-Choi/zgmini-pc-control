@@ -141,7 +141,7 @@ export async function publishExactControllerApprovalPair({
  const [current,pairDiff]=await Promise.all([io.readPr(pr.number),io.readPrFiles(pr.number)]);
  if(current?.head?.sha!==next.sha||!Array.isArray(pairDiff)||pairDiff.length!==2||
   pairDiff.some(x=>x.status!=='added')||
-  JSON.stringify(pairDiff.map(x=>x.filename).sort())!==JSON.stringify(paths))
+  JSON.stringify(pairDiff.map(x=>x.filename).sort())!==JSON.stringify([...paths].sort()))
   return {state:'STATE_UNKNOWN',code:'CI_APPROVAL_PAIR_READBACK_UNKNOWN',
    branch:name,prNumber:pr.number};
  for(const file of files){
