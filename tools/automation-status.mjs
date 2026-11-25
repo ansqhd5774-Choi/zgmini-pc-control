@@ -66,7 +66,9 @@ const live=pid=>{if(!Number.isSafeInteger(pid)||pid<=0)return null;try{process.k
 
 const watchdogRoot='E:/ZGmini/automation/pc-watchdog';
 const WATCHDOG_STATES=new Set(['HEALTHY','PAUSED','PAUSED_WORKFLOW','STARTING',
- 'BLOCKED','BLOCKED_LIVE_OR_UNKNOWN','BLOCKED_RESTART_LIMIT','BLOCKED_SPAWN_ERROR']);
+ 'BLOCKED','BLOCKED_LIVE_OR_UNKNOWN','BLOCKED_RESTART_LIMIT','BLOCKED_SPAWN_ERROR',
+ 'BLOCKED_STANDBY_SETUP','BLOCKED_STANDBY_NOT_READY',
+ 'BLOCKED_OLD_RUNNER_CHILD_UNVERIFIED','BLOCKED_STANDBY_IPC_DELIVERY_UNKNOWN']);
 /**
  * Fixed-layout, read-only supplement to Controller/Runner status.
  * The watchdog state file is historical until timestamp and PID are checked.
@@ -139,7 +141,11 @@ export function inspectWatchdogReadOnly({filesystem=fs,watchdogHome=watchdogRoot
   guardianStop:flags.guardianStop,watchdogPause:flags.watchdogPause,
   controllerDrain:flags.controllerDrain,
   controllerInstallLease:flags.controllerInstallLease,
-  otherControllerLeases,inhibitors,diagnostics};
+  otherControllerLeases,inhibitors,diagnostics,
+  ...(stateFile?.standbyRole&&['READY','STARTING','PROMOTING','UNVERIFIED'].includes(stateFile.standbyRole)?
+   {standbyRole:stateFile.standbyRole,
+    standbyPid:Number.isSafeInteger(stateFile.standbyPid)&&stateFile.standbyPid>0?
+     stateFile.standbyPid:null}:{} )};
 }
 
 /** Non-sensitive Supervisor evidence; does not alter health or recovery verdicts. */
