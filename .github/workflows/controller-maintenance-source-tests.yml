@@ -17,6 +17,7 @@ on:
       - 'controller/standby.mjs'
       - 'tests/controller-standby.test.mjs'
       - 'tests/controller-standby-windows-isolation.test.mjs'
+      - 'tests/controller-standby-ipc-windows-isolation.test.mjs'
       - 'controller/pc-source-readonly.mjs'
       - 'tests/pc-source-readonly.test.mjs'
       - 'controller/pc-source-origin-readonly.mjs'
@@ -434,6 +435,9 @@ jobs:
       - name: Exercise R3 Standby Windows temp-only process contention and fencing
         if: steps.scope.outputs.core == 'true'
         run: node --test --test-concurrency=1 tests/controller-standby-windows-isolation.test.mjs
+      - name: Exercise R3 Standby full IPC promotion on isolated Windows TEMP fixtures
+        if: steps.scope.outputs.core == 'true'
+        run: node --test --test-concurrency=1 tests/controller-standby-ipc-windows-isolation.test.mjs
       - name: Validate fixed Watchdog B module syntax without PC writes
         if: steps.scope.outputs.watchdog == 'true'
         run: |
