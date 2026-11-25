@@ -51,11 +51,27 @@ export async function collectMetrics({repository,workflow,limit=10,request}){
  if(!Number.isInteger(limit)||limit<1||limit>20)
   throw Error('CI_METRICS_LIMIT_INVALID');
  if(typeof request!=='function')throw Error('CI_METRICS_REQUEST_REQUIRED');
- const listed=await request('actions/runs?per_page=100');
+ // Repository-wide latest 100 runs can exclude the workflow we are measuring.
+ // Use existing read-only workflow inventory to scope the subsequent runs query.
+ const inventory=await request('actions/workflows?per_page=100');
+ if(!inventory||!Array.isArray(inventory.workflows)||
+    !Number.isSafeInteger(inventory.total_count)||
+    inventory.total_count!==inventory.workflows.length||
+    inventory.workflows.length>100)
+  throw Error('CI_METRICS_WORKFLOW_INVENTORY_INCOMPLETE');
+ const matches=inventory.workflows.filter(w=>w?.name===workflow);
+ if(matches.length!==1)throw Error(matches.length?
+  'CI_METRICS_WORKFLOW_NAME_AMBIGUOUS':'CI_METRICS_WORKFLOW_NOT_FOUND');
+ const workflowId=matches[0].id;
+ if(!Number.isSafeInteger(workflowId)||workflowId<1)
+  throw Error('CI_METRICS_WORKFLOW_ID_UNVERIFIED');
+ const listed=await request('actions/workflows/'+workflowId+'/runs?per_page=100');
  if(!listed||!Array.isArray(listed.workflow_runs)||
     listed.workflow_runs.length>100||
     !Number.isSafeInteger(listed.total_count)||
-    listed.total_count<listed.workflow_runs.length)
+    listed.total_count<listed.workflow_runs.length||
+    listed.workflow_runs.some(r=>r?.workflow_id!==undefined&&
+      r.workflow_id!==workflowId))
   throw Error('CI_METRICS_RUN_LIST_UNVERIFIED');
  const runs=listed.workflow_runs.filter(r=>
   r&&r.name===workflow&&r.status==='completed'&&FINAL.has(r.conclusion)
@@ -77,7 +93,7 @@ export async function collectMetrics({repository,workflow,limit=10,request}){
  const byRunConclusion={};
  for(const run of runs)
   byRunConclusion[run.conclusion]=(byRunConclusion[run.conclusion]||0)+1;
- return {repository,workflow,scope:'MOST_RECENT_100_REPOSITORY_RUNS',
+ return {repository,workflow,workflowId,scope:'MOST_RECENT_100_WORKFLOW_RUNS',
   sampledRuns:runs.length,runIds:runs.map(r=>({id:r.id,attempt:r.run_attempt})),
   byRunConclusion,...summarizeJobs(jobs)};
 }
@@ -85,7 +101,7 @@ export async function collectMetrics({repository,workflow,limit=10,request}){
 export async function githubRead(repository,resource,token,fetcher=fetch){
  if(!REPOSITORIES.includes(repository))throw Error('CI_METRICS_REPOSITORY_NOT_ALLOWED');
  if(typeof token!=='string'||!token.trim())throw Error('CI_METRICS_TOKEN_REQUIRED');
- if(!/^(?:actions\/runs\?per_page=100|actions\/runs\/\d+\/attempts\/\d+\/jobs\?per_page=100)$/.test(resource))
+ if(!/^(?:actions\/workflows\?per_page=100|actions\/workflows\/[1-9]\d*\/runs\?per_page=100|actions\/runs\/[1-9]\d*\/attempts\/[1-9]\d*\/jobs\?per_page=100)$/.test(resource))
   throw Error('CI_METRICS_RESOURCE_NOT_ALLOWED');
  const response=await fetcher('https://api.github.com/repos/'+repository+'/'+resource,{
   method:'GET',headers:{Authorization:'Bearer '+token,
