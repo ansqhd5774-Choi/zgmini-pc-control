@@ -347,7 +347,7 @@ test('W04 57 weekly bins return exact 2,880-key aggregate and stay capped at 64'
   'CREATE TABLE market_score_employment_r4_shadow_history_v1('+cols+');');
  const insert=db.prepare('INSERT INTO market_score_employment_r4_shadow_current_v1 VALUES(?,?,?,?,?,?,?,?,?)');
  const hash='a'.repeat(64),meta=JSON.stringify({rawRecordHash:hash,
-  responseHash:raw.hash,secret:'PRIVATE_W04_SOURCE_METADATA'});
+  responseHash:raw.hash,fixtureMarker:'DUMMY'});
  const date=i=>new Date(Date.UTC(2025,6,26+7*i)).toISOString().slice(0,10);
  const regions=Array.from({length:51},(_,i)=>'REGION_'+String(i).padStart(2,'0'));
  for(let w=0;w<57;w++){
@@ -370,7 +370,7 @@ test('W04 57 weekly bins return exact 2,880-key aggregate and stay capped at 64'
  assert.equal(group.latestMissingWeekCounts.reduce((n,x)=>n+x.missingKeys,0),2880);
  assert.equal(v.pitAttested,false);assert.equal(v.repairAuthorized,false);
  assert.ok(Buffer.byteLength(JSON.stringify(report))<32768);
- assert.doesNotMatch(JSON.stringify(report),/PRIVATE_W04|REGION_\d\d|geography_code|provenance_json/);
+ assert.doesNotMatch(JSON.stringify(report),/PRIVATE_W04|DUMMY|REGION_\d\d|geography_code|provenance_json/);
  // Output remains bounded when the SQLite query observes more than 64 weeks.
  for(let w=-13;w<0;w++)
   insert.run('STATE_INITIAL_CLAIMS','STATE','REGION_00',date(w),'DOL_ETA',hash,
