@@ -26,7 +26,7 @@ const commonUrl=new URL('../controller/common.mjs',import.meta.url).href;
 const contender=[
  "import fs from 'node:fs';",
  "import {exclusive} from '"+commonUrl+"';",
- "const [root,ready,go,hold]=process.argv.slice(1);",
+ "const [root,ready,go,releaseSignal]=process.argv.slice(1);",
  "fs.writeFileSync(ready,String(process.pid),{flag:'wx'});",
  "const timer=setInterval(()=>{",
  " if(!fs.existsSync(go))return;",
@@ -34,21 +34,25 @@ const contender=[
  " try{",
  "  const release=exclusive(root,'supervisor');",
  "  process.stdout.write('ACQUIRED\\n');",
- "  setTimeout(()=>{try{release();process.exit(0);}catch{process.exit(7);}},Number(hold));",
+ "  const holdTimer=setInterval(()=>{",
+ "   if(!fs.existsSync(releaseSignal))return;",
+ "   clearInterval(holdTimer);",
+ "   try{release();process.exit(0);}catch{process.exit(7);}",
+ "  },5);",
  " }catch(e){",
  "  process.stdout.write(e.code==='LEASE_BUSY'?'BUSY\\n':'UNEXPECTED\\n');",
  "  process.exit(e.code==='LEASE_BUSY'?0:8);",
  " }",
  "},5);"
 ].join('\n');
-function contenderChild(dir,ready,go,hold=350){
+function contenderChild(dir,ready,go,releaseSignal){
  const child=spawn(process.execPath,['--input-type=module','-e',contender,
-  dir,ready,go,String(hold)],{cwd:dir,windowsHide:true,
+  dir,ready,go,releaseSignal],{cwd:dir,windowsHide:true,
   stdio:['ignore','pipe','pipe']});
  let stdout='',stderr='';
  child.stdout.on('data',x=>{stdout+=String(x);});
  child.stderr.on('data',x=>{stderr+=String(x);});
- return {child,finish:new Promise((resolve,reject)=>{
+ return {child,output:()=>stdout,finish:new Promise((resolve,reject)=>{
   const timeout=setTimeout(()=>{child.kill();reject(Error('CONTENDER_TIMEOUT'));},6000);
   child.on('error',e=>{clearTimeout(timeout);reject(e);});
   child.on('close',(code,signal)=>{clearTimeout(timeout);
@@ -65,11 +69,17 @@ async function until(predicate,timeout=3000){
  throw Error('ISOLATED_FIXTURE_TIMEOUT');
 }
 test('WIN-T01 two Windows contenders obtain exactly one atomic Supervisor owner',windows,async()=>{
- const dir=root(),go=path.join(dir,'go'),a=path.join(dir,'a'),b=path.join(dir,'b');
- const c1=contenderChild(dir,a,go),c2=contenderChild(dir,b,go);
+ const dir=root(),go=path.join(dir,'go'),release=path.join(dir,'release'),
+  a=path.join(dir,'a'),b=path.join(dir,'b');
+ const c1=contenderChild(dir,a,go,release),c2=contenderChild(dir,b,go,release);
  try{
   await until(()=>fs.existsSync(a)&&fs.existsSync(b));
   fs.writeFileSync(go,'now',{flag:'wx'});
+  // Do not release the first owner's lease on a timer: a delayed second
+  // contender must observe BUSY, not a sequentially reacquired lease.
+  await until(()=>[c1.output(),c2.output()].some(x=>x.includes('ACQUIRED'))&&
+    [c1.output(),c2.output()].some(x=>x.includes('BUSY')),4500);
+  fs.writeFileSync(release,'done',{flag:'wx'});
   const res=await Promise.all([c1.finish,c2.finish]);
   assert.equal(res.filter(x=>x.stdout==='ACQUIRED').length,1,JSON.stringify(res));
   assert.equal(res.filter(x=>x.stdout==='BUSY').length,1,JSON.stringify(res));
