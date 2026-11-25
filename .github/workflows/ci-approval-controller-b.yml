@@ -2,7 +2,8 @@ name: ZGMINI CI Controller B Submission
 on:
   push:
     branches: [main]
-    paths: ['approvals/controller-updates/*.json', 'controller/**']
+    # A source PR may finish CI before merging; its main push wakes the gated pipeline.
+    paths: ['approvals/controller-updates/*.json', 'controller/**', 'ci-approval/**']
   workflow_run:
     workflows: ['ZGMINI Controller Maintenance Source Tests']
     types: [completed]
@@ -48,7 +49,7 @@ jobs:
       # event's main revision, candidate PR or mutable branch.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: 4f4c59872d4123160208d46f73cb7338beea3ac1
+          ref: a9c6cc74c5dc6a6814c07c64413cdd0b4c60229b
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:

@@ -158,6 +158,9 @@ test('submission workflow is activation-gated, source-event driven and pinned to
  assert.match(trigger,/push:\s+branches: \[main\]/);
  assert.match(trigger,/workflow_run:\s+workflows: \['ZGMINI Controller Maintenance Source Tests'\]\s+types: \[completed\]/);
  assert.match(trigger,/'controller\/\*\*'/);
+ // A merged CI automation source change must not be lost to push path filtering.
+ assert.match(trigger,/'ci-approval\/\*\*'/);
+ assert.match(trigger,/'approvals\/controller-updates\/\*\.json'/);
  assert.doesNotMatch(trigger,/pull_request:|workflow_dispatch:|schedule:/);
  assert.match(y,/permissions: \{\}/);
  assert.match(y,/vars\.ZGMINI_CI_CONTROLLER_B_ENABLED == 'true'/);
@@ -165,7 +168,7 @@ test('submission workflow is activation-gated, source-event driven and pinned to
  assert.match(y,/name: Record Controller B request receipt/);
  // Keep the privileged workflow on the last reviewed 4/4-green publisher source.
  // A publisher implementation change requires an explicit new fixed pin.
- assert.match(y,/ref: 4f4c59872d4123160208d46f73cb7338beea3ac1\s+persist-credentials: false/);
+ assert.match(y,/ref: a9c6cc74c5dc6a6814c07c64413cdd0b4c60229b\s+persist-credentials: false/);
  assert.match(y,/run: node ci-approval\/completed-run-intake\.mjs --publish-existing/);
  assert.match(y,/cancel-in-progress: false/);
  assert.match(y,/github\.event\.workflow_run\.conclusion == 'success'/);
@@ -175,6 +178,35 @@ test('submission workflow is activation-gated, source-event driven and pinned to
  assert.match(y,/contents: write/);
  assert.match(y,/pull-requests: write/);
  assert.doesNotMatch(y,/id-token: write|administration: write|persist-credentials: true/);
+});
+
+test('configured source merge becomes eligible on first main push containing it',async()=>{
+ const merged='b'.repeat(40),before='a'.repeat(40),after='d'.repeat(40);
+ const push={repository:{...repository},ref:'refs/heads/main',deleted:false,
+  forced:false,before,after};
+ const policy={targetSha:'c'.repeat(40),sourcePrNumber:28,approvalPrNumber:29};
+ const source={number:28,merged:true,merge_commit_sha:merged,
+  base:{ref:'main',repo:repository},head:{ref:'codex/source',repo:repository,sha:'e'.repeat(40)}};
+ const reads=[];
+ const getJson=async route=>{
+  reads.push(route);
+  if(route==='pulls/28')return source;
+  if(route==='compare/'+merged+'...'+before)return {status:'diverged',behind_by:1};
+  if(route==='compare/'+merged+'...'+after)return {status:'ahead',behind_by:0,
+   base_commit:{sha:merged},merge_base_commit:{sha:merged}};
+  throw Error('unexpected route: '+route);
+ };
+ let writes=0;
+ const result=await publishConfiguredControllerApproval(push,{policy,getJson,
+  runId:123,attempt:1,emitReceipt:()=>assert.fail('no receipt expected'),
+  ports:{readAutoApprovalContext:()=>{},readApprovalPrFiles:()=>{},
+   mergeApprovalPr:()=>{writes++;throw Error('must not merge')},
+   readRepository:async()=>null}});
+ assert.equal(result.state,'PUBLICATION_PROCESSED');
+ assert.equal(result.results[0].code,'MAINTENANCE_CI_REPOSITORY_DENIED');
+ assert.equal(writes,0);
+ assert.deepEqual(reads,['pulls/28','compare/'+merged+'...'+before,
+  'compare/'+merged+'...'+after]);
 });
 
 test('configured auto approval context binds initial grant and exact PR scope',async()=>{
