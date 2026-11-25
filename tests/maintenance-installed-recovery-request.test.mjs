@@ -306,9 +306,6 @@ test('W04 #3516 tampered approval fails before a recovery claim',async t=>{
  for(const mutant of [
   x=>({...x,proof:{...x.proof,issueNumber:3409}}),
   x=>({...x,proof:{...x.proof,resultPath:'results/unapproved.json'}}),
-  x=>({...x,sourceSha:'f'.repeat(40)}),
-  x=>({...x,requestId:W04_INSTALLED_RECOVERY_ORIGINAL_ID}),
-  x=>({...x,approved:false})
  ])await t.test('tampered proof or source',async t2=>{
   const f=setup(t2,{which:'w04-3516',approvalMutation:mutant});
   const out=await f.agent.pollOnce();
@@ -316,4 +313,12 @@ test('W04 #3516 tampered approval fails before a recovery claim',async t=>{
   assert.equal(f.stats.recoveries,0);
   assert.equal(f.agent.loadLedger(f.request.requestId),null);
  });
+});
+
+test('W04 #3516 wrong approval identity is rejected before Issue construction',()=>{
+ for(const mutant of [
+  x=>({...x,sourceSha:'f'.repeat(40)}),
+  x=>({...x,requestId:W04_INSTALLED_RECOVERY_ORIGINAL_ID}),
+  x=>({...x,approved:false})
+ ])assert.throws(()=>prepareInstalledRecoveryRequest(approved(mutant,'w04-3516')));
 });
