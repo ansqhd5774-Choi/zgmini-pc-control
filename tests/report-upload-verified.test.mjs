@@ -463,3 +463,55 @@ test('invalid policy permits only original fixed BLOCKED policy-error receipt up
  assert.throws(()=>resolveUploadPolicy('{bad',{pointer,...spec,runId:'123/4'}),
   {code:'REPORT_POLICY_UNAVAILABLE'});
 });
+
+test('#3650 selective B one-file approval binds installed SHA and tested upload bytes',async()=>{
+ const {manifestFingerprint,validateControllerSelectivePin,
+  validateControllerOnlyInstallDelta,validateUpdateRequest,
+  MAINTENANCE_ISSUE_SCHEMA,CONTROL_REPOSITORY}=await import('../tools/maintenance-contract.mjs');
+ const installed='60f37de24cbad4adc0b6ee9eee3c98a43160443d';
+ const target='4851f1ff1d04c86151c67578ea7a221f40081897';
+ const selected='codex/report-upload-3650-selective-60f-20261126';
+ const sourceMain='f75ad5adc7a1c30b32d9a2160fc45d6a516fbaf1';
+ const file='controller/report-upload-verified.mjs';
+ const approvedUrl='https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3656';
+ const raw=fs.readFileSync(new URL('../approvals/controller-updates/'+target+'.json',import.meta.url));
+ const manifest=JSON.parse(raw);
+ const pin=JSON.parse(fs.readFileSync(new URL('../approvals/controller-selective-targets/'+target+'.json',import.meta.url)));
+ const source=fs.readFileSync(new URL('../'+file,import.meta.url));
+ const hash=value=>createHash('sha256').update(value).digest('hex');
+ assert.equal(manifest.installedSha,installed);
+ assert.equal(manifest.targetSha,target);
+ assert.equal(manifest.purpose,'pc-controller-maintenance');
+ assert.equal(manifest.controllerOnlyInstall,true);
+ assert.equal(manifest.approval.ref,approvedUrl);
+ assert.equal(manifest.approval.grade,'B');
+ assert.equal(manifest.approval.scope,'PC_CONTROL_CONTROLLER_UPDATE');
+ assert.equal(manifest.selectiveSource.branch,selected);
+ assert.equal(manifest.selectiveSource.mainSha,sourceMain);
+ assert.deepEqual(manifest.selectiveSource.customPaths,[]);
+ assert.equal(manifest.selectiveSource.schema,'ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1');
+ assert.deepEqual(manifest.allowFiles.map(x=>x.path),[file]);
+ assert.equal(manifest.allowFiles[0].sha256,hash(source));
+ assert.equal(manifest.allowFiles[0].sha256,'65639a1281c1a39bf35bed773c1814aa973c38cd88bdb45a87f0081730887585');
+ assert.equal(manifest.checks.manifestSha256,manifestFingerprint(manifest.allowFiles).sha256);
+ assert.equal(manifest.checks.status,'PASS');
+ assert.equal(manifest.checks.targetSha,target);
+ assert.equal(manifest.backup.strategy,'VERSIONED_SNAPSHOT');
+ assert.equal(manifest.backup.rollback.sha,installed);
+ assert.equal(manifest.backup.rollback.kind,'RESTORE_INSTALLED_SHA');
+ assert.equal(manifest.postOperation,'core-status');
+ assert.equal(manifest.postSourceBranch,'main');
+ assert.equal(manifest.postSourceSha,'b6049aac81b3442a58b08050ee138921f87a09e6');
+ assert.equal(validateControllerSelectivePin(manifest,pin),true);
+ assert.equal(validateControllerOnlyInstallDelta([file],manifest.allowFiles),true);
+ assert.throws(()=>validateControllerOnlyInstallDelta([file,'controller/operations.mjs'],manifest.allowFiles),
+  /ALLOWFILE_DIFF_MISMATCH/);
+ const request={schema:MAINTENANCE_ISSUE_SCHEMA,
+  requestId:'pc-update-71b68f93-61e6-4b6e-8cf3-45f61fa50618',
+  chatId:'chat-report-upload-3650-selective-b-20261126',
+  operation:'controller-update',controlRepository:CONTROL_REPOSITORY,
+  targetControllerSha:target,approvalManifestSha256:hash(raw)};
+ assert.equal(validateUpdateRequest(request,raw,{actor:'ansqhd5774-Choi',installedSha:installed}).manifest.targetSha,target);
+ assert.throws(()=>validateUpdateRequest(request,raw,{actor:'ansqhd5774-Choi',installedSha:'a'.repeat(40)}),
+  /UPDATE_INSTALLED_SOURCE_DRIFT/);
+});
