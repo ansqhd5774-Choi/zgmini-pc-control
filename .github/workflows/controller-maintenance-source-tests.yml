@@ -186,6 +186,9 @@ on:
       - 'tests/engine.test.mjs'
       - 'tests/maintenance-agent.test.mjs'
       - 'tests/maintenance-installed-recovery-request.test.mjs'
+      - 'tools/operator-packets/w04-3516-recovery-once.mjs'
+      - 'tools/operator-packets/W04_3516_INDEPENDENT_RECOVERY_ONCE_V1.cmd'
+      - 'tests/w04-3516-operator-once.test.mjs'
       - 'tests/maintenance-lock.test.mjs'
       - 'tests/source-bundle-register.test.mjs'
       - 'tests/source-inventory-runtime-readonly.test.mjs'
@@ -296,6 +299,9 @@ jobs:
       - name: Verify W04 fixed-key D1 readback without network or operational effects
         if: steps.scope.outputs.core == 'true'
         run: node --test --test-concurrency=1 tests/employment-r6-d1-readback-readonly.test.mjs
+      - name: Verify exact W04 #3516 independent Windows C package without operating PC access
+        if: hashFiles('tests/w04-3516-operator-once.test.mjs') != ''
+        run: node --test --test-concurrency=1 tests/w04-3516-operator-once.test.mjs
       - name: Run scoped maintenance and Controller runtime safety regressions
         if: steps.scope.outputs.core == 'true'
         run: node --test --test-concurrency=1 tests/maintenance-agent.test.mjs tests/maintenance-installed-recovery-request.test.mjs tests/maintenance-lock.test.mjs tests/maintenance-contract.test.mjs tests/maintenance-request.test.mjs tests/source-bundle-register.test.mjs tests/controller-heavy-only-install.test.mjs tests/controller-selective-source.test.mjs tests/maintenance-apply.test.mjs tests/core-runtime-source-readonly.test.mjs tests/core-task-observation.test.mjs tests/controller-core-lock-source-contract.test.mjs tests/supervisor-status-write.test.mjs tests/runner-watchdog.test.mjs tests/watchdog-b-upgrade.test.mjs tests/watchdog-b-protection-r2.test.mjs tests/watchdog-protected-drift.test.mjs tests/watchdog-guardian-activation.test.mjs tests/watchdog-activation-first-fail.test.mjs tests/watchdog-handoff-firstfail.test.mjs tests/rollback-stalled-claim.test.mjs tests/rollback-first-evidence.test.mjs
