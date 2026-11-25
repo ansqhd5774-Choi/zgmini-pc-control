@@ -254,3 +254,57 @@ test('RUM B V2 uses corrected source merge and cannot silently overwrite ER1',()
   'controller/market-calendar-er1-dec31-evidence-readonly.mjs'
  ],CORRECTED_MAN.allowFiles),/ALLOWFILE_DIFF_MISMATCH/);
 });
+
+test('missing economic mobile INP triggers one scoped browser query, without altering P75',async()=>{
+ const baseline=rows().map(r=>({...r,sum:{lcpTotal:2,inpTotal:2,clsTotal:2}}));
+ baseline[2]={...baseline[2],count:2,
+  quantiles:{...Q,interactionToNextPaintP75:-1},
+  sum:{lcpTotal:2,inpTotal:0,clsTotal:2}};
+ const browser=JSON.stringify({data:{viewer:{accounts:[{
+  rumWebVitalsEventsAdaptiveGroups:[{count:2,dimensions:{
+   requestHost:'zgmini.kr',requestPath:'/economic-indicators/',
+   deviceType:'mobile',userAgentBrowser:'Safari',browserVersion:'18.6',
+   browserEngine:'WebKit',browserEngineVersion:'620.3'},sum:{inpTotal:0}}]}]}}});
+ const responses=[body(baseline),browser],calls=[];
+ const fetchImpl=async(url,opt)=>{
+  calls.push({url,...opt});
+  return {status:200,headers:{get:()=>null},text:async()=>responses.shift()};
+ };
+ const x=await queryCloudflareRum({account:ACCOUNT,token:TOKEN,fetchImpl,nowMs:NOW});
+ assert.equal(x.status,'STATE_UNKNOWN');
+ assert.equal(x.code,'CF_RUM_FIELD_INCOMPLETE');
+ assert.equal(x.cloudflareApiCalls,2);
+ assert.equal(calls.length,2);
+ assert.equal(calls[0].url,GRAPHQL_ENDPOINT);
+ assert.equal(calls[1].url,GRAPHQL_ENDPOINT);
+ assert.equal(calls[1].method,'POST');
+ assert.match(JSON.parse(calls[1].body).query,/requestPath: "\/economic-indicators\//);
+ assert.match(JSON.parse(calls[1].body).query,/deviceType: "mobile"/);
+ assert.equal(x.browserEvidence.status,'BROWSER_GROUPS_PRESENT');
+ assert.equal(x.browserEvidence.countsMatchPrimaryGroup,true);
+ assert.equal(x.browserEvidence.groups[0].browserVersion,'18.6');
+ assert.equal(x.browserEvidence.rootCause,'UNVERIFIED');
+ assert.equal(x.observations[2].metrics.inpMs.p75,null);
+ assert.equal(x.observations[2].metricReportedTotals.inpMs,0);
+ assert.equal(x.metricSampleSizesVerified,false);
+ assert.equal(x.siteGoodCertified,false);
+ assert.doesNotMatch(JSON.stringify(x),new RegExp(TOKEN+'|'+ACCOUNT));
+});
+test('optional browser read failures cannot erase verified RUM measurements',async()=>{
+ const baseline=rows().map(r=>({...r,sum:{lcpTotal:2,inpTotal:2,clsTotal:2}}));
+ baseline[2]={...baseline[2],count:2,
+  quantiles:{...Q,interactionToNextPaintP75:-1},
+  sum:{lcpTotal:2,inpTotal:0,clsTotal:2}};
+ let calls=0;
+ const x=await queryCloudflareRum({account:ACCOUNT,token:TOKEN,nowMs:NOW,
+  fetchImpl:async()=>{calls++;
+   return calls===1?{status:200,headers:{get:()=>null},text:async()=>body(baseline)}:
+    {status:403,headers:{get:()=>null},text:async()=>''};
+  }});
+ assert.equal(calls,2);
+ assert.equal(x.code,'CF_RUM_FIELD_INCOMPLETE');
+ assert.equal(x.observations[0].metrics.inpMs.p75,180);
+ assert.equal(x.observations[2].metrics.inpMs.p75,null);
+ assert.equal(x.browserEvidence.status,'UNVERIFIED');
+ assert.equal(x.siteGoodCertified,false);
+});

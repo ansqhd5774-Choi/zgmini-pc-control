@@ -19,6 +19,19 @@ export const GRAPHQL_QUERY=[
  'quantiles {largestContentfulPaintP75 interactionToNextPaintP75 cumulativeLayoutShiftP75}',
  '} } } }'
 ].join(' ');
+// Browser/engine evidence only for the missing economic-mobile INP.
+// This separate read-only query never changes the existing four P75 groups.
+export const RUM_BROWSER_QUERY=[
+ 'query ZgminiRumMissingInpBrowser($account: string!, $start: Time!, $end: Time!) {',
+ 'viewer { accounts(filter: {accountTag: $account}) {',
+ 'rumWebVitalsEventsAdaptiveGroups(limit: 30,',
+ 'filter: {datetime_geq: $start, datetime_leq: $end, requestHost: "zgmini.kr",',
+ 'requestPath: "/economic-indicators/", deviceType: "mobile", bot: 0}) {',
+ 'count dimensions {requestHost requestPath deviceType',
+ 'userAgentBrowser browserVersion browserEngine browserEngineVersion}',
+ 'sum {inpTotal}', 
+ '} } } }'
+].join(' ');
 const fail=code=>{throw Object.assign(new Error(code),{code});};
 const obj=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const utc=v=>typeof v==='string'&&
@@ -33,6 +46,10 @@ export function buildRumQuery({accountTag,startUtc,endUtc}={}){
  return {endpoint:GRAPHQL_ENDPOINT,method:'POST',query:GRAPHQL_QUERY,
   variables:{account:accountTag,start:startUtc,end:endUtc},
   registeredOperation:false,networkExecuted:false};
+}
+export function buildRumBrowserQuery(args={}){
+ const base=buildRumQuery(args);
+ return {...base,query:RUM_BROWSER_QUERY};
 }
 const metric=(value,limit,scale)=>{
  if(value!==undefined&&value!==null&&
@@ -142,4 +159,50 @@ export function parseRumGraphql(response,{startUtc,endUtc}={}){
   siteGoodCertified:false,cruxEquivalent:false,
   metricSampleSizesVerified:false,mergeBlocking:false,
   nonTargetDeviceGroups,observations};
+}
+
+// These are aggregate browser-version labels, never raw User-Agent strings,
+// personal identifiers, per-visitor events, or verified INP sample counts.
+// A browser grouping cannot establish whether an individual clicked.
+const safeBrowser=(value,version=false)=>{
+ if(typeof value!=='string'||value.length<1||value.length>48)return 'UNVERIFIED';
+ const allowed=version?/^[0-9A-Za-z][0-9A-Za-z._+-]{0,47}$/:/^[0-9A-Za-z][0-9A-Za-z ._+-]{0,47}$/;
+ return allowed.test(value)?value:'UNVERIFIED';
+};
+export function parseRumBrowserGraphql(response,{startUtc,endUtc}={}){
+ if(!validWindow(startUtc,endUtc))fail('CF_RUM_WINDOW_INVALID');
+ if(!obj(response)||response.errors?.length)
+  fail('CF_RUM_BROWSER_GRAPHQL_INVALID');
+ const accounts=response.data?.viewer?.accounts;
+ if(!Array.isArray(accounts)||accounts.length!==1)
+  fail('CF_RUM_BROWSER_ACCOUNT_INVALID');
+ const rows=accounts[0]?.rumWebVitalsEventsAdaptiveGroups;
+ if(!Array.isArray(rows)||rows.length>30)
+  fail('CF_RUM_BROWSER_GROUPS_INVALID');
+ const groups=[],seen=new Set();
+ for(const row of rows){
+  if(!obj(row)||!obj(row.dimensions)||!Number.isSafeInteger(row.count)||
+     row.count<0||!obj(row.sum)||typeof row.sum.inpTotal!=='number'||
+     !Number.isFinite(row.sum.inpTotal)||row.sum.inpTotal<0)
+   fail('CF_RUM_BROWSER_GROUP_SHAPE_INVALID');
+  const d=row.dimensions;
+  if(d.requestHost!==RUM_HOST||d.requestPath!=='/economic-indicators/'||
+     String(d.deviceType).toLowerCase()!=='mobile'|| 
+     (d.bot!==undefined&&d.bot!==0))continue;
+  const group={browser:safeBrowser(d.userAgentBrowser),
+   browserVersion:safeBrowser(d.browserVersion,true),
+   browserEngine:safeBrowser(d.browserEngine),
+   browserEngineVersion:safeBrowser(d.browserEngineVersion,true),
+   groupEventCount:row.count,
+   reportedInpTotal:row.sum.inpTotal};
+  const key=[group.browser,group.browserVersion,group.browserEngine,
+   group.browserEngineVersion].join('|');
+  if(seen.has(key))fail('CF_RUM_BROWSER_DUPLICATE_GROUPS');
+  seen.add(key);groups.push(group);
+ }
+ // Return no more than 30 fixed-scope aggregate groups.
+ return {status:groups.length?'BROWSER_GROUPS_PRESENT':'NO_BROWSER_GROUPS',
+  scope:'ECONOMIC_MOBILE_RUM_WEB_VITALS_EVENTS',
+  metricSampleSizesVerified:false,actualInputObserved:'UNVERIFIED',
+  rootCause:'UNVERIFIED',groups};
 }
