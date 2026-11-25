@@ -140,3 +140,111 @@ test('R3 snapshot CAS uses exact installed R2 bytes and existing health, no new 
  assert.throws(()=>verifyWatchdogUpgradeSnapshot({...sample,existingClaim:true}),
   /WATCHDOG_B_PREIMAGE_SHA_MISMATCH/);
 });
+
+import {
+ R4_TARGET,R4_SOURCE_SHA256,R4_PREIMAGE_SHA256,R4_INSTALL_PREIMAGE_SHA256,
+ R4_MANIFEST_SCHEMA,R4_SCOPE,R4_BASIS,R4_STANDBY,R4_CONTROLLER_FILES,
+ validateR4Request,verifyR4ControllerHost,projectR4InstalledManifest,rawSha256
+} from '../watchdog-b/standby-r4-contract.mjs';
+
+function fixtureR4(){
+ const x=fixture();
+ x.body.targetSha=R4_TARGET;
+ x.approval={
+  schema:R4_MANIFEST_SCHEMA,approved:true,scope:R4_SCOPE,
+  installedSha256:R4_PREIMAGE_SHA256,
+  installedManifestSha256:R4_INSTALL_PREIMAGE_SHA256,
+  targetSha:R4_TARGET,targetSha256:R4_SOURCE_SHA256,
+  fromScope:FINAL_SCOPE,toScope:FINAL_SCOPE,
+  allowedFiles:['pc-watchdog/runner-watchdog.mjs','pc-watchdog/INSTALL.json'],
+  operation:'watchdog-b-upgrade',approvalBasis:R4_BASIS,revision:4,
+  expectedControllerSha:R4_TARGET,
+  expectedControllerFiles:{...R4_CONTROLLER_FILES},
+  protectionPolicy:'CURRENT_CAS_WITH_HISTORICAL_KEY_PRESENCE',
+  standby:{...R4_STANDBY}
+ };
+ x.installed={scope:FINAL_SCOPE,sha256:R4_PREIMAGE_SHA256,
+  approvedTargetSourceSha:NEXT_TARGET,
+  startupSha256:'b'.repeat(64),priorStartupSha256:'c'.repeat(64)};
+ x.sourceDigest=R4_SOURCE_SHA256;
+ x.installedManifestDigest=R4_INSTALL_PREIMAGE_SHA256;
+ return x;
+}
+const admitR4=x=>validateR4Request(x.event,x.body,x.approval,x.installed,
+ x.sourceDigest,x.approvalDigest,x.installedManifestDigest);
+
+test('R4 pins exact real Watchdog byte preimage and distinct INSTALL raw hash',()=>{
+ assert.equal(rawSha256(Buffer.from('abc')),
+  'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+ assert.notEqual(R4_PREIMAGE_SHA256,R4_INSTALL_PREIMAGE_SHA256);
+ assert.notEqual(R4_PREIMAGE_SHA256,R4_SOURCE_SHA256);
+ const x=fixtureR4(),plan=admitR4(x);
+ assert.equal(plan.targetSha,R4_TARGET);
+ assert.equal(plan.oldSha,R4_PREIMAGE_SHA256);
+ assert.equal(plan.newSha,R4_SOURCE_SHA256);
+ assert.equal(plan.oldManifestSha,R4_INSTALL_PREIMAGE_SHA256);
+ assert.deepEqual(parseCanonicalBody(JSON.stringify(x.body)),x.body);
+});
+
+test('R4 admission fails closed for old manifest drift, approval and wrong source',()=>{
+ const mutations=[
+  x=>x.event.sender.login='untrusted',
+  x=>x.event.issue.labels=[],
+  x=>x.body.targetSha=NEXT_TARGET,
+  x=>x.body.command='shell',
+  x=>x.approval.approved=false,
+  x=>x.approval.revision=3,
+  x=>x.approval.approvalBasis='other',
+  x=>x.approval.scope='OTHER',
+  x=>x.approval.expectedControllerSha=NEXT_TARGET,
+  x=>x.approval.expectedControllerFiles['controller/standby.mjs']='0'.repeat(64),
+  x=>x.approval.targetSha256='0'.repeat(64),
+  x=>x.approval.standby.mode='ACTIVE_2_STANDBY_0',
+  x=>x.approval.standby.approved=false,
+  x=>x.approval.allowedFiles.push('controller/engine.mjs'),
+  x=>x.sourceDigest='0'.repeat(64),
+  x=>x.approvalDigest='0'.repeat(64),
+  x=>x.installedManifestDigest='0'.repeat(64),
+  x=>x.installed.sha256='0'.repeat(64),
+  x=>x.installed.scope=INITIAL_SCOPE,
+  x=>x.installed.standby={mode:'ACTIVE_1_STANDBY_1',approved:true},
+  x=>x.installed.approvedTargetSourceSha=TARGET,
+ ];
+ for(const change of mutations){
+  const x=fixtureR4();change(x);
+  assert.throws(()=>admitR4(x),/WATCHDOG_R4_/);
+ }
+});
+
+test('R4 Controller must already be installed with exact five standby file hashes',()=>{
+ const host={controllerSourceSha:R4_TARGET,controllerFiles:{
+  ...R4_CONTROLLER_FILES,'controller/extra.mjs':'d'.repeat(64)}};
+ assert.equal(verifyR4ControllerHost(host),true);
+ for(const mutation of [
+  x=>{x.controllerSourceSha=NEXT_TARGET;},
+  x=>{delete x.controllerFiles['controller/standby.mjs'];},
+  x=>{x.controllerFiles['controller/engine.mjs']='f'.repeat(64);},
+  x=>{x.controllerFiles=[];}
+ ]){
+  const actual={controllerSourceSha:host.controllerSourceSha,
+   controllerFiles:{...host.controllerFiles}};
+  mutation(actual);
+  assert.throws(()=>verifyR4ControllerHost(actual),/WATCHDOG_R4_/);
+ }
+});
+
+test('R4 projected B stage changes only approved Watchdog fields, never input',()=>{
+ const x=fixtureR4(),plan=admitR4(x);
+ const installed=structuredClone(x.installed),at='2026-11-26T00:01:00.000Z';
+ const changed=projectR4InstalledManifest(installed,plan,at);
+ assert.deepEqual(changed,{...installed,sha256:R4_SOURCE_SHA256,
+  scope:FINAL_SCOPE,approvedTargetSourceSha:R4_TARGET,
+  standby:{mode:'ACTIVE_1_STANDBY_1',approved:true},upgradedAt:at});
+ assert.equal(installed.standby,undefined);
+ assert.notEqual(changed.sha256,installed.sha256);
+ for(const patch of [{...plan,targetSha:NEXT_TARGET},
+  {...plan,oldSha:'0'.repeat(64)},undefined]){
+  assert.throws(()=>projectR4InstalledManifest(installed,patch,at),
+   /WATCHDOG_R4_INSTALL_PROJECTION_INVALID/);
+ }
+});
