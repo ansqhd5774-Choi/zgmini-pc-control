@@ -322,3 +322,53 @@ test('W04 #3516 wrong approval identity is rejected before Issue construction',(
   x=>({...x,approved:false})
  ])assert.throws(()=>prepareInstalledRecoveryRequest(approved(mutant,'w04-3516')));
 });
+
+test('committed #3516 recovery manifest pins exact source, seven CAS and independent A without a PC effect',()=>{
+ const dir='../approvals/maintenance-recoveries/';
+ const name='pc-update-c087fa10-88e2-42e3-bc60-c758ab93f0c1.installed.json';
+ const canonical=JSON.parse(fs.readFileSync(new URL(dir+name,import.meta.url),'utf8'));
+ const candidate=JSON.parse(fs.readFileSync(new URL(dir+'candidates/'+name,import.meta.url),'utf8'));
+ assert.equal(candidate.approved,false);
+ assert.equal(canonical.approved,true);
+ const {approved:ignoredApproval,note:ignoredNote,...canonicalScope}=canonical;
+ const {approved:candidateApproval,note:candidateNote,...candidateScope}=candidate;
+ assert.deepEqual(canonicalScope,candidateScope);
+ assert.equal(canonical.requestId,W04_3516_INSTALLED_RECOVERY_ORIGINAL_ID);
+ assert.equal(canonical.issueNumber,3516);
+ assert.equal(canonical.sourceSha,W04_3516_INSTALLED_RECOVERY_SOURCE_SHA);
+ assert.equal(canonical.targetControllerSha,W04_3516_INSTALLED_RECOVERY_CONTROLLER_SHA);
+ assert.equal(canonical.proof.issueNumber,3528);
+ assert.equal(canonical.proof.runId,45579963186);
+ assert.equal(canonical.proof.jobId,139087219551);
+ assert.equal(canonical.proof.runnerName,'zgmini-pc-03');
+ assert.deepEqual(Object.keys(canonical.casDigests).sort(),[
+  'ledgerSha256','ownerSha256','markerSha256','backlogSha256',
+  'snapshotSha256','protectionSha256','writerSha256'].sort());
+ assert.equal(canonical.approvedCurrentWriterConfigSha256,
+  canonical.casDigests.writerSha256);
+ assert.equal(canonical.files.length,4);
+ const expectedPaths=['tools/maintenance-recovery.mjs','tools/update.mjs',
+  'tools/maintenance-contract.mjs','controller/fixed-readonly-bytes.mjs'];
+ for(const {path:rel,sha256} of canonical.files){
+  assert.ok(expectedPaths.includes(rel),rel);
+  const bytes=fs.readFileSync(new URL('../'+rel,import.meta.url));
+  assert.equal(digest(bytes),sha256,rel);
+ }
+ const proofBytes=fs.readFileSync(
+  new URL('../'+canonical.proof.resultPath,import.meta.url));
+ assert.equal(digest(proofBytes),canonical.proof.resultSha256);
+ const observed=JSON.parse(proofBytes).w043516MaintenanceStatus;
+ assert.equal(observed.historicalRequest.status,'RECOVERY_REQUIRED');
+ assert.equal(observed.historicalRequest.code,'POSTCHECK_OUTCOME_UNKNOWN');
+ assert.equal(observed.historicalRequest.postIssueNumber,3519);
+ assert.equal(observed.recoveryCas.recoveryEligible,false);
+ assert.deepEqual(observed.recoveryCas.casDigests,canonical.casDigests);
+ // This constructs the already-approved receiver envelope in memory only;
+ // it must not submit a new Issue or assert that the operating PC has run it.
+ const raw=fs.readFileSync(new URL(dir+name,import.meta.url));
+ const request=prepareInstalledRecoveryRequest(raw,{chatId:'chat-3516-exact-approval-source-test'});
+ assert.equal(request.operation,INSTALLED_RECOVERY_OPERATION);
+ assert.equal(request.approvalManifestSha256,digest(raw));
+ assert.equal(request.targetControllerSha,canonical.targetControllerSha);
+ assert.notEqual(request.requestId,canonical.requestId);
+});
