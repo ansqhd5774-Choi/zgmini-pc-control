@@ -11,7 +11,7 @@ import {
 } from '../tools/maintenance-contract.mjs';
 
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const target='8c4d5234cb4e4b60c8e057946724ae9438eea471';
+const target='b91340d5047daf753e1c17a5c966e4d2aecea586';
 const installed='53fe24e22446d21a9fd4ee308d12b7cba7f37e25';
 const manifestPath=path.join(root,'approvals/controller-updates',target+'.json');
 const pinPath=path.join(root,'approvals/controller-selective-targets',target+'.json');
@@ -50,10 +50,10 @@ test('R3 selective Controller B reuses exact installed-base pin and existing con
  assert.equal(validateControllerSelectivePin(manifest,pin),true);
  assert.deepEqual(manifest.allowFiles.map(x=>x.path),files);
  assert.equal(manifest.allowFiles.find(x=>x.path==='controller/operations.mjs')?.sha256,
-  'e23bd680967e82b40177eb861a245382b433f6612208d5ac2217c573daa0cea3');
+  'd4a76910806cba861b3253f5fd24eccc8968fcbaa66133999483034b2f661cd3');
  assert.deepEqual([...manifest.selectiveSource.customPaths].sort(),files);
  assert.equal(pin.sourceMainSha,'f09f5a5510bd11e6e6f869ea1728d940939a5e59');
- assert.equal(pin.targetBranch,'codex/controller-standby-selective-r3-sixfile-20261126');
+ assert.equal(pin.targetBranch,'codex/controller-standby-selective-r3-minimal-20261126');
  assert.equal(pin.approvalRef,'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3752');
 });
 test('R3 selective manifest refuses extra operations, SHA, and unapproved files',()=>{
