@@ -1595,6 +1595,27 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
      issueNumber:postIssueNumber,state:'ISSUE_CREATED',code:'POSTCHECK_ISSUE_CREATED',
      runId:null,jobId:null,observedAtUtc:new Date().toISOString()}});
    }
+   // The bot receipt can arrive between the periodic Run/Job probes.
+   // Reuse one bounded read-only lookup to bind its exact completed execution.
+   const lookupPostcheckRunAndJobs=()=>{
+    const liveIssue=github('issues/'+postIssueNumber);
+    const openedAt=Date.parse(liveIssue.created_at??'');
+    need(Number.isFinite(openedAt),'POSTCHECK_ISSUE_TIME_UNVERIFIED');
+    const untilAt=openedAt+900000;
+    const window=`${new Date(openedAt).toISOString()}..${new Date(untilAt).toISOString()}`;
+    const runs=readAllMaintenancePages(page=>github(
+     `actions/workflows/pc-job.yml/runs?event=issues&created=${encodeURIComponent(window)}&per_page=100&page=${page}`).workflow_runs,
+     {maxPages:3});
+    const expectedTitle=`PC Update ${issue.requestId} postcheck`;
+    const linkedRuns=runs.filter(r=>r.event==='issues'&&r.display_title===expectedTitle&&
+     Number.isFinite(Date.parse(r.created_at))&&
+     Date.parse(r.created_at)>=openedAt&&Date.parse(r.created_at)<=untilAt);
+    const selected=selectMaintenancePostcheckRun(linkedRuns);
+    const jobs=selected?readAllMaintenancePages(page=>github(
+     `actions/runs/${selected.id}/jobs?per_page=100&page=${page}`).jobs,
+     {maxPages:3}):null;
+    return {liveIssue,runs,selected,jobs};
+   };
    for(let n=0;n<100;n++){
     let comments;
     try{comments=readAllMaintenancePages(page=>github(`issues/${postIssueNumber}/comments?per_page=100&page=${page}`));}
@@ -1618,12 +1639,41 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
      // The bot-reported payload is a different event from verified execution.
      // Preserve the observed status/source comparison without retroactive PASS,
      // and retain any already correlated Run/Job identity.
+     // A bot comment is not proof of its Run/Job identity. Correlate the
+     // exact report jobId, attempt, PC seat and source before recording IDs.
+     // GET failures never invalidate an otherwise verified postcheck.
+     let reportedRunJobLinked=false,reportedRunId=null,reportedJobId=null;
+     try{
+      const {liveIssue,runs,selected,jobs}=lookupPostcheckRunAndJobs();
+      const linked=classifyMaintenancePostcheckLink({
+       requestId:issue.requestId,issueNumber:postIssueNumber,
+       operation:manifest.postOperation,sourceBranch:manifest.postSourceBranch,
+       sourceSha:manifest.postSourceSha,issue:liveIssue,runs,jobs});
+      if(['UPLOAD_MISSING','RUNNING'].includes(linked.state)&&selected&&Array.isArray(jobs)){
+       const matched=jobs.filter(j=>j.id===linked.jobId&&j.run_id===selected.id);
+       const seat=Number(matched.length===1?
+        matched[0].runner_name?.match(/^zgmini-pc-0([1-6])$/)?.[1]:null);
+       const proof=summarizeMaintenancePostcheckLocalPointer({
+        pointer:{issueNumber:postIssueNumber,report:result},
+        requestId:issue.requestId,issueNumber:postIssueNumber,
+        runId:linked.runId,attempt:selected.run_attempt,seat,
+        operation:manifest.postOperation,sourceBranch:manifest.postSourceBranch,
+        sourceSha:manifest.postSourceSha,controllerSha:manifest.targetSha});
+       if(proof.status==='LOCAL_RESULT_MATCHED'){
+        reportedRunJobLinked=true;
+        reportedRunId=linked.runId;reportedJobId=linked.jobId;
+       }
+      }
+     }catch{/* Missing diagnostic evidence does not turn postcheck into FAIL. */}
      const current=json(ledgerFile);
      writeJson(ledgerFile,{...current,postcheckLink:{
       ...(current.postcheckLink??{}),
       schema:'ZGMINI_MAINTENANCE_POSTCHECK_LINK_V1',
       requestId:issue.requestId,issueNumber:postIssueNumber,
       state:'RESULT_REPORTED',code:'POSTCHECK_BOT_RESULT_OBSERVED',
+      runId:reportedRunJobLinked?reportedRunId:(current.postcheckLink?.runId??null),
+      jobId:reportedRunJobLinked?reportedJobId:(current.postcheckLink?.jobId??null),
+      reportedRunJobLinked,
       reportedStatus:['PASS','FAIL','BLOCKED'].includes(result.status)?result.status:null,
       postSourceVerified,observedAtUtc:new Date().toISOString()}});
      return {status:result.status,code:result.code,actualExecutionSha:result.actualExecutionSha,
@@ -1635,24 +1685,7 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
     if(n%5===0){
      let confirmed=null;
      try{
-      const liveIssue=github('issues/'+postIssueNumber);
-      // Same 15-minute event window as the existing proven-failure
-      // predicate. Avoid an open-ended scan of unrelated future runs.
-      const openedAt=Date.parse(liveIssue.created_at??'');
-      need(Number.isFinite(openedAt),'POSTCHECK_ISSUE_TIME_UNVERIFIED');
-      const untilAt=openedAt+900000;
-      const window=`${new Date(openedAt).toISOString()}..${new Date(untilAt).toISOString()}`;
-      const runs=readAllMaintenancePages(page=>github(
-       `actions/workflows/pc-job.yml/runs?event=issues&created=${encodeURIComponent(window)}&per_page=100&page=${page}`).workflow_runs,
-       {maxPages:3});
-      const expectedTitle=`PC Update ${issue.requestId} postcheck`;
-      const linkedRuns=runs.filter(r=>r.event==='issues'&&r.display_title===expectedTitle&&
-       Number.isFinite(Date.parse(r.created_at))&&
-       Date.parse(r.created_at)>=openedAt&&Date.parse(r.created_at)<=untilAt);
-      const selected=selectMaintenancePostcheckRun(linkedRuns);
-      const jobs=selected?readAllMaintenancePages(page=>github(
-       `actions/runs/${selected.id}/jobs?per_page=100&page=${page}`).jobs,
-       {maxPages:3}):null;
+      const {liveIssue,runs,selected,jobs}=lookupPostcheckRunAndJobs();
       const link=classifyMaintenancePostcheckLink({
        requestId:issue.requestId,issueNumber:postIssueNumber,
        operation:manifest.postOperation,sourceBranch:manifest.postSourceBranch,
