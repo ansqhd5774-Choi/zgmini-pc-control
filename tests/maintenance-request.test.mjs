@@ -321,6 +321,18 @@ test('durable effect receipt survives independent submitter instances and preser
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-ci-effect-test-'));
  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  const f=workloadPublisherFixture(),store=createCiEffectReceiptStore(root);
+ // Use the actual durable claim in the POST assertion, not the fixture's
+ // in-memory receipt slot (which is intentionally not used by this store).
+ f.ports.createIssue=async e=>{
+  f.posts++;
+  const files=fs.readdirSync(root).filter(name=>/^[a-f0-9]{64}\.json$/.test(name));
+  assert.equal(files.length,1);
+  const claimed=store.loadReceipt(files[0].slice(0,-5));
+  assert.equal(claimed.phase,'CREATING');assert.deepEqual(claimed.expected,e);
+  f.actual={number:42,state:'open',user:{login:'github-actions[bot]',id:41898282,type:'Bot'},
+   title:e.title,body:e.body,labels:e.labels.map(name=>({name}))};
+  return {number:42};
+ };
  const first=await submitExistingControllerApprovalFromCi(f.input,{...f.ports,...store});
  assert.equal(first.status,'REQUEST_READBACK_VERIFIED');assert.equal(f.posts,1);
  const secondStore=createCiEffectReceiptStore(root);
