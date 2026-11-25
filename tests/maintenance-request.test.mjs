@@ -5,7 +5,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {test} from 'node:test';
 import {manifestFingerprint,validateControllerImportClosure,controllerImportScanRoots} from '../tools/maintenance-contract.mjs';
-import {prepareMaintenanceIssue,verifyMaintenanceIssue,submitMaintenanceIssue,submitPreparedMaintenanceIssue,reconcileMaintenanceIssue,main} from '../tools/maintenance-request.mjs';
+import {prepareMaintenanceIssue,verifyMaintenanceIssue,submitMaintenanceIssue,submitPreparedMaintenanceIssue,submitCiPreparedMaintenanceIssue,reconcileMaintenanceIssue,main} from '../tools/maintenance-request.mjs';
 const OLD='a'.repeat(40),NEXT='b'.repeat(40),OWNER='ansqhd5774-Choi';
 function manifest(){
  const allowFiles=[{path:'controller/operations.mjs',sha256:'c'.repeat(64)}];
@@ -133,4 +133,43 @@ test('prepared bridge preserves unknown POST and uses same reconciliation',async
 test('prepared CLI rejects incomplete or mixed mode before IO',async()=>{
  await assert.rejects(()=>main(['submit-prepared','--prepared-file','x','--installed-sha',OLD]),/USAGE/);
  await assert.rejects(()=>main(['submit-prepared','--prepared-file','x','--target-sha',NEXT]),/USAGE/);
+});
+
+function ciPorts(f){
+ const repo='ansqhd5774-Choi/zgmini-pc-control',head='d'.repeat(40);
+ const pr={number:28,merged:true,base:{ref:'main',repo:{full_name:repo}},head:{sha:head,repo:{full_name:repo}}};
+ const run={id:123,workflow_id:416355595,path:'.github/workflows/controller-maintenance-source-tests.yml',
+  event:'pull_request',status:'completed',conclusion:'success',repository:{id:1442936296,full_name:repo},
+  head_repository:{id:1442936296},head_sha:head};
+ return {...preparedPorts(f),runId:123,readApprovalPr:async n=>{assert.equal(n,28);return pr;},
+  readRun:async n=>{assert.equal(n,123);return run;},pr,run};
+}
+test('CI-selected existing approval uses regular owner submitter and original receipt',async()=>{
+ const f=setup(),p=ciPorts(f);
+ const r=await submitCiPreparedMaintenanceIssue(f.expected,p);
+ assert.equal(r.status,'REQUEST_READBACK_VERIFIED');assert.equal(r.execution,'NOT_ASSERTED');
+ assert.equal(f.posts,1);assert.equal(f.saved.expected.body,f.expected.body);
+ await assert.rejects(()=>submitCiPreparedMaintenanceIssue(f.expected,p),/EEXIST/);assert.equal(f.posts,1);
+});
+for(const [name,edit] of [
+ ['unmerged approval',p=>{p.pr.merged=false}],
+ ['CI failure',p=>{p.run.conclusion='failure'}],
+ ['different source',p=>{p.run.head_sha='e'.repeat(40)}],
+ ['unrelated workflow',p=>{p.run.workflow_id=42}],
+ ['foreign source',p=>{p.run.head_repository.id=42}]
+])test('CI submitter refuses '+name+' before POST',async()=>{
+ const f=setup(),p=ciPorts(f);edit(p);
+ await assert.rejects(()=>submitCiPreparedMaintenanceIssue(f.expected,p),/CI_APPROVAL_SOURCE_MISMATCH/);
+ assert.equal(f.posts,0);assert.equal(f.saved,null);
+});
+test('CI token is not owner authority',async()=>{
+ const f=setup(),p=ciPorts(f);p.readIdentity=async()=>({login:'github-actions[bot]'});
+ await assert.rejects(()=>submitCiPreparedMaintenanceIssue(f.expected,p),/IDENTITY_DENIED/);
+ assert.equal(f.posts,0);assert.equal(f.saved,null);
+});
+test('approval drift during CI handoff stops regular submission',async()=>{
+ const f=setup(),p=ciPorts(f);let reads=0;
+ p.readManifest=async()=>++reads===1?manifest():Buffer.from(manifest().toString()+' ');
+ await assert.rejects(()=>submitCiPreparedMaintenanceIssue(f.expected,p),/MANIFEST_PIN_MISMATCH/);
+ assert.equal(f.posts,0);assert.equal(f.saved,null);
 });
