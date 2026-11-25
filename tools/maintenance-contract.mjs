@@ -1025,3 +1025,23 @@ export function summarizeMaintenancePostcheckLocalPointer({pointer,requestId,iss
  return {status:'LOCAL_RESULT_MATCHED',code:'POSTCHECK_EXISTING_LOCAL_RESULT_MATCHED',
   resultStatus:report.status,resultCode:report.code};
 }
+
+// Read-only GitHub workflow registration evidence for NO_RUN: a workflow may
+// be enabled yet its issues event has not registered an actual run. Do not
+// convert the registration state into postcheck PASS or a recovery claim.
+export function classifyMaintenancePostcheckWorkflowRegistration(workflow){
+ const base={schema:'ZGMINI_POSTCHECK_WORKFLOW_REGISTRATION_V1',
+  workflowState:'UNVERIFIED',code:'POSTCHECK_WORKFLOW_REGISTRATION_UNVERIFIED',
+  workflowId:null};
+ if(!workflow||typeof workflow!=='object'||Array.isArray(workflow)||
+   workflow.path!=='.github/workflows/pc-job.yml'||
+   workflow.name!=='ZGMINI PC Job'||
+   !Number.isSafeInteger(workflow.id)||workflow.id<1)
+  return base;
+ if(workflow.state==='active')return {...base,workflowState:'ACTIVE',
+  code:'POSTCHECK_WORKFLOW_ACTIVE_WITHOUT_RUN',workflowId:workflow.id};
+ if(['disabled_manually','disabled_inactivity'].includes(workflow.state))
+  return {...base,workflowState:'DISABLED',
+   code:'POSTCHECK_WORKFLOW_DISABLED',workflowId:workflow.id};
+ return base;
+}
