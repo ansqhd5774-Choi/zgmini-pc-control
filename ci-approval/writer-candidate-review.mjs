@@ -32,8 +32,13 @@ export async function reviewWriterCandidate({plan,delegation,ci,live,getJson,rea
   // Only full-file, naturally idle overlay pilot. Existing extended-drain and
   // insertion approvals continue through their original paths.
   if(Object.hasOwn(p,'coreMaintenance')||p.files.some(f=>Object.hasOwn(f,'insertions')))return out('OUT_OF_SCOPE','SPECIAL_OVERLAY_REQUIRES_EXISTING_ROUTE');
-  if(live?.requestState==='CONSUMED'||live?.requestState==='UNKNOWN'||live?.resourceState==='BUSY')return out('WAIT_RESOURCE','RECONCILE_OR_WAIT');
-  if(live?.requestState!=='NEW'||live?.resourceState!=='READY'||live?.observedHead!==p.baseHead||live?.observedConfigSha!==p.baseConfigSourceSha||live?.rollbackVerified!==true||live?.runtimeDependenciesVerified!==true||!Array.isArray(live?.files))return out('EVIDENCE_MISSING','WRITER_LIVE_PRECONDITIONS_UNVERIFIED');
+  // Source checks do not need a current operating-PC snapshot. Actual
+  // submission and the existing combined review retain live preconditions.
+  const sourceOnly=live===undefined;
+  if(!sourceOnly){
+   if(live?.requestState==='CONSUMED'||live?.requestState==='UNKNOWN'||live?.resourceState==='BUSY')return out('WAIT_RESOURCE','RECONCILE_OR_WAIT');
+   if(live?.requestState!=='NEW'||live?.resourceState!=='READY'||live?.observedHead!==p.baseHead||live?.observedConfigSha!==p.baseConfigSourceSha||live?.rollbackVerified!==true||live?.runtimeDependenciesVerified!==true||!Array.isArray(live?.files))return out('EVIDENCE_MISSING','WRITER_LIVE_PRECONDITIONS_UNVERIFIED');
+  }
   if(delegation?.scope?.effect!=='B_WRITER_SOURCE'||delegation.scope.sourceRepository!==p.sourceRepository||delegation.scope.sourceBranch!==p.sourceBranch||delegation.scope.purpose!==p.scope||delegation.scope.targetSha!==p.candidateSourceSha||delegation.scope.scopeDigest!==candidate.planSha256)return out('REJECTED','WRITER_DELEGATION_BINDING_MISMATCH');
   const tested=inspectWriterPushCI(ci);
   if(tested.state!=='WRITER_PUSH_CI_MATCH_ONLY')return out(tested.state,tested.reason);
@@ -42,17 +47,19 @@ export async function reviewWriterCandidate({plan,delegation,ci,live,getJson,rea
   const observed=await collectDelegatedScope({...delegation,getJson});
   if(observed.state!=='DELEGATED_DIFF_OBSERVED_ONLY')return out(observed.state,observed.reason);
   if(JSON.stringify(p.files.map(f=>f.path).sort())!==JSON.stringify(observed.changedPaths))return out('REJECTED','WRITER_DIFF_PATH_MISMATCH');
-  if(live.files.length!==p.files.length+p.protectedFiles.length)return out('EVIDENCE_MISSING','WRITER_LIVE_FILE_ROSTER_INCOMPLETE');
-  for(const f of [...p.files,...p.protectedFiles]){
-   const hits=live.files.filter(x=>x?.path===f.path);
-   const expected=Object.hasOwn(f,'change')?f.beforeSha256:f.sha256;
-   if(hits.length!==1||hits[0].sha256!==expected||hits[0].exists!==(expected!==null))return out('REJECTED','WRITER_LIVE_FILE_PREIMAGE_MISMATCH');
-   if(Object.hasOwn(f,'change')){
-    const bytes=await readFileBytes(repo,p.candidateSourceSha,f.path);
-    if(!Buffer.isBuffer(bytes)||bytes.length===0||bytes.length>2*1024*1024)return out('EVIDENCE_MISSING','WRITER_FILE_BYTES_MISSING');
-    if(hash(bytes)!==f.afterSha256)return out('REJECTED','WRITER_TARGET_BYTES_MISMATCH');
+  if(!sourceOnly){
+   if(live.files.length!==p.files.length+p.protectedFiles.length)return out('EVIDENCE_MISSING','WRITER_LIVE_FILE_ROSTER_INCOMPLETE');
+   for(const f of [...p.files,...p.protectedFiles]){
+    const hits=live.files.filter(x=>x?.path===f.path);
+    const expected=Object.hasOwn(f,'change')?f.beforeSha256:f.sha256;
+    if(hits.length!==1||hits[0].sha256!==expected||hits[0].exists!==(expected!==null))return out('REJECTED','WRITER_LIVE_FILE_PREIMAGE_MISMATCH');
    }
   }
-  return out('WRITER_CANDIDATE_REVIEW_MATCH_ONLY','INDEPENDENT_AUTHORITY_AND_LIVE_CLAIM_REQUIRED',{candidate,runId:tested.runId,jobId:tested.jobId,remoteBaseSha:observed.baseSha,localBaseSha:p.baseHead,delegationSha256:observed.delegationSha256});
+  for(const f of p.files){
+   const bytes=await readFileBytes(repo,p.candidateSourceSha,f.path);
+   if(!Buffer.isBuffer(bytes)||bytes.length===0||bytes.length>2*1024*1024)return out('EVIDENCE_MISSING','WRITER_FILE_BYTES_MISSING');
+   if(hash(bytes)!==f.afterSha256)return out('REJECTED','WRITER_TARGET_BYTES_MISMATCH');
+  }
+  return out(sourceOnly?'WRITER_SOURCE_REVIEW_MATCH_ONLY':'WRITER_CANDIDATE_REVIEW_MATCH_ONLY',sourceOnly?'LIVE_CHECKS_DEFERRED_TO_EXECUTION':'INDEPENDENT_AUTHORITY_AND_LIVE_CLAIM_REQUIRED',{candidate,runId:tested.runId,jobId:tested.jobId,remoteBaseSha:observed.baseSha,localBaseSha:p.baseHead,delegationSha256:observed.delegationSha256});
  }catch{return out('EVIDENCE_MISSING','WRITER_REVIEW_READ_FAILED')}
 }
