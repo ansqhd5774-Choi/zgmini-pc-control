@@ -561,3 +561,51 @@ test('PIT-04-08 direct projection rejects forged region and offset, never publis
  assert.throws(()=>projectPit04KeyReview({...p,evidence:[{...p.evidence[0],observationDate:'2026-11-01'}]},
   {offset:0,asOfDate:'2026-11-02'}),/R6_PIT04_RESULT_INVALID/);
 });
+
+function stageMissingDateFixture(t,{date='2026-10-31',scoreStatus='PARTIAL_HISTORY'}={}){
+  const f=fixture(t);
+  const original=fs.readFileSync(f.script,'utf8');
+  const before="chartStatus:'READY',scoreStatus:'READY'})),";
+  assert.equal(original.split(before).length,2);
+  const source=original.replace(before,
+    "chartStatus:'READY',scoreStatus:i===0?"+JSON.stringify(scoreStatus)+":'READY',"+
+    " ...(i===0?{firstMissingReferenceDate:"+JSON.stringify(date)+
+    ",privateRaw:'PRIVATE_R6_SOURCE_BYTES'}:{})})),");
+  fs.writeFileSync(f.script,source);
+  const manifestBytes=Buffer.from(JSON.stringify({
+    files:{[ENTRY]:hash(Buffer.from(source))}},null,2)+'\n');
+  fs.writeFileSync(path.join(f.host.approvedSources[SHA].root,'manifest.json'),manifestBytes);
+  f.host.approvedSources[SHA].manifestSha256=hash(manifestBytes);
+  return f;
+}
+
+test('W04 optional first missing reference date survives bounded Controller projection',async t=>{
+  const f=stageMissingDateFixture(t);
+  const result=await inspectEmploymentR6Candidate(f.request,f);
+  assert.equal(result.status,'PASS',JSON.stringify(result));
+  assert.equal(result.indicators[0].scoreStatus,'PARTIAL_HISTORY');
+  assert.equal(result.indicators[0].firstMissingReferenceDate,'2026-10-31');
+  assert.equal(Object.hasOwn(result.indicators[1],'firstMissingReferenceDate'),false);
+  assert.equal(JSON.stringify(result).includes('PRIVATE_R6_SOURCE_BYTES'),false);
+  assert.equal(result.operationalWrites,0);
+  assert.equal(result.providerCalls,0);
+  assert.equal(result.d1Writes,0);
+});
+
+test('W04 invalid or unrelated missing date is rejected without touching SQLite',async t=>{
+  for(const [label,date,status] of [
+    ['invalid calendar','2026-02-30','PARTIAL_HISTORY'],
+    ['future date','2026-11-03','PARTIAL_HISTORY'],
+    ['READY score','2026-10-31','READY'],
+    ['timestamp not date','2026-10-31T12:00:00Z','PARTIAL_HISTORY'],
+  ]){
+    await t.test(label,async sub=>{
+      const f=stageMissingDateFixture(sub,{date,scoreStatus:status});
+      const result=await inspectEmploymentR6Candidate(f.request,f);
+      assert.equal(result.status,'FAIL',JSON.stringify(result));
+      assert.equal(result.code,'R6_RESULT_INVALID');
+      assert.equal(fs.readFileSync(f.core,'utf8'),'synthetic-core');
+      assert.equal(fs.readFileSync(f.candidate,'utf8'),'synthetic-candidate');
+    });
+  }
+});
