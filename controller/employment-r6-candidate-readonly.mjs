@@ -204,6 +204,47 @@ export function projectPit0605Aggregate(raw){
   ...(projected===null?{}:{missingCandidateReceipts:projected}),
   historicalVersionAttested:false,repairAuthorized:false};
 }
+// Pinned, previously retained PC-private evidence (#3640). This opt-in uses
+// the existing A operation, but avoids re-running the historical raw scan.
+const REPAIR_PREVIEW_ENTRY='scripts/pc-writer/employment-r6-history-repair-readonly.mjs';
+const REPAIR_PREVIEW_SOURCE='551640c3094738f7803d6a7f799098a55c21523c';
+const REPAIR_PREVIEW_RECEIPT='pit0605-pc-c9e5b130-4e7a-4a24-a588-717d7faef26d.json';
+const REPAIR_PREVIEW_RECEIPT_SHA='2163132e165e45e08edff062722465dac1ff3a2d17ce999ec98a479d6e32547b';
+const REPAIR_PREVIEW_EVIDENCE='30afbbec30466fa3e93442c78514ccb5125ca57ae4609dfdd5b9f44716c3acc5';
+export function wantsHistoryRepairPreview(request,files){
+ return request.pit0605Raw===true&&request.sourceSha===REPAIR_PREVIEW_SOURCE&&
+  Object.hasOwn(files,REPAIR_PREVIEW_ENTRY);
+}
+export function stageHistoryRepairReceipt(host,outputDir){
+ const home=host?.dataRoot;
+ if(typeof home!=='string'||!path.isAbsolute(home)||path.basename(home).toLowerCase()!=='data')
+   stop('R6_HISTORY_REPAIR_RECEIPT_ROOT_INVALID');
+ const folder=path.join(home,'pc-writer','pit-evidence');
+ const dir=fs.lstatSync(folder);
+ if(!dir.isDirectory()||dir.isSymbolicLink())stop('R6_HISTORY_REPAIR_RECEIPT_ROOT_INVALID');
+ const file=path.join(folder,REPAIR_PREVIEW_RECEIPT),st=fs.lstatSync(file);
+ if(!st.isFile()||st.isSymbolicLink()||st.size<10||st.size>32*1024*1024)
+   stop('R6_HISTORY_REPAIR_RECEIPT_INVALID');
+ const bytes=fs.readFileSync(file);
+ if(digest(bytes)!==REPAIR_PREVIEW_RECEIPT_SHA)stop('R6_HISTORY_REPAIR_RECEIPT_DRIFT');
+ fs.writeFileSync(path.join(outputDir,'PIT0605_REPAIR_INPUT.json'),bytes,{flag:'wx',mode:0o600});
+}
+export function projectHistoryRepairSelection(raw){
+ const fields=['existingHistory','unmatched','unsupportedCurrent'];
+ const held=Object.fromEntries(fields.map(k=>[k,count(raw?.held?.[k])]));
+ const eligible=count(raw?.eligible);
+ if(raw?.status!=='REPAIR_PREVIEW_ONLY'||raw.receiptSha256!==REPAIR_PREVIEW_RECEIPT_SHA||
+   raw.evidenceDigest!==REPAIR_PREVIEW_EVIDENCE||raw.expectedKeys!==2880||
+   eligible===null||Object.values(held).some(x=>x===null)||
+   eligible+Object.values(held).reduce((a,b)=>a+b,0)!==2880||
+   !HASH.test(raw.selectionSha256??'')||raw.historicalVersionAttested!==false||
+   raw.repairAuthorized!==false||raw.sqliteWrites!==0)
+   stop('R6_HISTORY_REPAIR_SELECTION_INVALID');
+ return {status:raw.status,eligible,held,expectedKeys:2880,
+  receiptSha256:REPAIR_PREVIEW_RECEIPT_SHA,evidenceDigest:REPAIR_PREVIEW_EVIDENCE,
+  selectionSha256:raw.selectionSha256,historicalVersionAttested:false,repairAuthorized:false,sqliteWrites:0};
+}
+
 export function retainPit0605PrivateEvidence({outputDir,host,request,aggregate}){
  const file=path.join(outputDir,'PIT0605_PRIVATE_KEY_EVIDENCE.json');
  const st=fs.lstatSync(file);
@@ -426,6 +467,12 @@ export async function inspectEmploymentR6Candidate(request,context){
   if(Object.hasOwn(request,'pit04Offset'))argv.push('--pit04-offset',String(request.pit04Offset));
   if(request.pit0408Private===true)argv.push('--pit0408-private','1');
   if(request.pit0605Raw===true)argv.push('--pit0605-raw','1');
+  const repairPreview=wantsHistoryRepairPreview(request,files);
+  if(repairPreview){
+    try{stageHistoryRepairReceipt(context.host,outputDir);}
+    catch(error){return {status:'BLOCKED',code:safe(error.code),candidateExecuted:false};}
+    argv.push('--pit0605-repair-preview','1');
+  }
   const env={SystemRoot:process.env.SystemRoot,ComSpec:process.env.ComSpec,
     PATH:path.dirname(process.execPath),TEMP:workspace,TMP:workspace,HOME:workspace,USERPROFILE:workspace};
   const child=await runChild(path.join(target,ENTRY),argv,{cwd:target,env});
@@ -436,7 +483,7 @@ export async function inspectEmploymentR6Candidate(request,context){
     if(fs.statSync(resultFile).size>12000)stop('R6_RESULT_TOO_LARGE');
     const body=JSON.parse(fs.readFileSync(resultFile,'utf8'));
     const resultKind=body.status==='PASS'&&request.pit0605Raw===true
-      ?'EMPLOYMENT_R6_RUNNER_PIT0605_AGGREGATE_V1'
+      ?(repairPreview?'EMPLOYMENT_R6_RUNNER_HISTORY_REPAIR_PREVIEW_V1':'EMPLOYMENT_R6_RUNNER_PIT0605_AGGREGATE_V1')
       :'EMPLOYMENT_R6_RUNNER_READONLY_REPORT_V1';
     if(!STATUS.has(body.status)||!/^[A-Z0-9_]{1,100}$/.test(body.code??'')
       ||body.kind!==resultKind
@@ -449,6 +496,14 @@ export async function inspectEmploymentR6Candidate(request,context){
       return {status:body.status,code:safe(body.code),
        candidateExecuted:true,sqliteOpened:body.sqliteOpened===true,
        repairAuthorized:false,operationalWrites:0,providerCalls:0,d1Writes:0};
+    }
+    if(repairPreview){
+      if(body.code!=='W04_HISTORY_REPAIR_SELECTION_PREVIEW'||body.sqliteOpened!==true)
+        stop('R6_HISTORY_REPAIR_SELECTION_INVALID');
+      return {status:'PASS',code:'W04_HISTORY_REPAIR_SELECTION_PREVIEW',
+       actualExecutionSha:request.sourceSha,sqliteOpened:true,
+       selection:projectHistoryRepairSelection(body.selection),
+       promotionApproved:false,repairAuthorized:false,operationalWrites:0,providerCalls:0,d1Writes:0};
     }
     if(request.pit0605Raw===true){
       if(body.kind!=='EMPLOYMENT_R6_RUNNER_PIT0605_AGGREGATE_V1'
