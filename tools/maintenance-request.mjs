@@ -130,24 +130,25 @@ function github(endpoint,{body}={}){
 }
 function argsOf(argv){
  const [mode,...rest]=argv;
- if(!['prepare','submit','submit-prepared','reconcile','verify'].includes(mode)||rest.length%2)fail('MAINTENANCE_REQUEST_USAGE');
+ if(!['prepare','submit','submit-prepared','submit-ci-prepared','reconcile','verify'].includes(mode)||rest.length%2)fail('MAINTENANCE_REQUEST_USAGE');
  const options={};
  for(let i=0;i<rest.length;i+=2){
-  if(!['--manifest-file','--target-sha','--installed-sha','--chat-id','--receipt-file','--issue-number','--prepared-file'].includes(rest[i])||
+  if(!['--manifest-file','--target-sha','--installed-sha','--chat-id','--receipt-file','--issue-number','--prepared-file','--run-id'].includes(rest[i])||
    Object.hasOwn(options,rest[i])||!rest[i+1]||rest[i+1].startsWith('--'))fail('MAINTENANCE_REQUEST_USAGE');
   options[rest[i]]=rest[i+1];
  }
  const allowed=mode==='verify'?['--issue-number']:mode==='reconcile'?['--receipt-file']:
+  mode==='submit-ci-prepared'?['--prepared-file','--installed-sha','--receipt-file','--run-id']:
   mode==='submit-prepared'?['--prepared-file','--installed-sha','--receipt-file']:
   ['--manifest-file','--target-sha','--installed-sha','--chat-id',...(mode==='submit'?['--receipt-file']:[])];
  if(Object.keys(options).some(k=>!allowed.includes(k)))fail('MAINTENANCE_REQUEST_USAGE');
  return {mode,options};
 }
-export async function main(argv=process.argv.slice(2)){
+export async function main(argv=process.argv.slice(2),{githubApi=github}={}){
  const {mode,options:o}=argsOf(argv);
  if(mode==='verify'){
   if(!/^[1-9]\d*$/.test(o['--issue-number']??''))fail('MAINTENANCE_REQUEST_USAGE');
-  const actual=github(`repos/${CONTROL_REPOSITORY}/issues/${o['--issue-number']}`);
+  const actual=githubApi(`repos/${CONTROL_REPOSITORY}/issues/${o['--issue-number']}`);
   // Independent readback of an existing request, never submission or approval.
   const result=verifyMaintenanceIssue({repository_full_name:CONTROL_REPOSITORY,title:TITLE,labels:[LABEL],body:actual.body},actual,{allowClosed:true});
   return {...result,status:'EXISTING_REQUEST_ENVELOPE_VERIFIED',expectedOriginalBytes:'NOT_INDEPENDENTLY_PINNED'};
@@ -157,31 +158,39 @@ export async function main(argv=process.argv.slice(2)){
   if(!receiptPath)fail('MAINTENANCE_RECEIPT_PATH_REQUIRED');
   fs.writeFileSync(receiptPath,JSON.stringify(receipt,null,2)+'\n',{flag:exclusive?'wx':'w'});
  };
- const readIssue=n=>github(`repos/${CONTROL_REPOSITORY}/issues/${n}`);
+ const readIssue=n=>githubApi(`repos/${CONTROL_REPOSITORY}/issues/${n}`);
  if(mode==='reconcile'){
   if(!receiptPath)fail('MAINTENANCE_RECEIPT_PATH_REQUIRED');
   return reconcileMaintenanceIssue(JSON.parse(fs.readFileSync(receiptPath,'utf8')),{
    readIssue,saveReceipt,findIssues:requestId=>{
     const q=encodeURIComponent(`repo:${CONTROL_REPOSITORY} is:issue "${requestId}" in:body`);
-    const result=github(`search/issues?q=${q}&per_page=100`);
+    const result=githubApi(`search/issues?q=${q}&per_page=100`);
     if(result.incomplete_results||result.total_count>100||!Array.isArray(result.items))fail('MAINTENANCE_SEARCH_INCOMPLETE_NO_REPOST');
     return result.items;
    }});
  }
  // Prefer immutable GitHub blob bytes to avoid Windows checkout CRLF drift.
  const readRemote=sha=>{
-  const found=github(`repos/${CONTROL_REPOSITORY}/contents/approvals/controller-updates/${sha}.json?ref=main`);
+  const found=githubApi(`repos/${CONTROL_REPOSITORY}/contents/approvals/controller-updates/${sha}.json?ref=main`);
   if(found.encoding!=='base64'||typeof found.content!=='string')fail('MAINTENANCE_REMOTE_MANIFEST_BYTES_MISSING');
   return Buffer.from(found.content,'base64');
  };
- if(mode==='submit-prepared'){
+ if(['submit-prepared','submit-ci-prepared'].includes(mode)){
   if(!o['--prepared-file']||!o['--installed-sha']||!receiptPath)fail('MAINTENANCE_REQUEST_USAGE');
+  const ci=mode==='submit-ci-prepared';
+  if(ci&&(!/^[1-9]\d*$/.test(o['--run-id']??'')||
+   !Number.isSafeInteger(Number(o['--run-id']))||!/^[a-f0-9]{40}$/.test(o['--installed-sha'])))
+   fail('MAINTENANCE_REQUEST_USAGE');
   if(fs.existsSync(receiptPath))fail('MAINTENANCE_RECEIPT_EXISTS_USE_RECONCILE');
   const expected=JSON.parse(fs.readFileSync(path.resolve(o['--prepared-file']),'utf8'));
-  return submitPreparedMaintenanceIssue(expected,{installedSha:o['--installed-sha'],
-   readIdentity:()=>github('user'),readRepository:()=>github(`repos/${CONTROL_REPOSITORY}`),
+  const ports={installedSha:o['--installed-sha'],
+   readIdentity:()=>githubApi('user'),readRepository:()=>githubApi(`repos/${CONTROL_REPOSITORY}`),
    readManifest:readRemote,saveReceipt,readIssue,
-   createIssue:e=>github(`repos/${CONTROL_REPOSITORY}/issues`,{body:{title:e.title,labels:e.labels,body:e.body}})});
+   createIssue:e=>githubApi(`repos/${CONTROL_REPOSITORY}/issues`,{body:{title:e.title,labels:e.labels,body:e.body}})};
+  if(ci)return submitCiPreparedMaintenanceIssue(expected,{...ports,runId:Number(o['--run-id']),
+   readApprovalPr:n=>githubApi(`repos/${CONTROL_REPOSITORY}/pulls/${n}`),
+   readRun:n=>githubApi(`repos/${CONTROL_REPOSITORY}/actions/runs/${n}`)});
+  return submitPreparedMaintenanceIssue(expected,ports);
  }
  if(!o['--installed-sha']||Boolean(o['--manifest-file'])===Boolean(o['--target-sha']))fail('MAINTENANCE_REQUEST_USAGE');
  if(o['--target-sha']&&!/^[a-f0-9]{40}$/.test(o['--target-sha']))fail('MAINTENANCE_REQUEST_USAGE');
@@ -191,13 +200,13 @@ export async function main(argv=process.argv.slice(2)){
  if(mode==='prepare')return expected;
  if(!receiptPath)fail('MAINTENANCE_RECEIPT_PATH_REQUIRED');
  if(fs.existsSync(receiptPath))fail('MAINTENANCE_RECEIPT_EXISTS_USE_RECONCILE');
- if(github('user').login!==CONTROL_ACTOR||github(`repos/${CONTROL_REPOSITORY}`).private!==true)
+ if(githubApi('user').login!==CONTROL_ACTOR||githubApi(`repos/${CONTROL_REPOSITORY}`).private!==true)
   fail('MAINTENANCE_SUBMIT_IDENTITY_DENIED');
  const request=JSON.parse(expected.body);
  if(!readRemote(request.targetControllerSha).equals(bytes))
   fail('MAINTENANCE_REMOTE_MANIFEST_BYTES_MISMATCH');
  return submitMaintenanceIssue(expected,{saveReceipt,readIssue,
-  createIssue:e=>github(`repos/${CONTROL_REPOSITORY}/issues`,{body:{title:e.title,labels:e.labels,body:e.body}})});
+  createIssue:e=>githubApi(`repos/${CONTROL_REPOSITORY}/issues`,{body:{title:e.title,labels:e.labels,body:e.body}})});
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  try{const result=await main();console.log(JSON.stringify(result));
