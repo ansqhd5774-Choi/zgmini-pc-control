@@ -1250,7 +1250,16 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
  const result={request,ports:{
   fingerprint:x=>sha256(JSON.stringify({issue,manifest,targetSha:x.targetSha})),
   read:async id=>fs.existsSync(path.join(recordDir,id+'.json'))?json(path.join(recordDir,id+'.json')):null,
-  persist:async x=>writeJson(ledgerFile,{...x,issueNumber,postIssueNumber}),
+  persist:async x=>{
+   // The coordinator persists a new phase after postcheck returns/throws.
+   // Retain only this request's latest observed execution link, never reuse
+   // a previous Issue or mistake an observation for postcheck PASS.
+   const prior=fs.existsSync(ledgerFile)?json(ledgerFile):null;
+   const postcheckLink=prior?.postcheckLink?.requestId===request.requestId?
+    prior.postcheckLink:null;
+   writeJson(ledgerFile,{...x,issueNumber,postIssueNumber,
+    ...(postcheckLink?{postcheckLink}:{})});
+  },
   // Capture a read-only baseline BEFORE acquiring the install lease, while
   // immutable source/owner/protected-state evidence is available. This does
   // not change Core tasks, supervisor processes or the intake workflow.
