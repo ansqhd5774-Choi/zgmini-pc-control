@@ -434,11 +434,20 @@ export async function inspectEmploymentR6Candidate(request,context){
         ||!['READY','PARTIAL_HISTORY','PARTIAL_MISSING'].includes(x.scoreStatus)))){
       stop('R6_RESULT_INVALID');
     }
+    // The approved reader already computed this missing-reference date;
+    // validate it before exposing only the bounded date (never raw rows).
+    if(Array.isArray(body.indicators)&&body.indicators.some(x=>
+      x?.firstMissingReferenceDate!==undefined&&(
+        x.scoreStatus!=='PARTIAL_HISTORY'||
+        dateOnly(x.firstMissingReferenceDate)===null||
+        dateOnly(body.asOfDate)===null||
+        x.firstMissingReferenceDate>body.asOfDate)))stop('R6_RESULT_INVALID');
     const indicators=Array.isArray(body.indicators)&&body.indicators.length<=29
       ?body.indicators.map(x=>({id:/^[A-Z0-9_]{1,64}$/.test(x.id??'')?x.id:null,
         rawStatus:['READY','STALE','UNAVAILABLE'].includes(x.rawStatus)?x.rawStatus:'UNAVAILABLE',
         chartStatus:['READY','PARTIAL','UNAVAILABLE'].includes(x.chartStatus)?x.chartStatus:'UNAVAILABLE',
-        scoreStatus:['READY','PARTIAL_HISTORY','PARTIAL_MISSING'].includes(x.scoreStatus)?x.scoreStatus:'PARTIAL_MISSING'})):[];
+        scoreStatus:['READY','PARTIAL_HISTORY','PARTIAL_MISSING'].includes(x.scoreStatus)?x.scoreStatus:'PARTIAL_MISSING',
+        ...(x.firstMissingReferenceDate===undefined?{}:{firstMissingReferenceDate:x.firstMissingReferenceDate})})):[];
     // Optional PIT-08 metadata. Older approved bundles remain compatible.
     const sourceMeta={};
     if(body.sourceStoredAt!==undefined){
