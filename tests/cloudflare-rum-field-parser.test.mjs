@@ -25,7 +25,7 @@ test('static query is host-scoped, account-scoped, bounded, and not executable i
  assert.doesNotMatch(GRAPHQL_QUERY,/\$account: String!/);
  assert.match(GRAPHQL_QUERY,/rumWebVitalsEventsAdaptiveGroups/);
  assert.match(GRAPHQL_QUERY,/largestContentfulPaintP75/);
- assert.match(GRAPHQL_QUERY,/sum \\{lcpTotal inpTotal clsTotal\\}/);
+ assert.match(GRAPHQL_QUERY,/sum \{lcpTotal inpTotal clsTotal\}/);
  assert.doesNotMatch(GRAPHQL_QUERY,/mutation|subscription/i);
 });
 test('invalid account, windows, dates and future horizon are rejected',()=>{
