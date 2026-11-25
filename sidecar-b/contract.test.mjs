@@ -87,3 +87,20 @@ test('unverified rollback never reports success',async()=>{
  await assert.rejects(applyOneFile(m,after,io),e=>e.code==='SIDECAR_B_RECOVERY_UNVERIFIED_STOP');
  assert.equal(io.events.at(-1),'release');
 });
+
+test('installed R3 after-image cannot replay original one-file B request',async()=>{
+ const m=manifest(),io=adapter(m);
+ const alreadyInstalledR3='583297b451f168a32a2a5de4b0b04c9b14449aab9a041c954a420203cf04f188';
+ assert.notEqual(alreadyInstalledR3,PREIMAGE);
+ io.observe=async()=>({...observed(m),beforeSha256:alreadyInstalledR3});
+ await assert.rejects(applyOneFile(m,after,io),e=>e.code==='SIDECAR_B_PREIMAGE_STOP');
+ assert.deepEqual(io.events,['acquire','release']);
+});
+test('operational approved source mismatch independently prevents B claim',async()=>{
+ const m=manifest(),io=adapter(m);
+ const operationalApprovedSource='d8ac245003e7b8e006c2345382d5c639c6d5f18b';
+ assert.notEqual(operationalApprovedSource,m.installedConfigSource);
+ io.observe=async()=>({...observed(m),configSource:operationalApprovedSource});
+ await assert.rejects(applyOneFile(m,after,io),e=>e.code==='SIDECAR_B_LINEAGE_STOP');
+ assert.deepEqual(io.events,['acquire','release']);
+});
