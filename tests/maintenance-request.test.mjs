@@ -185,6 +185,7 @@ test('CI CLI calls the existing owner submitter using the exact original receipt
  const githubApi=(route,options)=>{
   if(route==='user')return {login:OWNER};
   if(route===repo)return {private:true};
+  if(route.startsWith('search/issues?'))return {total_count:0,incomplete_results:false,items:[]};
   if(route===repo+'/pulls/28')return p.pr;
   if(route===repo+'/actions/runs/123')return p.run;
   if(route.startsWith(repo+'/contents/approvals/controller-updates/'))return {encoding:'base64',content:manifest().toString('base64')};
@@ -230,5 +231,29 @@ test('listed success must survive exact independent run readback',async()=>{
  p.listRuns=async()=>({workflow_runs:[p.run]});
  p.readRun=async()=>({...p.run,conclusion:'cancelled'});
  await assert.rejects(()=>submitCiPreparedMaintenanceIssue(f.expected,p),/CI_APPROVAL_SOURCE_MISMATCH/);
+ assert.equal(f.posts,0);assert.equal(f.saved,null);
+});
+
+test('CI with a missing receipt recovers an already closed exact request without checking obsolete installed SHA or posting',async()=>{
+ const f=setup(),p=ciPorts(f);
+ p.findIssues=async id=>{assert.equal(id,JSON.parse(f.expected.body).requestId);return [{...f.actual,state:'closed'}];};
+ p.readIssue=async n=>{assert.equal(n,f.actual.number);return {...f.actual,state:'closed'};};
+ p.readManifest=async()=>{throw Error('historical approval need not be current');};
+ p.installedSha=NEXT;
+ const result=await submitCiPreparedMaintenanceIssue(f.expected,p);
+ assert.equal(result.recoveredExistingRequest,true);assert.equal(result.execution,'NOT_ASSERTED');
+ assert.equal(f.saved.issueNumber,f.actual.number);assert.equal(f.saved.phase,'READBACK_VERIFIED');assert.equal(f.posts,0);
+});
+test('same request identity with a different body cannot cause a fresh CI POST',async()=>{
+ const f=setup(),p=ciPorts(f);
+ const body=JSON.stringify({...JSON.parse(f.actual.body),targetControllerSha:OLD});
+ p.findIssues=async()=>[{...f.actual,body}];
+ const result=await submitCiPreparedMaintenanceIssue(f.expected,p);
+ assert.equal(result.code,'MAINTENANCE_EXISTING_REQUEST_CONFLICT');assert.equal(f.posts,0);assert.equal(f.saved,null);
+});
+test('incomplete existing-request search does not authorize a fresh CI POST',async()=>{
+ const f=setup(),p=ciPorts(f);
+ p.findIssues=async()=>{throw Error('MAINTENANCE_SEARCH_INCOMPLETE_NO_REPOST');};
+ await assert.rejects(()=>submitCiPreparedMaintenanceIssue(f.expected,p),/SEARCH_INCOMPLETE_NO_REPOST/);
  assert.equal(f.posts,0);assert.equal(f.saved,null);
 });
