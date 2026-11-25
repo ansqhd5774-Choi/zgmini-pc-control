@@ -41,3 +41,20 @@ const cases=[
 ];
 for(const [name,edit,state] of cases)test(name,async()=>{const v=fixture();edit(v);const r=await review(v);assert.equal(r.state,state);assert.equal(r.canPublish,false);assert.equal(r.canExecute,false);if(state===match){assert.notEqual(r.localBaseSha,r.remoteBaseSha);assert.equal(r.candidate.status,'PROPOSED_NOT_APPROVED');}});
 test('missing CI logs cannot pass',()=>{const {ci}=fixture();ci.logs='';assert.equal(inspect(ci).state,'EVIDENCE_MISSING');});
+
+test('Writer source review needs no operating PC snapshot',async()=>{
+ const v=fixture();delete v.live;
+ const r=await review(v);
+ assert.equal(r.state,'WRITER_SOURCE_REVIEW_MATCH_ONLY');
+ assert.equal(r.reason,'LIVE_CHECKS_DEFERRED_TO_EXECUTION');
+ assert.equal(r.candidate.status,'PROPOSED_NOT_APPROVED');
+ assert.equal(r.canPublish,false);assert.equal(r.canExecute,false);
+});
+test('Writer source review still checks changed source bytes',async()=>{
+ const v=fixture();delete v.live;v.readFileBytes=async()=>Buffer.from('wrong');
+ const r=await review(v);assert.equal(r.state,'REJECTED');assert.equal(r.canExecute,false);
+});
+test('Writer provided invalid live context is not source-only',async()=>{
+ const v=fixture();v.live=null;
+ const r=await review(v);assert.equal(r.state,'EVIDENCE_MISSING');assert.equal(r.canExecute,false);
+});
