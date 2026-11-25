@@ -3,6 +3,9 @@ on:
   workflow_run:
     workflows: [ZGMINI Controller Maintenance Source Tests]
     types: [completed]
+  push:
+    branches: [main]
+    paths: ['approvals/controller-updates/*.json']
 permissions:
   actions: read
   contents: read
@@ -12,10 +15,13 @@ jobs:
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
       github.event.repository.id == 1442936296 &&
       github.event.repository.private == true &&
+      ((github.event_name == 'workflow_run' &&
       github.event.workflow_run.workflow_id == 416355595 &&
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.head_repository.id == 1442936296
+      github.event.workflow_run.head_repository.id == 1442936296) ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      github.event.forced == false && github.event.deleted == false))
     runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
     timeout-minutes: 4
     defaults:
@@ -34,7 +40,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
-      - name: Verify source CI completion event without operational writes
+      - name: Observe source CI or published approval without operational writes
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node ci-approval/completed-run-intake.mjs
