@@ -1,0 +1,19 @@
+{
+  "schema": "ZGMINI_CONTROLLER_SELECTIVE_PIN_V1",
+  "installedSha": "83679b013ac9a9820331d93311ec97e572b18e13",
+  "targetSha": "90f2bdca223ebb6b031d60b28bcd879f72bae2ff",
+  "sourceMainSha": "e1651b7f764415f4fffa29ba2eeb72a8ced743be",
+  "targetBranch": "codex/er1-dec31-selective-installed83679-20261125",
+  "customPaths": [],
+  "allowFiles": [
+    {
+      "path": "controller/market-calendar-er1-dec31-evidence-readonly.mjs",
+      "sha256": "0b93d41303b366c9204f84bbeeada10aae2c02ada6c61932af5755f2f7444590"
+    },
+    {
+      "path": "controller/writer-publication-evidence-readonly.mjs",
+      "sha256": "206f90f4753b1146f40e9e9c9be2791f8c6958eafe05492cb54fc045f909c3b2"
+    }
+  ],
+  "approvalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3542"
+}
