@@ -151,11 +151,13 @@ test('non-main publication cannot call publisher even if caller supplies ports',
  assert.equal(result.state,'IGNORED');assert.deepEqual(result.results,[]);
 });
 
-test('submission workflow is activation-gated, push-only and pinned to reviewed publisher source',()=>{
+test('submission workflow is activation-gated, source-event driven and pinned to publisher source',()=>{
  const y=readFileSync(new URL('../.github/workflows/ci-approval-controller-b.yml',import.meta.url),'utf8');
  const trigger=y.slice(0,y.indexOf('\npermissions:'));
  assert.match(trigger,/push:\s+branches: \[main\]/);
- assert.doesNotMatch(trigger,/workflow_run:|pull_request:|workflow_dispatch:|schedule:/);
+ assert.match(trigger,/workflow_run:\s+workflows: \['ZGMINI Controller Maintenance Source Tests'\]\s+types: \[completed\]/);
+ assert.match(trigger,/'controller\/\*\*'/);
+ assert.doesNotMatch(trigger,/pull_request:|workflow_dispatch:|schedule:/);
  assert.match(y,/permissions: \{\}/);
  assert.match(y,/vars\.ZGMINI_CI_CONTROLLER_B_ENABLED == 'true'/);
  assert.match(y,/name: submit-controller-b/);
@@ -163,7 +165,12 @@ test('submission workflow is activation-gated, push-only and pinned to reviewed 
  assert.match(y,/ref: [a-f0-9]{40}\s+persist-credentials: false/);
  assert.match(y,/run: node ci-approval\/completed-run-intake\.mjs --publish-existing/);
  assert.match(y,/cancel-in-progress: false/);
- assert.doesNotMatch(y,/contents: write|id-token: write/);
+ assert.match(y,/github\.event\.workflow_run\.conclusion == 'success'/);
+ assert.match(y,/github\.event\.workflow_run\.head_repository\.id == 1442936296/);
+ assert.match(y,/vars\.ZGMINI_CI_CONTROLLER_B_POLICY != ''/);
+ assert.match(y,/ZGMINI_CI_CONTROLLER_B_POLICY: \$\{\{ vars\.ZGMINI_CI_CONTROLLER_B_POLICY \}\}/);
+ assert.match(y,/contents: write/);
+ assert.doesNotMatch(y,/id-token: write|administration: write|pull-requests: write|persist-credentials: true/);
 });
 
 test('configured auto approval context binds initial grant and exact PR scope',async()=>{

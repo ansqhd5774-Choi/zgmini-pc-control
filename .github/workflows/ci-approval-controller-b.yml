@@ -2,7 +2,10 @@ name: ZGMINI CI Controller B Submission
 on:
   push:
     branches: [main]
-    paths: ['approvals/controller-updates/*.json']
+    paths: ['approvals/controller-updates/*.json', 'controller/**']
+  workflow_run:
+    workflows: ['ZGMINI Controller Maintenance Source Tests']
+    types: [completed]
 permissions: {}
 jobs:
   submit-controller-b:
@@ -15,10 +18,19 @@ jobs:
       github.event.repository.id == 1442936296 &&
       github.event.repository.private == true &&
       github.ref == 'refs/heads/main' &&
-      github.event.forced == false &&
-      github.event.deleted == false
+      ((github.event_name == 'push' &&
+        github.event.forced == false &&
+        github.event.deleted == false) ||
+       (github.event_name == 'workflow_run' &&
+        vars.ZGMINI_CI_CONTROLLER_B_POLICY != '' &&
+        github.event.workflow_run.event == 'pull_request' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_repository.id == 1442936296))
     permissions:
-      contents: read
+      # Only the fixed publisher can merge an exact two-file approval PR.
+      # GitHub's existing merge rules remain in force. No repository-wide
+      # settings, administrator privileges or personal token are changed.
+      contents: write
       actions: read
       pull-requests: read
       issues: write
@@ -36,7 +48,7 @@ jobs:
       # event's main revision, candidate PR or mutable branch.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: 55cf73bdfbce33a515a4a06c4cbc3fea13e82b6b
+          ref: 292398753e42c3cf5c9f57b114ee550baecef202
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
@@ -46,4 +58,5 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           ZGMINI_CI_CONTROLLER_B_ENABLED: ${{ vars.ZGMINI_CI_CONTROLLER_B_ENABLED }}
           ZGMINI_CI_CONTROLLER_B_RECEIPT_ROOT: ${{ vars.ZGMINI_CI_CONTROLLER_B_RECEIPT_ROOT }}
+          ZGMINI_CI_CONTROLLER_B_POLICY: ${{ vars.ZGMINI_CI_CONTROLLER_B_POLICY }}
         run: node ci-approval/completed-run-intake.mjs --publish-existing
