@@ -4,3 +4,7 @@
 # Fingerprint is limited to the immutable introducing commit, path, rule and line.
 # All other Gitleaks default rules and findings remain active.
 df2e1db5084ae04d714a77ad4a1f314f67c4f451:approvals/source-bundles/manifests/39b54c38e5a842ddd5e7fd546e32950f52767de6.json:generic-api-key:14
+
+# W04 #3647: isolated run 45648280087 verified the same source digest field.
+# Exact immutable finding only; no broader rule or path exception.
+13da7a3c4334d959a5835b55afe5da0e4fbe2e51:approvals/source-bundles/manifests/551640c3094738f7803d6a7f799098a55c21523c.json:generic-api-key:14
