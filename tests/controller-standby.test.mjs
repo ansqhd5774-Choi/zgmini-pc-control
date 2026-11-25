@@ -150,7 +150,7 @@ test('Standby never promotes from missing, partial or ambiguous Runner heartbeat
 });
 test('Watchdog promotion must call exact six-seat exit proof, not accept empty heartbeat',()=>{
  const source=fs.readFileSync(new URL('../tools/runner-watchdog.mjs',import.meta.url),'utf8');
- assert.match(source,/if\(standbyMode&&!provenOldRunnerExit\(\{owner,heartbeat:hb\}\)\)/);
+ assert.match(source,/if\(standbyMode&&!verifiedColdStandbyStart\(\{owner,heartbeat:hb\}\)&&\s*!provenOldRunnerExit\(\{owner,heartbeat:hb\}\)\)/);
  assert.match(source,/heartbeat\.children\.length!==6/);
 });
 
