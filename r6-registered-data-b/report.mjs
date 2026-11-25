@@ -87,6 +87,23 @@ export function sanitizeR6BResult(raw,request,env){
  // The immutable workflow's real effect step must have exited successfully;
  // a stale/forged local SUCCESS file cannot override a failed Actions step.
  if(env?.R6_B_EFFECT_OUTCOME!=='success')return base;
+ if(raw.mode==='HISTORY_REPAIR'){
+  // Preserve zero provider/D1 effects and the exact selected key count.
+  if(raw.status!=='SUCCESS'||raw.code!=='W04_HISTORY_REPAIR_COMMITTED'||
+   raw.sourceSha!=='551640c3094738f7803d6a7f799098a55c21523c'||
+   raw.approvalManifestSha256!==request.approvalManifestSha256||
+   !SHA64.test(raw.selectionSha256??'')||!Number.isSafeInteger(raw.approvedCount)||
+   raw.approvedCount<1||raw.approvedCount>2880||raw.historyRowsAdded!==raw.approvedCount||
+   raw.providerRequests!==0||raw.blsRequests!==0||raw.dolRequests!==0||
+   !Array.isArray(raw.groupResults)||raw.groupResults.length!==0||
+   raw.sqlite!=='HISTORY_REPAIR_VERIFIED'||raw.publication!=='NOT_ATTEMPTED'||
+   raw.backupVerified!==true||raw.historicalVersionAttested!==false||
+   raw.lastPass!=='HISTORY_READBACK'||raw.firstFail!==null)return base;
+  return {...simple,sourceSha:raw.sourceSha,mode:raw.mode,providerRequests:0,blsRequests:0,dolRequests:0,
+   sqlite:raw.sqlite,publication:raw.publication,selectionSha256:raw.selectionSha256,
+   approvedCount:raw.approvedCount,historyRowsAdded:raw.historyRowsAdded,backupVerified:true,
+   historicalVersionAttested:false,lastPass:'HISTORY_READBACK'};
+ }
  const sourceOk=SHA40.test(raw.sourceSha??'');
  const validCount=x=>Number.isSafeInteger(x)&&x>=0;
  const groups=safeGroups(raw.groupResults);
@@ -166,6 +183,9 @@ export function r6BTextResult(result){return [
  `NATIONAL_SERIES_SAVED=${result.nationalSeriesSaved??'UNVERIFIED'}`,
  `NATIONAL_ROWS_SAVED=${result.nationalRowsSaved??'UNVERIFIED'}`,
  `STATE_ROWS_SAVED=${result.stateRowsSaved??'UNVERIFIED'}`,
+ ...(result.mode==='HISTORY_REPAIR'?[`HISTORY_ROWS_ADDED=${result.historyRowsAdded}`,
+  `SELECTION_SHA256=${result.selectionSha256}`,`BACKUP_VERIFIED=${result.backupVerified}`,
+  'HISTORICAL_VERSION_ATTESTED=false']:[]),
  `LAST_PASS=${result.lastPass??'UNVERIFIED'}`,
  `FIRST_FAIL=${result.firstFail??'NONE'}`,
  `RUN_ID=${result.runId??'UNVERIFIED'}`,
@@ -197,7 +217,7 @@ export async function deliverR6BReport({event,env,rawResult,fetchApi=fetch,
   (typeof pair?.delivery==='string'&&/^[A-Z0-9_]{1,100}$/.test(pair.delivery)?
    pair.delivery:'RESULT_PAIR_UNVERIFIED');
  const body=`<!-- r6-registered-data-b:${request.requestId} -->\n`+
-  `R6 BLS registered data one-shot: **${status}** `+
+  `R6 ${result.mode==='HISTORY_REPAIR'?'History repair':'BLS registered data'} one-shot: **${status}** `+
   `(${verified===2?result.code:'R6_B_RESULT_DELIVERY_UNVERIFIED'})\n`+
   `DELIVERY: ${delivery}; CREATED: ${pair?.created??'UNKNOWN'}/2; `+
   `READBACK: ${verified}/2\n`+
