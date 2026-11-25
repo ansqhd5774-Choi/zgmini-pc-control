@@ -5,6 +5,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
 import {readFixedReadonlyBytes} from './fixed-readonly-bytes.mjs';
+import {inspectER1DecemberSavedEvidence} from './market-calendar-er1-dec31-evidence-readonly.mjs';
 
 const SHA40=/^[a-f0-9]{40}$/i;
 const SHA64=/^[a-f0-9]{64}$/;
@@ -105,7 +106,7 @@ export function inspectWriterPublicationEvidence(dataRoot,{fileSystem=fs,
  readOutput=readER1LocalOutput}={}){
  const result={status:'STATE_UNKNOWN',code:'ER1_WRITER_EVIDENCE_UNAVAILABLE',
   observedAt:new Date().toISOString(),evidenceLevel:'LOCAL_WRITER_AND_OUTPUT_READONLY',
-  writer:null,er1Future:null,ledger:null,w05Sidecars:null,
+  writer:null,er1Future:null,er1DecemberInput:null,ledger:null,w05Sidecars:null,
   output:{key:null,state:'NOT_OBSERVED',storedAt:null,bodySha256:null},
   d1:{perKeyReadback:'NOT_RECORDED',matchedToLocal:false,
    productionVerified:false,publicApiUiVerified:false,
@@ -113,6 +114,7 @@ export function inspectWriterPublicationEvidence(dataRoot,{fileSystem=fs,
   localOutputVerified:false,globalLedgerVerified:false,
   providerCalls:0,d1Writes:0,operationalWrites:0,sqliteOpened:false};
  if(typeof dataRoot!=='string'||!path.isAbsolute(dataRoot))return result;
+ result.er1DecemberInput=inspectER1DecemberSavedEvidence(dataRoot);
  const output=readOutput(dataRoot,{fileSystem});
  result.sqliteOpened=output.sqliteOpened===true;
  result.output={key:OUT_KEY.test(output.key??'')?output.key:null,state:output.state,
