@@ -499,7 +499,12 @@ export async function main({eventPath=process.env.GITHUB_EVENT_PATH,token=proces
 export function ciPublicationExitCode(result,{publish=false}={}){
  // An explicitly invoked submission on an untrusted host or without its
  // configured identity must fail, not produce an apparently green CI job.
- if(result?.state==='EVIDENCE_MISSING'||(publish&&result?.state==='DISABLED'))return 1;
+ if(publish){
+  // Only a truly non-target event may exit successfully without a receipt.
+  // Unknown or future top-level states must never turn a publishing job green.
+  if(result?.state==='IGNORED')return 0;
+  if(result?.state!=='PUBLICATION_PROCESSED')return 1;
+ }else if(result?.state==='EVIDENCE_MISSING')return 1;
  if(result?.state!=='PUBLICATION_PROCESSED')return 0;
  if(!Array.isArray(result.results)||result.results.length===0)return 1;
  return result.results.every(item=>item?.status==='REQUEST_READBACK_VERIFIED'||
