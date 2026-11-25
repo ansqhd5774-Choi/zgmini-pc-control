@@ -240,6 +240,26 @@ test('configured source event rejects unrelated or unmerged source before any wr
  assert.equal((await publishConfiguredControllerApproval(e,{...opts,getJson})).code,'CONFIGURED_SOURCE_EVENT_NOT_MATCHED');
  assert.equal((await publishConfiguredControllerApproval(e,{...opts,getJson:async()=>({...base,merged:false})})).code,'CONFIGURED_SOURCE_NOT_MERGED');
 });
+test('staged approval does not construct a PR-number-dependent context before PR allocation',async()=>{
+ const staged={installPlan:{targetSha:'a'.repeat(40)},targetSha:'a'.repeat(40),
+  sourcePrNumber:28};
+ assert.equal(initialControllerPublicationPolicy(staged),null);
+ const initial=createControllerPublicationPorts({getJson:async()=>({}),postIssue:()=>{},
+  store:{loadReceipt:()=>{},saveReceipt:()=>{}},
+  autoApprovalPolicy:initialControllerPublicationPolicy(staged),readJobLogs:async()=>{},
+  putMerge:()=>assert.fail('not allowed before PR allocation')});
+ assert.equal(initial.readAutoApprovalContext,undefined);
+ assert.equal(initial.mergeApprovalPr,undefined);
+ const ready={...staged,approvalPrNumber:29,sourceWorkflowBlobSha:'a'.repeat(40),
+  businessApprovalSha256:'b'.repeat(64),policyRevision:'c'.repeat(40),
+  sourceBranch:'codex/example-selective',
+  delegationPin:{issueNumber:1,commentId:2,bodySha256:'d'.repeat(64)}};
+ const final=createControllerPublicationPorts({getJson:async()=>({}),postIssue:()=>{},
+  store:{loadReceipt:()=>{},saveReceipt:()=>{}},autoApprovalPolicy:ready,
+  readJobLogs:async()=>{},putMerge:async()=>({merged:true})});
+ assert.equal(typeof final.readAutoApprovalContext,'function');
+ assert.equal(typeof final.mergeApprovalPr,'function');
+});
 test('configured exact merge API receives immutable head CAS',async()=>{
  const calls=[],policy={approvalPrNumber:29,targetSha:'a'.repeat(40),sourcePrNumber:28,
   sourceWorkflowBlobSha:'b'.repeat(40),businessApprovalSha256:'c'.repeat(64),policyRevision:'d'.repeat(40),

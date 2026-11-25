@@ -156,6 +156,12 @@ export function createAutoApprovalContextReader({policy,getJson,readJobLogs}={})
    }};
  };
 }
+// Until the exact approval PR number is allocated, the initial event port
+// cannot use the approval-PR reconstruction context. It is created only
+// after staging has revalidated the independent owner grant and actual PR.
+export function initialControllerPublicationPolicy(policy){
+ return policy?.installPlan ? null : policy;
+}
 export function createControllerPublicationPorts({getJson,postIssue,store,autoApprovalPolicy,readJobLogs,putMerge}){
  const readBytes=async(target,revision)=>{
   if(!sha(target)||!(revision==='main'||sha(revision)))throw Error('CI_PUBLICATION_SOURCE_INVALID');
@@ -447,7 +453,8 @@ export async function main({eventPath=process.env.GITHUB_EVENT_PATH,token=proces
    return bytes;
   };
   const ports=createControllerPublicationPorts({getJson,postIssue:body=>github('issues',body),store,
-   autoApprovalPolicy:policy,readJobLogs,putMerge:(n,body)=>github('pulls/'+n+'/merge',body,'PUT')});
+   autoApprovalPolicy:initialControllerPublicationPolicy(policy),readJobLogs,
+   putMerge:(n,body)=>github('pulls/'+n+'/merge',body,'PUT')});
   const opts={getJson,ports,runId:Number(process.env.GITHUB_RUN_ID),
    attempt:Number(process.env.GITHUB_RUN_ATTEMPT),emitReceipt:marker=>console.log(marker)};
   if(policy){
