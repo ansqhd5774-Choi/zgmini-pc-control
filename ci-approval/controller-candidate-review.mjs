@@ -14,9 +14,14 @@ export async function reviewControllerCandidate({plan,delegation,ci,live,getJson
   if(proposed.state!=='CANDIDATE_ONLY')return out(proposed.state,proposed.reason);
   const candidate=proposed.candidate,p=candidate.plan;
   if(p.purpose!=='pc-controller-maintenance')return out('OUT_OF_SCOPE','PURPOSE_NOT_IN_DELEGATION_PILOT');
-  if(live?.requestState==='CONSUMED'||live?.requestState==='UNKNOWN')return out('WAIT_RESOURCE','RECONCILE_EXISTING_REQUEST');
-  if(live?.resourceState==='BUSY')return out('WAIT_RESOURCE','RESOURCE_BUSY');
-  if(live?.requestState!=='NEW'||live?.resourceState!=='READY'||live?.installedSha!==p.installedSha||live?.rollbackVerified!==true||live?.postcheckBound!==true)return out('EVIDENCE_MISSING','LIVE_PRECONDITIONS_UNVERIFIED');
+  // Source-only preparation is independent of the operating PC. The existing
+  // combined review keeps all live checks when a live context is provided.
+  const sourceOnly=live===undefined;
+  if(!sourceOnly){
+   if(live?.requestState==='CONSUMED'||live?.requestState==='UNKNOWN')return out('WAIT_RESOURCE','RECONCILE_EXISTING_REQUEST');
+   if(live?.resourceState==='BUSY')return out('WAIT_RESOURCE','RESOURCE_BUSY');
+   if(live?.requestState!=='NEW'||live?.resourceState!=='READY'||live?.installedSha!==p.installedSha||live?.rollbackVerified!==true||live?.postcheckBound!==true)return out('EVIDENCE_MISSING','LIVE_PRECONDITIONS_UNVERIFIED');
+  }
   if(typeof readFileBytes!=='function'||typeof getJson!=='function'||!delegation?.scope||!ci?.expected)return out('EVIDENCE_MISSING','READ_ADAPTER_OR_EVIDENCE_MISSING');
   if(delegation.scope.effect!=='B_CONTROLLER_INSTALL'||delegation.scope.purpose!==p.purpose||delegation.scope.targetSha!==p.targetSha||delegation.scope.scopeDigest!==candidate.fileManifestSha256||delegation.baseSha!==p.installedSha)return out('REJECTED','DELEGATION_CANDIDATE_BINDING_MISMATCH');
   const tree=inspectIntegrationTree(ci);
@@ -36,6 +41,6 @@ export async function reviewControllerCandidate({plan,delegation,ci,live,getJson
     if(digest(bytes)!==f.sha256)return out('REJECTED','FILE_BYTES_MISMATCH');
    }
   }
-  return out('CANDIDATE_REVIEW_MATCH_ONLY','INDEPENDENT_AUTHORITY_AND_LIVE_CLAIM_REQUIRED',{candidate,delegationSha256:observed.delegationSha256,testedSha:tree.testedSha,runId:tree.runId,jobId:tree.jobId});
+  return out(sourceOnly?'SOURCE_REVIEW_MATCH_ONLY':'CANDIDATE_REVIEW_MATCH_ONLY',sourceOnly?'LIVE_CHECKS_DEFERRED_TO_EXECUTION':'INDEPENDENT_AUTHORITY_AND_LIVE_CLAIM_REQUIRED',{candidate,delegationSha256:observed.delegationSha256,testedSha:tree.testedSha,runId:tree.runId,jobId:tree.jobId});
  }catch{return out('EVIDENCE_MISSING','REVIEW_INPUT_OR_READ_FAILED')}
 }
