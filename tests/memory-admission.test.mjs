@@ -26,10 +26,10 @@ test('R6 post-admission check tolerates transient RAM dips but keeps the 1536 Mi
  const branch=source.split("if(request.operation==='employment-r6-candidate-stage-readonly')")[1]
   ?.split("if(request.operation==='core-conflict-proof')")[0];
  assert.ok(branch,'R6 operation branch present');
- assert.match(branch,/await waitForMemoryAdmission\\(\\{minimumFreeMiB,timeoutMs:9000,intervalMs:1500\\}\\)/);
- assert.match(branch,/minimumFreeMiB=policy\\.operations\\[request\\.operation\\]\\.minimumFreeMiB\\?\\?policy\\.minimumFreeMiBForHeavy/);
- assert.match(branch,/if\\(!memoryRecheck\\.admitted\\)return \\{status:'BLOCKED',code:'RESOURCE_WAIT_MEMORY'/);
- assert.doesNotMatch(branch,/if\\(os\\.freemem\\(\\)\\/1048576<minimum\\)/);
+ assert.ok(branch.includes("await waitForMemoryAdmission({minimumFreeMiB,timeoutMs:9000,intervalMs:1500})"));
+ assert.ok(branch.includes("minimumFreeMiB=policy.operations[request.operation].minimumFreeMiB??policy.minimumFreeMiBForHeavy"));
+ assert.ok(branch.includes("if(!memoryRecheck.admitted)return {status:'BLOCKED',code:'RESOURCE_WAIT_MEMORY'"));
+ assert.equal(branch.includes("if(os.freemem()/1048576<minimum"),false);
  const threshold=memoryAdmissionMinimum(policy,'employment-r6-candidate-stage-readonly');
  assert.equal(threshold,1536);
  const admitted=await waitForMemoryAdmission({minimumFreeMiB:threshold,
