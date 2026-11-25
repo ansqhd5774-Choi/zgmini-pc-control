@@ -66,29 +66,20 @@ export async function submitPreparedMaintenanceIssue(expected,{installedSha,read
  validateUpdateRequest(request,bytes,{actor:CONTROL_ACTOR,installedSha});
  return submitMaintenanceIssue(snapshot,ports);
 }
-// CI submission integration for an explicitly selected, already-approved
-// Controller request. Runs only through an independently authenticated owner
-// submitter; never use the PR runner token as owner or infer authority from CI.
-// The source approval and final PC-side CAS/effect claim remain unchanged.
-export async function submitCiPreparedMaintenanceIssue(expected,{runId,readRun,listRuns,...ports}={}){
+// Shared read-only CI discovery for approval publication and the regular submitter.
+// A matching CI run is not a business approval, an execution credential or a live CAS.
+export async function resolveControllerApprovalCI(approvalRef,{runId,readRun,listRuns,readApprovalPr}={}){
  if((runId!==undefined&&(!Number.isSafeInteger(runId)||runId<=0))||typeof readRun!=='function'||
     (runId===undefined&&typeof listRuns!=='function'))
   fail('MAINTENANCE_CI_RUN_REQUIRED');
- const snapshot=structuredClone(expected);
- const request=requestOf(snapshot);
- if((await ports.readIdentity())?.login!==CONTROL_ACTOR||
-    (await ports.readRepository())?.private!==true)
-  fail('MAINTENANCE_SUBMIT_IDENTITY_DENIED');
- const bytes=await ports.readManifest(request.targetControllerSha);
- if(!Buffer.isBuffer(bytes))fail('MAINTENANCE_REMOTE_MANIFEST_BYTES_MISSING');
- const {manifest}=validateUpdateRequest(request,bytes,{actor:CONTROL_ACTOR,installedSha:ports.installedSha});
  // The relevant CI run must be tied to the exact approved source PR.
  // Selective install target is not itself a PR HEAD. Its existing manifest
  // and pin checks stay with the independent maintenance receiver.
- const number=Number(manifest.approval.ref.split('/').at(-1));
- if(!Number.isSafeInteger(number)||number<=0||typeof ports.readApprovalPr!=='function')
+ const match=typeof approvalRef==='string'&&approvalRef.match(/^https:\/\/github\.com\/ansqhd5774-Choi\/zgmini-pc-control\/pull\/([1-9]\d*)$/);
+ const number=match?Number(match[1]):0;
+ if(!Number.isSafeInteger(number)||number<=0||typeof readApprovalPr!=='function')
   fail('MAINTENANCE_CI_APPROVAL_PR_REQUIRED');
- const pr=await ports.readApprovalPr(number);
+ const pr=await readApprovalPr(number);
  if(pr?.number!==number||pr.merged!==true||pr.base?.ref!=='main'||
     pr.base?.repo?.full_name!==CONTROL_REPOSITORY||
     pr.head?.repo?.full_name!==CONTROL_REPOSITORY||
@@ -111,6 +102,25 @@ export async function submitCiPreparedMaintenanceIssue(expected,{runId,readRun,l
  const run=await readRun(runId);
  if(!matches(run)||run.id!==runId)
   fail('MAINTENANCE_CI_APPROVAL_SOURCE_MISMATCH');
+ return Object.freeze({approvalPr:number,headSha:pr.head.sha,runId:run.id});
+}
+// CI submission integration for an explicitly selected, already-approved
+// Controller request. Runs only through an independently authenticated owner
+// submitter; never use the PR runner token as owner or infer authority from CI.
+// The source approval and final PC-side CAS/effect claim remain unchanged.
+export async function submitCiPreparedMaintenanceIssue(expected,{runId,readRun,listRuns,...ports}={}){
+ if((runId!==undefined&&(!Number.isSafeInteger(runId)||runId<=0))||typeof readRun!=='function'||
+    (runId===undefined&&typeof listRuns!=='function'))
+  fail('MAINTENANCE_CI_RUN_REQUIRED');
+ const snapshot=structuredClone(expected);
+ const request=requestOf(snapshot);
+ if((await ports.readIdentity())?.login!==CONTROL_ACTOR||
+    (await ports.readRepository())?.private!==true)
+  fail('MAINTENANCE_SUBMIT_IDENTITY_DENIED');
+ const bytes=await ports.readManifest(request.targetControllerSha);
+ if(!Buffer.isBuffer(bytes))fail('MAINTENANCE_REMOTE_MANIFEST_BYTES_MISSING');
+ const {manifest}=validateUpdateRequest(request,bytes,{actor:CONTROL_ACTOR,installedSha:ports.installedSha});
+ await resolveControllerApprovalCI(manifest.approval.ref,{runId,readRun,listRuns,readApprovalPr:ports.readApprovalPr});
  // Existing submitter re-reads main manifest and checks owner identity and
  // exact request before its original atomic receipt and only POST.
  // A moved or altered approval cannot reuse the prior CI evidence.
