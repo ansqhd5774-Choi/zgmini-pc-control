@@ -13,7 +13,7 @@ const paths=['/','/economic-indicators/'];
 const devices=['mobile','desktop'];
 const rows=()=>paths.flatMap(route=>devices.map(device=>({
  count:220,dimensions:{requestHost:'zgmini.kr',requestPath:route,
-  deviceType:device,bot:0},quantiles:Q
+  deviceType:device},quantiles:Q
 })));
 const body=(data=rows())=>JSON.stringify({data:{viewer:{accounts:[
  {rumWebVitalsEventsAdaptiveGroups:data}]}}});
@@ -38,6 +38,7 @@ test('official GraphQL POST is one fixed authorized query, no request-controlled
  assert.equal(result.status,'PASS');
  assert.equal(result.fieldP75ValuesPresent,true);
  assert.equal(result.observations.length,4);
+ assert(result.observations.every(r=>r.groupEventCount===220));
  assert.equal(result.observations[0].metrics.lcpMs.p75,2300);
  assert.equal(result.observations[0].metrics.inpMs.p75,180);
  assert.equal(result.observations[0].metrics.cls.p75,0.09);
