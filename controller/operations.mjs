@@ -274,9 +274,12 @@ export async function runOperation(request,context){
  if(request.operation==='w05-wpsfd42-service-readonly')return await runW05ServiceStoredReadonly({request,host,dataRoot,workspace});
  if(request.operation==='inflation19-d1-readback-readonly')return inspectInflation19D1Readback(dataRoot);
  if(request.operation==='employment-r6-candidate-stage-readonly'){
-  const minimum=policy.operations[request.operation].minimumFreeMiB??policy.minimumFreeMiBForHeavy;
-  if(os.freemem()/1048576<minimum)return {status:'BLOCKED',code:'RESOURCE_WAIT_MEMORY',
-    candidateExecuted:false,sqliteOpened:false,providerCalls:0,d1Writes:0};
+  // Admission already passed; a momentary RAM dip before the R6 worker
+  // must use the same bounded policy recheck, not an immediate one-shot denial.
+  const minimumFreeMiB=policy.operations[request.operation].minimumFreeMiB??policy.minimumFreeMiBForHeavy;
+  const memoryRecheck=await waitForMemoryAdmission({minimumFreeMiB,timeoutMs:9000,intervalMs:1500});
+  if(!memoryRecheck.admitted)return {status:'BLOCKED',code:'RESOURCE_WAIT_MEMORY',
+    candidateExecuted:false,sqliteOpened:false,providerCalls:0,d1Writes:0,memoryRecheck};
   return inspectEmploymentR6Candidate(request,{host,workspace});
  }
  if(request.operation==='core-conflict-proof'){
