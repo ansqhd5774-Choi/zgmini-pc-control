@@ -161,11 +161,17 @@ test('IPC-T05 two READY candidates race, but exact temp supervisor lease has onl
   assert.equal(fs.existsSync(path.join(fx.control,'leases','supervisor')),false);
   a.child.send({type:'PROMOTE',oldChildrenStopped:true});
   b.child.send({type:'PROMOTE',oldChildrenStopped:true});
-  await waitFor(()=>saw(a,'PROMOTION_ATTEMPTED')&&saw(b,'PROMOTION_ATTEMPTED'),'BOTH_ATTEMPTED');
+  // The second candidate may be rejected at the preflight owner check,
+  // OR both may pass preflight and the atomic mkdir rejects one of them.
+  // These are both safe, valid schedules; do not require two attempts.
+  await waitFor(()=>saw(a,'PROMOTION_ATTEMPTED')||saw(b,'PROMOTION_ATTEMPTED'),'ONE_ATTEMPT');
   await waitFor(()=>fs.existsSync(path.join(fx.control,'PROMOTED.json')),'ONE_OWNER');
   const owner=JSON.parse(fs.readFileSync(path.join(fx.control,'leases','supervisor','owner.json')));
   assert.ok([a.child.pid,b.child.pid].includes(owner.pid));
-  await waitFor(()=>saw(a,'PROMOTION_FAILED')||saw(b,'PROMOTION_FAILED'),'SECOND_REJECTED');
+  const loser=owner.pid===a.child.pid?b:a;
+  await waitFor(()=>saw(loser,'PROMOTION_FAILED')||saw(loser,'PROMOTION_BLOCKED'),'SECOND_REJECTED');
+  assert.equal(saw(loser,'PROMOTION_ATTEMPTED')===undefined||
+    saw(loser,'PROMOTION_FAILED')!==undefined,true);
   assert.equal(fs.readdirSync(path.join(fx.control,'leases')).filter(x=>x==='supervisor').length,1);
   assert.equal(JSON.parse(fs.readFileSync(path.join(fx.control,'PROMOTED.json'))).ownerPid,owner.pid);
  }finally{await cleanup(fx,a,b);}
