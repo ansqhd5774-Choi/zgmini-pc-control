@@ -9,6 +9,7 @@ import path from "node:path";
 import {fileURLToPath,pathToFileURL} from "node:url";
 
 import {validateMaintenanceRequest,validateUpdateRequest,
+  authenticateControllerBIssue,CI_CONTROLLER_ACTOR,installedControllerBPolicy,
   validateR6HostIssueEnvelope,validateR6HostRegistrationRequest,
   validateR54BIssueEnvelope,validateR54BManifestRequest,
   R54_B_ISSUE_TITLE,R54_B_OPERATION,R54_B_SOURCE_FILES,
@@ -876,9 +877,43 @@ export function createMaintenanceAgent({
   async function processIssue(issue){
     if(issue?.title===INSTALLED_RECOVERY_ISSUE_TITLE)
       return processInstalledRecoveryIssue(issue);
+    const ciOrigin=issue?.title===ISSUE_TITLE&&issue.state==='OPEN'&&
+      Number.isSafeInteger(issue.number)&&issue.number>0&&
+      [CI_CONTROLLER_ACTOR,'app/github-actions'].includes(issue.author?.login)&&
+      issue.labels?.some(x=>x.name===label);
+    let ciPolicy=null;
+    if(ciOrigin){
+      try{
+        // The installed seven-file source must still match its existing CAS.
+        verifyInstalledSource();
+        const file=path.join(root,'MAINTENANCE_INSTALL.json'),stat=fs.lstatSync(file);
+        if(!stat.isFile()||stat.isSymbolicLink()||stat.size<1||stat.size>131072)
+          throw coded('CI_INSTALLED_POLICY_UNVERIFIED');
+        ciPolicy=installedControllerBPolicy(JSON.parse(fs.readFileSync(file,'utf8')));
+      }catch{
+        return {status:'BLOCKED',code:'CI_INSTALLED_POLICY_UNVERIFIED',issueNumber:issue.number};
+      }
+    }
+    const ciCandidate=ciOrigin&&ciPolicy!==null;
     if(![ISSUE_TITLE,R6_HOST_ISSUE_TITLE,R54_B_ISSUE_TITLE,SOURCE_BUNDLE_ISSUE_TITLE].includes(issue?.title)
-      ||!issueIsTrusted(issue,{allowedActors,title:issue.title,label}))
+      ||(!ciCandidate&&!issueIsTrusted(issue,{allowedActors,title:issue.title,label})))
       return {status:"IGNORED",issueNumber:issue?.number};
+    let ciAuthorization=null;
+    if(ciCandidate){
+      const actual=await githubJson(["api",`repos/${repo}/issues/${issue.number}`],"GITHUB_ISSUE_READ_FAILED");
+      if(actual.number!==issue.number||actual.body!==issue.body)
+        return {status:"BLOCKED",code:"CI_ISSUE_READBACK_MISMATCH",issueNumber:issue.number};
+      const checked=await authenticateControllerBIssue(actual,{policy:ciPolicy,
+        getJson:route=>githubJson(["api",`repos/${repo}/${route}`],"CI_IDENTITY_READ_FAILED"),
+        readJobLogs:async jobId=>(await github(["api",`repos/${repo}/actions/jobs/${jobId}/logs`])).stdout,
+      });
+      if(checked.state!=='CI_WORKLOAD_IDENTITY_VERIFIED_ONLY')
+        return {status:checked.state==='QUEUED'?'QUEUED':checked.state==='EVIDENCE_MISSING'?'STATE_UNKNOWN':'BLOCKED',
+          code:checked.code,issueNumber:issue.number};
+      ciAuthorization=checked.authorization;
+      // Record the actual authenticated actor, not the owner or GraphQL app alias.
+      issue={...issue,author:{...issue.author,login:actual.user.login}};
+    }
     if(typeof issue.body!=="string"||Buffer.byteLength(issue.body)>MAX_BODY_BYTES){
       return rejectAdmission(issue,'ISSUE_BODY_INVALID');
     }
@@ -891,7 +926,7 @@ export function createMaintenanceAgent({
         ?validateSourceBundleIssueEnvelope(parsed,{actor:issue.author.login,controlRepository:repo})
         :parsed.operation===R54_B_OPERATION
         ?validateR54BIssueEnvelope(parsed,{actor:issue.author.login,allowedActors,controlRepository:repo})
-        :validateMaintenanceRequest(parsed,{actor:issue.author.login,allowedActors,controlRepository:repo});
+        :validateMaintenanceRequest(parsed,{actor:issue.author.login,allowedActors,controlRepository:repo,ciAuthorization});
       if((request.operation==="employment-r6-host-register")!==(issue.title===R6_HOST_ISSUE_TITLE))
         throw coded("ISSUE_TITLE_OPERATION_MISMATCH");
       if((request.operation===R54_B_OPERATION)!==(issue.title===R54_B_ISSUE_TITLE))
@@ -938,7 +973,7 @@ export function createMaintenanceAgent({
       }
       const installedSha=installedShaFromStatus(preflight);
       if(!isSha(installedSha))throw coded("INSTALLED_CONTROLLER_SHA_UNVERIFIED");
-      const args={actor:issue.author.login,allowedActors,controlRepository:repo,installedSha};
+      const args={actor:issue.author.login,allowedActors,controlRepository:repo,installedSha,ciAuthorization};
       approved=request.operation===R54_B_OPERATION
         ?validateR54BManifestRequest(request,approvedBytes,{...args})
         :request.operation===SOURCE_BUNDLE_OPERATION

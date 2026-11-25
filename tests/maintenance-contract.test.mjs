@@ -568,3 +568,50 @@ test('#3409 maintainer handoff V2 pins only existing-approved three-file delta',
   /HANDOFF_APPROVAL_REQUIRED/);
  assert.throws(()=>requireHandoffApproval(next,before,before),/HANDOFF_APPROVAL_REQUIRED/);
 });
+
+test('independent handoff installs fixed CI workload pin only when explicitly approved',async()=>{
+ const {approvedHandoffCiPolicy}=await import('../tools/handoff-maintenance.mjs');
+ const before={schema:'ZGMINI_PC_MAINTENANCE_INSTALL_V1',
+  sourceSha:'a'.repeat(40),startupSha256:'d'.repeat(64),
+  files:Object.fromEntries(['a','b','c','d','e','f','g'].map(x=>['tools/'+x+'.mjs','e'.repeat(64)]))};
+ const next={...before,sourceSha:'b'.repeat(40)};
+ const policy={schema:'ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V1',enabled:true,workflowId:42,
+  workflowBlobSha:'c'.repeat(40),workflowPath:'.github/workflows/ci-approval-controller-b.yml'};
+ const approval={schema:'ZGMINI_MAINTENANCE_HANDOFF_V2',transition:'SEVEN_TO_SEVEN',
+  installedSha:before.sourceSha,targetSha:next.sourceSha,approved:true,ciControllerBPolicy:policy};
+ // Without an explicit policy field, an ordinary handoff cannot enable CI.
+ const ordinary=structuredClone(approval);delete ordinary.ciControllerBPolicy;
+ assert.equal(approvedHandoffCiPolicy(before,ordinary,next),undefined);
+ const selected=approvedHandoffCiPolicy(before,approval,next);
+ assert.deepEqual(selected,policy);
+ assert.notEqual(selected,policy);
+ for(const edit of [
+  x=>x.approved=false,
+  x=>x.installedSha='f'.repeat(40),
+  x=>x.targetSha='f'.repeat(40),
+  x=>x.transition='SIX_TO_SEVEN',
+  x=>x.ciControllerBPolicy.workflowBlobSha='invalid',
+  x=>x.ciControllerBPolicy.enabled=false
+ ]){
+  const bad=structuredClone(approval);edit(bad);
+  assert.throws(()=>approvedHandoffCiPolicy(before,bad,next),/HANDOFF_CI_POLICY_/);
+ }
+ // A future approved handoff must preserve already installed policy unless
+ // its own exact approved manifest explicitly changes that policy field.
+ assert.deepEqual(approvedHandoffCiPolicy({...before,ciControllerBPolicy:policy},ordinary,next),policy);
+});
+
+test('optional CI policy approval is prevalidated before receiver stop or any file replacement',()=>{
+ const source=fs.readFileSync(new URL('../tools/handoff-maintenance.mjs',import.meta.url),'utf8');
+ const begin=source.indexOf('export async function main(');
+ assert.ok(begin>=0);
+ const body=source.slice(begin);
+ const gate=body.indexOf('const approvedCiPolicy=approvedHandoffCiPolicy(');
+ const stop=body.indexOf("fs.writeFileSync(root+'/STOP_REQUEST.json'");
+ const backup=body.indexOf('fs.mkdirSync(backup,{recursive:true})');
+ const replaced=body.indexOf('for(const rel of filePlan.writes)');
+ const manifest=body.indexOf("fs.writeFileSync(root+'/MAINTENANCE_INSTALL.json'");
+ assert.ok(gate>=0&&stop>=0&&backup>=0&&replaced>=0&&manifest>=0);
+ assert.ok(gate<stop&&gate<backup&&gate<replaced&&gate<manifest);
+ assert.equal(body.slice(replaced,manifest).includes('approvedHandoffCiPolicy('),false);
+});

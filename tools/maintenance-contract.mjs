@@ -58,6 +58,136 @@ export function selectPreservedRecoveryProtection(original,current,
 
 export const CONTROL_REPOSITORY="ansqhd5774-Choi/zgmini-pc-control";
 export const CONTROL_ACTOR="ansqhd5774-Choi";
+// Disabled until the fixed reviewed submission workflow and independently
+// approved installed pin are available. Neither Issue nor GitHub event may
+// set this policy. This preserves the current seven-file installation layout.
+export const CI_CONTROLLER_POLICY=null;
+// The independent maintainer's already verified installation manifest is the
+// only local activation source. Absent policy remains disabled. Neither a
+// GitHub Issue, incoming event, candidate PR nor environment variable may
+// configure the receiver. The installed manifest is written only by the
+// approved independent maintenance handoff.
+export function installedControllerBPolicy(installed){
+ if(installed?.ciControllerBPolicy===undefined)return null;
+ const policy=installed.ciControllerBPolicy;
+ const keys=['schema','enabled','workflowId','workflowBlobSha','workflowPath'];
+ if(installed?.schema!=='ZGMINI_PC_MAINTENANCE_INSTALL_V1'||
+    !/^[a-f0-9]{40}$/.test(installed.sourceSha??'')||
+    !/^[a-f0-9]{64}$/.test(installed.startupSha256??'')||
+    !installed.files||typeof installed.files!=='object'||Array.isArray(installed.files)||
+    Object.keys(installed.files).length!==7||
+    !policy||typeof policy!=='object'||Array.isArray(policy)||
+    Object.keys(policy).length!==keys.length||!keys.every(k=>Object.hasOwn(policy,k))||
+    policy.schema!=='ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V1'||policy.enabled!==true||
+    !Number.isSafeInteger(policy.workflowId)||policy.workflowId<=0||
+    !/^[a-f0-9]{40}$/.test(policy.workflowBlobSha??'')||
+    policy.workflowPath!=='.github/workflows/ci-approval-controller-b.yml')
+  throw Error('CI_INSTALLED_POLICY_INVALID');
+ return Object.freeze({workflowId:policy.workflowId,workflowBlobSha:policy.workflowBlobSha});
+}
+export const CI_CONTROLLER_ACTOR='github-actions[bot]';
+const ciWorkload=(()=>{
+const REPO='ansqhd5774-Choi/zgmini-pc-control',REPO_ID=1442936296;
+const WORKFLOW='.github/workflows/ci-approval-controller-b.yml';
+const JOB='submit-controller-b',STEP='Record Controller B request receipt';
+const MARKER='ZGMINI_CI_CONTROLLER_B_RECEIPT=';
+const sha=x=>typeof x==='string'&&/^[a-f0-9]{40}$/.test(x);
+const id=x=>Number.isSafeInteger(x)&&x>0;
+const hash=b=>createHash('sha256').update(b).digest('hex');
+const bytesOk=b=>Buffer.isBuffer(b)&&b.length>0&&b.length<=32768;
+const out=(state,code,extra={})=>Object.freeze({state,code,canPublish:false,canExecute:false,...extra});
+function controllerBReceiptMarker(issueNumber,requestBytes){
+ if(!id(issueNumber)||!bytesOk(requestBytes))throw Error('CI_RECEIPT_INPUT_INVALID');
+ return MARKER+issueNumber+':'+hash(requestBytes);
+}
+// Only the fixed reviewed workflow emits the marker after creating and reading
+// back the exact Issue. The receiver reads the historical attempt, not a later
+// rerun. A pending attempt is queued, not considered an authentication failure.
+async function verifyControllerBIdentity({issueNumber,requestBytes,runId,attempt,policy,getJson,readJobLogs}={}){
+ if(!id(policy?.workflowId)||!sha(policy?.workflowBlobSha))
+  return out('DISABLED','CI_IDENTITY_POLICY_NOT_CONFIGURED');
+ if(!id(runId)||!id(attempt)||!id(issueNumber)||!bytesOk(requestBytes)||
+    typeof getJson!=='function'||typeof readJobLogs!=='function')
+  return out('REJECTED','CI_RECEIPT_INPUT_INVALID');
+ const expected=controllerBReceiptMarker(issueNumber,requestBytes),route='actions/runs/'+runId+'/attempts/'+attempt;
+ try{
+  const run=await getJson(route);
+  if(run?.id!==runId||run.run_attempt!==attempt||run.workflow_id!==policy.workflowId||
+     run.path!==WORKFLOW||run.repository?.id!==REPO_ID||run.repository?.full_name!==REPO||
+     run.repository?.private!==true||run.head_repository?.id!==REPO_ID||
+     run.head_branch!=='main'||!sha(run.head_sha)||!['push','workflow_run'].includes(run.event))
+   return out('REJECTED','CI_RUN_IDENTITY_MISMATCH');
+  if(run.status!=='completed')return out('QUEUED','CI_RUN_NOT_COMPLETED');
+  if(run.conclusion!=='success')return out('REJECTED','CI_RUN_NOT_SUCCESS');
+  // Independently read the caller workflow at its immutable run revision.
+  // The installed pin must cover a workflow that only checks out fixed reviewed
+  // source and never executes a candidate or accepts arbitrary marker text.
+  const file=await getJson('contents/'+WORKFLOW+'?ref='+run.head_sha);
+  if(file?.type!=='file'||file.path!==WORKFLOW||file.sha!==policy.workflowBlobSha||
+     file.encoding!=='base64'||typeof file.content!=='string'||file.content.length>131072)
+   return out('REJECTED','CI_WORKFLOW_PIN_MISMATCH');
+  const bytes=Buffer.from(file.content,'base64');
+  const blob=createHash('sha1').update(Buffer.concat([Buffer.from('blob '+bytes.length+'\0'),bytes])).digest('hex');
+  if(blob!==policy.workflowBlobSha)return out('REJECTED','CI_WORKFLOW_BYTES_MISMATCH');
+  const jobs=await getJson(route+'/jobs?per_page=100');
+  if(!Array.isArray(jobs?.jobs)||!id(jobs.total_count)||jobs.total_count!==jobs.jobs.length)
+   return out('EVIDENCE_MISSING','CI_JOBS_INCOMPLETE');
+  const matched=jobs.jobs.filter(j=>j?.name===JOB);
+  if(matched.length!==1)return out('REJECTED','CI_JOB_IDENTITY_MISMATCH');
+  const job=matched[0];
+  if(!id(job.id)||job.run_id!==runId||job.run_attempt!==attempt||job.head_sha!==run.head_sha||
+     job.status!=='completed'||job.conclusion!=='success')
+   return out('REJECTED','CI_JOB_IDENTITY_MISMATCH');
+  const steps=Array.isArray(job.steps)?job.steps.filter(s=>s?.name===STEP):[];
+  if(steps.length!==1||steps[0].status!=='completed'||steps[0].conclusion!=='success')
+   return out('REJECTED','CI_RECEIPT_STEP_NOT_SUCCESS');
+  const logs=await readJobLogs(job.id);
+  if(typeof logs!=='string'||!logs.length||logs.length>16000000)
+   return out('EVIDENCE_MISSING','CI_RECEIPT_LOG_UNAVAILABLE');
+  const marks=logs.split(/\r?\n/).flatMap(line=>{
+   const m=line.match(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z (ZGMINI_CI_CONTROLLER_B_RECEIPT=[1-9]\d*:[a-f0-9]{64})$/);
+   return m?[m[1]]:[];
+  });
+  if(!marks.includes(expected))return out('REJECTED','CI_RECEIPT_ISSUE_OR_BYTES_MISMATCH');
+  return out('CI_WORKLOAD_IDENTITY_VERIFIED_ONLY','CI_RECEIPT_MATCH',{runId,attempt,jobId:job.id,
+    issueNumber,requestSha256:hash(requestBytes),workflowBlobSha:blob,runHeadSha:run.head_sha});
+ }catch{return out('EVIDENCE_MISSING','CI_IDENTITY_READ_FAILED')}
+}
+
+return {controllerBReceiptMarker,verifyControllerBIdentity};
+})();
+export const {controllerBReceiptMarker,verifyControllerBIdentity}=ciWorkload;
+const ciAuthorizations=new WeakMap();
+// Only authenticated REST issue bytes and the original workflow receipt can
+// mint this in-process capability. A package cannot serialize/replay it.
+// The caller must supply the authenticated GitHub read ports. Production
+// callers use only the installed policy above, never a request-provided pin.
+export async function authenticateControllerBIssue(actual,{policy=CI_CONTROLLER_POLICY,getJson,readJobLogs,recovery=false}={}){
+ const denied=code=>({state:'REJECTED',code});
+ if(!policy)return {state:'DISABLED',code:'CI_IDENTITY_POLICY_NOT_CONFIGURED'};
+ if(actual?.user?.login!==CI_CONTROLLER_ACTOR||actual.user.type!=='Bot'||actual.user.id!==41898282||
+    actual.title!=='pc-controller-update'||
+    !(actual.state==='open'||(recovery===true&&actual.state==='closed'&&actual.state_reason==='completed'))||
+    actual.pull_request||
+    !actual.labels?.some(x=>x.name==='pc-maintenance')||typeof actual.body!=='string'||
+    Buffer.byteLength(actual.body)>32768)return denied('CI_ISSUE_ORIGIN_DENIED');
+ let request;try{request=JSON.parse(actual.body);}catch{return denied('CI_ISSUE_BODY_INVALID');}
+ if(!request||request.operation!=='controller-update'||request.controlRepository!==CONTROL_REPOSITORY||
+    JSON.stringify(request)!==actual.body)return denied('CI_ISSUE_BODY_INVALID');
+ const trace=typeof request.chatId==='string'&&request.chatId.match(/^chat-ci-([1-9]\d*)-([1-9]\d*)$/);
+ if(!trace)return denied('CI_ISSUE_TRACE_INVALID');
+ const result=await verifyControllerBIdentity({issueNumber:actual.number,requestBytes:Buffer.from(actual.body),
+    runId:Number(trace[1]),attempt:Number(trace[2]),policy,getJson,readJobLogs});
+ if(result.state!=='CI_WORKLOAD_IDENTITY_VERIFIED_ONLY')return result;
+ const authorization=Object.freeze({});
+ ciAuthorizations.set(authorization,actual.body);
+ return {...result,authorization};
+}
+function ciAuthorizedRequest(request,actor,authorization){
+ return actor===CI_CONTROLLER_ACTOR&&authorization!==null&&typeof authorization==='object'&&
+   ciAuthorizations.has(authorization)&&ciAuthorizations.get(authorization)===JSON.stringify(request);
+}
+
 export const UPDATE_SCHEMA="ZGMINI_PC_UPDATE_V1";
 export const MAINTENANCE_ISSUE_SCHEMA="ZGMINI_PC_MAINTENANCE_REQUEST_V1";
 export const INSTALLABLE_FILES=Object.freeze([
@@ -402,13 +532,13 @@ export function validateControllerConfigTransition(previous,next,{resourceProfil
  * supplied by the Issue body. Absence of that allowlist is a hard stop.
  */
 export function validateMaintenanceRequest(request,{
-  controlRepository=CONTROL_REPOSITORY,actor=null,allowedActors=[CONTROL_ACTOR],
+  controlRepository=CONTROL_REPOSITORY,actor=null,allowedActors=[CONTROL_ACTOR],ciAuthorization=null,
 }={}){
   if(controlRepository!==CONTROL_REPOSITORY||request?.controlRepository!==CONTROL_REPOSITORY){
     throw Error("UPDATE_CONTROL_REPOSITORY_NOT_ALLOWED");
   }
-  if(actor!==CONTROL_ACTOR||!Array.isArray(allowedActors)
-    ||!allowedActors.includes(CONTROL_ACTOR))throw Error("UPDATE_ACTOR_NOT_ALLOWED");
+  const ownerAllowed=actor===CONTROL_ACTOR&&Array.isArray(allowedActors)&&allowedActors.includes(CONTROL_ACTOR);
+  if(!ownerAllowed&&!ciAuthorizedRequest(request,actor,ciAuthorization))throw Error("UPDATE_ACTOR_NOT_ALLOWED");
   requireKeys(request,ISSUE_KEYS,"UPDATE_ISSUE_FIELDS_INVALID");
   if(request.schema!==MAINTENANCE_ISSUE_SCHEMA)throw Error("UPDATE_ISSUE_SCHEMA_NOT_SUPPORTED");
   requireString(request.requestId,REQUEST_ID,"UPDATE_REQUEST_ID_INVALID");
@@ -523,9 +653,9 @@ export function validateR6HostRegistrationRequest(request,manifestBytes,{
  */
 export function validateUpdateRequest(issue,manifestBytes,{
   controlRepository=CONTROL_REPOSITORY,actor=null,allowedActors=[CONTROL_ACTOR],
-  installedSha=null,approvedTargets=null,
+  installedSha=null,approvedTargets=null,ciAuthorization=null,
 }={}){
-  const request=validateMaintenanceRequest(issue,{controlRepository,actor,allowedActors});
+  const request=validateMaintenanceRequest(issue,{controlRepository,actor,allowedActors,ciAuthorization});
   if(!(typeof manifestBytes==="string"||Buffer.isBuffer(manifestBytes))){
     throw Error("UPDATE_MANIFEST_BYTES_REQUIRED");
   }
@@ -552,6 +682,13 @@ export function validateUpdateRequest(issue,manifestBytes,{
     throw Error("UPDATE_TARGET_NOT_APPROVED");
   }
   const manifest=manifestFingerprint(raw.allowFiles);
+  // The first CI effect is only the existing selective Controller B overlay.
+  // Existing owner authorization, other operations and source/rollback checks
+  // remain unchanged. The trusted publisher must separately verify business scope.
+  if(actor===CI_CONTROLLER_ACTOR&&(raw.purpose!=='pc-controller-maintenance'||
+    raw.controllerOnlyInstall!==true||!raw.selectiveSource||
+    !manifest.files.every(f=>/^controller\/[a-z][a-z0-9-]*\.mjs$/.test(f.path))))
+    throw Error('UPDATE_CI_PILOT_SCOPE_DENIED');
   if(!Object.hasOwn(PURPOSE_SCOPE,raw.purpose))throw Error("UPDATE_PURPOSE_NOT_ALLOWED");
   requireKeys(raw.approval,APPROVAL_KEYS,"UPDATE_APPROVAL_FIELDS_INVALID");
   if(raw.approval.grade!=="B"
