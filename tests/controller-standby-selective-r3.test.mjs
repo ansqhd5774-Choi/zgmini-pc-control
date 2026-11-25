@@ -4,10 +4,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {
  validateUpdateRequest,validateControllerSelectivePin,manifestFingerprint,
- MAINTENANCE_ISSUE_SCHEMA,CONTROL_REPOSITORY,CONTROL_ACTOR
+ MAINTENANCE_ISSUE_SCHEMA,CONTROL_REPOSITORY,CONTROL_ACTOR,
+ controllerImportScanRoots,validateControllerImportClosure,
+ validateControllerOnlyInstallDelta
 } from '../tools/maintenance-contract.mjs';
 
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -86,4 +89,44 @@ test('R3 overlay does not approve Watchdog or mutate six-seat operating policy',
  assert.equal(installedOps.mutationsEnabled,false);
  assert.deepEqual(manifest.backup,{strategy:'VERSIONED_SNAPSHOT',
   rollback:{kind:'RESTORE_INSTALLED_SHA',sha:installed}});
+});
+
+const gitBytes=(...args)=>execFileSync('git',args,{cwd:root,windowsHide:true,
+ timeout:15000,maxBuffer:8*1024*1024});
+const git=(...args)=>gitBytes(...args).toString('utf8').trim();
+
+test('R3 immutable target has installed parent, six exact bytes and full import closure',()=>{
+ const {manifest,pin}=load();
+ assert.equal(git('cat-file','-t',target),'commit');
+ assert.equal(git('rev-parse','refs/remotes/origin/'+pin.targetBranch),target);
+ assert.equal(git('rev-list','--parents','-n','1',target),target+' '+installed);
+ const changed=git('diff','--name-only',installed,target,'--').split(/\r?\n/).filter(Boolean).sort();
+ assert.deepEqual(changed,files);
+ assert.equal(validateControllerOnlyInstallDelta(changed,manifest.allowFiles),true);
+ for(const x of manifest.allowFiles){
+  const bytes=gitBytes('show',target+':'+x.path);
+  assert.equal(createHash('sha256').update(bytes).digest('hex'),x.sha256,x.path);
+ }
+ assert.deepEqual(gitBytes('show',target+':config/operations.json'),
+  gitBytes('show',installed+':config/operations.json'));
+ const full=git('ls-tree','-r','--name-only',target,'--','controller','config')
+  .split(/\r?\n/).filter(x=>x&&!x.endsWith('.test.mjs'));
+ const scan=validateControllerImportClosure(full,controllerImportScanRoots(changed),
+  rel=>gitBytes('show',target+':'+rel).toString('utf8'));
+ assert.equal(scan.status,'VERIFIED');
+ assert.ok(scan.checkedModules>=6);
+});
+
+test('R3 operations overlay is only the minimal constant export, no R6/other behavior',()=>{
+ const previous=gitBytes('show',installed+':controller/operations.mjs').toString('utf8');
+ const next=gitBytes('show',target+':controller/operations.mjs').toString('utf8');
+ const exact=\`// R3 engine optional Worker timeout stage names; preserve installed operation behavior.
+export const CORE_STATUS_STAGES=Object.freeze([
+ 'CORE_STATUS_ENTERED','CORE_LOCK_READ','CORE_CHECKPOINT_CYCLE',
+ 'CORE_CHECKPOINT_COLLECTION','CORE_CHECKPOINT_WRITER','CORE_CONFIG',
+ 'CORE_TASK_HASHES','CORE_STATUS_DONE'
+]);
+\`;
+ assert.ok(next.includes(exact));
+ assert.equal(next.replace(exact,''),previous);
 });
