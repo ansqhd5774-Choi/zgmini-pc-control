@@ -322,3 +322,22 @@ test('W04 #3516 wrong approval identity is rejected before Issue construction',(
   x=>({...x,approved:false})
  ])assert.throws(()=>prepareInstalledRecoveryRequest(approved(mutant,'w04-3516')));
 });
+
+test('W04 #3516 committed approval matches immutable candidate except authorization and note',()=>{
+ const root=path.dirname(new URL(import.meta.url).pathname);
+ const approval=JSON.parse(fs.readFileSync(path.join(root,'../approvals/maintenance-recoveries/pc-update-c087fa10-88e2-42e3-bc60-c758ab93f0c1.installed.json'),'utf8'));
+ const candidate=JSON.parse(fs.readFileSync(path.join(root,'../approvals/maintenance-recoveries/candidates/pc-update-c087fa10-88e2-42e3-bc60-c758ab93f0c1.installed.json'),'utf8'));
+ assert.equal(candidate.approved,false);
+ assert.equal(approval.approved,true);
+ assert.equal(approval.operation,'RECONCILE_INSTALLED');
+ assert.equal(approval.requestId,W04_3516_INSTALLED_RECOVERY_ORIGINAL_ID);
+ assert.equal(approval.sourceSha,W04_3516_INSTALLED_RECOVERY_SOURCE_SHA);
+ assert.equal(approval.targetControllerSha,W04_3516_INSTALLED_RECOVERY_CONTROLLER_SHA);
+ assert.deepEqual({...approval,approved:false,note:candidate.note},candidate);
+ assert.equal(approval.proof.issueNumber,3528);
+ assert.equal(approval.proof.runId,45579963186);
+ assert.equal(approval.proof.jobId,139087219551);
+ assert.equal(approval.casDigests.writerSha256,approval.approvedCurrentWriterConfigSha256);
+ assert.equal(Object.keys(approval.casDigests).length,7);
+ assert.equal(approval.files.length,4);
+});
