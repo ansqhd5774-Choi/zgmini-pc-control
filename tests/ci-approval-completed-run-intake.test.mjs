@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {observeCompletedRun,observePublishedControllerApprovals,createControllerPublicationPorts,publishExistingControllerApprovals,createAutoApprovalContextReader} from '../ci-approval/completed-run-intake.mjs';
+import {observeCompletedRun,observePublishedControllerApprovals,createControllerPublicationPorts,publishExistingControllerApprovals,createAutoApprovalContextReader,ciPublicationExitCode} from '../ci-approval/completed-run-intake.mjs';
 
 const repository={id:1442936296,full_name:'ansqhd5774-Choi/zgmini-pc-control',private:true};
 const event=()=>({action:'completed',repository:{...repository},workflow_run:{
@@ -199,4 +199,24 @@ test('missing independent policy does not create an automated approval read port
  const ports=createControllerPublicationPorts({getJson:()=>{},postIssue:()=>{},store:{}});
  assert.equal(ports.readAutoApprovalContext,undefined);
  assert.throws(()=>createAutoApprovalContextReader({policy:{},getJson:()=>{},readJobLogs:()=>{}}),/AUTO_POLICY_UNVERIFIED/);
+});
+
+test('CI publisher process exit fails on withheld or uncertain effects, not reused original requests',()=>{
+ const processed=results=>({state:'PUBLICATION_PROCESSED',results});
+ for(const status of ['STATE_UNKNOWN','NOT_SUBMITTED','AUTOMATION_BLOCKED']){
+  assert.equal(ciPublicationExitCode(processed([{status}])),1,status);
+  assert.equal(ciPublicationExitCode(processed([
+   {status:'REQUEST_READBACK_VERIFIED'},{status}])),1,'mixed '+status);
+ }
+ assert.equal(ciPublicationExitCode(processed([
+  {status:'REQUEST_READBACK_VERIFIED'},{status:'EXISTING_REQUEST_REUSED'}])),0);
+ assert.equal(ciPublicationExitCode(processed([])),1);
+ assert.equal(ciPublicationExitCode(processed(null)),1);
+ assert.equal(ciPublicationExitCode({state:'EVIDENCE_MISSING'}),1);
+ assert.equal(ciPublicationExitCode({state:'IGNORED'}),0);
+ assert.equal(ciPublicationExitCode({state:'DISABLED'}),0);
+ assert.equal(ciPublicationExitCode({state:'DISABLED'}, {publish:true}),1);
+ assert.equal(ciPublicationExitCode({state:'IGNORED'}, {publish:true}),0);
+ const moduleText=readFileSync(new URL('../ci-approval/completed-run-intake.mjs',import.meta.url),'utf8');
+ assert.match(moduleText,/process\.exitCode=ciPublicationExitCode\(result,\{publish:process\.argv\[2\]===\'--publish-existing\'\}\)/);
 });
