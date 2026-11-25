@@ -59,6 +59,9 @@ export function parseRumGraphql(response,{startUtc,endUtc}={}){
  const rows=accounts[0]?.rumWebVitalsEventsAdaptiveGroups;
  if(!Array.isArray(rows)||rows.length>30)fail('CF_RUM_GROUPS_INVALID');
  const seen=new Map();
+ // Count only non-empty, in-scope non-target device GROUPS; never expose
+ // raw non-target metrics or reclassify them as mobile/desktop observations.
+ const nonTargetDeviceGroups={tablet:0,unrecognized:0};
  for(const row of rows){
   if(!obj(row)||!obj(row.dimensions)||!obj(row.quantiles)||
    !Number.isSafeInteger(row.count)||row.count<0)
@@ -70,7 +73,13 @@ export function parseRumGraphql(response,{startUtc,endUtc}={}){
   // responses omit dimensions.bot; reject unexpected explicitly nonzero bots.
   if(row.dimensions.bot!==undefined&&row.dimensions.bot!==0)continue;
   const device=typeof deviceType==='string'?deviceType.toLowerCase():null;
-  if(!RUM_DEVICES.includes(device))continue;
+  if(!RUM_DEVICES.includes(device)){
+   if(row.count>0){
+    if(device==='tablet')nonTargetDeviceGroups.tablet++;
+    else nonTargetDeviceGroups.unrecognized++;
+   }
+   continue;
+  }
   const key=requestPath+'|'+device;
   if(seen.has(key))fail('CF_RUM_DUPLICATE_GROUPS_UNVERIFIED');
   const q=row.quantiles;
@@ -91,5 +100,6 @@ export function parseRumGraphql(response,{startUtc,endUtc}={}){
   source:'CLOUDFLARE_RUM_FIELD_GROUPS_PROVISIONAL',host:RUM_HOST,
   window:{startUtc,endUtc},fieldP75ValuesPresent:!missing,
   siteGoodCertified:false,cruxEquivalent:false,
-  metricSampleSizesVerified:false,mergeBlocking:false,observations};
+  metricSampleSizesVerified:false,mergeBlocking:false,
+  nonTargetDeviceGroups,observations};
 }

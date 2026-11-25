@@ -141,3 +141,28 @@ test('zero page views never turn quantiles into a verified Good reading',()=>{
  assert(out.observations.every(o=>o.groupEventCount===0));
  assert(out.observations.every(o=>o.metrics.cls.p75===null));
 });
+
+test('non-target device groups are visible as bounded aggregate diagnostics only',()=>{
+ const tablet=row('/','tablet',undefined,17);
+ const unknown=row('/economic-indicators/','unknown',undefined,5);
+ const emptyTablet=row('/economic-indicators/','tablet',undefined,0);
+ const foreign={...row('/','tablet'),dimensions:{
+  requestHost:'other.example',requestPath:'/',deviceType:'tablet'}};
+ const bot={...row('/','tablet'),dimensions:{
+  requestHost:RUM_HOST,requestPath:'/',deviceType:'tablet',bot:1}};
+ const out=parse(from([row('/','desktop'),tablet,unknown,emptyTablet,foreign,bot]));
+ assert.deepEqual(out.nonTargetDeviceGroups,{tablet:1,unrecognized:1});
+ assert.equal(out.observations.length,4);
+ assert.equal(out.observations.find(o=>o.route==='/'&&o.device==='mobile')
+  .groupEventCount,0);
+ assert.equal(out.fieldP75ValuesPresent,false);
+ assert.equal(out.siteGoodCertified,false);
+ assert.equal(JSON.stringify(out).includes('other.example'),false);
+ assert.equal(JSON.stringify(out).includes('"unknown"'),false);
+});
+
+test('normal four-group response has zero non-target device groups',()=>{
+ const out=parse(from(all()));
+ assert.deepEqual(out.nonTargetDeviceGroups,{tablet:0,unrecognized:0});
+ assert.equal(out.fieldP75ValuesPresent,true);
+});
