@@ -69,7 +69,7 @@ test('paired executable or unverifiable Runs remain ambiguous and never authoriz
  assert.equal(select([run({id:0})]),null);
  assert.equal(result({runs:[],jobs:null}).state,'NO_RUN');
  const src=fs.readFileSync(fileURLToPath(new URL('../tools/update.mjs',import.meta.url)),'utf8');
- assert.match(src,/const selected=selectMaintenancePostcheckRun\\(linkedRuns\\)/);
+ assert.match(src,/const selected=selectMaintenancePostcheckRun\(linkedRuns\)/);
 });
 
 test('run at exactly existing 15-minute provenance boundary remains eligible',()=>{
