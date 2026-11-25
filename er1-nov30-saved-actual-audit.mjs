@@ -13,7 +13,6 @@ const PINNED_SOURCE='a6dd77d19ccfcb79ddcdd0b4a6f495ec3888e24a';
 // legacy ticker-alphabetical digest. Never re-date a raw observation.
 const ORIGINAL_474_ASOF='2026-11-06';
 const ORIGINAL_474_COLLECTOR_SHA='548d5c68e00af32d933a327b521e6b05a89f3bb37eac3ccb100e6af9b74ad255';
-const ORIGINAL_474_ISSUE_TITLE='pc-er1-nov30-original-cohort-audit';
 const PC_HOME=String.raw`E:\ZGmini\data\pc-writer`;
 const DAYS=Array.from({length:30},(_,i)=>`2026-11-${String(i+1).padStart(2,'0')}`);
 const GROUPS=['pre','after','notSupplied'];
@@ -252,12 +251,11 @@ export function validIssue(event,env){
   if(env.GITHUB_REPOSITORY!==CONTROL||env.GITHUB_ACTOR!=='ansqhd5774-Choi'||
     env.GITHUB_EVENT_NAME!=='issues'||env.GITHUB_EVENT_ACTION!=='opened'||
     event?.action!=='opened'||event.issue?.user?.login!=='ansqhd5774-Choi'||
-    !['pc-er1-nov30-saved-actual-audit',ORIGINAL_474_ISSUE_TITLE]
-      .includes(event.issue?.title)||
+    event.issue?.title!=='pc-er1-nov30-saved-actual-audit'||
     !event.issue.labels.some(x=>x.name==='pc-er1-approved'))
     stop('NOV30_SAVED_AUDIT_ISSUE_STOP');
   let req;try{req=JSON.parse(event.issue.body)}catch{stop('NOV30_SAVED_AUDIT_JSON_STOP')}
-  const original474=event.issue.title===ORIGINAL_474_ISSUE_TITLE;
+  const original474=req?.schema==='ZGMINI_ER1_NOV30_ORIGINAL_COHORT_A_V1';
   const keys=original474?
     ['schema','operation','sourceSha','requestId','chatId','originalIssueNumber']:
     ['schema','operation','sourceSha','requestId','chatId'];
