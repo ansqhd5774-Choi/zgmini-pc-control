@@ -63,6 +63,53 @@ export function provenOldRunnerExit({owner,heartbeat,pidAlive=alive}={}){
  }
  return seen.size===6;
 }
+// The Supervisor's six child PIDs can be cmd.exe wrappers, not the actual
+// Runner.Listener/Worker executables. Dead wrappers alone do not prove the
+// child process tree was stopped. This bounded, read-only WMI result is a
+// SECOND required proof. Never publish raw executable paths or process ids.
+export function classifyRunnerExecutableProof(rows,{controllerRoot=control,
+ canonicalize=fs.realpathSync.native}={}){
+ if(!Array.isArray(rows)||rows.length>256)return 'UNVERIFIED';
+ let realRoot;
+ try{realRoot=path.win32.normalize(canonicalize(controllerRoot)).toLowerCase();}
+ catch{return 'UNVERIFIED';}
+ if(!path.win32.isAbsolute(realRoot))return 'UNVERIFIED';
+ const prefix=realRoot.replace(/[\\]+$/,'')+'\\runners\\';
+ for(const row of rows){
+  if(!row||typeof row!=='object'||!Number.isSafeInteger(row.pid)||
+    row.pid<=0||!/^runner\.(listener|worker)\.exe$/i.test(row.name??'')||
+    typeof row.executablePath!=='string'||!path.win32.isAbsolute(row.executablePath))
+    return 'UNVERIFIED';
+  let realFile;
+  try{realFile=path.win32.normalize(canonicalize(row.executablePath)).toLowerCase();}
+  catch{return 'UNVERIFIED';}
+  if(!path.win32.isAbsolute(realFile))return 'UNVERIFIED';
+  if(realFile.startsWith(prefix))return 'ACTIVE_RUNNER_PROCESS';
+ }
+ return 'NO_CONTROLLER_RUNNER_PROCESS';
+}
+// Fixed Windows-only observation. Uses the same WMI API as the existing
+// process inventory. No command lines, environment variables, or identities
+// leave this function. Query failures conservatively block only promotion.
+export function scanControllerRunnersReadOnly({run=execFileSync,systemRoot=process.env.SystemRoot,
+ controllerRoot=control,canonicalize=fs.realpathSync.native}={}){
+ if(process.platform!=='win32'||typeof systemRoot!=='string'||
+   !/^[a-z]:\\windows$/i.test(systemRoot))return 'UNVERIFIED';
+ const ps=path.win32.join(systemRoot,'System32','WindowsPowerShell','v1.0','powershell.exe');
+ const script=[
+  "$ErrorActionPreference='Stop'",
+  "$items=@(Get-CimInstance -ClassName Win32_Process -Filter \"Name = 'Runner.Listener.exe' OR Name = 'Runner.Worker.exe'\" -ErrorAction Stop | ForEach-Object { [pscustomobject]@{pid=[int]$_.ProcessId;name=[string]$_.Name;executablePath=[string]$_.ExecutablePath} })",
+  "[pscustomobject]@{rows=$items} | ConvertTo-Json -Depth 4 -Compress"
+ ].join(';');
+ try{
+  const out=run(ps,['-NoLogo','-NoProfile','-NonInteractive','-Command',script],
+   {windowsHide:true,timeout:15000,maxBuffer:65536,encoding:'utf8'});
+  if(typeof out!=='string'||Buffer.byteLength(out)>65536)return 'UNVERIFIED';
+  const parsed=JSON.parse(out);
+  return classifyRunnerExecutableProof(parsed?.rows,{controllerRoot,canonicalize});
+ }catch{return 'UNVERIFIED';}
+}
+
 export function archiveDeadLease(directory,isAlive=alive,destination=null){
  if(!fs.existsSync(directory))return null;
  const original=fs.readFileSync(path.join(directory,'owner.json'));
@@ -331,6 +378,11 @@ export async function main(){
     // A missing/partial old heartbeat is not proof that six Runners exited.
     // Preserve their leases and never restart a second seat owner on guesswork.
     status('BLOCKED_OLD_RUNNER_CHILD_UNVERIFIED');return;
+   }
+   if(standbyMode&&scanControllerRunnersReadOnly()!=='NO_CONTROLLER_RUNNER_PROCESS'){
+    // A dead cmd.exe launcher does not prove its Runner.Listener.exe exited.
+    // Unknown WMI process attribution must not create a second Runner owner.
+    status('BLOCKED_OLD_RUNNER_EXECUTABLE_UNVERIFIED');return;
    }
    if(!workflowActive()){status('PAUSED_WORKFLOW');return;}
    history=history.filter(x=>Date.now()-x<3600000);
