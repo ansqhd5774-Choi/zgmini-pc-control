@@ -147,3 +147,14 @@ test('Watchdog promotion must call exact six-seat exit proof, not accept empty h
  assert.match(source,/if\(standbyMode&&!provenOldRunnerExit\(\{owner,heartbeat:hb\}\)\)/);
  assert.match(source,/heartbeat\.children\.length!==6/);
 });
+
+test('promoted Supervisor cannot leak Watchdog IPC nonce to Runner job environments',()=>{
+ const src=fs.readFileSync(new URL('../controller/standby.mjs',import.meta.url),'utf8');
+ const authenticated=src.indexOf("STANDBY_WATCHDOG_IDENTITY_UNVERIFIED");
+ const clearNonce=src.indexOf('delete process.env.ZGMINI_WATCHDOG_NONCE;');
+ const clearPid=src.indexOf('delete process.env.ZGMINI_WATCHDOG_PID;');
+ const importSupervisor=src.indexOf("await import('./supervisor.mjs')");
+ assert.ok(authenticated>=0&&clearNonce>authenticated);
+ assert.ok(clearPid>authenticated&&clearPid<importSupervisor);
+ assert.ok(clearNonce<importSupervisor);
+});
