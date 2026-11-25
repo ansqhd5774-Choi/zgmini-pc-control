@@ -33,6 +33,10 @@ const TARGET2960='pc-update-e8767e20-6bad-4418-97c6-561cf79a8213';
 const PROBE2960='w05-2960-maintenance-status-readonly';
 const TARGET3409='pc-update-71ea39dc-7048-4e10-9d11-d4be7f6c3ec0';
 const PROBE3409='w04-3409-maintenance-status-readonly';
+const ER1_TARGET='pc-update-f4ad863b-608b-4c04-b23c-921a8b4823fe';
+const ER1_PROBE='w04-3587-postcheck-link-readonly';
+const ER1_CONTROLLER_SHA='502aac841475fa94b7cc9d56c028fd38b0554831';
+const ER1_POSTCHECK_ISSUE=3590,ER1_POSTCHECK_RUN=45617472368,ER1_POSTCHECK_JOB=139216506442;
 const TARGET3516='pc-update-c087fa10-88e2-42e3-bc60-c758ab93f0c1';
 const PROBE3516='w04-3516-maintenance-status-readonly';
 const CONTROLLER3516='83679b013ac9a9820331d93311ec97e572b18e13';
@@ -109,6 +113,7 @@ export function authenticateProcess(event,env,role){
   const isOperator=withW05&&raw.probe==='w05-operator-topology-readonly';
   const is2960=withW05&&raw.probe===PROBE2960;
    const is3409=withW05&&raw.probe===PROBE3409;
+   const isEr1Postcheck=withW05&&raw.probe===ER1_PROBE;
   const is3516=withW05&&raw.probe===PROBE3516;
   const isD05Writer=withW05&&raw.probe===D05_WRITER_PROBE;
   const isD05PrivateReceipt=withW05&&raw.probe===D05_PRIVATE_RECEIPT_PROBE;
@@ -123,7 +128,7 @@ export function authenticateProcess(event,env,role){
  if(!raw||(!basic&&!withJobs&&!withW05)||
    raw.schema!==SCHEMA||raw.operation!==ROLE_OPERATION||raw.role!==role||
    (withJobs&&role!=='operating')||
-   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!is3409&&!is3516&&!isD05Writer&&!isD05PrivateReceipt&&!isD05Theme&&!isD05Registration&&!is3160&&!isCnnStaticGuard&&!isCnnGitPredicates&&!isCnnBPins&&!isCnnBResources&&!isCnnBCore))))
+   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!is3409&&!isEr1Postcheck&&!is3516&&!isD05Writer&&!isD05PrivateReceipt&&!isD05Theme&&!isD05Registration&&!is3160&&!isCnnStaticGuard&&!isCnnGitPredicates&&!isCnnBPins&&!isCnnBResources&&!isCnnBCore))))
   fail('REQUEST_SCOPE_INVALID');
  const runnerJobRefs=withJobs?validateRunnerJobRefs(raw.runnerJobRefs):null;
  const normalized=structuredClone(event);
@@ -136,6 +141,7 @@ export function authenticateProcess(event,env,role){
   ...(isOperator?{w05OperatorTopology:true}:{}),
    ...(is2960?{w052960MaintenanceStatus:true}:{}),
     ...(is3409?{w043409MaintenanceStatus:true}:{}),
+    ...(isEr1Postcheck?{w043587PostcheckLink:true}:{}),
    ...(is3516?{w043516MaintenanceStatus:true}:{}),
    ...(isD05Writer?{d05WriterCheckpoint:true}:{}),
    ...(isD05PrivateReceipt?{d05PrivateFinalReceipt:true}:{}),
@@ -418,6 +424,57 @@ export function project3409MaintenanceStatus(raw){
  return projectFixedMaintenanceStatus(raw,{requestId:TARGET3409,
   schema:'ZGMINI_W04_3409_MAINTENANCE_READONLY_V1',codePrefix:'W04_3409'});
 }
+// #3587 ER1: project exactly one historical local maintenance record.
+// No request-controlled paths, raw ledger publication, mutation or new operation.
+export function projectEr1PostcheckLinkReadonly(raw){
+ const unknown=code=>({schema:'ZGMINI_ER1_POSTCHECK_LINK_READONLY_V1',
+  requestId:ER1_TARGET,status:'STATE_UNKNOWN',code,reportedRunJobLinked:null,
+  runId:null,jobId:null,postIssueNumber:null,reportedStatus:null,
+  postSourceMetadataMatched:null,exactRunJobMatched:false,
+  operationalWrites:0,providerCalls:0,d1Writes:0});
+ if(!raw||typeof raw!=='object'||Array.isArray(raw))
+  return unknown('ER1_LEDGER_UNAVAILABLE');
+ if(raw.requestId!==ER1_TARGET||raw.issueNumber!==3587||
+  raw.targetSha!==ER1_CONTROLLER_SHA||raw.postIssueNumber!==ER1_POSTCHECK_ISSUE)
+  return unknown('ER1_LEDGER_IDENTITY_UNVERIFIED');
+ const link=raw.postcheckLink;
+ if(!link||typeof link!=='object'||Array.isArray(link)||
+  link.schema!=='ZGMINI_MAINTENANCE_POSTCHECK_LINK_V1'||
+  link.requestId!==ER1_TARGET||link.issueNumber!==ER1_POSTCHECK_ISSUE)
+  return unknown('ER1_POSTCHECK_LINK_IDENTITY_UNVERIFIED');
+ const positive=n=>Number.isSafeInteger(n)&&n>0?n:null;
+ const runId=positive(link.runId),jobId=positive(link.jobId);
+ const reportedRunJobLinked=typeof link.reportedRunJobLinked==='boolean'?
+  link.reportedRunJobLinked:null;
+ const reportedStatus=['PASS','FAIL','BLOCKED'].includes(link.reportedStatus)?
+  link.reportedStatus:null;
+ const postSourceMetadataMatched=typeof link.postSourceVerified==='boolean'?
+  link.postSourceVerified:null;
+ const observedAtUtc=typeof link.observedAtUtc==='string'&&
+  link.observedAtUtc.length<=40&&Number.isFinite(Date.parse(link.observedAtUtc))?
+  link.observedAtUtc:null;
+ const exactRunJobMatched=reportedRunJobLinked===true&&
+  runId===ER1_POSTCHECK_RUN&&jobId===ER1_POSTCHECK_JOB&&
+  reportedStatus==='PASS';
+ return {schema:'ZGMINI_ER1_POSTCHECK_LINK_READONLY_V1',requestId:ER1_TARGET,
+  status:exactRunJobMatched?'PASS':'PARTIAL',
+  code:exactRunJobMatched?'ER1_LOCAL_RUN_JOB_LINK_MATCHED':'ER1_LOCAL_RUN_JOB_LINK_UNVERIFIED',
+  postIssueNumber:ER1_POSTCHECK_ISSUE,reportedRunJobLinked,runId,jobId,
+  reportedStatus,postSourceMetadataMatched,observedAtUtc,exactRunJobMatched,
+  // The source SHA's existence in the claimed repository is NOT attested here.
+  sourceCommitExistenceVerified:null,
+  operationalWrites:0,providerCalls:0,d1Writes:0};
+}
+function inspectEr1PostcheckLinkReadonly(){
+ const root='E:/ZGmini/automation/pc-maintenance';
+ const file=path.join(root,'ledger',ER1_TARGET+'.json');
+ const observed=readFixedReadonlyBytes(file,
+  {verifiedRoot:root,minBytes:1,maxBytes:131072});
+ if(observed.ok!==true)return projectEr1PostcheckLinkReadonly(null);
+ try{return projectEr1PostcheckLinkReadonly(JSON.parse(observed.bytes.toString('utf8')));}
+ catch{return projectEr1PostcheckLinkReadonly(null);}
+}
+
 // Fixed #3516 recovery observation, never a substitute for the original postcheck.
 // Identity mismatches leave a bounded STATE_UNKNOWN report rather than false PASS.
 export function project3516MaintenanceStatus(raw){
@@ -2223,6 +2280,10 @@ export function collect(role,ctx,env=process.env){
   return compact2960ProcessResult(base,inspect2960MaintenanceStatusReadonly());
  if(ctx.w043409MaintenanceStatus===true)
   return compact3409ProcessResult(base,inspect3409MaintenanceStatusReadonly());
+ if(ctx.w043587PostcheckLink===true){
+  const observed=inspectEr1PostcheckLinkReadonly();
+  return {...base,status:observed.status,code:observed.code,er1PostcheckLink:observed};
+ }
  if(ctx.w043516MaintenanceStatus===true)
   return compact3516ProcessResult(base,inspect3516MaintenanceStatusReadonly());
  if(ctx.d05WriterCheckpoint===true)
@@ -2302,8 +2363,12 @@ export function toText(r){
    'w043516LeaseCorrelation='+(r.w043516MaintenanceStatus.recoveryCas?.status??'UNVERIFIED'),
    'w043516RecoveryArchive='+(r.w043516MaintenanceStatus.recoveryArchive?.status??'UNVERIFIED'),
    'w043516ArchiveRecord='+(r.w043516MaintenanceStatus.recoveryArchive?.archiveRecordVerified??'UNVERIFIED')]:[]),
+  ...(r.er1PostcheckLink?[
+   'er1PostcheckLink='+r.er1PostcheckLink.code,
+   'er1ReportedRunJobLinked='+(r.er1PostcheckLink.reportedRunJobLinked??'UNVERIFIED'),
+   'er1ExactRunJobMatched='+r.er1PostcheckLink.exactRunJobMatched]:[]),
   ...(r.w043409MaintenanceStatus?[
-   'w043409Status='+r.w043409MaintenanceStatus.status,
+   'w043409Status=+r.w043409MaintenanceStatus.status,
    'w043409HistoricalPhase='+(r.w043409MaintenanceStatus.historicalRequest?.phase??'UNKNOWN'),
    'w043409LeaseHeld='+(r.w043409MaintenanceStatus.recoveryEvidence?.leaseHeld??'UNKNOWN'),
    'w043409RecoveryRequired='+(r.w043409MaintenanceStatus.recoveryEvidence?.recoveryRequired??'UNKNOWN'),
