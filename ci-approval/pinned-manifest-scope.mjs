@@ -109,6 +109,13 @@ export async function inspectSelectiveTree(input,{getJson,readFileBytes}={}){
     if(createHash('sha256').update(bytes).digest('hex')!==f.sha256)return out('REJECTED','SELECTIVE_FILE_HASH_MISMATCH');
    }
   }
+  // The installed maintenance updater dispatches its postcheck to zgmini,
+  // not the control repository. A syntactically valid SHA is insufficient.
+  let postSource;
+  try{postSource=await getJson('repos/ansqhd5774-Choi/zgmini/commits/'+m.postSourceSha);}
+  catch{return out('EVIDENCE_MISSING','SELECTIVE_POST_SOURCE_APP_COMMIT_UNVERIFIED');}
+  if(postSource?.sha!==m.postSourceSha)
+   return out('REJECTED','SELECTIVE_POST_SOURCE_APP_SHA_MISMATCH');
   const [lastMain,lastBranch]=await Promise.all([getJson(mainPath),getJson(branchPath)]);
   if(!current(lastMain,'main',revision)||!current(lastBranch,x.branch,m.targetSha))return out('EVIDENCE_MISSING','SELECTIVE_BRANCH_DRIFT');
   return out('SELECTIVE_TREE_MATCH_ONLY','INDEPENDENT_AUTHORITY_CI_AND_LIVE_CLAIM_REQUIRED',{targetSha:m.targetSha,installedSha:m.installedSha,revision,approvalMergeSha:pr.merge_commit_sha,selectivePinSha256:checked.selectivePinSha256,changedPaths:paths});
