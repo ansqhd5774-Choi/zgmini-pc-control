@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
-import {inspectOriginalNov6InputVintage,summarizeOriginalPriorActualContent,validIssue} from '../er1-nov30-saved-actual-audit.mjs';
+import {inspectOriginalNov6InputVintage,inspectExtraEr1ArchiveCandidates,summarizeOriginalPriorActualContent,validIssue} from '../er1-nov30-saved-actual-audit.mjs';
 
 const digest=arr=>createHash('sha256').update(JSON.stringify(arr)).digest('hex');
 const EVENT_ENV={
@@ -137,4 +137,50 @@ test('fixed #474 prior actual aggregates exclude null and post-as-of earnings',(
   assert.deepEqual(summarizeOriginalPriorActualContent({kind:'INVALID',rows:history.rows}),{
     epsRows:0,revenueRows:0,bothRows:0
   });
+});
+
+test('nearby raw scan finds only new matching original symbols, never duplicate files',t=>{
+  const home=fs.mkdtempSync(path.join(os.tmpdir(),'er1-nearby-'));
+  t.after(()=>fs.rmSync(home,{recursive:true,force:true}));
+  const input=path.join(home,'er1-input');fs.mkdirSync(input);
+  const extra='nov30-legacy-symbol-history',known='dec31-symbol-batch-a';
+  fs.mkdirSync(path.join(input,extra));fs.mkdirSync(path.join(input,known));
+  const write=(dir,symbol,storedAt)=>{
+    fs.writeFileSync(path.join(input,dir,symbol+'.json'),JSON.stringify({
+      storedAt,body:[{symbol,date:'2026-11-03',eps:0,revenue:18}]
+    }));
+  };
+  write(extra,'AAA','2026-11-05T02:00:00.000Z');
+  write(extra,'BBB','2026-11-06T13:00:00.000Z');
+  write(known,'BBB','2026-11-05T02:00:00.000Z');
+  const x=inspectExtraEr1ArchiveCandidates(input,['AAA','BBB','CCC']);
+  assert.equal(x.status,'PASS');
+  assert.equal(x.inspectedFolders,1);
+  assert.equal(x.candidateFiles,2);
+  assert.equal(x.shapeValidFiles,2);
+  assert.equal(x.extraOriginalSymbols,1);
+  assert.equal(x.extraOriginalWithPriorBothActual,1);
+  assert.equal(x.extraOriginalPreRunWithPriorBothActual,1);
+  assert.equal(x.providerCalls,0);
+  assert.equal(JSON.stringify(x).includes('AAA'),false);
+  assert.equal(JSON.stringify(x).includes(extra),false);
+});
+
+test('nearby scan rejects malformed candidate, and bounds unsafe root inventory',t=>{
+  const home=fs.mkdtempSync(path.join(os.tmpdir(),'er1-nearby-invalid-'));
+  t.after(()=>fs.rmSync(home,{recursive:true,force:true}));
+  const input=path.join(home,'er1-input');fs.mkdirSync(input);
+  const dir=path.join(input,'dec31-candidate-cache');fs.mkdirSync(dir);
+  fs.writeFileSync(path.join(dir,'AAA.json'),'{"notRaw":true}');
+  const x=inspectExtraEr1ArchiveCandidates(input,['AAA']);
+  assert.equal(x.status,'PASS');
+  assert.equal(x.invalidFiles,1);
+  assert.equal(x.extraOriginalSymbols,0);
+  assert.equal(inspectExtraEr1ArchiveCandidates(path.join(home,'absent'),['AAA']).status,
+    'NOT_VERIFIED');
+  for(let i=0;i<128;i++)
+    fs.writeFileSync(path.join(input,'extra-'+i),'x');
+  const bound=inspectExtraEr1ArchiveCandidates(input,['AAA']);
+  assert.equal(bound.status,'PARTIAL');
+  assert.equal(bound.code,'NEARBY_ARCHIVE_ROOT_LIMIT');
 });
