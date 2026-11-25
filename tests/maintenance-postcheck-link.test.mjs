@@ -208,3 +208,42 @@ test('updater reads registration only after NO_RUN and preserves original execut
  const block=src.slice(onlyNoRun,localReceiptAt);
  assert.doesNotMatch(block,/issues','POST'|workflow_dispatch|PATCH|repost|resumeIntake/);
 });
+
+test('early bot receipt links only its exact completed Run/Job identity',()=>{
+ const report={schema:'ZGMINI_PC_RESULT_V1',jobId:'run-777-1-seat-2',
+  requestId:id+'-postcheck',operation:'core-status',
+  sourceBranch:'main',requestedSourceSha:source,controlSourceSha:'b'.repeat(40),
+  status:'PASS',code:'CORE_READONLY_DIAGNOSIS'};
+ const params={pointer:{issueNumber:42,report},requestId:id,issueNumber:42,
+  runId:777,attempt:1,seat:2,operation:'core-status',
+  sourceBranch:'main',sourceSha:source,controllerSha:'b'.repeat(40)};
+ assert.equal(localPointer(params).status,'LOCAL_RESULT_MATCHED');
+ for(const changed of [
+  {...params,runId:778},{...params,attempt:2},{...params,seat:3},
+  {...params,issueNumber:43},{...params,controllerSha:'c'.repeat(40)},
+  {...params,pointer:{issueNumber:42,report:{...report,requestedSourceSha:'c'.repeat(40)}}},
+  {...params,pointer:{issueNumber:42,report:{...report,jobId:'run-778-1-seat-2'}}},
+ ])assert.equal(localPointer(changed).status,'LOCAL_RESULT_UNVERIFIED');
+});
+
+test('postcheck result publication makes one bounded read-only Run/Job receipt correlation',()=>{
+ const src=fs.readFileSync(fileURLToPath(new URL('../tools/update.mjs',import.meta.url)),'utf8');
+ const helper=src.indexOf('const lookupPostcheckRunAndJobs=()=>{');
+ const comment=src.indexOf('let reportedRunJobLinked=false,reportedRunId=null,reportedJobId=null');
+ const periodic=src.indexOf('if(n%5===0){',comment);
+ assert.ok(helper>0&&comment>helper&&periodic>comment);
+ const block=src.slice(comment,src.indexOf('const current=json(ledgerFile);',comment));
+ assert.match(block,/lookupPostcheckRunAndJobs\(\)/);
+ assert.match(block,/linked\.state==='UPLOAD_MISSING'/);
+ assert.match(block,/runner_name\?\.match\(\/\^zgmini-pc-0/);
+ assert.match(block,/pointer:\{issueNumber:postIssueNumber,report:result\}/);
+ assert.match(block,/proof\.status==='LOCAL_RESULT_MATCHED'/);
+ assert.doesNotMatch(block,/issues','POST'|workflow_dispatch|resumeIntake|repost/);
+ const written=src.slice(src.indexOf('const current=json(ledgerFile);',comment),
+  src.indexOf('return {status:result.status',comment));
+ assert.match(written,/reportedRunJobLinked,/);
+ assert.match(written,/runId:reportedRunJobLinked\?reportedRunId:/);
+ assert.match(written,/jobId:reportedRunJobLinked\?reportedJobId:/);
+ assert.match(src,/const untilAt=openedAt\+900000/);
+ assert.match(src,/maxPages:3/);
+});
