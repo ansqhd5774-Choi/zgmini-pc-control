@@ -66,3 +66,8 @@ A는 기존 정규 접수/판정에 필요한 확인만 재사용한다. B는 �
 - 기존 PR의 대기 중 CI를 취소하지 않기 위해 동일 HEAD를 기반으로 한 준비 브랜치 `codex/ci-auto-approval-evidence-prep-20261125`에만 보존. 별도 PR 없음. 기존 CI 결과 확인 후 원래 작업 브랜치로 통합하고 기존 격리 CI 테스트 목록에 신규 파일 연결 예정.
 - 권한 출처 조사: GitHub branches/main API의 protected=false, protection.enabled=false, rulesets 목록 빈 배열. 상세 branch-protection API는 403. 이 관측은 기존 업무 승인 폐기를 뜻하지 않으나 보호된 CI 자동 권한 발행 근거는 확립되지 않음. 정책/권한 변경 없이 신뢰된 위임 출처와 변조 방지 검증을 별도로 설계한다. CI 성공만으로 승인 명세서 발행 금지.
 - 단계 2/3/4 진행 중, 전체 약 45%(추정), 운영 0%. 다음: 기존 PR 실제 CI 회수, 준비 변경 통합 및 64건 Node 시험, 보호된 승인 출처 검증 설계. 운영 PC/정책/권한/요청 실행 변경 없음.
+
+### 2026-11-25 후속 — 준비 변경 통합 및 64건 CI 연결
+- 원래 HEAD 52e347c15e7933445951ee8173a544adb9793200의 CI 3종 최종 SUCCESS: Controller 45591949395, C996 45591949481, Secret Scan 45591949415. Controller job 139128128225의 shadow/candidate 단계 7 SUCCESS. 기존 47건 소스 시험 결과를 승계한다.
+- 준비 커밋 d1c807bab953d7d1a1c68d619e3449f500832c75는 원래 HEAD의 직계 후손(3 commits, behind=0)이며 변경 3파일만 확인. 기존 소스 CI에 신규 17건을 별도 단계로 연결하고 누락 방지 scope 회귀 1건을 추가한다. 기존 시험 및 운영 경로 유지. 총 승인 시험 64건 + CI wiring 회귀 1건; 새 HEAD 결과 미확인.
+- 중요: Controller CI는 PR head가 아닌 github.sha 통합 트리를 checkout한다. Run head_sha 및 성공 step은 관측 증거이지 실제 checkout 바이트의 증명이나 업무 승인 근거가 아니다. 향후 신뢰된 workflow revision, 통합 SHA와 부모, 실제 실행 트리, 승인 범위의 독립 검증을 연결해야 한다. 현재 자동 승인/실행 비활성. 기존 main, 운영 PC, 권한 및 보호 설정 변경 없음.
