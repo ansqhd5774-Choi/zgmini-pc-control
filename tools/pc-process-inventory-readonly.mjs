@@ -101,7 +101,8 @@ export function classifyR3RunnerWmiRows(raw,{
 }
 export function inspectR3RunnerWmiReadonly({
  run=spawnSync,filesystem=fs,env=process.env,
- controllerRoot='E:/ZGmini/automation/pc-control'
+ controllerRoot='E:/ZGmini/automation/pc-control',
+ canonicalize=fs.realpathSync.native
 }={}){
  const unknown=(code)=>({schema:'ZGMINI_R3_STANDBY_RUNNER_WMI_A_V1',
   status:'STATE_UNKNOWN',code,promotionApproved:false,
@@ -127,7 +128,7 @@ export function inspectR3RunnerWmiReadonly({
     Buffer.byteLength(result.stdout)>65536)
   return unknown('STANDBY_WMI_PROBE_UNAVAILABLE');
  try{return classifyR3RunnerWmiRows(JSON.parse(result.stdout.replace(/^\uFEFF/,'').trim()),
-    {controllerRoot});}
+    {controllerRoot,canonicalize});}
  catch{return unknown('STANDBY_WMI_RESULT_UNVERIFIED');}
 }
 
