@@ -133,3 +133,9 @@ A는 기존 정규 접수/판정에 필요한 확인만 재사용한다. B는 �
 ### 2026-11-25 후속 — Writer 정규 소유자 제출 연결
 - 8993475의 CI 3종 SUCCESS(45603404536/45603404651/45603404701), 172건 PASS. Controller 제출기 2abe746을 기존 PR #3545에 통합했다.
 - tools/writer-request.mjs: 이미 승인된 main 원본과 정확 requestId/본문을 사용하는 opt-in submit-prepared 및 reconcile. 기존 Writer 수신기에서 순수 요청/manifest/라벨 검증만 분리하여 동일 계약 재사용. 실제 opened event/owner 인증 및 process-local seal은 수신기에서만 생성한다. 소유자 인증, 비공개 repo, raw hash, PC HEAD/config 대조, requestId 고정 receipt 및 단회 POST/readback을 적용한다. 무인 승인 발행이나 CI의 소유자 권한은 부여하지 않는다. 8건 신규 시험 및 기존 Writer 계약 시험 연결. 실제 제출/설치 없음. 운영자 receipt-directory는 고정된 기존 신뢰 실행 주체에서 관리해야 하며 다른 디렉터리 사용에 의한 중복 제출은 별도 원장 검증이 필요하다. 새 CI 결과 확인 전 준비 브랜치에 보존한다.
+
+### 2026-11-25 후속 — CI 실행 경로의 실제 인증 경계 및 최소 연결 결정
+- HEAD 6e2af54b919429d55aeacdddbf699376e8a270e1 CI 3/3 SUCCESS: Controller Maintenance 45625447231, C996 45625447255, Secret Scan 45625447171. 완료 이벤트 수신 14건 회귀를 실제 source-only CI에서 통과했다. 기본 브랜치 workflow_run 실제 실행은 아직 미검증.
+- 기존 main의 config/operations.json allowedActors, tools/maintenance-agent.mjs ALLOWED_ACTORS, writer-b/contract.mjs opened sender/issue actor는 owner만 허용한다. agent-handoff/bot-direct-route.mjs의 기존 정본은 GITHUB_TOKEN으로 생성한 Issue가 후속 Issue 이벤트 workflow를 시작하지 않는 점과 동일 격리 job의 메타데이터 직접 라우팅을 명시한다. 이 경로는 운영 요청 승인 권한이 아니다. 따라서 CI token을 owner로 가장하거나 bot을 기존 전역 allowedActors에 추가하는 방식, bot Issue가 Writer/A workflow를 자동 실행한다고 가정하는 방식은 제외한다.
+- 최소 구현 후보: CI는 완료 이벤트와 실제 업무 승인 원본 및 범위에 따라 정확 manifest/요청 후보를 생성하고 기존 인증된 제출 경로에 연결한다. 기존 owner 인증을 가진 정규 제출 주체를 자동 기동할 수 있는 이미 승인된 경로가 있는지 확인한다. 있다면 기존 submit-prepared/receipt를 그대로 사용하고 ChatGPT/새 예약/새 토큰/별도 서비스는 요구하지 않는다. 없다면 CI 전용으로 한정된 실제 발행·제출 인증 계약을 사용자 승인 범위와 보안 경계에 맞춰 별도 설계·검토해야 하며, 기존 운영 수신기의 owner-only 검사나 CI 권한을 임의 변경하지 않는다. CI가 판정 주체이며 인증된 제출기와 실행기는 구현 구성요소로만 역할을 구분한다.
+- 남은 핵심은 독립적인 기존 업무 승인 원본의 실제 공급 및 자동 기동 가능한 정규 제출 인증이다. 현재 추가 승인 근거나 새 권한을 임의 발행하지 않는다. 무관한 업무 및 기존 A/B 경로에는 새 Gate를 추가하지 않는다.
