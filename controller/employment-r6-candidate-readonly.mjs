@@ -435,10 +435,19 @@ export async function inspectEmploymentR6Candidate(request,context){
       stop('R6_RESULT_INVALID');
     }
     const indicators=Array.isArray(body.indicators)&&body.indicators.length<=29
-      ?body.indicators.map(x=>({id:/^[A-Z0-9_]{1,64}$/.test(x.id??'')?x.id:null,
-        rawStatus:['READY','STALE','UNAVAILABLE'].includes(x.rawStatus)?x.rawStatus:'UNAVAILABLE',
-        chartStatus:['READY','PARTIAL','UNAVAILABLE'].includes(x.chartStatus)?x.chartStatus:'UNAVAILABLE',
-        scoreStatus:['READY','PARTIAL_HISTORY','PARTIAL_MISSING'].includes(x.scoreStatus)?x.scoreStatus:'PARTIAL_MISSING'})):[];
+      ?body.indicators.map(x=>{
+        // Approved R1 bundles can optionally report the first missing
+        // reference calendar date. Do not expose raw revisions or private PIT.
+        const missing=x.firstMissingReferenceDate;
+        if(missing!=null&&(x.scoreStatus!=='PARTIAL_HISTORY'
+          ||dateOnly(missing)!==missing||dateOnly(body.asOfDate)===null
+          ||missing>body.asOfDate))stop('R6_RESULT_INVALID');
+        return {id:/^[A-Z0-9_]{1,64}$/.test(x.id??'')?x.id:null,
+          rawStatus:['READY','STALE','UNAVAILABLE'].includes(x.rawStatus)?x.rawStatus:'UNAVAILABLE',
+          chartStatus:['READY','PARTIAL','UNAVAILABLE'].includes(x.chartStatus)?x.chartStatus:'UNAVAILABLE',
+          scoreStatus:['READY','PARTIAL_HISTORY','PARTIAL_MISSING'].includes(x.scoreStatus)?x.scoreStatus:'PARTIAL_MISSING',
+          ...(missing==null?{}:{firstMissingReferenceDate:missing})};
+      }):[];
     // Optional PIT-08 metadata. Older approved bundles remain compatible.
     const sourceMeta={};
     if(body.sourceStoredAt!==undefined){
