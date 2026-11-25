@@ -229,3 +229,12 @@
 - **PR #3739 실제 MERGED**: main merge SHA `5926d7274200f72b181d0b94d4cb0008084a2028`. GitHub main 재조회 시 정확 SHA 동일 및 해당 main 파일 readback: 운영 Workflow 상위 `contents: read`·승인 2개 Job의 job-level `issues: write`, Windows CRLF 정규화 시험 존재 확인. source·CI·병합 검증이며 별도 운영 PC 설치/배포 성과가 아님.
 - [#3724 최종 증거 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3724#issuecomment-7176872514), [#3740 최종 증거 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3740#issuecomment-7176873105), [#3630 원본 대체 근거](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3630#issuecomment-7176734702). 과거 원본 실패 자체는 성공으로 소급하지 않음.
 - **CI 11건 처리 범위의 추가 필수 구현·재실행 없음.** 다른 본체/PC 작업, 미병합 PR, 운영 설치는 각각의 독립 원장에서 처리.
+
+
+### 2026-11-26 후속 자동접수 CI 2건 (#3743·#3744) 별도 종결
+
+- **원본 고정 CI 11건:** 이전 확정 **11/11 종결(100%)** 유지. 이후 자동접수된 별도 실패 사건은 고정 cohort 지표에 더하지 않음.
+- 신규 [#3743](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3743) **CLOSED/completed**: 과거 C996 [#45714237730](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45714237730)의 Zizmor `excessive-permissions` 실패는 원본 이력으로 보존하고, 수정 PR #3739의 권한 범위 축소와 최종 보안 감사 SUCCESS에 연결. [원본 Issue 근거 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3743#issuecomment-7176910051).
+- 신규 [#3744](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3744) **CLOSED/completed**: 과거 C996 [#45715335054](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45715335054)의 Windows CRLF 정규식 회귀 실패를 단독 기록, 후속 회귀 시험 입력의 CRLF→LF 보정과 정확 HEAD C996 SUCCESS에 연결. [원본 Issue 근거 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3744#issuecomment-7176910708).
+- 두 사건 모두 수정 [PR #3739](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3739) **MERGED `5926d7274200f72b181d0b94d4cb0008084a2028`**, 최종 HEAD `1055df088a1c6e27b74682e3d0bf99d51795a308`의 [C996 #45716336204](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45716336204), [Secret #45716336263](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45716336263), [ER1 PR #45716336185](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45716336185) **각 SUCCESS**. 보안 Gate나 실제 운영 PC 미변경.
+- 현재 자동화 담당 CI 보안 사건의 **원본 11건 + 이후 신규 #3740/#3743/#3744까지 확인된 관련 정리 완료**. 무관한 원장 #68/#1743/#2426/#2427, 다른 담당 브랜치의 #3545/#3719/#3738 및 W06 요청 #3741/#3742는 이 완료 범위에 포함하지 않고 기존 담당 계약 유지.
