@@ -57,6 +57,12 @@ import {inspectBeaUnitArchiveReadonly} from './earnings-bea-unit-archive-readonl
 import {inspectBeaNipaCaptureReadonly} from './earnings-bea-nipa-capture-readonly.mjs';
 import {runW05ServiceStoredReadonly} from './w05-wpsfd42-service-readonly.mjs';
 import {inspectInflation19D1Readback} from './inflation19-d1-readback-readonly.mjs';
+// R3 engine optional Worker timeout stage names; preserve installed operation behavior.
+export const CORE_STATUS_STAGES=Object.freeze([
+ 'CORE_STATUS_ENTERED','CORE_LOCK_READ','CORE_CHECKPOINT_CYCLE',
+ 'CORE_CHECKPOINT_COLLECTION','CORE_CHECKPOINT_WRITER','CORE_CONFIG',
+ 'CORE_TASK_HASHES','CORE_STATUS_DONE'
+]);
 const activeTasks=['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea'];
 const retiredIranTask='ZGMINI-PC-Iran-Progress-R13';
 const taskNotFound=text=>/cannot find the file|cannot find the specified|does not exist|지정.*(?:파일|작업|경로).*찾을 수 없|찾을 수 없.*(?:파일|작업|경로)/i.test(text);
