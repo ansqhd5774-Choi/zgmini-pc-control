@@ -3,12 +3,13 @@
 // live evidence, one-shot claim, and operational authorization remain separate.
 import {inspectPinnedApprovalSource} from './approval-source-integrity.mjs';
 import {inspectExistingContract} from './contract-adapter.mjs';
+import {validateUpdateRequest,validateControllerSelectivePin} from '../tools/maintenance-contract.mjs';
 const repo='ansqhd5774-Choi/zgmini-pc-control';
 const exact=(x,k)=>x!==null&&typeof x==='object'&&!Array.isArray(x)&&Object.keys(x).length===k.length&&k.every(v=>Object.hasOwn(x,v));
 const sha=(x,n)=>typeof x==='string'&&x.length===n&&/^[a-f0-9]+$/.test(x);
 const uuid=x=>typeof x==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(x);
 const out=(state,reason,extra={})=>Object.freeze({mode:'SHADOW_ONLY',state,reason,canPublish:false,canExecute:false,...extra});
-export function inspectPinnedManifestScope({effect,pin,observation,request,context,targetSha,requestState}={}){
+export function inspectPinnedManifestScope({effect,pin,observation,request,context,targetSha,requestState,selectivePin,selectiveObservation}={}){
  if(!['B_CONTROLLER_INSTALL','B_WRITER_SOURCE'].includes(effect))return out('OUT_OF_SCOPE','EFFECT_NOT_IN_PILOT');
  if(requestState==='CONSUMED'||requestState==='UNKNOWN')return out('WAIT_RESOURCE','RECONCILE_EXISTING_REQUEST');
  if(requestState!=='NEW')return out('EVIDENCE_MISSING','REQUEST_STATE_UNCONFIRMED');
@@ -32,5 +33,24 @@ export function inspectPinnedManifestScope({effect,pin,observation,request,conte
  }
  if(checked.state!=='CONTRACT_MATCH')return out('REJECTED',checked.reason);
  if(checked.targetSha!==targetSha||checked.scopeDigest!==pin.sha256)return out('REJECTED','TARGET_OR_SCOPE_MISMATCH');
+ // Existing selective B approvals require a second immutable source pin.
+ // This does not authorize new candidate issuance or expand the delegation pilot.
+ if(effect==='B_CONTROLLER_INSTALL'){
+  try{
+   const {manifest}=validateUpdateRequest(request,observation.bytes,context);
+   if(manifest.selectiveSource){
+    if(!manifest.allowFiles.every(f=>/^controller\/[a-z][a-z0-9-]*\.mjs$/.test(f.path)))
+     return out('OUT_OF_SCOPE','SELECTIVE_PATH_OUTSIDE_PILOT');
+    if(!selectivePin||!selectiveObservation)return out('EVIDENCE_MISSING','SELECTIVE_PIN_REQUIRED');
+    if(pin.path!=='approvals/controller-updates/'+targetSha+'.json'||selectivePin.path!=='approvals/controller-selective-targets/'+targetSha+'.json'||selectivePin.revision!==pin.revision)
+     return out('REJECTED','SELECTIVE_PIN_SOURCE_MISMATCH');
+    const second=inspectPinnedApprovalSource(selectivePin,selectiveObservation);
+    if(second.state!=='PIN_MATCH_ONLY')return out(second.state,second.reason);
+    validateControllerSelectivePin(manifest,JSON.parse(selectiveObservation.bytes.toString('utf8')));
+    return out('SELECTIVE_MANIFEST_PIN_MATCH_ONLY','INDEPENDENT_AUTHORITY_TREE_AND_LIVE_CLAIM_REQUIRED',{effect,targetSha,requestId:request.requestId,manifestSha256:pin.sha256,selectivePinSha256:selectivePin.sha256,revision:pin.revision});
+   }
+   if(selectivePin!==undefined||selectiveObservation!==undefined)return out('REJECTED','UNEXPECTED_SELECTIVE_PIN');
+  }catch{return out('REJECTED','SELECTIVE_CONTRACT_REJECTED')}
+ }
  return out('EXACT_MANIFEST_SCOPE_MATCH_ONLY','INDEPENDENT_AUTHORITY_AND_LIVE_CLAIM_REQUIRED',{effect,targetSha,requestId:request.requestId,manifestSha256:pin.sha256,revision:pin.revision});
 }
