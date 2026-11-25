@@ -129,6 +129,60 @@ test('GitHub lookup access failure cannot be treated as upload success',async()=
  assert.equal(calls.some(c=>c.method==='PUT'),false);
 });
 
+
+test('bounded branch-tip conflict retries preserve the exact output and recover on later success',async()=>{
+ const remote=new Map(),puts=[];
+ const api=async(route,method='GET',body)=>{
+  if(method==='PUT'){
+   puts.push(route);
+   if(puts.length<=2)return {status:409,data:{message:'conflict'}};
+   remote.set(route,Buffer.from(body.content,'base64'));
+   return {status:201,data:{}};
+  }
+  return remote.has(route)?{status:200,data:encoded(remote.get(route))}:{status:404,data:{}};
+ };
+ const links=await uploadVerifiedReportPair({...params,api});
+ assert.equal(links.length,2);
+ assert.equal(puts.length,4,'two conflicts plus successful JSON and TXT creations');
+ assert.equal(remote.get(target('json')).toString(),params.json);
+ assert.equal(remote.get(target('txt')).toString(),params.txt);
+});
+
+test('persistent 409 conflict remains a failure after five bounded attempts with HTTP evidence',async()=>{
+ let puts=0;
+ const api=async(_route,method='GET')=>{
+  if(method==='PUT'){puts++;return {status:409,data:{message:'do not log this'}};}
+  return {status:404,data:{}};
+ };
+ await assert.rejects(uploadVerifiedReportPair({...params,api}),error=>{
+  assert.equal(error.code,'REPORT_FILE_READBACK_NOT_VERIFIED');
+  assert.deepEqual(error.evidence,{extension:'json',initialGetStatus:404,putStatus:409,
+   postPutGetStatus:404,putOutcomeUnknown:false,maxAttempts:5});
+  assert.doesNotMatch(JSON.stringify(error.evidence),/do not log this/);
+  return true;
+ });
+ assert.equal(puts,5);
+});
+
+test('GitHub denied PUT preserves safe 403 status and never reports a verified file',async()=>{
+ let puts=0;
+ const api=async(_route,method='GET')=>{
+  if(method==='PUT'){puts++;return {status:403,data:{token:'DO_NOT_LOG'}};}
+  return {status:404,data:{}};
+ };
+ await assert.rejects(uploadVerifiedReportPair({...params,api}),error=>{
+  assert.equal(error.code,'REPORT_FILE_READBACK_NOT_VERIFIED');
+  assert.equal(error.evidence.extension,'json');
+  assert.equal(error.evidence.initialGetStatus,404);
+  assert.equal(error.evidence.putStatus,403);
+  assert.equal(error.evidence.postPutGetStatus,404);
+  assert.equal(error.evidence.maxAttempts,3);
+  assert.doesNotMatch(JSON.stringify(error.evidence),/DO_NOT_LOG/);
+  return true;
+ });
+ assert.equal(puts,3);
+});
+
 test('caller posts Issue comment only after await of both verified artifacts',()=>{
  const entry=fileURLToPath(new URL('../controller/upload.mjs',import.meta.url));
  const src=fs.readFileSync(entry,'utf8');
