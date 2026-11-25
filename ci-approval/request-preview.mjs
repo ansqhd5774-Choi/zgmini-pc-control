@@ -13,8 +13,15 @@ export function prepareScopedRequestPreview(input){
   const snapshot=structuredClone(input);
   if(!Buffer.isBuffer(input?.observation?.bytes))return out('INVALID','SOURCE_BYTES_REQUIRED');
   snapshot.observation.bytes=Buffer.from(input.observation.bytes);
+  if(input.selectiveObservation!==undefined){
+   if(!Buffer.isBuffer(input.selectiveObservation?.bytes))return out('INVALID','SELECTIVE_SOURCE_BYTES_REQUIRED');
+   snapshot.selectiveObservation.bytes=Buffer.from(input.selectiveObservation.bytes);
+  }
+  if(snapshot.effect!=='B_CONTROLLER_INSTALL'&&(snapshot.selectivePin!==undefined||snapshot.selectiveObservation!==undefined))
+   return out('REJECTED','UNEXPECTED_SELECTIVE_PIN');
   const checked=inspectPinnedManifestScope(snapshot);
-  if(checked.state!=='EXACT_MANIFEST_SCOPE_MATCH_ONLY')return out(checked.state,checked.reason);
+  const selective=checked.state==='SELECTIVE_MANIFEST_PIN_MATCH_ONLY';
+  if(!selective&&checked.state!=='EXACT_MANIFEST_SCOPE_MATCH_ONLY')return out(checked.state,checked.reason);
   const writer=snapshot.effect==='B_WRITER_SOURCE';
   const labels=writer?[ISSUE_LABEL]:['pc-maintenance'];
   if(writer){
@@ -24,7 +31,12 @@ export function prepareScopedRequestPreview(input){
   }
   const body=JSON.stringify(snapshot.request);
   const preview=Object.freeze({repository_full_name:repo,title:writer?ISSUE_TITLE:'pc-controller-update',labels:Object.freeze(labels),body});
-  return out('REQUEST_PREVIEW_ONLY','TRUSTED_ISSUANCE_AND_ONE_SHOT_SUBMISSION_REQUIRED',{
+  // A selective preview is deliberately distinguishable from ordinary B.
+  // Neither preview constitutes permission to submit, and the selective tree,
+  // immutable main lineage and independent authority still require verification.
+  return out(selective?'SELECTIVE_REQUEST_PREVIEW_ONLY':'REQUEST_PREVIEW_ONLY',
+   selective?'SELECTIVE_TREE_AUTHORITY_AND_ONE_SHOT_SUBMISSION_REQUIRED':'TRUSTED_ISSUANCE_AND_ONE_SHOT_SUBMISSION_REQUIRED',{
+   ...(selective?{selectivePinSha256:checked.selectivePinSha256,approvalRevision:checked.revision}:{}),
    requestId:checked.requestId,manifestSha256:checked.manifestSha256,targetSha:checked.targetSha,
    bodySha256:digest(body),preview});
  }catch{return out('INVALID','PREVIEW_INPUT_INVALID')}
