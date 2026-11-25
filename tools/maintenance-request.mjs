@@ -238,17 +238,46 @@ export async function submitExistingControllerApprovalFromCi({targetSha,approval
   fail('MAINTENANCE_CI_PILOT_SCOPE_DENIED');
  const prNumber=Number(manifest.approval.ref.split('/').at(-1));
  const pr=await ports.readApprovalPr(prNumber);
- // An exact already-approved main manifest, not a newly generated candidate.
- // A CI success or bot-written record alone cannot issue business approval.
+ // Preserve the historical owner-approved path. Automated publication is
+ // not a new grant: only a pinned original business authorization and exact
+ // reconstruction of both approved files can replace the manual merger check.
+ const ownerMerged=ownerIdentity(pr?.merged_by);
  if(pr?.number!==prNumber||pr.merged!==true||pr.base?.ref!=='main'||
     pr.base?.repo?.full_name!==CONTROL_REPOSITORY||pr.head?.repo?.full_name!==CONTROL_REPOSITORY||
-    !ownerIdentity(pr.merged_by)||!sha40(pr.merge_commit_sha))
+    (!ownerMerged&&!botIdentity(pr.merged_by))||!sha40(pr.merge_commit_sha))
   fail('MAINTENANCE_CI_EXISTING_APPROVAL_PROVENANCE_DENIED');
  const approvedBytes=await ports.readMergedManifest(targetSha,pr.merge_commit_sha);
  if(!Buffer.isBuffer(approvedBytes)||!approvedBytes.equals(bytes))
   fail('MAINTENANCE_CI_EXISTING_APPROVAL_BYTES_MISMATCH');
  await resolveControllerApprovalCI(manifest.approval.ref,{readApprovalPr:ports.readApprovalPr,
   listRuns:ports.listRuns,readRun:ports.readRun});
+ if(!ownerMerged){
+  // This port is supplied by the independently reviewed fixed publisher,
+  // not by the approval PR, manifest or Issue. No production context is
+  // configured yet; the automatic branch therefore fails closed by default.
+  if(typeof ports.readAutoApprovalContext!=='function')
+   fail('MAINTENANCE_CI_AUTO_APPROVAL_CONTEXT_REQUIRED');
+  const ctx=await ports.readAutoApprovalContext(targetSha,prNumber);
+  if(!ctx?.policy||!ctx.delegation||!Number.isSafeInteger(ctx.policy.sourcePrNumber)||
+     ctx.policy.sourcePrNumber<=0||typeof ctx.readFileBytes!=='function'||typeof ctx.getJson!=='function')
+   fail('MAINTENANCE_CI_AUTO_APPROVAL_CONTEXT_REQUIRED');
+  const {prepareSelectiveApprovalPublication}=await import('../ci-approval/controller-candidate-review.mjs');
+  const plan=Object.fromEntries(['installedSha','targetSha','allowFiles','purpose','postOperation','postSourceBranch','postSourceSha'].map(k=>[k,manifest[k]]));
+  const prepared=await prepareSelectiveApprovalPublication({
+   plan,delegation:{...ctx.delegation,now:new Date().toISOString().replace(/\.\d{3}Z$/,'Z')},
+   sourcePrNumber:ctx.policy.sourcePrNumber,approvalPrNumber:prNumber,
+   sourceMainSha:manifest.selectiveSource.mainSha,policy:ctx.policy,
+   getJson:ctx.getJson,readFileBytes:ctx.readFileBytes,readJobLogs:ctx.readJobLogs});
+  if(prepared.state!=='SELECTIVE_APPROVAL_FILES_PREPARED'||prepared.files.length!==2||
+     !prepared.files[0].bytes.equals(bytes))
+   fail('MAINTENANCE_CI_AUTO_APPROVAL_RECONSTRUCTION_DENIED');
+  const pin=prepared.files[1];
+  for(const revision of [pr.merge_commit_sha,'main']){
+   const actual=await ctx.readFileBytes(CONTROL_REPOSITORY,revision,pin.path);
+   if(!Buffer.isBuffer(actual)||!actual.equals(pin.bytes))
+    fail('MAINTENANCE_CI_AUTO_APPROVAL_PIN_MISMATCH');
+  }
+ }
  // The effect key is independent of a retry, approval publication event, or
  // mutable chat trace. The existing receiver-side effect claim still applies.
  const effectKey=digest(JSON.stringify([CONTROL_REPOSITORY,manifest.installedSha,targetSha]));

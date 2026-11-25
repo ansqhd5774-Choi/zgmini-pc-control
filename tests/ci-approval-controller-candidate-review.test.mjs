@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {manifestFingerprint,CONTROLLER_POST_OPERATIONS,prepareControllerUpdateRequest,validateControllerSelectivePin} from '../tools/maintenance-contract.mjs';
 import {reviewControllerCandidate as review,prepareSelectiveApprovalPublication} from '../ci-approval/controller-candidate-review.mjs';
+import {submitExistingControllerApprovalFromCi} from '../tools/maintenance-request.mjs';
 const repo='ansqhd5774-Choi/zgmini-pc-control',root='repos/'+repo;
 const hash=b=>createHash('sha256').update(b).digest('hex');
 function fixture(){
@@ -107,4 +108,52 @@ for(const [name,edit,state] of [
 ])test('selective publication rejects '+name,async()=>{
  const f=publicationFixture();edit(f);const r=await prepareSelectiveApprovalPublication(f.inputs);
  assert.equal(r.state,state,r.reason);assert.equal(r.files,undefined);assert.equal(r.canExecute,false);
+});
+
+async function automaticSubmissionFixture(){
+ const f=publicationFixture(),ctx=f.inputs;
+ // Replace the historical fixture grant with a current simulated direct-owner
+ // grant. Keep its original pin, exact scope and authenticated-read structure.
+ const route=root+'/issues/comments/'+ctx.delegation.pin.commentId,read=ctx.getJson;
+ const comment=await read(route),now=Date.now();
+ const start=new Date(now-60000).toISOString().replace(/\.\d{3}Z$/,'Z');
+ const end=new Date(now+3600000).toISOString().replace(/\.\d{3}Z$/,'Z');
+ const grant=JSON.parse(comment.body);grant.notBefore=start;grant.notAfter=end;
+ comment.body=JSON.stringify(grant);comment.created_at=start;comment.updated_at=start;
+ ctx.delegation.pin.bodySha256=hash(comment.body);ctx.delegation.now=new Date(now).toISOString().replace(/\.\d{3}Z$/,'Z');
+ ctx.policy.sourcePrNumber=28;
+ ctx.getJson=async p=>p===route?structuredClone(comment):read(p);
+ const prepared=await prepareSelectiveApprovalPublication(ctx);
+ assert.equal(prepared.state,'SELECTIVE_APPROVAL_FILES_PREPARED',prepared.reason);
+ const [m,pin]=prepared.files,approvalHead='4'.repeat(40),approvalMerge='5'.repeat(40);
+ const owner={login:'ansqhd5774-Choi',id:327938088,type:'User'};
+ const bot={login:'github-actions[bot]',id:41898282,type:'Bot'};
+ const pr={...f.pr,number:29,merged_by:bot,merge_commit_sha:approvalMerge,head:{...f.pr.head,sha:approvalHead}};
+ const run={...f.run,id:999,head_sha:approvalHead};
+ const store={receipt:null,posts:0,actual:null};
+ const readFile=ctx.readFileBytes;
+ ctx.readFileBytes=async(r,revision,path)=>path===pin.path?Buffer.from(pin.bytes):readFile(r,revision,path);
+ const ports={readRepository:async()=>({id:1442936296,private:true,full_name:repo,owner}),
+  readManifest:async()=>m.bytes,readMergedManifest:async()=>m.bytes,readApprovalPr:async()=>pr,
+  listRuns:async()=>({workflow_runs:[run]}),readRun:async()=>run,
+  readAutoApprovalContext:async()=>ctx,loadReceipt:async()=>store.receipt,
+  saveReceipt:async(key,value)=>{store.receipt=structuredClone(value)},findPriorRequests:async()=>[],
+  createIssue:async e=>{store.posts++;store.actual={number:42,state:'open',user:bot,title:e.title,body:e.body,labels:e.labels.map(name=>({name}))};return {number:42}},
+  readIssue:async()=>store.actual};
+ return {ctx,m,pin,ports,store,input:{targetSha:f.v.plan.targetSha,approvalSha256:m.sha256,runId:1000,attempt:1}};
+}
+test('auto-published exact pair reuses initial approval and submits without a second owner merge',async()=>{
+ const f=await automaticSubmissionFixture(),r=await submitExistingControllerApprovalFromCi(f.input,f.ports);
+ assert.equal(r.status,'REQUEST_READBACK_VERIFIED');assert.equal(f.store.posts,1);
+});
+test('bot merge without independently configured original approval cannot submit',async()=>{
+ const f=await automaticSubmissionFixture();delete f.ports.readAutoApprovalContext;
+ await assert.rejects(()=>submitExistingControllerApprovalFromCi(f.input,f.ports),/AUTO_APPROVAL_CONTEXT_REQUIRED/);
+ assert.equal(f.store.posts,0);
+});
+test('auto publication with different main selective pin cannot submit',async()=>{
+ const f=await automaticSubmissionFixture(),read=f.ctx.readFileBytes;
+ f.ctx.readFileBytes=async(r,s,p)=>s==='main'&&p===f.pin.path?Buffer.from('{}'):read(r,s,p);
+ await assert.rejects(()=>submitExistingControllerApprovalFromCi(f.input,f.ports),/AUTO_APPROVAL_PIN_MISMATCH/);
+ assert.equal(f.store.posts,0);
 });
