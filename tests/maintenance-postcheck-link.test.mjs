@@ -234,7 +234,7 @@ test('postcheck result publication makes one bounded read-only Run/Job receipt c
  assert.ok(helper>0&&comment>helper&&periodic>comment);
  const block=src.slice(comment,src.indexOf('const current=json(ledgerFile);',comment));
  assert.match(block,/lookupPostcheckRunAndJobs\(\)/);
- assert.match(block,/linked\.state==='UPLOAD_MISSING'/);
+ assert.match(block,/\['UPLOAD_MISSING','RUNNING'\]\.includes\(linked\.state\)/);
  assert.match(block,/runner_name\?\.match\(\/\^zgmini-pc-0/);
  assert.match(block,/pointer:\{issueNumber:postIssueNumber,report:result\}/);
  assert.match(block,/proof\.status==='LOCAL_RESULT_MATCHED'/);
