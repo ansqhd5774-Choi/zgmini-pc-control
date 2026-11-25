@@ -1,4 +1,4 @@
-// R3 exact five-file selective Controller B regression; source-only, no PC I/O.
+// R3 exact six-file selective Controller B regression; source-only, no PC I/O.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -11,7 +11,7 @@ import {
 } from '../tools/maintenance-contract.mjs';
 
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const target='8da8834d5fde333850ad02269ef080cf1de4ce76';
+const target='8c4d5234cb4e4b60c8e057946724ae9438eea471';
 const installed='53fe24e22446d21a9fd4ee308d12b7cba7f37e25';
 const manifestPath=path.join(root,'approvals/controller-updates',target+'.json');
 const pinPath=path.join(root,'approvals/controller-selective-targets',target+'.json');
@@ -34,7 +34,7 @@ const admit=(m)=>validateUpdateRequest(request(m),m,{
 });
 const files=[
  'controller/common.mjs','controller/engine.mjs','controller/entry.mjs',
- 'controller/standby.mjs','controller/supervisor.mjs'
+ 'controller/operations.mjs','controller/standby.mjs','controller/supervisor.mjs'
 ];
 test('R3 selective Controller B reuses exact installed-base pin and existing contract',()=>{
  const {raw,manifest,pin}=load();
@@ -49,9 +49,11 @@ test('R3 selective Controller B reuses exact installed-base pin and existing con
  assert.equal(manifest.checks.manifestSha256,manifestFingerprint(manifest.allowFiles).sha256);
  assert.equal(validateControllerSelectivePin(manifest,pin),true);
  assert.deepEqual(manifest.allowFiles.map(x=>x.path),files);
+ assert.equal(manifest.allowFiles.find(x=>x.path==='controller/operations.mjs')?.sha256,
+  'e23bd680967e82b40177eb861a245382b433f6612208d5ac2217c573daa0cea3');
  assert.deepEqual([...manifest.selectiveSource.customPaths].sort(),files);
  assert.equal(pin.sourceMainSha,'f09f5a5510bd11e6e6f869ea1728d940939a5e59');
- assert.equal(pin.targetBranch,'codex/controller-standby-selective-r3-20261126');
+ assert.equal(pin.targetBranch,'codex/controller-standby-selective-r3-sixfile-20261126');
  assert.equal(pin.approvalRef,'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3752');
 });
 test('R3 selective manifest refuses extra operations, SHA, and unapproved files',()=>{
@@ -77,7 +79,7 @@ test('R3 overlay does not approve Watchdog or mutate six-seat operating policy',
  const {manifest,pin}=load();
  assert.equal(manifest.allowFiles.some(x=>x.path.startsWith('tools/')||
   x.path.startsWith('config/')||x.path.startsWith('watchdog-b/')),false);
- assert.equal(pin.customPaths.length,5);
+ assert.equal(pin.customPaths.length,6);
  const installedOps=JSON.parse(fs.readFileSync(
   path.join(root,'config/operations.json'),'utf8'));
  assert.equal(installedOps.seats,6);
