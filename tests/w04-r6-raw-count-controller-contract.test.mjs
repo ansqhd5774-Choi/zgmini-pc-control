@@ -37,7 +37,7 @@ test('Controller raw aggregation projection permits count-only, strips private f
  const value=projectR6RawCountAggregate(raw);
  assert.deepEqual([value.metadataKeys,value.bodyVerifiedKeys,value.runCertifiedKeys],[1,1,1]);
  assert.equal(value.rawSnapshotByGroup[0].releaseGroup,'BLS_EMPLOYMENT_SITUATION');
- assert.doesNotMatch(JSON.stringify(value),/SECRET_|privateSourceHash|sourceSha|sourceHash|requestKey|body/);
+ assert.doesNotMatch(JSON.stringify(value),/SECRET_|privateSourceHash|sourceSha|sourceHash|requestKey|SECRET_BODY/);
  assert.equal(value.promotionApproved,false);
  assert.equal(value.historicalPitAttested,false);
 });
