@@ -54,6 +54,83 @@ const CNN_B_RESOURCE_PROBE='cnn-sidecar-b-resource-readonly';
 const CNN_B_CORE_PROBE='cnn-sidecar-b-core-readonly';
 const MAX_BYTES=32768;
 const R3_WATCHDOG_PREIMAGE_PROBE='controller-standby-watchdog-preimage-readonly';
+const R3_WMI_PROBE='controller-standby-runner-wmi-readonly';
+// Existing A only: observe whether the same fixed WMI process-path query
+// used by the candidate Watchdog can classify installed Runner executables.
+// This single instant is NOT an owner/child-exit proof and cannot promote Standby.
+export function classifyR3RunnerWmiRows(raw,{
+ controllerRoot='E:/ZGmini/automation/pc-control',
+ canonicalize=fs.realpathSync.native
+}={}){
+ const base={schema:'ZGMINI_R3_STANDBY_RUNNER_WMI_A_V1',
+  evidence:'SINGLE_INSTANT_WMI_NOT_PROMOTION_AUTHORIZATION',
+  promotionApproved:false,operationalWrites:0,providerCalls:0,d1Writes:0};
+ const unknown=(code)=>({...base,status:'STATE_UNKNOWN',code,
+  controllerListenerCount:null,controllerWorkerCount:null,unknownPathCount:null});
+ if(!raw||!Array.isArray(raw.rows)||raw.rows.length>256)
+  return unknown('STANDBY_WMI_ROWS_UNVERIFIED');
+ let root;
+ try{root=path.win32.normalize(canonicalize(controllerRoot)).toLowerCase();}
+ catch{return unknown('STANDBY_WMI_CONTROLLER_ROOT_UNVERIFIED');}
+ if(!path.win32.isAbsolute(root)||!root.endsWith('\\')&&root.length<5)
+  return unknown('STANDBY_WMI_CONTROLLER_ROOT_UNVERIFIED');
+ const prefix=root.replace(/[\\]+$/,'')+'\\runners\\';
+ const seen=new Set();let listeners=0,workers=0,unknownPaths=0;
+ for(const row of raw.rows){
+  const name=typeof row?.name==='string'?row.name.toLowerCase():'';
+  if(!Number.isSafeInteger(row?.pid)||row.pid<1||seen.has(row.pid)||
+   !['runner.listener.exe','runner.worker.exe'].includes(name))
+   return unknown('STANDBY_WMI_PROCESS_SHAPE_INVALID');
+  seen.add(row.pid);
+  if(typeof row.executablePath!=='string'||!path.win32.isAbsolute(row.executablePath)){
+   unknownPaths++;continue;
+  }
+  let exe;
+  try{exe=path.win32.normalize(canonicalize(row.executablePath)).toLowerCase();}
+  catch{unknownPaths++;continue;}
+  if(!path.win32.isAbsolute(exe)){unknownPaths++;continue;}
+  if(exe.startsWith(prefix)){
+   if(name==='runner.listener.exe')listeners++;
+   else workers++;
+  }
+ }
+ if(unknownPaths)return {...base,status:'STATE_UNKNOWN',code:'STANDBY_WMI_EXECUTABLE_PATH_UNVERIFIED',
+  controllerListenerCount:listeners,controllerWorkerCount:workers,unknownPathCount:unknownPaths};
+ return {...base,status:'PASS',code:'STANDBY_WMI_EXECUTABLE_PATHS_CLASSIFIED',
+  controllerListenerCount:listeners,controllerWorkerCount:workers,unknownPathCount:0};
+}
+export function inspectR3RunnerWmiReadonly({
+ run=spawnSync,filesystem=fs,env=process.env,
+ controllerRoot='E:/ZGmini/automation/pc-control'
+}={}){
+ const unknown=(code)=>({schema:'ZGMINI_R3_STANDBY_RUNNER_WMI_A_V1',
+  status:'STATE_UNKNOWN',code,promotionApproved:false,
+  evidence:'SINGLE_INSTANT_WMI_NOT_PROMOTION_AUTHORIZATION',
+  controllerListenerCount:null,controllerWorkerCount:null,unknownPathCount:null,
+  operationalWrites:0,providerCalls:0,d1Writes:0});
+ if(process.platform!=='win32'||typeof env.SystemRoot!=='string'||
+   !/^[a-z]:[\\/]windows$/i.test(env.SystemRoot))
+  return unknown('STANDBY_WMI_WINDOWS_SCOPE_UNVERIFIED');
+ const ps=path.win32.join(env.SystemRoot,'System32','WindowsPowerShell','v1.0','powershell.exe');
+ try{if(!filesystem.statSync(ps).isFile())return unknown('STANDBY_WMI_POWERSHELL_UNAVAILABLE');}
+ catch{return unknown('STANDBY_WMI_POWERSHELL_UNAVAILABLE');}
+ const cmd=[
+  "$ErrorActionPreference='Stop'",
+  "$rows=@(Get-CimInstance -ClassName Win32_Process -Filter \"Name = 'Runner.Listener.exe' OR Name = 'Runner.Worker.exe'\" -ErrorAction Stop | ForEach-Object { [pscustomobject]@{pid=[int]$_.ProcessId;name=[string]$_.Name;executablePath=[string]$_.ExecutablePath} })",
+  "[pscustomobject]@{rows=$rows}|ConvertTo-Json -Compress -Depth 4"
+ ].join(';');
+ let result;
+ try{result=run(ps,['-NoLogo','-NoProfile','-NonInteractive','-Command',cmd],
+  {windowsHide:true,timeout:15000,maxBuffer:65536,encoding:'utf8',shell:false});}
+ catch{return unknown('STANDBY_WMI_PROBE_UNAVAILABLE');}
+ if(result.error||result.status!==0||typeof result.stdout!=='string'||
+    Buffer.byteLength(result.stdout)>65536)
+  return unknown('STANDBY_WMI_PROBE_UNAVAILABLE');
+ try{return classifyR3RunnerWmiRows(JSON.parse(result.stdout.replace(/^\\uFEFF/,'').trim()),
+    {controllerRoot});}
+ catch{return unknown('STANDBY_WMI_RESULT_UNVERIFIED');}
+}
+
 // One additional scope of the existing approved A inventory; no job,
 // schedule, service or runtime source changes. No raw bytes or credentials
 // are exported, and any read uncertainty stays explicitly unverified.
@@ -175,10 +252,11 @@ export function authenticateProcess(event,env,role){
   const isCnnBResources=withW05&&raw.probe===CNN_B_RESOURCE_PROBE;
   const isCnnBCore=withW05&&raw.probe===CNN_B_CORE_PROBE;
   const isR3Watchdog=withW05&&raw.probe===R3_WATCHDOG_PREIMAGE_PROBE;
+ const isR3Wmi=withW05&&raw.probe===R3_WMI_PROBE;
  if(!raw||(!basic&&!withJobs&&!withW05)||
    raw.schema!==SCHEMA||raw.operation!==ROLE_OPERATION||raw.role!==role||
    (withJobs&&role!=='operating')||
-   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!is3409&&!isEr1Postcheck&&!is3516&&!isD05Writer&&!isD05PrivateReceipt&&!isD05Theme&&!isD05Registration&&!is3160&&!isCnnStaticGuard&&!isCnnGitPredicates&&!isCnnBPins&&!isCnnBResources&&!isCnnBCore&&!isR3Watchdog))))
+   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!is3409&&!isEr1Postcheck&&!is3516&&!isD05Writer&&!isD05PrivateReceipt&&!isD05Theme&&!isD05Registration&&!is3160&&!isCnnStaticGuard&&!isCnnGitPredicates&&!isCnnBPins&&!isCnnBResources&&!isCnnBCore&&!isR3Watchdog&&!isR3Wmi))))
   fail('REQUEST_SCOPE_INVALID');
  const runnerJobRefs=withJobs?validateRunnerJobRefs(raw.runnerJobRefs):null;
  const normalized=structuredClone(event);
@@ -203,7 +281,8 @@ export function authenticateProcess(event,env,role){
    ...(isCnnBPins?{cnnSidecarBPreimagePins:true}:{}),
    ...(isCnnBResources?{cnnSidecarBResources:true}:{}),
    ...(isCnnBCore?{cnnSidecarBCore:true}:{}),
-   ...(isR3Watchdog?{watchdogR3Preimage:true}:{})};
+   ...(isR3Watchdog?{watchdogR3Preimage:true}:{}),
+  ...(isR3Wmi?{standbyRunnerWmi:true}:{})};
 }
 export function sanitizeProbe(raw){
  if(!raw||raw.schema!=='ZGMINI_PC_PROCESS_PROBE_V1')fail('PROBE_SCHEMA_INVALID');
@@ -2322,6 +2401,10 @@ export function collect(role,ctx,env=process.env){
  if(identity!=='MATCH'||(role==='operating'&&host!=='PC')){
   return {...base,status:'BLOCKED',code:identity==='MATCH'?'HOST_NOT_CANONICAL':identity};
  }
+ if(ctx.standbyRunnerWmi===true){
+  const proof=inspectR3RunnerWmiReadonly();
+  return {...base,status:proof.status,code:proof.code,standbyRunnerWmi:proof};
+ }
  if(ctx.watchdogR3Preimage===true){
   const proof=inspectR3WatchdogPreimageReadonly();
   return {...base,status:proof.status,code:proof.code,watchdogR3Preimage:proof};
@@ -2498,6 +2581,12 @@ export function toText(r){
   ...(r.c3160LocalPreflight?[
    'c3160LocalApproval='+r.c3160LocalPreflight.localApproval,
    'c3160RecoveryClaim='+r.c3160LocalPreflight.recoveryClaim]:[]),
+  ...(r.standbyRunnerWmi?[
+   'standbyRunnerWmi='+r.standbyRunnerWmi.code,
+   'wmiControllerListenerCount='+(r.standbyRunnerWmi.controllerListenerCount??'UNKNOWN'),
+   'wmiControllerWorkerCount='+(r.standbyRunnerWmi.controllerWorkerCount??'UNKNOWN'),
+   'wmiUnknownPathCount='+(r.standbyRunnerWmi.unknownPathCount??'UNKNOWN'),
+   'standbyPromotionApproved=false']:[]),
   ...(r.watchdogR3Preimage?[
    'watchdogR3Preimage='+r.watchdogR3Preimage.code,
    'watchdogSourceSha256='+(r.watchdogR3Preimage.sourceSha256??'UNKNOWN'),
