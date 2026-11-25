@@ -71,3 +71,9 @@ A는 기존 정규 접수/판정에 필요한 확인만 재사용한다. B는 �
 - 원래 HEAD 52e347c15e7933445951ee8173a544adb9793200의 CI 3종 최종 SUCCESS: Controller 45591949395, C996 45591949481, Secret Scan 45591949415. Controller job 139128128225의 shadow/candidate 단계 7 SUCCESS. 기존 47건 소스 시험 결과를 승계한다.
 - 준비 커밋 d1c807bab953d7d1a1c68d619e3449f500832c75는 원래 HEAD의 직계 후손(3 commits, behind=0)이며 변경 3파일만 확인. 기존 소스 CI에 신규 17건을 별도 단계로 연결하고 누락 방지 scope 회귀 1건을 추가한다. 기존 시험 및 운영 경로 유지. 총 승인 시험 64건 + CI wiring 회귀 1건; 새 HEAD 결과 미확인.
 - 중요: Controller CI는 PR head가 아닌 github.sha 통합 트리를 checkout한다. Run head_sha 및 성공 step은 관측 증거이지 실제 checkout 바이트의 증명이나 업무 승인 근거가 아니다. 향후 신뢰된 workflow revision, 통합 SHA와 부모, 실제 실행 트리, 승인 범위의 독립 검증을 연결해야 한다. 현재 자동 승인/실행 비활성. 기존 main, 운영 PC, 권한 및 보호 설정 변경 없음.
+
+### 2026-11-25 후속 — 승인 원본 무결성 확인
+- HEAD c85dc294f5150f836b09f350de930b0ecf5fff8e의 Controller CI 45596459687 job 139143696525: 기존 승인 판정/후보 단계 7 및 CI evidence 단계 8 SUCCESS. 전체 실행 종료는 별도 확인한다.
+- 운영 정본 §5에서 이미 승인된 업무의 필수 유지보수는 정확한 효과 범위 내 재승인 없이 가능함을 확인. 변경 불가능한 승인 원본 확인은 신규 자동 승인 경로에만 적용하며 기존 승인이나 실행기의 전역 Gate로 사용하지 않는다.
+- approval-source-integrity.mjs: 독립적으로 제공된 pin의 repository/revision/path/Git blob SHA/SHA256과 원본 바이트를 모두 비교. 일치해도 PIN_MATCH_ONLY이며 업무 승인 또는 발행 권한으로 해석하지 않는다. 외부 신뢰 pin의 설정·현재 유효성·권한 범위 매핑은 미완료. PR/Issue/변경 가능한 main 자체를 신뢰 root로 사용하지 않는다. 별도 신규 비밀키/서비스/관리자 권한을 요구하지 않는 방향으로 설계했다.
+- 16건 회귀시험 추가 및 기존 격리 CI 연결. 총 승인 관련 시험 80건 + 기존 CI 연결 회귀 1건. 신규 16건 실제 Node 결과 미확인. 기존 CI 진행을 보존하기 위해 준비 변경을 별도 commit으로 유지한다. 실제 운영 승인/발행/실행 미활성.
