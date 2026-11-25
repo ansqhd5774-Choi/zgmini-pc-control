@@ -25,7 +25,7 @@ test('offline PR verification uses hosted runner, read-only token and credential
  assert.match(offline,/\npermissions:\s*\n\s+contents: read\s*\n/);
  assert.doesNotMatch(offline,/^\s*(?:issues|pull-requests):\s*write\s*$/m);
  assert.doesNotMatch(offline,/write-all|self-hosted|GITHUB_TOKEN|pc-job|--upload/);
- assert.match(offline,/runs-on: ubuntu-24\\.04/);
+ assert.match(offline,/runs-on: ubuntu-24\.04/);
  assert.match(offline,/persist-credentials: false/);
  assert.match(offline,/node --test er1-dec31-symbol-pair-resume-entry\.test\.mjs tests\/ci-er1-workflow-pr-boundary\.test\.mjs/);
  for(const p of [
