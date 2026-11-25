@@ -46,7 +46,7 @@ test('unavailable authenticated read is not success',async()=>{
 function publicationFixture(){
  const before='a'.repeat(40),after='b'.repeat(40),target='c'.repeat(40);
  const path='approvals/controller-updates/'+target+'.json';
- const bytes=Buffer.from(JSON.stringify({schema:'ZGMINI_PC_UPDATE_V1',targetSha:target}));
+ const bytes=Buffer.from(JSON.stringify({schema:'ZGMINI_PC_UPDATE_V1',targetSha:target,approval:{ref:'https://github.com/'+repository.full_name+'/pull/3573'}}));
  const blob=createHash('sha1').update(Buffer.concat([Buffer.from('blob '+bytes.length+'\0'),bytes])).digest('hex');
  const event={repository:{...repository},ref:'refs/heads/main',deleted:false,forced:false,before,after};
  const diff={status:'ahead',behind_by:0,base_commit:{sha:before},merge_base_commit:{sha:before},files:[{filename:path,status:'added',sha:blob}]};
@@ -91,4 +91,28 @@ test('incomplete publication diff is not approved',async()=>{
  const v=publicationFixture();v.diff.files=Array(300).fill(v.diff.files[0]);
  const r=await observePublishedControllerApprovals(v.event,v);
  assert.equal(r.state,'EVIDENCE_MISSING');assert.equal(r.canPublish,false);
+});
+
+test('published approval links exact merged PR and successful CI through shared resolver',async()=>{
+ const v=publicationFixture(),run=event().workflow_run,read=v.getJson;
+ const calls=[];
+ v.getJson=async route=>{
+  calls.push(route);
+  if(route==='pulls/3573')return {number:3573,merged:true,base:{ref:'main',repo:repository},head:{sha:run.head_sha,repo:repository}};
+  if(route==='actions/workflows/416355595/runs?head_sha='+run.head_sha+'&event=pull_request&status=success&per_page=100')return {workflow_runs:[run]};
+  if(route==='actions/runs/'+run.id)return run;
+  return read(route);
+ };
+ const r=await observePublishedControllerApprovals(v.event,v);
+ assert.equal(r.entries[0].ciState,'SOURCE_CI_MATCH_ONLY');
+ assert.deepEqual(r.entries[0].sourceCI,{approvalPr:3573,headSha:run.head_sha,runId:run.id});
+ assert.equal(r.canPublish,false);assert.equal(r.canExecute,false);
+ assert.ok(calls.includes('actions/runs/'+run.id));
+});
+test('unavailable source CI preserves observed manifest but does not claim successful match',async()=>{
+ const v=publicationFixture(),r=await observePublishedControllerApprovals(v.event,v);
+ assert.equal(r.entries[0].state,'EXISTING_MANIFEST_OBSERVED_ONLY');
+ assert.equal(r.entries[0].ciState,'SOURCE_CI_UNVERIFIED');
+ assert.equal(r.entries[0].sourceCI,undefined);
+ assert.equal(r.canPublish,false);assert.equal(r.canExecute,false);
 });
