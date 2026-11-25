@@ -2,6 +2,12 @@ name: ZGMINI PC November ER1 Saved Actual Read-Only
 on:
   issues:
     types: [opened]
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'er1-nov30-saved-actual-audit.mjs'
+      - 'er1-nov30-saved-actual-audit.test.mjs'
+      - '.github/workflows/pc-er1-nov30-saved-actual-audit.yml'
 
 permissions:
   contents: read
@@ -18,7 +24,8 @@ jobs:
       github.event.repository.private == true &&
       github.actor == 'ansqhd5774-Choi' &&
       github.event.issue.user.login == 'ansqhd5774-Choi' &&
-      github.event.issue.title == 'pc-er1-nov30-saved-actual-audit' &&
+      (github.event.issue.title == 'pc-er1-nov30-saved-actual-audit' ||
+       github.event.issue.title == 'pc-er1-nov30-original-cohort-audit') &&
       contains(github.event.issue.labels.*.name, 'pc-er1-approved')
     runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
     timeout-minutes: 5
@@ -52,3 +59,24 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_EVENT_ACTION: ${{ github.event.action }}
         run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\er1-nov30-saved-actual-audit.mjs" --upload'
+
+  # Offline source verification only; no Windows host or EarningsAPI.
+  cohort-order-tests:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source without persisting credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Setup pinned Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify saved cohort ordering and owner-only A contract
+        run: |
+          node --check er1-nov30-saved-actual-audit.mjs
+          node --test er1-nov30-saved-actual-audit.test.mjs
