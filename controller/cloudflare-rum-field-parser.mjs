@@ -35,16 +35,21 @@ const metric=(value,limit,scale)=>{
  if(value!==undefined&&value!==null&&
   (typeof value!=='number'||!Number.isFinite(value)))
   fail('CF_RUM_METRIC_SHAPE_INVALID');
- const raw=value===undefined||value===null||value<0?null:value/scale;
+ // Preserve the provider representation; an absent field, explicit null,
+ // and negative no-value marker are different observations, not INP causes.
+ const missingKind=value===undefined?'FIELD_OMITTED':
+  value===null?'PROVIDER_NULL':value<0?'PROVIDER_NEGATIVE':null;
+ const raw=missingKind===null?value/scale:null;
  const p75=raw===null?null:Math.round(raw*1e5)/1e5;
  // Compare ORIGINAL values: rounding a CLS 0.100001 must not yield Good.
  return {p75,goodLimit:limit,state:raw===null?'UNVERIFIED':
-   raw<=limit?'AT_OR_BELOW_GOOD_REFERENCE':'EXCEEDS_GOOD_REFERENCE'};
+   raw<=limit?'AT_OR_BELOW_GOOD_REFERENCE':'EXCEEDS_GOOD_REFERENCE',
+  ...(missingKind===null?{}:{missingKind})};
 };
-const empty=(route,device)=>({route,device,groupEventCount:0,
+const empty=(route,device,missingKind='NO_MATCHING_GROUP')=>({route,device,groupEventCount:0,
  metricSpecificSampleCounts:'UNAVAILABLE',
  metrics:Object.fromEntries(Object.entries(GOOD).map(([k,limit])=>[
-  k,{p75:null,goodLimit:limit,state:'UNVERIFIED'}]))});
+  k,{p75:null,goodLimit:limit,state:'UNVERIFIED',missingKind}]))});
 export function parseRumGraphql(response,{startUtc,endUtc}={}){
  if(!validWindow(startUtc,endUtc))fail('CF_RUM_WINDOW_INVALID');
  if(!obj(response))fail('CF_RUM_RESPONSE_INVALID');
@@ -83,7 +88,7 @@ export function parseRumGraphql(response,{startUtc,endUtc}={}){
   const key=requestPath+'|'+device;
   if(seen.has(key))fail('CF_RUM_DUPLICATE_GROUPS_UNVERIFIED');
   const q=row.quantiles;
-  const metrics=row.count===0?empty(requestPath,device).metrics:{
+  const metrics=row.count===0?empty(requestPath,device,'ZERO_GROUP_EVENTS').metrics:{
    lcpMs:metric(q.largestContentfulPaintP75,GOOD.lcpMs,1000),
    inpMs:metric(q.interactionToNextPaintP75,GOOD.inpMs,1000),
    cls:metric(q.cumulativeLayoutShiftP75,GOOD.cls,1)};
