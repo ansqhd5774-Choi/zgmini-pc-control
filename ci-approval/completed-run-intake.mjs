@@ -282,7 +282,12 @@ export function createConfiguredSelectivePreparer({policy,getJson,readJobLogs}={
  };
  return {
   branch,plan:Object.freeze(plan),policy:cfg,
-  prepare:n=>prepareSelectiveApprovalPublication({plan,delegation,sourcePrNumber:cfg.sourcePrNumber,
+  // The original owner grant has an explicit validity window. Re-evaluate
+  // UTC now on every attempt, including after a PR-number bootstrap.
+  // Never take time from an event, candidate, PR or configuration.
+  prepare:n=>prepareSelectiveApprovalPublication({
+   plan,delegation:{...delegation,now:new Date().toISOString().replace(/\.\d{3}Z$/,'Z')},
+   sourcePrNumber:cfg.sourcePrNumber,
    approvalPrNumber:n,sourceMainSha:cfg.sourceMainSha,policy:cfg,getJson:rootRead,
    readFileBytes,readJobLogs})
  };

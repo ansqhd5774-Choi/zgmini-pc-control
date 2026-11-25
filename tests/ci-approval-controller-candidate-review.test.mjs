@@ -1,3 +1,4 @@
+import {createConfiguredSelectivePreparer} from '../ci-approval/completed-run-intake.mjs';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
@@ -223,4 +224,42 @@ test('already merged bot approval with extra files is denied',async()=>{
  f.ports.readApprovalPrFiles=async()=>[{filename:f.m.path,status:'added'},{filename:f.pin.path,status:'added'},{filename:'tools/update.mjs',status:'modified'}];
  await assert.rejects(()=>submitExistingControllerApprovalFromCi(f.input,f.ports),/MERGE_DIFF_DENIED/);
  assert.equal(f.store.posts,0);
+});
+
+test('configured publisher reaches original owner grant + source CI with independently refreshed current UTC',async()=>{
+ const f=publicationFixture(),now=Date.now(),stamp=ms=>new Date(ms).toISOString().replace(/\.\d{3}Z$/,'Z');
+ const start=stamp(now-3600000),end=stamp(now+3600000);
+ const old=await f.inputs.getJson(root+'/issues/comments/456'),grant=JSON.parse(old.body);
+ grant.notBefore=start;grant.notAfter=end;
+ const body=JSON.stringify(grant),updated={...old,created_at:start,updated_at:start,body};
+ const cfg={targetSha:f.inputs.plan.targetSha,sourceMainSha:f.sourceMainSha,
+  sourcePrNumber:28,sourceWorkflowBlobSha:f.inputs.policy.sourceWorkflowBlobSha,
+  policyRevision:grant.policyRevision,businessApprovalSha256:grant.businessApprovalSha256,
+  sourceBranch:grant.sourceBranch,delegationPin:{...f.inputs.delegation.pin,
+   bodySha256:hash(body)},authorityChangesExcluded:true,installPlan:f.inputs.plan};
+ const getJson=async route=>{
+  if(route.startsWith('contents/')){
+   const m=route.match(/^contents\/(.+)\?ref=([a-f0-9]{40})$/);
+   assert.ok(m,'unexpected file path '+route);
+   const bytes=await f.inputs.readFileBytes(repo,m[2],m[1]);
+   const blob=createHash('sha1').update(Buffer.from('blob '+bytes.length+'\0')).update(bytes).digest('hex');
+   return {type:'file',path:m[1],encoding:'base64',sha:blob,content:bytes.toString('base64')};
+  }
+  if(route==='issues/comments/456')return updated;
+  return f.inputs.getJson(root+(route?'/'+route:''));
+ };
+ const configured=createConfiguredSelectivePreparer({policy:cfg,getJson,
+  readJobLogs:f.inputs.readJobLogs});
+ const first=await configured.prepare(29);
+ assert.equal(first.state,'SELECTIVE_APPROVAL_FILES_PREPARED',first.reason);
+ assert.equal(first.sourcePrNumber,28);
+ assert.equal(first.approvalPrNumber,29);
+ assert.equal(first.targetSha,cfg.targetSha);
+ assert.equal(first.files.length,2);
+ const manifest=JSON.parse(first.files[0].bytes),pin=JSON.parse(first.files[1].bytes);
+ assert.equal(manifest.approval.ref,'https://github.com/'+repo+'/pull/29');
+ assert.equal(pin.approvalRef,manifest.approval.ref);
+ const next=await configured.prepare(30);
+ assert.equal(next.state,'SELECTIVE_APPROVAL_FILES_PREPARED',next.reason);
+ assert.equal(JSON.parse(next.files[0].bytes).approval.ref,'https://github.com/'+repo+'/pull/30');
 });
