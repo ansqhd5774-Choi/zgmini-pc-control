@@ -3,7 +3,7 @@ import {publishExactControllerApprovalPair} from '../ci-approval/approval-pr-pub
 import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {observeCompletedRun,observePublishedControllerApprovals,createControllerPublicationPorts,publishExistingControllerApprovals,createAutoApprovalContextReader,ciPublicationExitCode,publishConfiguredControllerApproval} from '../ci-approval/completed-run-intake.mjs';
+import {observeCompletedRun,observePublishedControllerApprovals,createControllerPublicationPorts,publishExistingControllerApprovals,createAutoApprovalContextReader,ciPublicationExitCode,publishConfiguredControllerApproval,createConfiguredSelectivePreparer,createControllerPrPublicationIo} from '../ci-approval/completed-run-intake.mjs';
 
 const repository={id:1442936296,full_name:'ansqhd5774-Choi/zgmini-pc-control',private:true};
 const event=()=>({action:'completed',repository:{...repository},workflow_run:{
@@ -355,4 +355,31 @@ test('publisher rejects a PR that brings an unrelated file into the final diff',
   prepare:f.prepare,io:f.io};
  await assert.rejects(()=>publishExactControllerApprovalPair(args),/CI_APPROVAL_DIFF_DENIED/);
  assert.equal(f.state.updates,0);
+});
+
+test('configured publication policy requires independently pinned effect scope before PR writes',()=>{
+ const target='f'.repeat(40),policy={targetSha:target,sourceMainSha:'e'.repeat(40),
+  sourcePrNumber:42,sourceWorkflowBlobSha:'d'.repeat(40),policyRevision:'c'.repeat(40),
+  businessApprovalSha256:'a'.repeat(64),sourceBranch:'codex/example-selective',
+  delegationPin:{issueNumber:1,commentId:2,bodySha256:'b'.repeat(64)},
+  installPlan:{installedSha:'a'.repeat(40),targetSha:target,purpose:'pc-controller-maintenance',
+   postOperation:'core-status',allowFiles:[{path:'controller/entry.mjs',sha256:'c'.repeat(64)}]}};
+ const x=createConfiguredSelectivePreparer({policy,getJson:async()=>{},readJobLogs:async()=>''});
+ assert.equal(x.branch,'codex/ci-controller-b-'+target);
+ assert.equal(x.plan.targetSha,target);
+ assert.throws(()=>createConfiguredSelectivePreparer({policy:{...policy,installPlan:{
+  ...policy.installPlan,targetSha:'b'.repeat(40)}},getJson:async()=>{},readJobLogs:async()=>''}),/STAGING_POLICY_INVALID/);
+ assert.throws(()=>createConfiguredSelectivePreparer({policy:{...policy,businessApprovalSha256:''},
+  getJson:async()=>{},readJobLogs:async()=>''}),/STAGING_POLICY_INVALID/);
+});
+test('fixed GitHub approval PR ports cannot write other branches or arbitrary files',async()=>{
+ const target='f'.repeat(40),calls=[],github=async(route,body,method)=>{
+  calls.push([route,body,method]);return {sha:'a'.repeat(40)};
+ };
+ const io=createControllerPrPublicationIo({targetSha:target,getJson:async()=>{},github});
+ assert.throws(()=>io.createTree({tree:[{path:'tools/update.mjs',mode:'100644',type:'blob',content:'x'}]}),/TREE_DENIED/);
+ assert.throws(()=>io.createBranch({ref:'refs/heads/main',sha:'a'.repeat(40)}),/BRANCH_DENIED/);
+ assert.throws(()=>io.createPr({head:'main',base:'main',draft:false}),/INPUT_DENIED/);
+ assert.throws(()=>io.updateBranch('main',{sha:'a'.repeat(40),force:false}),/BRANCH_DENIED/);
+ assert.equal(calls.length,0);
 });

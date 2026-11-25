@@ -7,6 +7,8 @@ import os from 'node:os';
 import {pathToFileURL} from 'node:url';
 import {resolveControllerApprovalCI,createCiEffectReceiptStore,submitExistingControllerApprovalFromCi,mergeAndSubmitPreparedControllerApproval} from '../tools/maintenance-request.mjs';
 import {manifestFingerprint} from '../tools/maintenance-contract.mjs';
+import {prepareSelectiveApprovalPublication} from './controller-candidate-review.mjs';
+import {publishExactControllerApprovalPair} from './approval-pr-publisher.mjs';
 
 const repo='ansqhd5774-Choi/zgmini-pc-control';
 const repositoryId=1442936296;
@@ -230,8 +232,135 @@ export async function publishExistingControllerApprovals(event,{getJson,ports,ru
 // A single independently configured prepared effect, not a free-form event
 // target. Source completion and source merge can arrive in either order.
 // No subsequent bot-generated PR CI or push event is required for submission.
-export async function publishConfiguredControllerApproval(event,{getJson,ports,policy,runId,attempt,emitReceipt}={}){
- if(!policy||!sha(policy.targetSha)||!id(policy.sourcePrNumber)||!id(policy.approvalPrNumber)||
+
+// Construct publication evidence exclusively from independently configured
+// business scope. This path is used BEFORE allocating an approval PR number.
+// Candidate branches, event bodies and candidate manifest text cannot supply
+// or enlarge any of these parameters.
+export function createConfiguredSelectivePreparer({policy,getJson,readJobLogs}={}){
+ const cfg=structuredClone(policy);
+ const digest=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
+ const plan=cfg?.installPlan;
+ if(!cfg||!sha(cfg.targetSha)||!sha(cfg.sourceMainSha)||!id(cfg.sourcePrNumber)||
+    !sha(cfg.sourceWorkflowBlobSha)||!sha(cfg.policyRevision)||
+    !digest(cfg.businessApprovalSha256)||!id(cfg.delegationPin?.issueNumber)||
+    !id(cfg.delegationPin?.commentId)||!digest(cfg.delegationPin?.bodySha256)||
+    typeof cfg.sourceBranch!=='string'||!/^codex\/[a-z0-9][a-z0-9-]{3,94}$/.test(cfg.sourceBranch)||
+    !plan||plan.targetSha!==cfg.targetSha||!sha(plan.installedSha)||
+    plan.installedSha===cfg.targetSha||plan.purpose!=='pc-controller-maintenance'||
+    plan.postOperation!=='core-status'||!Array.isArray(plan.allowFiles)||
+    plan.allowFiles.length===0||plan.allowFiles.length>32||
+    typeof getJson!=='function'||typeof readJobLogs!=='function')
+  throw Error('CI_APPROVAL_STAGING_POLICY_INVALID');
+ const fp=manifestFingerprint(plan.allowFiles);
+ const branch='codex/ci-controller-b-'+cfg.targetSha;
+ const delegation={pin:cfg.delegationPin,baseSha:plan.installedSha,
+  scope:{effect:'B_CONTROLLER_INSTALL',businessApprovalSha256:cfg.businessApprovalSha256,
+   policyRevision:cfg.policyRevision,sourceRepository:repo,sourceBranch:cfg.sourceBranch,
+   purpose:plan.purpose,changedPaths:fp.files.map(x=>x.path),
+   targetSha:cfg.targetSha,scopeDigest:fp.sha256,
+   authorityChangesExcluded:cfg.authorityChangesExcluded===true}};
+ const readFileBytes=async(repository,revision,path)=>{
+  if(repository!==repo||!sha(revision)||typeof path!=='string'||!/^controller\/[a-z][a-z0-9-]*\.mjs$|^\.github\/workflows\/controller-maintenance-source-tests\.yml$/.test(path))
+   throw Error('CI_APPROVAL_STAGE_SOURCE_INVALID');
+  const item=await getJson('contents/'+path+'?ref='+revision);
+  if(item?.type!=='file'||item.path!==path||item.encoding!=='base64'||!sha(item.sha)||
+     typeof item.content!=='string'||item.content.length>3000000)
+   throw Error('CI_APPROVAL_STAGE_SOURCE_UNVERIFIED');
+  const bytes=Buffer.from(item.content,'base64');
+  if(!bytes.length||bytes.length>2*1024*1024||
+     createHash('sha1').update(Buffer.from('blob '+bytes.length+'\0')).update(bytes).digest('hex')!==item.sha)
+   throw Error('CI_APPROVAL_STAGE_SOURCE_UNVERIFIED');
+  return bytes;
+ };
+ const root='repos/'+repo+'/';
+ const rootRead=route=>{
+  if(route==='repos/'+repo)return getJson('');
+  if(typeof route!=='string'||!route.startsWith(root)||!/^(?:issues\/\d+|issues\/comments\/\d+|branches\/(?:main|codex%2F[a-z0-9-]+)|compare\/[a-f0-9]{40}\.\.\.[a-f0-9]{40}|git\/commits\/[a-f0-9]{40}|pulls\/\d+|actions\/runs\/\d+(?:\/attempts\/\d+\/jobs\?per_page=100)?|actions\/workflows\/416355595\/runs\?head_sha=[a-f0-9]{40}&event=pull_request&status=success&per_page=100)$/.test(route.slice(root.length)))
+   throw Error('CI_APPROVAL_STAGE_ROUTE_DENIED');
+  return getJson(route.slice(root.length));
+ };
+ return {
+  branch,plan:Object.freeze(plan),policy:cfg,
+  prepare:n=>prepareSelectiveApprovalPublication({plan,delegation,sourcePrNumber:cfg.sourcePrNumber,
+   approvalPrNumber:n,sourceMainSha:cfg.sourceMainSha,policy:cfg,getJson:rootRead,
+   readFileBytes,readJobLogs})
+ };
+}
+// REST ports are limited to one target-derived branch and a fixed two-file PR;
+// no arbitrary path, branch, API token, shell or repository setting is supplied
+// by the event or candidate PR. GitHub's normal PR merge protection still
+// applies after publication.
+export function createControllerPrPublicationIo({getJson,github,targetSha}={}){
+ if(!sha(targetSha)||typeof getJson!=='function'||typeof github!=='function')
+  throw Error('CI_APPROVAL_PR_PORTS_INVALID');
+ const branch='codex/ci-controller-b-'+targetSha,paths=[
+  'approvals/controller-updates/'+targetSha+'.json',
+  'approvals/controller-selective-targets/'+targetSha+'.json'];
+ const branchRoute='git/ref/heads/'+encodeURIComponent(branch);
+ const checkTree=v=>{
+  if(!Array.isArray(v?.tree)||v.tree.length<1||v.tree.length>2||v.tree.some(f=>
+     !paths.includes(f.path)||f.mode!=='100644'||f.type!=='blob'||typeof f.content!=='string'))
+   throw Error('CI_APPROVAL_PR_TREE_DENIED');
+  return v;
+ };
+ return {
+  readRepository:()=>getJson(''),
+  readMain:()=>getJson('branches/main'),
+  readCommit:sha40=>{if(!sha(sha40))throw Error('CI_APPROVAL_PR_SHA_INVALID');
+   return getJson('git/commits/'+sha40);},
+  async readBranch(name){
+   if(name!==branch)throw Error('CI_APPROVAL_PR_BRANCH_DENIED');
+   try{return await getJson(branchRoute);}
+   catch(e){if(e?.status===404)return null;throw e;}
+  },
+  async readPrs(name){
+   if(name!==branch)throw Error('CI_APPROVAL_PR_BRANCH_DENIED');
+   const rows=await getJson('pulls?state=all&head=ansqhd5774-Choi:'+branch+'&per_page=100');
+   if(!Array.isArray(rows)||rows.length>=100)throw Error('CI_APPROVAL_PR_INVENTORY_UNVERIFIED');
+   return rows;
+  },
+  readPr:n=>{if(!id(n))throw Error('CI_APPROVAL_PR_ID_INVALID');return getJson('pulls/'+n);},
+  readPrFiles:n=>{if(!id(n))throw Error('CI_APPROVAL_PR_ID_INVALID');
+   return getJson('pulls/'+n+'/files?per_page=100');},
+  async readBytes(revision,path){
+   if(!sha(revision)||!paths.includes(path))throw Error('CI_APPROVAL_PR_SOURCE_DENIED');
+   const item=await getJson('contents/'+path+'?ref='+revision);
+   if(item?.type!=='file'||item.path!==path||item.encoding!=='base64'||
+      !sha(item.sha)||typeof item.content!=='string'||item.content.length>65536)
+    throw Error('CI_APPROVAL_PR_BYTES_UNVERIFIED');
+   const bytes=Buffer.from(item.content,'base64');
+   if(!bytes.length||bytes.length>32768||
+     createHash('sha1').update(Buffer.from('blob '+bytes.length+'\0')).update(bytes).digest('hex')!==item.sha)
+    throw Error('CI_APPROVAL_PR_BYTES_UNVERIFIED');
+   return bytes;
+  },
+  createTree:v=>github('git/trees',checkTree(v),'POST'),
+  createCommit:v=>{
+   if(!sha(v?.tree)||!Array.isArray(v.parents)||v.parents.length!==1||!sha(v.parents[0]))
+    throw Error('CI_APPROVAL_PR_COMMIT_DENIED');
+   return github('git/commits',v,'POST');
+  },
+  createBranch:v=>{
+   if(v?.ref!=='refs/heads/'+branch||!sha(v.sha))throw Error('CI_APPROVAL_PR_BRANCH_DENIED');
+   return github('git/refs',v,'POST');
+  },
+  createPr:v=>{
+   if(v?.head!==branch||v.base!=='main'||v.draft!==false)
+    throw Error('CI_APPROVAL_PR_INPUT_DENIED');
+   return github('pulls',v,'POST');
+  },
+  updateBranch:(name,v)=>{
+   if(name!==branch||!sha(v?.sha)||v.force!==false)
+    throw Error('CI_APPROVAL_PR_BRANCH_DENIED');
+   return github(branchRoute,v,'PATCH');
+  }
+ };
+}
+
+export async function publishConfiguredControllerApproval(event,{getJson,ports,policy,runId,attempt,emitReceipt,stageApprovalPr}={}){
+ if(!policy||!sha(policy.targetSha)||!id(policy.sourcePrNumber)||
+    !(id(policy.approvalPrNumber)||typeof stageApprovalPr==='function')||
     !id(runId)||!id(attempt)||typeof emitReceipt!=='function')
   throw Error('CI_PUBLICATION_AUTO_POLICY_UNVERIFIED');
  const source=await getJson('pulls/'+policy.sourcePrNumber);
@@ -257,8 +386,14 @@ export async function publishConfiguredControllerApproval(event,{getJson,ports,p
  }
  if(!matched)return {state:'IGNORED',code:'CONFIGURED_SOURCE_EVENT_NOT_MATCHED',results:[]};
  try{
+  let selected={approvalPrNumber:policy.approvalPrNumber,ports};
+  if(typeof stageApprovalPr==='function'){
+   selected=await stageApprovalPr();
+   if(selected?.state!=='EXACT_APPROVAL_PR_READY'||!id(selected.approvalPrNumber)||
+      !selected.ports)throw Error('CI_APPROVAL_PR_PUBLICATION_UNVERIFIED');
+  }
   const result=await mergeAndSubmitPreparedControllerApproval({targetSha:policy.targetSha,
-   approvalPrNumber:policy.approvalPrNumber,runId,attempt},ports);
+   approvalPrNumber:selected.approvalPrNumber,runId,attempt},selected.ports);
   if(result.status==='REQUEST_READBACK_VERIFIED')emitReceipt(result.receiptMarker);
   const {receiptMarker,...safe}=result;
   return {state:'PUBLICATION_PROCESSED',results:[{targetSha:policy.targetSha,...safe}]};
@@ -278,7 +413,10 @@ export async function main({eventPath=process.env.GITHUB_EVENT_PATH,token=proces
    method,redirect:'error',signal:AbortSignal.timeout(15000),
    headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+token,'X-GitHub-Api-Version':'2022-11-28',...(body?{'Content-Type':'application/json'}:{})},
    ...(body?{body:JSON.stringify(body)}:{})});
-  if(!res.ok)throw Error(body?'CI_PUBLICATION_POST_FAILED':'READ_HTTP_FAILED');
+  if(!res.ok){
+   const error=Error(body?'CI_PUBLICATION_POST_FAILED':'READ_HTTP_FAILED');
+   error.status=res.status;throw error;
+  }
   return res.json();
  };
  const getJson=route=>github(route);
@@ -308,7 +446,20 @@ export async function main({eventPath=process.env.GITHUB_EVENT_PATH,token=proces
   const opts={getJson,ports,runId:Number(process.env.GITHUB_RUN_ID),
    attempt:Number(process.env.GITHUB_RUN_ATTEMPT),emitReceipt:marker=>console.log(marker)};
   if(policy){
-   const result=await publishConfiguredControllerApproval(event,{...opts,policy});
+   const stageApprovalPr=policy.installPlan?async()=>{
+    const prepared=createConfiguredSelectivePreparer({policy,getJson,readJobLogs});
+    const io=createControllerPrPublicationIo({getJson,github,targetSha:policy.targetSha});
+    const staged=await publishExactControllerApprovalPair({targetSha:policy.targetSha,
+     sourcePrNumber:policy.sourcePrNumber,sourceMainSha:policy.sourceMainSha,
+     prepare:prepared.prepare,io});
+    if(staged.state!=='EXACT_APPROVAL_PR_READY')return staged;
+    const readyPolicy={...policy,approvalPrNumber:staged.prNumber};
+    return {state:staged.state,approvalPrNumber:staged.prNumber,
+     ports:createControllerPublicationPorts({getJson,postIssue:body=>github('issues',body),
+      store,autoApprovalPolicy:readyPolicy,readJobLogs,
+      putMerge:(n,body)=>github('pulls/'+n+'/merge',body,'PUT')})};
+   }:undefined;
+   const result=await publishConfiguredControllerApproval(event,{...opts,policy,stageApprovalPr});
    if(result.state!=='IGNORED')return result;
   }
   if(eventName==='push')return publishExistingControllerApprovals(event,opts);
