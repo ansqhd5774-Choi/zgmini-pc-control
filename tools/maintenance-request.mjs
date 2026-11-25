@@ -108,6 +108,26 @@ export async function resolveControllerApprovalCI(approvalRef,{runId,readRun,lis
 // Controller request. Runs only through an independently authenticated owner
 // submitter; never use the PR runner token as owner or infer authority from CI.
 // The source approval and final PC-side CAS/effect claim remain unchanged.
+// Read an existing exact request before a CI retry with a missing local receipt.
+// Search can recover positive evidence, not prove absence or replace the atomic
+// receipt and receiver-side effect claim. Never turn a closed request into a retry.
+export async function recoverExistingCiRequest(expected,{findIssues,readIssue,saveReceipt}){
+ const request=requestOf(expected);
+ const candidates=await findIssues(request.requestId);
+ if(!Array.isArray(candidates))fail('MAINTENANCE_SEARCH_INCOMPLETE_NO_REPOST');
+ const matches=candidates.filter(x=>{
+  if(x?.pull_request||(x?.user?.login??x?.author?.login)!==CONTROL_ACTOR)return false;
+  try{return JSON.parse(x.body).requestId===request.requestId;}catch{return false;}
+ });
+ if(matches.length===0)return null;
+ if(matches.length!==1||matches[0].body!==expected.body||matches[0].title!==expected.title)
+  return {status:'STATE_UNKNOWN',code:'MAINTENANCE_EXISTING_REQUEST_CONFLICT',next:'READ_ORIGINAL_CREATION_STATE_NO_NEW_POST'};
+ const issueNumber=matches[0].number;
+ if(!Number.isSafeInteger(issueNumber)||issueNumber<=0)fail('MAINTENANCE_ISSUE_READBACK_TYPE_MISMATCH');
+ const verified=verifyMaintenanceIssue(expected,await readIssue(issueNumber),{allowClosed:true});
+ await saveReceipt({schema:'ZGMINI_MAINTENANCE_SUBMISSION_V1',phase:'READBACK_VERIFIED',expected,issueNumber},{exclusive:true});
+ return {...verified,recoveredExistingRequest:true};
+}
 export async function submitCiPreparedMaintenanceIssue(expected,{runId,readRun,listRuns,...ports}={}){
  if((runId!==undefined&&(!Number.isSafeInteger(runId)||runId<=0))||typeof readRun!=='function'||
     (runId===undefined&&typeof listRuns!=='function'))
@@ -117,6 +137,10 @@ export async function submitCiPreparedMaintenanceIssue(expected,{runId,readRun,l
  if((await ports.readIdentity())?.login!==CONTROL_ACTOR||
     (await ports.readRepository())?.private!==true)
   fail('MAINTENANCE_SUBMIT_IDENTITY_DENIED');
+ if(typeof ports.findIssues==='function'){
+  const existing=await recoverExistingCiRequest(snapshot,ports);
+  if(existing)return existing;
+ }
  const bytes=await ports.readManifest(request.targetControllerSha);
  if(!Buffer.isBuffer(bytes))fail('MAINTENANCE_REMOTE_MANIFEST_BYTES_MISSING');
  const {manifest}=validateUpdateRequest(request,bytes,{actor:CONTROL_ACTOR,installedSha:ports.installedSha});
@@ -181,15 +205,15 @@ export async function main(argv=process.argv.slice(2),{githubApi=github}={}){
   fs.writeFileSync(receiptPath,JSON.stringify(receipt,null,2)+'\n',{flag:exclusive?'wx':'w'});
  };
  const readIssue=n=>githubApi(`repos/${CONTROL_REPOSITORY}/issues/${n}`);
+ const findIssues=requestId=>{
+  const q=encodeURIComponent(`repo:${CONTROL_REPOSITORY} is:issue "${requestId}" in:body`);
+  const result=githubApi(`search/issues?q=${q}&per_page=100`);
+  if(result.incomplete_results||result.total_count>100||!Array.isArray(result.items))fail('MAINTENANCE_SEARCH_INCOMPLETE_NO_REPOST');
+  return result.items;
+ };
  if(mode==='reconcile'){
   if(!receiptPath)fail('MAINTENANCE_RECEIPT_PATH_REQUIRED');
-  return reconcileMaintenanceIssue(JSON.parse(fs.readFileSync(receiptPath,'utf8')),{
-   readIssue,saveReceipt,findIssues:requestId=>{
-    const q=encodeURIComponent(`repo:${CONTROL_REPOSITORY} is:issue "${requestId}" in:body`);
-    const result=githubApi(`search/issues?q=${q}&per_page=100`);
-    if(result.incomplete_results||result.total_count>100||!Array.isArray(result.items))fail('MAINTENANCE_SEARCH_INCOMPLETE_NO_REPOST');
-    return result.items;
-   }});
+  return reconcileMaintenanceIssue(JSON.parse(fs.readFileSync(receiptPath,'utf8')),{readIssue,saveReceipt,findIssues});
  }
  // Prefer immutable GitHub blob bytes to avoid Windows checkout CRLF drift.
  const readRemote=sha=>{
@@ -209,7 +233,7 @@ export async function main(argv=process.argv.slice(2),{githubApi=github}={}){
    readIdentity:()=>githubApi('user'),readRepository:()=>githubApi(`repos/${CONTROL_REPOSITORY}`),
    readManifest:readRemote,saveReceipt,readIssue,
    createIssue:e=>githubApi(`repos/${CONTROL_REPOSITORY}/issues`,{body:{title:e.title,labels:e.labels,body:e.body}})};
-  if(ci)return submitCiPreparedMaintenanceIssue(expected,{...ports,
+  if(ci)return submitCiPreparedMaintenanceIssue(expected,{...ports,findIssues,
    runId:o['--run-id']===undefined?undefined:Number(o['--run-id']),
    readApprovalPr:n=>githubApi(`repos/${CONTROL_REPOSITORY}/pulls/${n}`),
    listRuns:head=>githubApi(`repos/${CONTROL_REPOSITORY}/actions/workflows/416355595/runs?head_sha=${head}&event=pull_request&status=success&per_page=100`),
