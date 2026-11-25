@@ -1649,7 +1649,7 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
        requestId:issue.requestId,issueNumber:postIssueNumber,
        operation:manifest.postOperation,sourceBranch:manifest.postSourceBranch,
        sourceSha:manifest.postSourceSha,issue:liveIssue,runs,jobs});
-      if(linked.state==='UPLOAD_MISSING'&&selected&&Array.isArray(jobs)){
+      if(['UPLOAD_MISSING','RUNNING'].includes(linked.state)&&selected&&Array.isArray(jobs)){
        const matched=jobs.filter(j=>j.id===linked.jobId&&j.run_id===selected.id);
        const seat=Number(matched.length===1?
         matched[0].runner_name?.match(/^zgmini-pc-0([1-6])$/)?.[1]:null);
