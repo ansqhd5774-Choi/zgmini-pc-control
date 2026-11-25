@@ -539,7 +539,7 @@ test('independent recovery protection CAS stays strict at pre-pause and pre-swit
 });
 
 test('#3409 maintainer handoff V2 pins only existing-approved three-file delta',async()=>{
- const {requireHandoffApproval,approvedRuntimeChanges,handoffFilePlan}=
+ const {requireHandoffApproval,approvedRuntimeChanges,handoffFilePlan,nextRuntimeFiles}=
   await import('../tools/handoff-maintenance.mjs');
  const target='9a0378ffb96aa9f1403f74c189d3c39b30e4604e';
  const before='e34a20062e3ef3b77c78af0b4881c15609b36eb1';
@@ -558,8 +558,10 @@ test('#3409 maintainer handoff V2 pins only existing-approved three-file delta',
  assert.deepEqual(Object.keys(next.files),Object.keys(old.files));
  for(const hash of Object.values(next.files))assert.match(hash,/^[a-f0-9]{64}$/);
  const changed=['tools/maintenance-contract.mjs','tools/maintenance-agent.mjs','tools/update.mjs'];
- assert.deepEqual(approvedRuntimeChanges('SEVEN_TO_SEVEN',old.files,next.files),changed);
- assert.deepEqual(handoffFilePlan('SEVEN_TO_SEVEN',old.files,next.files).writes,changed);
+ const installedRuntime=Object.fromEntries(nextRuntimeFiles.map(path=>[path,old.files[path]]));
+ assert.equal(Object.keys(installedRuntime).length,7);
+ assert.deepEqual(approvedRuntimeChanges('SEVEN_TO_SEVEN',installedRuntime,next.files),changed);
+ assert.deepEqual(handoffFilePlan('SEVEN_TO_SEVEN',installedRuntime,next.files).writes,changed);
  assert.deepEqual(next.runtimeChangedFiles,changed);
  assert.throws(()=>requireHandoffApproval(next,target,'a'.repeat(40)),/HANDOFF_APPROVAL_REQUIRED/);
  assert.throws(()=>requireHandoffApproval({...next,approved:false},target,before),
