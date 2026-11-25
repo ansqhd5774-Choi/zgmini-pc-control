@@ -23,9 +23,11 @@ const jsonMutate=(bytes,mutate)=>{
  mutate(v);return Buffer.from(JSON.stringify(v));
 };
 
-test('exact #3516 Git objects produce source-only provenance, no recovery claim',()=>{
+test('exact #3516 Git bytes pass pure contract with separately verified ancestry',()=>{
  const original=fixture();
- git(['merge-base','--is-ancestor',FIXED.sourceSha,'HEAD']);
+ // C996's changed-source checkout may be shallow: this pure fixture supplies
+ // ancestry as a verified input. Only the isolated packet builder performs
+ // real merge-base with fetch-depth:0; never infer ancestor from source bytes.
  const result=validateRecoverySourcePacket(original);
  assert.equal(result.status,'SOURCE_PREPARED_ONLY');
  assert.equal(result.code,'IMMUTABLE_SOURCE_BYTES_CAS_COMPATIBLE');
