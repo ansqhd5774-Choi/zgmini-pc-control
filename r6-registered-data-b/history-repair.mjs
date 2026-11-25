@@ -81,7 +81,7 @@ async function nativeOpen(){const sqlite=await import('node:sqlite');
  const stat=fs.lstatSync(file);need(stat.isFile()&&!stat.isSymbolicLink(),'W04_REPAIR_CORE_FILE_STOP');
  return {db:new sqlite.DatabaseSync(file),backup:sqlite.backup,DatabaseSync:sqlite.DatabaseSync};
 }
-async function nativeSnapshot({db,backup,DatabaseSync,request}){
+async function nativeSnapshot({db,backup,DatabaseSync,request,inputs,approval}){
  const dir=path.join(home,'pit-evidence','history-repair-'+request.requestId);
  fs.mkdirSync(dir,{recursive:false});
  const file=path.join(dir,'CORE_BEFORE.sqlite');
@@ -89,16 +89,23 @@ async function nativeSnapshot({db,backup,DatabaseSync,request}){
  const copy=new DatabaseSync(file,{readOnly:true});
  try{const rows=copy.prepare('PRAGMA quick_check').all();
   need(rows.length===1&&Object.values(rows[0])[0]==='ok','W04_REPAIR_BACKUP_CHECK_STOP');
+  copy.exec('BEGIN');
+  try{const selected=inputs.preview(copy,inputs.receipt);
+   need(selected.eligible===approval.approvedCount&&selected.selectionSha256===approval.selectionSha256,
+    'W04_REPAIR_BACKUP_PREIMAGE_DRIFT');
+  }finally{copy.exec('ROLLBACK');}
  }finally{copy.close();}
  const stat=fs.statSync(file);
  need(stat.size>0,'W04_REPAIR_BACKUP_EMPTY');
- const journal=path.join(dir,'REPAIR_JOURNAL.json');
+ const backupFd=fs.openSync(file,'r+');
+ try{fs.fsyncSync(backupFd);}finally{fs.closeSync(backupFd);}
  const write=value=>{
-  const next=journal+'.tmp';
-  const fd=fs.openSync(next,'wx',0o600);
-  try{fs.writeFileSync(fd,JSON.stringify(value)+'\n');fs.fsyncSync(fd);}finally{fs.closeSync(fd);}
-  fs.renameSync(next,journal);
-  need(JSON.parse(fs.readFileSync(journal,'utf8')).phase===value.phase,'W04_REPAIR_JOURNAL_READBACK_STOP');
+  // Each phase is immutable, so a crash cannot replace the prior evidence.
+  const journal=path.join(dir,value.phase+'.json');
+  const bytes=JSON.stringify(value)+'\n';
+  const fd=fs.openSync(journal,'wx',0o600);
+  try{fs.writeFileSync(fd,bytes);fs.fsyncSync(fd);}finally{fs.closeSync(fd);}
+  need(fs.readFileSync(journal,'utf8')===bytes,'W04_REPAIR_JOURNAL_READBACK_STOP');
  };
  return {backupVerified:true,bytes:stat.size,write};
 }
@@ -106,6 +113,7 @@ async function nativeSnapshot({db,backup,DatabaseSync,request}){
 export async function performHistoryRepair({auth,acquire,claim,load=loadRegisteredRepairInputs,open=nativeOpen,snapshot=nativeSnapshot}={}){
  const {request,approval}=auth;
  const base={schema:'ZGMINI_R6_REGISTERED_DATA_B_RESULT_V1',requestId:request.requestId,
+ approvalManifestSha256:request.approvalManifestSha256,approvedCount:approval.approvedCount,
  sourceSha:approval.sourceSha,mode:HISTORY_REPAIR_MODE,providerRequests:0,blsRequests:0,dolRequests:0,groupResults:[],
  publication:'NOT_ATTEMPTED',sqlite:'UNVERIFIED',historicalVersionAttested:false,selectionSha256:approval.selectionSha256};
  let lock,handle,snap,claimed=false,claimStarted=false,committed=false,out;
@@ -117,7 +125,7 @@ export async function performHistoryRepair({auth,acquire,claim,load=loadRegister
   try{selected=inputs.preview(db,inputs.receipt);}finally{db.exec('ROLLBACK');}
   need(selected.eligible===approval.approvedCount&&selected.selectionSha256===approval.selectionSha256,'W04_REPAIR_SELECTION_DRIFT');
   need(lock.held(),'W04_REPAIR_LEASE_LOST');
-  snap=await snapshot({...handle,request});
+  snap=await snapshot({...handle,request,inputs,approval});
   need(snap.backupVerified===true&&lock.held(),'W04_REPAIR_BACKUP_OR_LEASE_STOP');
   const journal={requestId:request.requestId,approvalManifestSha256:request.approvalManifestSha256,
    selectionSha256:approval.selectionSha256,approvedCount:approval.approvedCount,backupBytes:snap.bytes};

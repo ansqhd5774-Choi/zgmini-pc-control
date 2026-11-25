@@ -471,6 +471,13 @@ export async function runR6RegisteredOnce({env=process.env}={}){
   sha(fs.readFileSync(path.join(controlRoot,...relative.split('/'))))===sha(approvalBytes),
   'R6_B_APPROVAL_WORKTREE_STOP');
  const parsedApproval=JSON.parse(approvalBytes.toString('utf8'));
+ // Fixed History-only mode reuses this lane and its exact owner event,
+ // shared Core lock and one-shot claim, not collection or publication.
+ if(parsedApproval?.schema==='ZGMINI_W04_HISTORY_REPAIR_B_APPROVAL_V1'){
+  const {authorizeHistoryRepair,performHistoryRepair}=await import('./history-repair.mjs');
+  const auth=authorizeHistoryRepair({event,env,approvalBytes});
+  return performHistoryRepair({auth,acquire:acquireCoreLockBounded,claim:claimOnce});
+ }
  // DOL-only manual collection has its own exact source/file/effect approval.
  // This branch never loads BLS overlay, BLS keys, publisher, or a scheduler.
  if(['ZGMINI_R6_DOL_MANUAL_B_APPROVAL_V1','ZGMINI_R6_DOL_MANUAL_B_APPROVAL_V2'].includes(parsedApproval?.schema)){
