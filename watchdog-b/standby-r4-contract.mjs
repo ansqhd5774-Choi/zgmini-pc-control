@@ -33,8 +33,9 @@ const approvalKeys=[
  'approvalBasis','revision','expectedControllerSha','expectedControllerFiles',
  'protectionPolicy','standby'
 ];
-export function verifyR4ControllerHost(host){
- if(!host||host.controllerSourceSha!==R4_TARGET||
+export function verifyR4ControllerHost(host,expectedControllerSha){
+ if(!hex40(expectedControllerSha)||!host||
+   host.controllerSourceSha!==expectedControllerSha||
    !host.controllerFiles||typeof host.controllerFiles!=='object'||
    Array.isArray(host.controllerFiles))throw error('WATCHDOG_R4_CONTROLLER_NOT_INSTALLED');
  for(const [file,digest] of Object.entries(R4_CONTROLLER_FILES)){
@@ -70,7 +71,7 @@ export function validateR4Request(
    approval.installedManifestSha256!==R4_INSTALL_PREIMAGE_SHA256||
    approval.fromScope!==FINAL_SCOPE||approval.toScope!==FINAL_SCOPE||
    approval.protectionPolicy!==PROTECTION_POLICY||
-   approval.expectedControllerSha!==R4_TARGET||
+   !hex40(approval.expectedControllerSha)||
    !exact(approval.expectedControllerFiles,Object.keys(R4_CONTROLLER_FILES))||
    Object.entries(R4_CONTROLLER_FILES).some(([p,v])=>approval.expectedControllerFiles[p]!==v)||
    !exact(approval.standby,['mode','approved'])||
@@ -86,11 +87,10 @@ export function validateR4Request(
    !hex64(installed.startupSha256)||!hex64(installed.priorStartupSha256)||
    installed.standby!==undefined)
   throw error('WATCHDOG_R4_INSTALLED_PREIMAGE_MISMATCH');
- if(!hex40(approval.expectedControllerSha))
-  throw error('WATCHDOG_R4_CONTROLLER_SHA_INVALID');
  return Object.freeze({requestId:body.requestId,issueNumber:event.issue.number,
   targetSha:R4_TARGET,oldSha:R4_PREIMAGE_SHA256,newSha:R4_SOURCE_SHA256,
-  oldManifestSha:R4_INSTALL_PREIMAGE_SHA256,expectedControllerSha:R4_TARGET});
+  oldManifestSha:R4_INSTALL_PREIMAGE_SHA256,
+  expectedControllerSha:approval.expectedControllerSha});
 }
 export function projectR4InstalledManifest(installed,plan,upgradedAt){
  if(!installed||plan?.targetSha!==R4_TARGET||
