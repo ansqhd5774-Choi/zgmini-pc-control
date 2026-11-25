@@ -323,6 +323,13 @@ export async function main(args=process.argv.slice(2)){
  }
  const {startupVbs,launchStartup}=await import(pathToFileURL(path.join(repo,'tools/bootstrap-maintenance.mjs')));
  const startupBytes=Buffer.from(startupVbs());
+ // Authorize the exact optional CI policy BEFORE stopping the receiver,
+ // creating backup/claim files, or replacing any maintainer executable.
+ // Reject malformed or unapproved policy without starting a B mutation.
+ const nextFiles=Object.fromEntries(nextRuntimeFiles.map(rel=>[rel,sha(bytes[rel])]));
+ const approvedCiPolicy=approvedHandoffCiPolicy(before,approval,{
+  ...before,sourceSha:target,startupSha256:sha(startupBytes),
+  files:nextFiles,capabilities:{cooperativeStop:true}});
  const record=root+'/handoff-'+target+'.json',backup=root+'/backups/handoff-'+target;
  need(!fs.existsSync(record)&&!fs.existsSync(backup),'HANDOFF_ALREADY_ATTEMPTED');
  const priorAlive=alive(priorOwner.pid);
@@ -390,8 +397,8 @@ export async function main(args=process.argv.slice(2)){
   for(const rel of nextRuntimeFiles)
    need(sha(fs.readFileSync(path.join(root,rel)))===sha(bytes[rel]),
     'HANDOFF_POSTWRITE_HASH_MISMATCH');
-  const manifest={...before,sourceSha:target,startupSha256:sha(startupBytes),files:Object.fromEntries(nextRuntimeFiles.map(p=>[p,sha(bytes[p])])),capabilities:{cooperativeStop:true},updatedAt:new Date().toISOString()};
-  const approvedCiPolicy=approvedHandoffCiPolicy(before,approval,manifest);
+  const manifest={...before,sourceSha:target,startupSha256:sha(startupBytes),
+   files:nextFiles,capabilities:{cooperativeStop:true},updatedAt:new Date().toISOString()};
   if(approvedCiPolicy!==undefined)manifest.ciControllerBPolicy=approvedCiPolicy;
   fs.writeFileSync(root+'/MAINTENANCE_INSTALL.json',JSON.stringify(manifest,null,2)+'\n');
   if(mode===sevenToSeven)
