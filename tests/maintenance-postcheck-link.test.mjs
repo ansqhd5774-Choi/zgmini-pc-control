@@ -1,0 +1,72 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {classifyMaintenancePostcheckLink as classify} from '../tools/maintenance-contract.mjs';
+
+const id='pc-update-11111111-1111-4111-8111-111111111111';
+const source='a'.repeat(40);
+const created='2026-11-25T01:00:00Z';
+const issue=()=>({number:42,title:`PC Update ${id} postcheck`,
+ user:{login:'ansqhd5774-Choi'},created_at:created,
+ labels:[{name:'pc-job'}],
+ body:JSON.stringify({schema:'ZGMINI_PC_JOB_V1',
+  requestId:id+'-postcheck',chatId:'chat-test',operation:'core-status',
+  sourceRepository:'ansqhd5774-Choi/zgmini',sourceBranch:'main',sourceSha:source})});
+const run=(overrides={})=>({id:777,event:'issues',name:'ZGMINI PC Job',
+ display_title:`PC Update ${id} postcheck`,created_at:'2026-11-25T01:00:02Z',
+ status:'completed',conclusion:'success',...overrides});
+const job=(overrides={})=>({id:888,run_id:777,name:'approved-pc-job',
+ status:'completed',conclusion:'success',steps:[
+  {name:'Execute fixed host allowlist entry',conclusion:'success'},
+  {name:'Upload sanitized TXT JSON and issue result',conclusion:'success'}],
+ ...overrides});
+const obs=(overrides={})=>({requestId:id,issueNumber:42,operation:'core-status',
+ sourceSha:source,issue:issue(),runs:[run()],jobs:[job()],...overrides});
+const result=(arg)=>classify(obs(arg));
+
+test('no Run is observed as NO_RUN, not failed installation or synthetic PASS',()=>{
+ assert.equal(result({runs:[],jobs:null}).state,'NO_RUN');
+ assert.equal(result({runs:[],jobs:null}).next,'CHECK_EVENT_AND_WORKFLOW_CONTRACT_NO_REPOST');
+});
+
+test('a nonmatching Run or a Run predating the Issue is never attached',()=>{
+ for(const r of [run({display_title:'same title for another request'}),
+  run({event:'push'}),run({created_at:'2026-11-24T23:59:59Z'})]){
+  assert.equal(result({runs:[r],jobs:null}).state,'NO_RUN');
+ }
+ assert.equal(result({runs:[run(),run({id:999})],jobs:null}).code,
+  'POSTCHECK_RUN_IDENTITY_AMBIGUOUS');
+});
+
+test('unverified Issue identity never produces NO_RUN',()=>{
+ const changed=issue();changed.body=JSON.stringify({...JSON.parse(changed.body),sourceSha:'b'.repeat(40)});
+ assert.equal(result({issue:changed,runs:[]}).state,'STATE_UNKNOWN');
+ assert.equal(result({issue:{...issue(),labels:[]},runs:[]}).state,'STATE_UNKNOWN');
+ assert.equal(result({runs:null}).state,'STATE_UNKNOWN');
+});
+
+test('Run gate skipped, Runner queue, and active job stay separate',()=>{
+ assert.equal(result({runs:[run({status:'queued',conclusion:null})],jobs:null}).state,'RUNNER_QUEUE');
+ assert.equal(result({jobs:[job({status:'queued',conclusion:null})]}).state,'RUNNER_QUEUE');
+ assert.equal(result({jobs:[job({status:'in_progress',conclusion:null})]}).state,'RUNNING');
+ assert.equal(result({jobs:[job({status:'completed',conclusion:'skipped'})]}).state,'SKIPPED_GATE');
+});
+
+test('entry step failure is not mislabeled upload-only failure',()=>{
+ assert.equal(result({jobs:[job({conclusion:'failure',steps:[
+  {name:'Execute fixed host allowlist entry',conclusion:'failure'}]})]}).state,
+ 'ENTRY_REJECT');
+});
+
+test('successful entry without receipt is UPLOAD_MISSING; do not rerun',()=>{
+ const v=result({});
+ assert.equal(v.state,'UPLOAD_MISSING');
+ assert.equal(v.next,'RECOVER_EXISTING_LOCAL_RECEIPT_NO_REEXECUTION');
+ assert.equal(v.runId,777);
+ assert.equal(v.jobId,888);
+});
+
+test('missing or wrong job evidence is unknown, not fabricated success',()=>{
+ assert.equal(result({jobs:null}).state,'STATE_UNKNOWN');
+ assert.equal(result({jobs:[job({name:'other-job'})]}).state,'STATE_UNKNOWN');
+ assert.equal(result({jobs:[job({run_id:999})]}).state,'STATE_UNKNOWN');
+});
