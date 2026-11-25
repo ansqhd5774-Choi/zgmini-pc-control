@@ -171,7 +171,8 @@ test('submission workflow is activation-gated, source-event driven and pinned to
  assert.match(y,/vars\.ZGMINI_CI_CONTROLLER_B_POLICY != ''/);
  assert.match(y,/ZGMINI_CI_CONTROLLER_B_POLICY: \$\{\{ vars\.ZGMINI_CI_CONTROLLER_B_POLICY \}\}/);
  assert.match(y,/contents: write/);
- assert.doesNotMatch(y,/id-token: write|administration: write|pull-requests: write|persist-credentials: true/);
+ assert.match(y,/pull-requests: write/);
+ assert.doesNotMatch(y,/id-token: write|administration: write|persist-credentials: true/);
 });
 
 test('configured auto approval context binds initial grant and exact PR scope',async()=>{
