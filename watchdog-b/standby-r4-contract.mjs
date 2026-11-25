@@ -45,7 +45,7 @@ export function verifyR4ControllerHost(host){
  return true;
 }
 export function validateR4Request(
- event,body,approval,installed,sourceDigest,approvalDigest,installedManifestBytes
+ event,body,approval,installed,sourceDigest,approvalDigest,installedManifestDigest
 ){
  if(event?.action!=='opened'||event?.repository?.full_name!==REPO||
    event.repository.private!==true||event?.sender?.login!=='ansqhd5774-Choi'||
@@ -80,8 +80,7 @@ export function validateR4Request(
    !hex64(approvalDigest)||approvalDigest!==body.approvalManifestSha256||
    sourceDigest!==R4_SOURCE_SHA256)
   throw error('WATCHDOG_R4_APPROVAL_OR_SOURCE_MISMATCH');
- if(!Buffer.isBuffer(installedManifestBytes)||
-   rawSha256(installedManifestBytes)!==R4_INSTALL_PREIMAGE_SHA256||
+ if(installedManifestDigest!==R4_INSTALL_PREIMAGE_SHA256||
    !installed||installed.sha256!==R4_PREIMAGE_SHA256||
    installed.scope!==FINAL_SCOPE||installed.approvedTargetSourceSha!==NEXT_TARGET||
    !hex64(installed.startupSha256)||!hex64(installed.priorStartupSha256)||
