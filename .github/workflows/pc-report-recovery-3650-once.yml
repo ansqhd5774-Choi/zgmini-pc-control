@@ -1,0 +1,30 @@
+name: ZGMINI #3650 Original Report Upload Recovery Once
+on:
+  issue_comment:
+    types: [created]
+permissions:
+  contents: write
+  issues: write
+concurrency:
+  group: zgmini-report-recovery-3650
+  cancel-in-progress: false
+jobs:
+  upload-original-only:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.issue.number == 3650 &&
+      github.event.issue.pull_request == null &&
+      github.event.comment.user.login == 'ansqhd5774-Choi' &&
+      github.event.comment.body == '/zgmini-recover-3650-once'
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Recover existing report only; never invoke A entry
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "E:\ZGmini\automation\pc-control\controller\report-recovery-3650-once.mjs"'
