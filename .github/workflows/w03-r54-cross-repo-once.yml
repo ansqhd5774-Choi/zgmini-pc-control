@@ -5,6 +5,11 @@ on:
       - codex/w03-r54-crossrepo-contract-20261125
     paths:
       - .github/workflows/w03-r54-cross-repo-once.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/w03-r54-cross-repo-once.yml
   workflow_dispatch:
 permissions:
   contents: read
