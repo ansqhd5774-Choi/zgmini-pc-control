@@ -217,8 +217,8 @@ test('missing failed-job identity is refused before incident writes',async()=>{
 });
 
 test('PC isolated C996 and Secret Scan retain independent checks after unrelated failed steps',()=>{
- const c996=readFileSync(new URL('../.github/workflows/c996-r5-readonly-source-checks.yml',import.meta.url),'utf8');
- const secret=readFileSync(new URL('../.github/workflows/pc-secret-scan.yml',import.meta.url),'utf8');
+ const c996=readFileSync(new URL('../.github/workflows/c996-r5-readonly-source-checks.yml',import.meta.url),'utf8').replace(/\r\n/g,'\n');
+ const secret=readFileSync(new URL('../.github/workflows/pc-secret-scan.yml',import.meta.url),'utf8').replace(/\r\n/g,'\n');
  for(const [yml,names,guard] of [
   [c996,['Validate pinned workflow security scanner',
    'Audit changed GitHub Actions workflow security'],
