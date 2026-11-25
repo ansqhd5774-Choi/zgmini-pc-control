@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 
-const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
+const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8').replace(/\r\n/g,'\n');
 const operational=read('.github/workflows/pc-er1-dec31-symbol-batch-a.yml');
 const offline=read('.github/workflows/pc-er1-dec31-symbol-pair-contract-tests.yml');
 
