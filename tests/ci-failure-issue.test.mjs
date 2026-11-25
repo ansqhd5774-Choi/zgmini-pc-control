@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {REPO,WORKFLOWS,triage,markerFor,caseKeyFor} from '../scripts/ci-failure-issue.mjs';
+import {REPO,WORKFLOWS,triage,markerFor,caseKeyFor,recurrenceCandidates} from '../scripts/ci-failure-issue.mjs';
 
 const event=(overrides={})=>({
  action:'completed',repository:{full_name:REPO,private:true},
@@ -312,4 +312,64 @@ test('comment acknowledgement requires an exact remote receipt readback',async()
  };
  await assert.rejects(triage({event:event(),request}),/CI_INCIDENT_ISSUE_COMMENT_READBACK/);
  assert.equal(posts,1);
+});
+
+test('historical closed CI candidates require exact workflow, job, step and are capped',()=>{
+ const data=[
+  {number:100,body:'**CI 실패 관측**\n- Workflow: CI-A\n- Job: test\n- Step: regression'},
+  {number:101,body:'**CI 실패 관측**\n- Workflow: CI-A\n- Job: test\n- Step: regression'},
+  {number:102,body:'**CI 실패 관측**\n- Workflow: CI-A\n- Job: test\n- Step: regression'},
+  {number:103,body:'**CI 실패 관측**\n- Workflow: CI-A\n- Job: test\n- Step: regression'},
+  {number:104,body:'**CI 실패 관측**\n- Workflow: CI-A\n- Job: test\n- Step: different'},
+  {number:105,pull_request:{url:'pr'},body:'**CI 실패 관측**\n- Workflow: CI-A\n- Job: test\n- Step: regression'}
+ ];
+ assert.deepEqual(recurrenceCandidates(data,{workflow:'CI-A',job:'test',step:'regression'}),[100,101,102]);
+ assert.deepEqual(recurrenceCandidates(data,{workflow:'CI-A',job:'test',step:'different'}),[104]);
+ assert.deepEqual(recurrenceCandidates(data,{workflow:'CI-A',job:'other',step:'regression'}),[]);
+});
+test('new CI failure lists previously closed matching step as candidate without claiming same cause',async()=>{
+ const calls=[];
+ const issueBody='**CI 실패 관측 (원인 미확정, 실행별 독립 사건)**\n'+
+  '- Workflow: '+WORKFLOWS[0]+'\n- Job: source-check\n- Step: Regression tests';
+ let created;
+ const request=async(resource,{method='GET',body}={})=>{
+  calls.push({resource,method});
+  if(resource==='actions/runs/123456/attempts/1/jobs?per_page=100')
+   return {total_count:1,jobs:[failureJob]};
+  if(resource==='issues?state=open&per_page=100&page=1')return [];
+  if(resource==='issues?state=closed&per_page=100&page=1')
+   return [{number:5000,body:issueBody},
+    {number:5001,body:issueBody.replace('Regression tests','another failure')}];
+  if(resource==='issues'&&method==='POST'){
+   created={number:6200,body:body.body};return created;
+  }
+  if(resource==='issues/6200')return created;
+  throw Error('unexpected route '+resource);
+ };
+ const result=await triage({event:event(),request});
+ assert.deepEqual(result,{state:'CREATED',issue:6200});
+ assert.match(created.body,/이전 종결 CI 관측 후보.*#5000/);
+ assert.doesNotMatch(created.body,/#5001/);
+ assert.match(created.body,/재발 판정: 미확인/);
+ assert.equal(calls.filter(x=>x.method==='POST').length,1);
+});
+test('closed issue read failure does not block original incident submission or assert no recurrence',async()=>{
+ const calls=[];
+ let created;
+ const request=async(resource,{method='GET',body}={})=>{
+  calls.push({resource,method});
+  if(resource==='actions/runs/123456/attempts/1/jobs?per_page=100')
+   return {total_count:1,jobs:[failureJob]};
+  if(resource==='issues?state=open&per_page=100&page=1')return [];
+  if(resource.startsWith('issues?state=closed'))throw Error('403 read-only candidate lookup');
+  if(resource==='issues'&&method==='POST'){
+   created={number:6200,body:body.body};return created;
+  }
+  if(resource==='issues/6200')return created;
+  throw Error('unexpected route '+resource);
+ };
+ assert.deepEqual(await triage({event:event(),request}),{state:'CREATED',issue:6200});
+ assert.match(created.body,/HISTORY_UNAVAILABLE/);
+ assert.match(created.body,/재발 판정: 미확인/);
+ assert.equal(calls.filter(x=>x.method==='POST').length,1);
 });
