@@ -637,7 +637,9 @@ test('#3650 after uploader: exact original report recovery B is single-file and 
  assert.equal(manifest.selectiveSource.mainSha,sourceMain);
  assert.deepEqual(manifest.selectiveSource.customPaths,[]);
  assert.deepEqual(manifest.allowFiles.map(x=>x.path),[file]);
- assert.equal(manifest.allowFiles[0].sha256,digest(fs.readFileSync(new URL('../'+file,import.meta.url))));
+ // The earlier B targets immutable historic bytes, not a later corrected source.
+ // A source identity fix must never silently inherit that older B approval.
+ assert.notEqual(manifest.allowFiles[0].sha256,digest(fs.readFileSync(new URL('../'+file,import.meta.url))));
  assert.equal(manifest.allowFiles[0].sha256,'e3fa9bed3230cafb43c98942e2708c83d2796d4b264ef38345354217cfd04eed');
  assert.equal(manifest.checks.targetSha,target);
  assert.equal(manifest.checks.status,'PASS');
