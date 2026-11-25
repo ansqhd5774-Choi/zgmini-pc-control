@@ -52,13 +52,34 @@
 
 | 항목 | 계획 작성 | 원인·fixture 재현 | 수정 필요 판정 | 구현·검증·병합 |
 |---|---|---|---|---|
-| #23 | 완료 | 미착수 | 미판정 | 미착수 |
-| #25 | 완료 | 미착수 | 미판정 | 미착수 |
+| #23 | 완료 | 기존 정상·오류 fixture 확인 | **DONE_NO_CHANGE** — 관측형 계약 의도 확인 | 기존 Run 성공 재사용, 코드 수정 없음 |
+| #25 | 완료 | 기존 incomplete·violation fixture 확인 | **확인 중** — 관측형 보고는 정합, 실제 미확정 규칙 원인 추가 분류 | 코드 수정 없음, 기존 Run 성공 재사용 |
 | #1 | 완료 | 미착수 | 미판정 | 미착수 |
-| #19 | 완료 | 미착수 | 미판정 | 미착수 |
+| #19 | 완료 | 전체 최근 100건 혼잡 조건 및 회귀시험 작성 | **수정 필요** — 대상 실행 누락 위험 확인 | [PC PR #3721](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3721) 생성, 정확 HEAD CI 검증 진행 |
 | #29 | 완료 | 미착수 | 미판정 | 미착수 |
 | #12 | 완료 | 미착수 | 미판정 | 미착수 |
 
-**계획 수립: 6/6**, **후속 구현·검증 완료: 0/6**. 기존 CI 도입 완료 19/19를 감소시키지 않는다. 사용자가 요청하지 않은 새 예약 검증을 후속 개선 완료조건으로 추가하지 않는다.
+**계획 수립: 6/6**, **후속 판정·필수 검증 완료: 1/6 (#23, DONE_NO_CHANGE)**, **수정 PR 진행: 1/6 (#19)**. 기존 CI 도입 완료 19/19를 감소시키지 않는다. 사용자가 요청하지 않은 새 예약 검증을 후속 개선 완료조건으로 추가하지 않는다.
 
 **첫 실행 대상:** #23의 `finalizeCrossBrowser`에 `javascriptErrors=1`을 주입한 기존 계약 테스트와 현재 요구된 합격 조건을 비교한다. 결과가 관측-only 정책과 일치하면 차단 추가 없이 `DONE_NO_CHANGE` 또는 별도 결정 필요로 처리하고 다음 독립 후보를 진행한다.
+
+## 6. 후속 실제 실행 증거 — 2026-11-26
+
+### #23 Cross-browser — DONE_NO_CHANGE
+
+- [현행 `scripts/ci-cross-browser-core.mjs`](https://github.com/ansqhd5774-Choi/zgmini/blob/main/scripts/ci-cross-browser-core.mjs)의 `finalizeCrossBrowser`는 **8조합 정확성·문서 응답·메인 영역·측정 형식**을 검증하고 JS 오류와 가로 넘침은 관측 수치로 기록한다. `baselineStatus=NOT_APPROVED`는 승인되지 않은 실패 임계값이 없음을 명시한다.
+- [기존 `tests/ci-cross-browser-core.test.mjs`](https://github.com/ansqhd5774-Choi/zgmini/blob/main/tests/ci-cross-browser-core.test.mjs)는 `overflowPx=14`, `javascriptErrors=2` 오류 주입을 **의도된 관측값**으로 보존하는 사례, 결손·중복·비정상 형식을 거부하는 사례를 이미 포함한다. 계획서 요구의 1건 JS 오류 가설을 더 강한 2건 fixture로 구분했다.
+- [기존 브라우저 성공 Run #45688120760](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45688120760)의 Firefox/WebKit 8조합에서 JS 오류 0·가로 넘침 0과 정확 Job 단계 성공을 확인했다.
+- **판정:** 실제 결함 미입증, 기존 사용자가 승인한 관측형 정책과 일치. 신규 오류 실패 Gate/임계값을 임의 도입하지 않고 **코드 수정 없이 종료**. 추가 수정은 별도 정책 결정 대상이며 이번 범위에 강제하지 않는다.
+
+### #25 Accessibility — 관측 정합·실제 미확정 규칙은 분리
+
+- [현행 `tests/ci-accessibility-axe.test.mjs`](https://github.com/ansqhd5774-Choi/zgmini/blob/main/tests/ci-accessibility-axe.test.mjs)는 `incomplete`를 `passes`와 구분해 `unverifiedRules`로 보존하고, 명시 위반과 개인정보 노출 방지·비정상 입력 거부를 검증한다.
+- [브라우저 Run #45688120760](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45688120760) 로그는 두 뷰포트에서 각각 **`violatedRules=0`, `unverifiedRules=1`**로 기록한다. 이는 전체 접근성 통과가 아니라 **현재 미확정 결과가 남아 있음**을 의미한다. 기존 보고 경로 자체의 결함은 재현되지 않아 새 Gate를 추가하지 않았다.
+- **미확인:** 실제 `incomplete` 규칙 ID 및 원인별 수리 필요 여부. 기존 브라우저 아티팩트의 제한된 요약부터 확인하고 실제 UI 결함과 단순 자동 검증 한계를 구분한다. #23 완료 판정과 섞지 않는다.
+
+### #19 CI Observability — 수정 PR 진행
+
+- [PC `scripts/ci-job-metrics.mjs`](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/scripts/ci-job-metrics.mjs)는 저장소 전체 최근 `actions/runs?per_page=100`을 읽은 후 Workflow 이름을 선별했다. 격리 PC 제어 저장소에서 인계/관제 실행이 다량 섞인 실제 첫 페이지를 확인했고, **실제 대상 실행이 101번째 이후일 때 빈 결과가 되는 조건**을 가설로 분리했다. 현재 관측에서 모든 대상이 누락됐다는 주장은 아니다.
+- [별도 최신 main 기반 PR #3721](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3721): 기존 공식 GET으로 Workflow 이름→고유 ID를 검증한 뒤 해당 Workflow 실행 100건을 조회하도록 최소 수정. 인벤토리 누락·동명·잘못된 ID·대상 외 실행은 fail-closed. 관련 시험 11건으로 회귀 확장. **정확 HEAD CI 미확정 단계이므로 완료로 계산하지 않는다.**
+- 새로운 Runner·예약·소스 설치·운영 데이터/권한·요금제 변경 없음.
