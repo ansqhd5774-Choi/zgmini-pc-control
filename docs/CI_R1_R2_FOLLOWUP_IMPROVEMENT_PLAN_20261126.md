@@ -57,9 +57,9 @@
 | #1 | 완료 | 실제 홈·레이아웃 공유 파일 7개 트리거 누락 확인 | **수정 필요** — 직접 UI 의존 경로 누락 | [웹 PR #1635](https://github.com/ansqhd5774-Choi/zgmini/pull/1635), 정확 HEAD CI 진행 |
 | #19 | 완료 | 전체 최근 100건 혼잡 조건 및 회귀시험 작성 | **DONE_FIXED** — Workflow별 범위 조회로 교정 | [PC PR #3721](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3721) CI 2/2·Node 회귀 11/11 PASS, main 병합 `9d8dcf906c938c41f6acde6f1ad4288652bcd890` |
 | #29 | 완료 | 미착수 | 미판정 | 미착수 |
-| #12 | 완료 | 미착수 | 미판정 | 미착수 |
+| #12 | 완료 | 변경 YAML 1파일 actionlint 실행·기존 경로 회귀 사용 확인 | **DONE_NO_CHANGE** — 현재 계약 검사 정합 | 웹 PR #1635 Node CI PASS, Browser CI 별도 확인 중; 신규 Governance 기능 없음 |
 
-**계획 수립: 6/6**, **후속 판정·필수 검증 완료: 2/6 (#23 DONE_NO_CHANGE, #19 DONE_FIXED)**, **수정 PR 진행: 1/6 (#1)**. 기존 CI 도입 완료 19/19를 감소시키지 않는다. 사용자가 요청하지 않은 새 예약 검증을 후속 개선 완료조건으로 추가하지 않는다.
+**계획 수립: 6/6**, **후속 판정·필수 검증 완료: 3/6 (#23 DONE_NO_CHANGE, #19 DONE_FIXED, #12 DONE_NO_CHANGE)**, **수정 PR 진행: 1/6 (#1)**. 기존 CI 도입 완료 19/19를 감소시키지 않는다. 사용자가 요청하지 않은 새 예약 검증을 후속 개선 완료조건으로 추가하지 않는다.
 
 **첫 실행 대상:** #23의 `finalizeCrossBrowser`에 `javascriptErrors=1`을 주입한 기존 계약 테스트와 현재 요구된 합격 조건을 비교한다. 결과가 관측-only 정책과 일치하면 차단 추가 없이 `DONE_NO_CHANGE` 또는 별도 결정 필요로 처리하고 다음 독립 후보를 진행한다.
 
@@ -89,3 +89,9 @@
 - 최신 웹 `main` `app/page.tsx`, `app/dashboard-ui.tsx`, `app/layout.tsx`, `app/about/page.tsx`의 **실존하는 직접 import**와 [`community-chat-browser.yml`](https://github.com/ansqhd5774-Choi/zgmini/blob/main/.github/workflows/community-chat-browser.yml)의 `pull_request.paths`를 비교. `components/site-header.tsx`, `components/site-footer.tsx`, `components/dashboard-side-rails.tsx`, `components/live-score-value.tsx`, `components/score-arrow-provider.tsx`, `app/responsive.css`, `app/about/about.module.css`는 실제 파일이면서 브라우저 트리거 목록에서 빠져 있었음.
 - [웹 PR #1635](https://github.com/ansqhd5774-Choi/zgmini/pull/1635): 기존 Workflow 경로 7개 추가와 `tests/browser-ci-trigger-scope.test.mjs`의 직접 의존 경로 회귀만 변경. **새 Workflow·전역 Gate·#8 성능예산 재도입 없음**.
 - 검증: 정확 HEAD `6b2df32e8e68f14ae8c7329040f0e450b643b97a`의 Node/Browser/CodeQL/Secret 실제 CI 완료 후 합격 판정·병합 여부를 갱신. 지금 단계는 **RUNNING**, 완료로 계산하지 않음.
+
+### #12 Workflow Governance — 기존 검사 재사용으로 DONE_NO_CHANGE
+
+- [웹 PR #1635](https://github.com/ansqhd5774-Choi/zgmini/pull/1635)에서는 기존 Workflow YAML 1파일의 경로만 변경. 정확 HEAD `6b2df32e8e68f14ae8c7329040f0e450b643b97a` [Node CI #45694551850](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45694551850)의 `Validate changed GitHub Actions YAML (actionlint)` 단계가 성공했고 로그 `ACTIONLINT_CHANGED_WORKFLOWS=1`을 확인.
+- 기존 `tests/browser-ci-trigger-scope.test.mjs`에 직접 의존 경로 7건을 추가해 YAML 형식 검사와 실제 트리거 누락 검사를 **서로 다른 조건**으로 분리했다. #12의 누락을 입증한 추가 오류는 없으므로 신규 Governance Workflow나 전역 검사를 추가하지 않고 **DONE_NO_CHANGE**.
+- 브라우저 CI 성공은 #1 PR 최종 검증으로 별도 확인한다.
