@@ -8,6 +8,7 @@ on:
       - 'tests/ci-approval-contract-adapter.test.mjs'
       - 'tests/ci-approval-github-ci-evidence.test.mjs'
       - 'tests/ci-approval-approval-source-integrity.test.mjs'
+      - 'tests/ci-approval-pinned-manifest-scope.test.mjs'
       - 'controller/common.mjs'
       - 'controller/entry.mjs'
       - 'controller/upload.mjs'
@@ -260,6 +261,9 @@ jobs:
       - name: Verify approval source integrity without authority issuance
         if: hashFiles('ci-approval/approval-source-integrity.mjs', 'tests/ci-approval-approval-source-integrity.test.mjs') != ''
         run: node --test --test-concurrency=1 tests/ci-approval-approval-source-integrity.test.mjs
+      - name: Verify exact pinned manifest effect scope without issuance
+        if: hashFiles('ci-approval/pinned-manifest-scope.mjs', 'tests/ci-approval-pinned-manifest-scope.test.mjs') != ''
+        run: node --test --test-concurrency=1 tests/ci-approval-pinned-manifest-scope.test.mjs
       - name: Verify W05 independent operator receipt without operational access
         # Historical PR integration trees can predate this W05 fixture.
         # Test it whenever it is present; do not fail unrelated older heads.
