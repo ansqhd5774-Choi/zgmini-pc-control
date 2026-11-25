@@ -1,6 +1,7 @@
 // Operator-only in-place update of a demonstrably stopped maintenance receiver.
 // No Runner job, process kill, lock deletion, Core, SQLite or D1 mutation.
 import fs from 'node:fs';import path from 'node:path';import {createHash,randomUUID} from 'node:crypto';
+import {installedControllerBPolicy} from './maintenance-contract.mjs';
 import {execFileSync} from 'node:child_process';import {fileURLToPath,pathToFileURL} from 'node:url';
 const root='E:/ZGmini/automation/pc-maintenance';
 const repo=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -62,6 +63,27 @@ export function approvedRuntimeChanges(mode,installedFiles,approvedFiles){
  const changes=nextRuntimeFiles.filter(rel=>installedFiles[rel]!==approvedFiles[rel]);
  need(changes.length>0,'HANDOFF_NO_RUNTIME_CHANGE');
  return changes;
+}
+// CI authentication is NOT activated by source merging. It is installed
+// only when the independent Windows handoff is itself approved for this
+// exact installed->target transition and explicitly carries the fixed
+// workload pin. The old manifest is part of the existing byte-for-byte
+// rollback snapshot; no environment or caller event can mutate this field.
+export function approvedHandoffCiPolicy(before,approval,nextManifest){
+ if(!Object.hasOwn(approval??{},'ciControllerBPolicy'))
+  return before?.ciControllerBPolicy;
+ need(approval?.schema==='ZGMINI_MAINTENANCE_HANDOFF_V2'&&
+    approval.transition==='SEVEN_TO_SEVEN'&&approval.approved===true&&
+    approval.installedSha===before?.sourceSha&&
+    approval.targetSha===nextManifest?.sourceSha&&
+    approval.targetSha!==approval.installedSha,
+   'HANDOFF_CI_POLICY_APPROVAL_REQUIRED');
+ const policy=approval.ciControllerBPolicy;
+ try{
+  const verified=installedControllerBPolicy({...nextManifest,ciControllerBPolicy:policy});
+  need(verified!==null,'HANDOFF_CI_POLICY_INVALID');
+ }catch{need(false,'HANDOFF_CI_POLICY_INVALID');}
+ return structuredClone(policy);
 }
 export function handoffFilePlan(mode,installedFiles,approvedFiles){
  const changes=approvedRuntimeChanges(mode,installedFiles,approvedFiles);
@@ -369,6 +391,8 @@ export async function main(args=process.argv.slice(2)){
    need(sha(fs.readFileSync(path.join(root,rel)))===sha(bytes[rel]),
     'HANDOFF_POSTWRITE_HASH_MISMATCH');
   const manifest={...before,sourceSha:target,startupSha256:sha(startupBytes),files:Object.fromEntries(nextRuntimeFiles.map(p=>[p,sha(bytes[p])])),capabilities:{cooperativeStop:true},updatedAt:new Date().toISOString()};
+  const approvedCiPolicy=approvedHandoffCiPolicy(before,approval,manifest);
+  if(approvedCiPolicy!==undefined)manifest.ciControllerBPolicy=approvedCiPolicy;
   fs.writeFileSync(root+'/MAINTENANCE_INSTALL.json',JSON.stringify(manifest,null,2)+'\n');
   if(mode===sevenToSeven)
    requireDirectInstalledFiles(path.dirname(startup),[path.basename(startup)]);
