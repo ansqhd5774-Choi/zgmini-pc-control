@@ -5,3 +5,5 @@ approvals/maintenance-recoveries/*.json text eol=lf
 approvals/w03-r179-guard/*.json text eol=lf
 approvals/source-bundles/manifests/42a1c46c0c973fb859f4050a77d781a026acc6c7.json text eol=lf
 approvals/sidecar-b/*.json text eol=lf
+approvals/controller-updates/90f2bdca223ebb6b031d60b28bcd879f72bae2ff.json text eol=lf
+approvals/controller-selective-targets/90f2bdca223ebb6b031d60b28bcd879f72bae2ff.json text eol=lf

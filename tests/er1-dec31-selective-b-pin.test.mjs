@@ -1,3 +1,4 @@
+import {execFileSync} from 'node:child_process';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -85,4 +86,38 @@ test('source or approval hash tampering cannot authorize B',()=>{
  assert.throws(()=>validateUpdateRequest(issue,raw,
   {actor:'ansqhd5774-Choi',installedSha:'0'.repeat(40)}),/UPDATE_INSTALLED_SOURCE_DRIFT/);
  assert.notEqual(manifest.installedSha,manifest.targetSha);
+});
+
+const exactApprovalPaths=Object.freeze([
+ 'approvals/controller-updates/90f2bdca223ebb6b031d60b28bcd879f72bae2ff.json',
+ 'approvals/controller-selective-targets/90f2bdca223ebb6b031d60b28bcd879f72bae2ff.json',
+]);
+const approvedRawManifestSha256=
+ '01e0b9231a9fbf222602635f879a136a8c827f2de5cea613246afc54b43bcbac';
+
+test('exact December B Git blob bytes retain LF independently of reused Windows worktrees',()=>{
+ const attrs=fs.readFileSync(path.join(root,'.gitattributes'),'utf8');
+ const rules=attrs.split(/\r?\n/);
+ for(const pathname of exactApprovalPaths){
+  assert.ok(rules.includes(pathname+' text eol=lf'),
+   'missing exact LF checkout attribute for '+pathname);
+  // B approval hashes are pinned to the immutable raw Git object, not the
+  // mutable Windows checkout, which may predate a changed .gitattributes.
+  const gitBytes=execFileSync('git',['show','HEAD:'+pathname],
+   {cwd:root,encoding:'buffer',maxBuffer:2_000_000});
+  assert.equal(gitBytes.includes(Buffer.from('\r\n')),false,
+   'approved Git blob cannot contain CRLF');
+  assert.equal(gitBytes.at(-1),10,'Git object ends with LF');
+  const checkout=fs.readFileSync(path.join(root,pathname));
+  if(checkout.includes(Buffer.from('\r\n')))
+   assert.notEqual(digest(checkout),digest(gitBytes),
+    'transformed worktree must never be treated as approval pin');
+ }
+ const manifest=execFileSync('git',['show','HEAD:'+exactApprovalPaths[0]],
+  {cwd:root,encoding:'buffer',maxBuffer:2_000_000});
+ assert.equal(manifest.length,1478);
+ assert.equal(digest(manifest),approvedRawManifestSha256);
+ const transformed=Buffer.from(manifest.toString('utf8').replace(/\n/g,'\r\n'));
+ assert.notEqual(digest(transformed),approvedRawManifestSha256,
+  'Windows CRLF must not authorize exact B request pin');
 });
