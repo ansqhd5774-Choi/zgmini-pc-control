@@ -49,7 +49,7 @@ jobs:
       # event's main revision, candidate PR or mutable branch.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: a9c6cc74c5dc6a6814c07c64413cdd0b4c60229b
+          ref: d0a62ced5b603351874f0266114d2311dfb88470
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
