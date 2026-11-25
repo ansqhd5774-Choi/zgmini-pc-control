@@ -8,6 +8,9 @@ jobs:
   scan-location:
     runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
     timeout-minutes: 8
+    defaults:
+      run:
+        shell: cmd
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
