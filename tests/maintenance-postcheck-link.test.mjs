@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {classifyMaintenancePostcheckLink as classify,
- summarizeMaintenancePostcheckLocalPointer as localPointer} from '../tools/maintenance-contract.mjs';
+ summarizeMaintenancePostcheckLocalPointer as localPointer,
+ classifyMaintenancePostcheckWorkflowRegistration as registration} from '../tools/maintenance-contract.mjs';
 
 const id='pc-update-11111111-1111-4111-8111-111111111111';
 const source='a'.repeat(40);
@@ -139,4 +140,41 @@ test('postcheck local report readback remains bounded and never triggers another
  assert.match(src,/stat\.size>0&&stat\.size<=131072/);
  assert.match(src,/summarizeMaintenancePostcheckLocalPointer\(\{/);
  assert.match(src,/VERIFY_AND_UPLOAD_EXISTING_RESULT_NO_REEXECUTION/);
+});
+
+test('NO_RUN workflow registration distinguishes active, disabled and unverifiable',()=>{
+ const workflow={id:128,name:'ZGMINI PC Job',
+  path:'.github/workflows/pc-job.yml',state:'active'};
+ assert.deepEqual(registration(workflow),{
+  schema:'ZGMINI_POSTCHECK_WORKFLOW_REGISTRATION_V1',
+  workflowState:'ACTIVE',code:'POSTCHECK_WORKFLOW_ACTIVE_WITHOUT_RUN',
+  workflowId:128});
+ assert.equal(registration({...workflow,state:'disabled_manually'}).workflowState,
+  'DISABLED');
+ assert.equal(registration({...workflow,state:'disabled_inactivity'}).workflowState,
+  'DISABLED');
+ for(const w of [null,{}, {...workflow,id:0},
+   {...workflow,path:'.github/workflows/other.yml'},
+   {...workflow,name:'Unrelated Workflow'},
+   {...workflow,state:'deleted'}]){
+  const observed=registration(w);
+  assert.equal(observed.workflowState,'UNVERIFIED');
+  assert.equal(observed.workflowId,null);
+ }
+});
+
+test('updater reads registration only after NO_RUN and preserves original execution semantics',()=>{
+ const src=fs.readFileSync(fileURLToPath(new URL('../tools/update.mjs',import.meta.url)),'utf8');
+ const classifyAt=src.indexOf('const link=classifyMaintenancePostcheckLink({');
+ const onlyNoRun=src.indexOf("if(link.state==='NO_RUN'){",classifyAt);
+ const workflowLookup=src.indexOf("github('actions/workflows/pc-job.yml')",onlyNoRun);
+ const localReceiptAt=src.indexOf("if(['ENTRY_REJECT','UPLOAD_MISSING'].includes",workflowLookup);
+ assert.ok(classifyAt>=0&&onlyNoRun>classifyAt&&workflowLookup>onlyNoRun&&
+  localReceiptAt>workflowLookup);
+ assert.match(src,/classifyMaintenancePostcheckWorkflowRegistration\(registration\)/);
+ assert.match(src,/Object\.entries\(prior\)\.filter\(\(\[key\]\)=>key!=='observedAtUtc'\)/);
+ assert.match(src,/JSON\.stringify\(comparable\)!==JSON\.stringify\(link\)/);
+ // Read-only observation must not activate late-label intake or replay the job.
+ const block=src.slice(onlyNoRun,localReceiptAt);
+ assert.doesNotMatch(block,/issues','POST'|workflow_dispatch|PATCH|repost|resumeIntake/);
 });
