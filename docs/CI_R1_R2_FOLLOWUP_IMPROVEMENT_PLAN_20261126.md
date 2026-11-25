@@ -53,13 +53,13 @@
 | 항목 | 계획 작성 | 원인·fixture 재현 | 수정 필요 판정 | 구현·검증·병합 |
 |---|---|---|---|---|
 | #23 | 완료 | 기존 정상·오류 fixture 확인 | **DONE_NO_CHANGE** — 관측형 계약 의도 확인 | 기존 Run 성공 재사용, 코드 수정 없음 |
-| #25 | 완료 | 기존 incomplete·violation fixture 확인 | **확인 중** — 관측형 보고는 정합, 실제 미확정 규칙 원인 추가 분류 | 코드 수정 없음, 기존 Run 성공 재사용 |
+| #25 | 완료 | 기존 fixture 및 실제 Browser 아티팩트의 color-contrast 미확정 결과 확인 | **DONE_NO_CHANGE (CI 계약)** — 미확정 결과를 통과로 위장하지 않음 | 기존 Browser CI 성공 재사용, 코드 수정 없음; 실제 UI 색 대비 여부는 별도 미확인 |
 | #1 | 완료 | 실제 홈·레이아웃 공유 파일 7개 트리거 누락 확인 | **수정 필요** — 직접 UI 의존 경로 누락 | [웹 PR #1635](https://github.com/ansqhd5774-Choi/zgmini/pull/1635), 정확 HEAD CI 진행 |
 | #19 | 완료 | 전체 최근 100건 혼잡 조건 및 회귀시험 작성 | **DONE_FIXED** — Workflow별 범위 조회로 교정 | [PC PR #3721](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3721) CI 2/2·Node 회귀 11/11 PASS, main 병합 `9d8dcf906c938c41f6acde6f1ad4288652bcd890` |
-| #29 | 완료 | 미착수 | 미판정 | 미착수 |
+| #29 | 완료 | 과거 Node CI 아티팩트 2개 원본 비교 완료 | **연결 방식 검토** — 비교 가능한 baseline 존재 | 두 보고 동일 129개 파일·bytes·hash, 자동 기준선 연결은 미구현 |
 | #12 | 완료 | 변경 YAML 1파일 actionlint 실행·기존 경로 회귀 사용 확인 | **DONE_NO_CHANGE** — 현재 계약 검사 정합 | 웹 PR #1635 Node CI PASS, Browser CI 별도 확인 중; 신규 Governance 기능 없음 |
 
-**계획 수립: 6/6**, **후속 판정·필수 검증 완료: 3/6 (#23 DONE_NO_CHANGE, #19 DONE_FIXED, #12 DONE_NO_CHANGE)**, **수정 PR 진행: 1/6 (#1)**. 기존 CI 도입 완료 19/19를 감소시키지 않는다. 사용자가 요청하지 않은 새 예약 검증을 후속 개선 완료조건으로 추가하지 않는다.
+**계획 수립: 6/6**, **후속 판정·필수 검증 완료: 4/6 (#23·#25·#12 DONE_NO_CHANGE, #19 DONE_FIXED)**, **수정 PR 진행: 1/6 (#1)**, **비교 자동 연결 미완료: 1/6 (#29)**. 기존 CI 도입 완료 19/19를 감소시키지 않는다. 사용자가 요청하지 않은 새 예약 검증을 후속 개선 완료조건으로 추가하지 않는다.
 
 **첫 실행 대상:** #23의 `finalizeCrossBrowser`에 `javascriptErrors=1`을 주입한 기존 계약 테스트와 현재 요구된 합격 조건을 비교한다. 결과가 관측-only 정책과 일치하면 차단 추가 없이 `DONE_NO_CHANGE` 또는 별도 결정 필요로 처리하고 다음 독립 후보를 진행한다.
 
@@ -76,7 +76,7 @@
 
 - [현행 `tests/ci-accessibility-axe.test.mjs`](https://github.com/ansqhd5774-Choi/zgmini/blob/main/tests/ci-accessibility-axe.test.mjs)는 `incomplete`를 `passes`와 구분해 `unverifiedRules`로 보존하고, 명시 위반과 개인정보 노출 방지·비정상 입력 거부를 검증한다.
 - [브라우저 Run #45688120760](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45688120760) 로그는 두 뷰포트에서 각각 **`violatedRules=0`, `unverifiedRules=1`**로 기록한다. 이는 전체 접근성 통과가 아니라 **현재 미확정 결과가 남아 있음**을 의미한다. 기존 보고 경로 자체의 결함은 재현되지 않아 새 Gate를 추가하지 않았다.
-- **미확인:** 실제 `incomplete` 규칙 ID 및 원인별 수리 필요 여부. 기존 브라우저 아티팩트의 제한된 요약부터 확인하고 실제 UI 결함과 단순 자동 검증 한계를 구분한다. #23 완료 판정과 섞지 않는다.
+- **원본 아티팩트 재조회:** [Browser Run #45688120760](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45688120760)의 `community-chat-browser-r1` ZIP 내 `ci-accessibility/summary.json`에서 각 뷰포트의 `incomplete`를 식별. 규칙 `color-contrast`, 영향도 `serious`, 모바일 390px **3개 노드**, 데스크톱 1440px **1개 노드**, 양쪽 확정 `violatedRules=0`. 이는 자동화로 판정할 수 없는 규칙이며, UI의 실제 대비 결함 확정은 아니다. 기존 요약·시험은 이를 미확정으로 정상 표기하므로 **CI 로직 수정 불필요**. 실제 UI 색 대비 합격·불합격은 이 증거만으로 확정하지 않는다.
 
 ### #19 CI Observability — 수정 PR 진행
 
@@ -95,3 +95,9 @@
 - [웹 PR #1635](https://github.com/ansqhd5774-Choi/zgmini/pull/1635)에서는 기존 Workflow YAML 1파일의 경로만 변경. 정확 HEAD `6b2df32e8e68f14ae8c7329040f0e450b643b97a` [Node CI #45694551850](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45694551850)의 `Validate changed GitHub Actions YAML (actionlint)` 단계가 성공했고 로그 `ACTIONLINT_CHANGED_WORKFLOWS=1`을 확인.
 - 기존 `tests/browser-ci-trigger-scope.test.mjs`에 직접 의존 경로 7건을 추가해 YAML 형식 검사와 실제 트리거 누락 검사를 **서로 다른 조건**으로 분리했다. #12의 누락을 입증한 추가 오류는 없으므로 신규 Governance Workflow나 전역 검사를 추가하지 않고 **DONE_NO_CHANGE**.
 - 브라우저 CI 성공은 #1 PR 최종 검증으로 별도 확인한다.
+
+### #29 Bundle Size — 기존 기준선 원본 비교 결과
+
+- [Node CI Run #45691667146](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45691667146)와 [#45691870499](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45691870499)의 기존 `client-bundle-size-report` ZIP 아티팩트(각 `report.json`)를 GitHub 공식 읽기로 회수, **스키마 1·`dist/client/assets/*.js,*.css` 범위 일치** 확인.
+- JS **102파일, 1,715,802 raw bytes, 563,383 gzip 추정 bytes**, CSS **27파일, 719,954 raw bytes, 129,355 gzip 추정 bytes**로 두 결과 일치. **총 129개 파일 개별 SHA-256 일치**, JS/CSS raw·gzip 증감 **모두 0 bytes**.
+- 따라서 비교 가능한 baseline 아티팩트가 존재하지 않는다는 가설은 반증. 그러나 현행 `ci-bundle-size.mjs` 실행 경로는 `CI_BUNDLE_SIZE_BASELINE=UNAVAILABLE`로 자동 이전 빌드 연결을 수행하지 않음. **수동 원본 비교 검증과 CI 자동 기준선 연결 완료를 구분**한다. P3의 필요한 기존 API/아티팩트 읽기 자동 연결은 별도 최소 수정 범위로 남김; 새 예산 임계값·강제 Gate 추가 없음.
