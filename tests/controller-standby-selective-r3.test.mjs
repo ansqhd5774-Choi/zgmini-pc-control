@@ -67,7 +67,7 @@ test('R3 selective manifest refuses extra operations, SHA, and unapproved files'
  ];
  for(const patch of patches){
   const m=structuredClone(manifest);patch(m);
-  assert.throws(()=>admit(Buffer.from(JSON.stringify(m))),/UPDATE_|SELECTIVE_|POST_|APPROVAL_/);
+  assert.throws(()=>admit(Buffer.from(JSON.stringify(m))),/UPDATE_|SELECTIVE_|POST_|APPROVAL_|CONTROLLER_/);
  }
  const altered=structuredClone(pin);
  altered.targetBranch='codex/unapproved';
