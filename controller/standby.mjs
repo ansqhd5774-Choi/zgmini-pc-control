@@ -82,6 +82,11 @@ export async function main(){
  const receiver=read(path.join(watchdogHome,'receiver/owner.json'));
  if(!watchdogIdentityMatches(receiver,{parentPid,nonce})||
   process.ppid!==parentPid)throw err('STANDBY_WATCHDOG_IDENTITY_UNVERIFIED');
+ // Keep the authenticated IPC token only in this candidate's private closure.
+ // The promoted process later spawns Runner.Listener children; Watchdog
+ // credentials must never be inherited into jobs or worker environments.
+ delete process.env.ZGMINI_WATCHDOG_NONCE;
+ delete process.env.ZGMINI_WATCHDOG_PID;
  const sourceSha=verifyStandbySource();
  let promoting=false,done=false;
  process.on('disconnect',()=>{if(!promoting)process.exit(0);});
