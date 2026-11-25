@@ -72,7 +72,7 @@ export async function submitPreparedMaintenanceIssue(expected,{installedSha,read
 }
 // Shared read-only CI discovery for approval publication and the regular submitter.
 // A matching CI run is not a business approval, an execution credential or a live CAS.
-export async function resolveControllerApprovalCI(approvalRef,{runId,readRun,listRuns,readApprovalPr}={}){
+export async function resolveControllerApprovalCI(approvalRef,{runId,readRun,listRuns,readApprovalPr,approvalState='MERGED'}={}){
  if((runId!==undefined&&(!Number.isSafeInteger(runId)||runId<=0))||typeof readRun!=='function'||
     (runId===undefined&&typeof listRuns!=='function'))
   fail('MAINTENANCE_CI_RUN_REQUIRED');
@@ -84,7 +84,9 @@ export async function resolveControllerApprovalCI(approvalRef,{runId,readRun,lis
  if(!Number.isSafeInteger(number)||number<=0||typeof readApprovalPr!=='function')
   fail('MAINTENANCE_CI_APPROVAL_PR_REQUIRED');
  const pr=await readApprovalPr(number);
- if(pr?.number!==number||pr.merged!==true||pr.base?.ref!=='main'||
+ const stateMatches=approvalState==='MERGED'?pr?.merged===true:
+  approvalState==='OPEN'?pr?.state==='open'&&pr.merged===false&&pr.draft===false:false;
+ if(pr?.number!==number||!stateMatches||pr.base?.ref!=='main'||
     pr.base?.repo?.full_name!==CONTROL_REPOSITORY||
     pr.head?.repo?.full_name!==CONTROL_REPOSITORY||
     !/^[a-f0-9]{40}$/.test(pr.head?.sha??''))
@@ -300,6 +302,91 @@ export async function submitExistingControllerApprovalFromCi({targetSha,approval
  // Only the exact new successful run emits this receipt; historical requests
  // and uncertain POSTs are never given fresh execution identity.
  return {...result,effectKey,receiptMarker:controllerBReceiptMarker(result.issueNumber,Buffer.from(expected.body))};
+}
+// A prepared approval PR already exists and has been tested. Use the
+// existing PR-based installation contract; never replace it with direct
+// main writes. A single trusted CI job can merge that exact head and submit
+// without depending on a subsequent push event. The real privileged caller,
+// initial business-approval source and PR creation/test path are separate.
+// No default production merge port or permission is enabled by this code.
+export async function mergeAndSubmitPreparedControllerApproval({targetSha,approvalPrNumber,runId,attempt},ports){
+ if(!sha40(targetSha)||!Number.isSafeInteger(approvalPrNumber)||approvalPrNumber<=0||
+    !Number.isSafeInteger(runId)||runId<=0||!Number.isSafeInteger(attempt)||attempt<=0)
+  fail('MAINTENANCE_CI_MERGE_INPUT_INVALID');
+ if(typeof ports.readAutoApprovalContext!=='function'||typeof ports.readApprovalPrFiles!=='function'||
+    typeof ports.mergeApprovalPr!=='function')
+  fail('MAINTENANCE_CI_AUTO_APPROVAL_CONTEXT_REQUIRED');
+ const repository=await ports.readRepository();
+ if(repository?.id!==1442936296||repository.full_name!==CONTROL_REPOSITORY||repository.private!==true||
+    !ownerIdentity(repository.owner))fail('MAINTENANCE_CI_REPOSITORY_DENIED');
+ const pr=await ports.readApprovalPr(approvalPrNumber);
+ if(pr?.number!==approvalPrNumber||pr.base?.ref!=='main'||
+    pr.base?.repo?.full_name!==CONTROL_REPOSITORY||pr.head?.repo?.full_name!==CONTROL_REPOSITORY||
+    !sha40(pr.head?.sha)||
+    !(pr.merged===true||(pr.state==='open'&&pr.merged===false&&pr.draft===false)))
+  fail('MAINTENANCE_CI_MERGE_PR_DENIED');
+ const ctx=await ports.readAutoApprovalContext(targetSha,approvalPrNumber);
+ if(!ctx?.policy||!ctx.delegation||!Number.isSafeInteger(ctx.policy.sourcePrNumber)||
+    ctx.policy.sourcePrNumber<=0||typeof ctx.getJson!=='function'||
+    typeof ctx.readFileBytes!=='function'||typeof ctx.readJobLogs!=='function')
+  fail('MAINTENANCE_CI_AUTO_APPROVAL_CONTEXT_REQUIRED');
+ const manifestPath='approvals/controller-updates/'+targetSha+'.json';
+ const candidateBytes=await ctx.readFileBytes(CONTROL_REPOSITORY,pr.head.sha,manifestPath);
+ if(!Buffer.isBuffer(candidateBytes)||candidateBytes.length===0||candidateBytes.length>32768)
+  fail('MAINTENANCE_CI_MERGE_MANIFEST_UNVERIFIED');
+ const manifest=JSON.parse(candidateBytes.toString('utf8'));
+ if(manifest.targetSha!==targetSha||manifest.approval?.ref!=='https://github.com/'+CONTROL_REPOSITORY+'/pull/'+approvalPrNumber)
+  fail('MAINTENANCE_CI_MERGE_MANIFEST_UNVERIFIED');
+ const {prepareSelectiveApprovalPublication}=await import('../ci-approval/controller-candidate-review.mjs');
+ const plan=Object.fromEntries(['installedSha','targetSha','allowFiles','purpose','postOperation','postSourceBranch','postSourceSha'].map(k=>[k,manifest[k]]));
+ const prepared=await prepareSelectiveApprovalPublication({
+  plan,delegation:{...ctx.delegation,now:new Date().toISOString().replace(/\.\d{3}Z$/,'Z')},
+  sourcePrNumber:ctx.policy.sourcePrNumber,approvalPrNumber,
+  sourceMainSha:manifest.selectiveSource?.mainSha,policy:ctx.policy,
+  getJson:ctx.getJson,readFileBytes:ctx.readFileBytes,readJobLogs:ctx.readJobLogs});
+ if(prepared.state!=='SELECTIVE_APPROVAL_FILES_PREPARED'||prepared.files.length!==2||
+    !prepared.files[0].bytes.equals(candidateBytes))
+  fail('MAINTENANCE_CI_AUTO_APPROVAL_RECONSTRUCTION_DENIED');
+ // Restrict publication to the exact two new files. Never merge unrelated
+ // code, workflow, permission or existing approval changes on this path.
+ const files=await ports.readApprovalPrFiles(approvalPrNumber);
+ const wanted=prepared.files.map(f=>f.path).sort();
+ if(!Array.isArray(files)||files.length!==2||files.some(f=>f.status!=='added')||
+    JSON.stringify(files.map(f=>f.filename).sort())!==JSON.stringify(wanted))
+  fail('MAINTENANCE_CI_MERGE_DIFF_DENIED');
+ for(const f of prepared.files){
+  const actual=await ctx.readFileBytes(CONTROL_REPOSITORY,pr.head.sha,f.path);
+  if(!Buffer.isBuffer(actual)||!actual.equals(f.bytes))fail('MAINTENANCE_CI_MERGE_FILE_MISMATCH');
+ }
+ const ci=await resolveControllerApprovalCI(manifest.approval.ref,{
+  approvalState:pr.merged?'MERGED':'OPEN',readApprovalPr:ports.readApprovalPr,listRuns:ports.listRuns,readRun:ports.readRun});
+ if(ci.headSha!==pr.head.sha)fail('MAINTENANCE_CI_MERGE_HEAD_DRIFT');
+ const current=await ports.readApprovalPr(approvalPrNumber);
+ if(current?.head?.sha!==pr.head.sha||current?.base?.ref!=='main')
+  fail('MAINTENANCE_CI_MERGE_HEAD_DRIFT');
+ let merged=current;
+ if(!merged.merged){
+  if(merged.state!=='open'||merged.draft!==false||pr.merged)
+   fail('MAINTENANCE_CI_MERGE_PR_DENIED');
+  // GitHub's merge API must use this exact head SHA. The PR is itself the
+  // one-time merge effect; do not issue a second merge after an uncertain
+  // response in this invocation. Always reconcile the exact PR by readback.
+  try{await ports.mergeApprovalPr(approvalPrNumber,pr.head.sha);}catch{}
+  try{merged=await ports.readApprovalPr(approvalPrNumber);}catch{
+   return {status:'STATE_UNKNOWN',code:'MAINTENANCE_CI_MERGE_OUTCOME_UNKNOWN',approvalPrNumber,next:'RECONCILE_ORIGINAL_PR'};
+  }
+ }
+ if(merged?.number!==approvalPrNumber||merged.merged!==true||merged.head?.sha!==pr.head.sha||
+    !sha40(merged.merge_commit_sha)||!(ownerIdentity(merged.merged_by)||botIdentity(merged.merged_by)))
+  return {status:'STATE_UNKNOWN',code:'MAINTENANCE_CI_MERGE_OUTCOME_UNKNOWN',approvalPrNumber,next:'RECONCILE_ORIGINAL_PR'};
+ // Independently read both merged and current main bytes before invoking
+ // the same exact single-POST submission path. No new push event is needed.
+ for(const f of prepared.files)for(const revision of [merged.merge_commit_sha,'main']){
+  const actual=await ctx.readFileBytes(CONTROL_REPOSITORY,revision,f.path);
+  if(!Buffer.isBuffer(actual)||!actual.equals(f.bytes))
+   return {status:'STATE_UNKNOWN',code:'MAINTENANCE_CI_MERGE_READBACK_MISMATCH',approvalPrNumber,next:'RECONCILE_ORIGINAL_PR'};
+ }
+ return submitExistingControllerApprovalFromCi({targetSha,approvalSha256:prepared.files[0].sha256,runId,attempt},ports);
 }
 export async function reconcileMaintenanceIssue(receipt,{findIssues,readIssue,saveReceipt}){
  if(receipt?.schema!=='ZGMINI_MAINTENANCE_SUBMISSION_V1')fail('MAINTENANCE_RECEIPT_INVALID');

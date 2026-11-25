@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {manifestFingerprint,CONTROLLER_POST_OPERATIONS,prepareControllerUpdateRequest,validateControllerSelectivePin} from '../tools/maintenance-contract.mjs';
 import {reviewControllerCandidate as review,prepareSelectiveApprovalPublication} from '../ci-approval/controller-candidate-review.mjs';
-import {submitExistingControllerApprovalFromCi} from '../tools/maintenance-request.mjs';
+import {submitExistingControllerApprovalFromCi,mergeAndSubmitPreparedControllerApproval} from '../tools/maintenance-request.mjs';
 const repo='ansqhd5774-Choi/zgmini-pc-control',root='repos/'+repo;
 const hash=b=>createHash('sha256').update(b).digest('hex');
 function fixture(){
@@ -156,4 +156,54 @@ test('auto publication with different main selective pin cannot submit',async()=
  f.ctx.readFileBytes=async(r,s,p)=>s==='main'&&p===f.pin.path?Buffer.from('{}'):read(r,s,p);
  await assert.rejects(()=>submitExistingControllerApprovalFromCi(f.input,f.ports),/AUTO_APPROVAL_PIN_MISMATCH/);
  assert.equal(f.store.posts,0);
+});
+
+async function mergeSubmissionFixture(){
+ const f=await automaticSubmissionFixture(),merged=await f.ports.readApprovalPr(29);
+ const open={...merged,state:'open',merged:false,draft:false,merged_by:null,merge_commit_sha:null};
+ let current=open;f.merges=0;
+ f.ports.readApprovalPr=async()=>current;
+ f.ports.readApprovalPrFiles=async()=>[f.m,f.pin].map(x=>({filename:x.path,status:'added'}));
+ const read=f.ctx.readFileBytes;
+ f.ctx.readFileBytes=async(r,s,p)=>p===f.m.path?Buffer.from(f.m.bytes):read(r,s,p);
+ f.ports.mergeApprovalPr=async(n,head)=>{
+  assert.equal(n,29);assert.equal(head,open.head.sha);f.merges++;current=merged;
+ };
+ f.mergeInput={targetSha:f.input.targetSha,approvalPrNumber:29,runId:1000,attempt:1};
+ return f;
+}
+test('one CI flow merges exact tested approval PR and immediately submits without push event',async()=>{
+ const f=await mergeSubmissionFixture(),r=await mergeAndSubmitPreparedControllerApproval(f.mergeInput,f.ports);
+ assert.equal(r.status,'REQUEST_READBACK_VERIFIED');assert.equal(f.merges,1);assert.equal(f.store.posts,1);
+ assert.match(r.receiptMarker,/^ZGMINI_CI_CONTROLLER_B_RECEIPT=42:/);
+ const second=await mergeAndSubmitPreparedControllerApproval(f.mergeInput,f.ports);
+ assert.equal(second.code,'MAINTENANCE_CI_EXISTING_RECEIPT_NO_REPOST');assert.equal(f.merges,1);assert.equal(f.store.posts,1);
+});
+test('unrelated PR file stops merge and submission',async()=>{
+ const f=await mergeSubmissionFixture();
+ f.ports.readApprovalPrFiles=async()=>[{filename:f.m.path,status:'added'},{filename:f.pin.path,status:'added'},{filename:'tools/update.mjs',status:'modified'}];
+ await assert.rejects(()=>mergeAndSubmitPreparedControllerApproval(f.mergeInput,f.ports),/MERGE_DIFF_DENIED/);
+ assert.equal(f.merges,0);assert.equal(f.store.posts,0);
+});
+test('uncertain merge response with exact successful readback continues once',async()=>{
+ const f=await mergeSubmissionFixture(),merge=f.ports.mergeApprovalPr;
+ f.ports.mergeApprovalPr=async(...args)=>{await merge(...args);throw Error('lost response')};
+ const r=await mergeAndSubmitPreparedControllerApproval(f.mergeInput,f.ports);
+ assert.equal(r.status,'REQUEST_READBACK_VERIFIED');assert.equal(f.merges,1);assert.equal(f.store.posts,1);
+});
+test('uncertain merge without merged readback never submits or repeats merge',async()=>{
+ const f=await mergeSubmissionFixture();f.ports.mergeApprovalPr=async()=>{f.merges++;throw Error('lost response')};
+ const r=await mergeAndSubmitPreparedControllerApproval(f.mergeInput,f.ports);
+ assert.equal(r.code,'MAINTENANCE_CI_MERGE_OUTCOME_UNKNOWN');assert.equal(f.merges,1);assert.equal(f.store.posts,0);
+});
+test('changed merged manifest prevents same-run submission',async()=>{
+ const f=await mergeSubmissionFixture(),read=f.ctx.readFileBytes;
+ f.ctx.readFileBytes=async(r,s,p)=>s==='main'&&p===f.m.path?Buffer.from('{}'):read(r,s,p);
+ const r=await mergeAndSubmitPreparedControllerApproval(f.mergeInput,f.ports);
+ assert.equal(r.code,'MAINTENANCE_CI_MERGE_READBACK_MISMATCH');assert.equal(f.merges,1);assert.equal(f.store.posts,0);
+});
+test('missing approval context denies both merge and issue',async()=>{
+ const f=await mergeSubmissionFixture();delete f.ports.readAutoApprovalContext;
+ await assert.rejects(()=>mergeAndSubmitPreparedControllerApproval(f.mergeInput,f.ports),/AUTO_APPROVAL_CONTEXT_REQUIRED/);
+ assert.equal(f.merges,0);assert.equal(f.store.posts,0);
 });
