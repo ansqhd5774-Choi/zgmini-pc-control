@@ -324,9 +324,8 @@ test('W04 #3516 wrong approval identity is rejected before Issue construction',(
 });
 
 test('W04 #3516 committed approval matches immutable candidate except authorization and note',()=>{
- const root=path.dirname(new URL(import.meta.url).pathname);
- const approval=JSON.parse(fs.readFileSync(path.join(root,'../approvals/maintenance-recoveries/pc-update-c087fa10-88e2-42e3-bc60-c758ab93f0c1.installed.json'),'utf8'));
- const candidate=JSON.parse(fs.readFileSync(path.join(root,'../approvals/maintenance-recoveries/candidates/pc-update-c087fa10-88e2-42e3-bc60-c758ab93f0c1.installed.json'),'utf8'));
+ const approval=JSON.parse(fs.readFileSync(new URL('../approvals/maintenance-recoveries/pc-update-c087fa10-88e2-42e3-bc60-c758ab93f0c1.installed.json',import.meta.url),'utf8'));
+ const candidate=JSON.parse(fs.readFileSync(new URL('../approvals/maintenance-recoveries/candidates/pc-update-c087fa10-88e2-42e3-bc60-c758ab93f0c1.installed.json',import.meta.url),'utf8'));
  assert.equal(candidate.approved,false);
  assert.equal(approval.approved,true);
  assert.equal(approval.operation,'RECONCILE_INSTALLED');
