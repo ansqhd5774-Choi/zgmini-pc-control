@@ -51,10 +51,15 @@ try{
   'controller/preimage-manifest-contract.mjs'].every(x=>
    /^[0-9a-f]{64}$/.test(host.controllerFiles?.[x]??'')),
   'PREIMAGE_STAGE_SOURCE_NOT_ATTESTED');
- // Distinguish the optional preimage import from the engine in failure receipts.
- importFailureStage='PREIMAGE_STAGE_IMPORT';
- const {readStagedPreimageScope}=await import('./preimage-manifest-contract.mjs');
- const approvedPreimageScope=readStagedPreimageScope({env:process.env,request:raw});
+ // The preimage module is optional. Ordinary PC operations must not depend
+ // on loading its files, while scoped requests still fail closed and retain
+ // their distinct PREIMAGE_STAGE_IMPORT receipt if its import is unavailable.
+ let approvedPreimageScope=null;
+ if(Object.hasOwn(raw,'preimageManifestPath')){
+  importFailureStage='PREIMAGE_STAGE_IMPORT';
+  const {readStagedPreimageScope}=await import('./preimage-manifest-contract.mjs');
+  approvedPreimageScope=readStagedPreimageScope({env:process.env,request:raw});
+ }
  // Delay engine/operations loading until inside the error receipt boundary.
  // Missing selective-overlay imports must still produce an uploadable BLOCKED result.
  importFailureStage='ENGINE_IMPORT';
