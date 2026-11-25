@@ -59,7 +59,7 @@ const providerTotals=sum=>{
   fail('CF_RUM_METRIC_TOTALS_INVALID');
  return {lcpMs:sum.lcpTotal,inpMs:sum.inpTotal,cls:sum.clsTotal};
 };
-// This confidence interval measures PAGE VIEW GROUPS only. It is not a
+// This confidence interval measures Web Vitals EVENT GROUP counts only, not
 // per-metric INP count and cannot attest raw user interaction sample sizes.
 const groupSampling=(avg,confidence)=>{
  if(avg===undefined||avg===null||confidence===undefined||
@@ -72,7 +72,7 @@ const groupSampling=(avg,confidence)=>{
    !Number.isSafeInteger(count.sampleSize)||count.sampleSize<0||
    !valid(count.estimate)||!valid(count.lower)||!valid(count.upper)||
    count.lower>count.upper)fail('CF_RUM_SAMPLING_SHAPE_INVALID');
- return {scope:'PAGE_VIEW_GROUP_ONLY',
+ return {scope:'WEB_VITALS_EVENT_GROUP_ONLY',
   averageSampleInterval:interval,
   countConfidence95:{estimate:count.estimate,lower:count.lower,
    upper:count.upper,sampleSize:count.sampleSize}};
