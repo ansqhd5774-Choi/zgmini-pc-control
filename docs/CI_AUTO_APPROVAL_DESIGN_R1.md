@@ -53,3 +53,9 @@ A는 기존 정규 접수/판정에 필요한 확인만 재사용한다. B는 �
 - 신뢰 출처 및 CI provenance는 현재 합성 fixture로만 표현한다. 실제 증거 인증이 아니며 자동 승인 권한은 생성하지 않았다. 새 운영 정책/Workflow/Issue 실행/PC 변경 없음.
 - 단계 2는 순수 모의 판정기 구현 완료, 실제 보호된 근거 수집 및 기존 검증기 연동 미완료. 6단계 기준 1단계 완료 + 2단계 진행 중(약 25%, 추정). 운영 적용 0%.
 - 다음: 기존 validateRequest / validateUpdateRequest / validateWriterBManifest에 대응하는 읽기 전용 증거/후보 어댑터를 구현하고 실제 Node 회귀 및 격리 CI 실행 경로를 검토한다. 권한 발행이나 실행 연결은 하지 않는다.
+
+### 2026-11-25 후속 — 실제 검증기 연결 및 승인 후보 생성
+- `ci-approval/contract-adapter.mjs`: 기존 validateRequest, validateUpdateRequest, validateWriterBManifest 및 manifestFingerprint 재사용. 형식/해시/현행값 대조와 신뢰된 출처의 인증은 분리한다. 반환 상태는 CONTRACT_MATCH/CANDIDATE_ONLY 또는 거절이며 모든 결과 canPublish/canExecute=false.
+- Controller 후보는 승인 기록 및 CI PASS를 만들지 않는다. Writer 후보는 기존 validator 내부 구조검사만 수행하고 승인 상태 없는 계획을 반환한다. 두 후보 모두 PROPOSED_NOT_APPROVED, 기존 approvals/에 저장하거나 실행하는 명세가 아니다.
+- 테스트 17건 추가(기존 30건과 총 47건). 원격 파일 확인. 기존 Controller Maintenance Source Tests의 격리 Windows CI에서 두 테스트를 실행하도록 후보 브랜치에만 경로/단계를 연결했다. 운영 Workflow·토큰 권한·Runner 변경은 없다. Node CI 결과는 아직 미확인.
+- 단계 2/3 부분 완료, 실제 보호된 승인 근거/CI 증거 수집 미완료. 전체 약 40%(6단계 진행 추정), 운영 적용 0%. 다음: Draft PR의 격리 CI 실제 결과 회수, 보호된 승인 출처 및 CI evidence adapter, 위임 검토. 실제 승인 발행/실행 연결은 아직 비활성.
