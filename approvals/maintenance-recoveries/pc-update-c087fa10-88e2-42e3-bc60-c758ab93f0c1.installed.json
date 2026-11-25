@@ -1,0 +1,48 @@
+{
+  "schema": "ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V1",
+  "approved": true,
+  "operation": "RECONCILE_INSTALLED",
+  "requestId": "pc-update-c087fa10-88e2-42e3-bc60-c758ab93f0c1",
+  "issueNumber": 3516,
+  "sourceSha": "ec9009be720f3da33c3300a81aaf54be1e18c683",
+  "targetControllerSha": "83679b013ac9a9820331d93311ec97e572b18e13",
+  "approvedCurrentWriterConfigSha256": "16bfe9b88497e5c52bf22079856ad5224b97ab9f4ef093dcc706a75de34a6066",
+  "files": [
+    {
+      "path": "tools/maintenance-recovery.mjs",
+      "sha256": "361c852955235a531a47460924986fd1d780932fda8f1358385804bdd8eebafc"
+    },
+    {
+      "path": "tools/update.mjs",
+      "sha256": "6d75fda5d95be12da5b5bce1014644bb686e82d4f6be657c8202a405588ee6cc"
+    },
+    {
+      "path": "tools/maintenance-contract.mjs",
+      "sha256": "8691783600ca55f40a6f6d9270c5ae53042a87d9689f4d84008296b7589471ec"
+    },
+    {
+      "path": "controller/fixed-readonly-bytes.mjs",
+      "sha256": "ef545e7621da26f790ac15089aba3c82956fb40e287c3a1ec9ad13cddfe3bdf8"
+    }
+  ],
+  "casDigests": {
+    "ledgerSha256": "9034f9a6e007952a2d5f84588af7f9f27151118bc4ecf53afd9721f0a74cdc9e",
+    "ownerSha256": "59da1f4044cc9faef6929bbca09e106668e1fd13c39dcf77ff16bb782e59a9a2",
+    "markerSha256": "45bf51175eefda907d29a7990720e57219a6657ceccb971b7a0e592dc09eaa83",
+    "backlogSha256": "bebfe12b784decaea93cf158135d6db9bec6ae77dff0e1e48b0a1784676f4188",
+    "snapshotSha256": "fc14e32e862a0e1e989a4c58ccbcfb2955e1131498edd6e3087ff90831d3b0d4",
+    "protectionSha256": "55304f80c07310c0d253d2a5935404be13b7fe23ef72c035674f58dca6516a60",
+    "writerSha256": "16bfe9b88497e5c52bf22079856ad5224b97ab9f4ef093dcc706a75de34a6066"
+  },
+  "proof": {
+    "issueNumber": 3528,
+    "runId": 45579963186,
+    "jobId": 139087219551,
+    "runnerName": "zgmini-pc-03",
+    "resultPath": "results/pc-process-inventory-45579963186-1-operating.json",
+    "resultSha256": "d9ad185a92bcc20f2f73bc33e3cf77694337ccd17f704627162921b8564baecb"
+  },
+  "observedAtUtc": "2026-11-25T08:52:36.006Z",
+  "observedRunId": 45579963186,
+  "note": "Approved exact #3516 installed-state reconciliation scope under 2026-11-25 user continuation instruction. Historical #3519 POSTCHECK_OUTCOME_UNKNOWN is never retroactively PASS. This manifest grants no Controller reinstall, workflow change, DB/D1 write, or lease deletion outside the existing independent Windows single-effect RECONCILE_INSTALLED path. Before effect, reverify live source bytes/ancestry, seven file CAS, original owner/protection/Supervisor, exact independent A receipt, and original lease claim. No retries on STATE_UNKNOWN."
+}
