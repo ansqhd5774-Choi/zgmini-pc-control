@@ -400,6 +400,13 @@ export async function publishConfiguredControllerApproval(event,{getJson,ports,p
   let selected={approvalPrNumber:policy.approvalPrNumber,ports};
   if(typeof stageApprovalPr==='function'){
    selected=await stageApprovalPr();
+   // An uncertain prior branch/PR must be reconciled without a repeat POST.
+   if(selected?.state==='STATE_UNKNOWN'){
+    const code=/^CI_APPROVAL_[A-Z0-9_]+$/.test(selected.code??'')?
+     selected.code:'CI_APPROVAL_PR_PUBLICATION_UNVERIFIED';
+    return {state:'PUBLICATION_PROCESSED',results:[
+     {targetSha:policy.targetSha,status:'STATE_UNKNOWN',code}]};
+   }
    if(selected?.state!=='EXACT_APPROVAL_PR_READY'||!id(selected.approvalPrNumber)||
       !selected.ports)throw Error('CI_APPROVAL_PR_PUBLICATION_UNVERIFIED');
   }
@@ -409,7 +416,8 @@ export async function publishConfiguredControllerApproval(event,{getJson,ports,p
   const {receiptMarker,...safe}=result;
   return {state:'PUBLICATION_PROCESSED',results:[{targetSha:policy.targetSha,...safe}]};
  }catch(error){
-  const code=/^(?:MAINTENANCE|CI_PUBLICATION)_[A-Z0-9_]+$/.test(error?.message??'')?error.message:'CI_PUBLICATION_ADAPTER_FAILED';
+  const code=/^(?:MAINTENANCE|CI_PUBLICATION|CI_APPROVAL)_[A-Z0-9_]+$/.test(error?.message??'')?
+   error.message:'CI_PUBLICATION_ADAPTER_FAILED';
   return {state:'PUBLICATION_PROCESSED',results:[{targetSha:policy.targetSha,status:'STATE_UNKNOWN',code}]};
  }
 }

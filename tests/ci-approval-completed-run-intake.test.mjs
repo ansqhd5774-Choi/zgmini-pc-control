@@ -273,6 +273,42 @@ test('configured exact merge API receives immutable head CAS',async()=>{
  await ports.mergeApprovalPr(29,'f'.repeat(40));
  assert.deepEqual(calls,[[29,{sha:'f'.repeat(40),merge_method:'merge'}]]);
 });
+test('staged approval reports original uncertain bootstrap code without any repeated write',async()=>{
+ const e=event(),policy={targetSha:'c'.repeat(40),sourcePrNumber:28};
+ const source={number:28,merged:true,merge_commit_sha:'b'.repeat(40),
+  base:{ref:'main',repo:repository},head:{repo:repository,sha:e.workflow_run.head_sha}};
+ let stageCount=0,downstream=0;
+ const args={policy,runId:123,attempt:1,emitReceipt:()=>assert.fail('receipt'),
+  getJson:async route=>route==='pulls/28'?source:e.workflow_run,
+  ports:{readRepository:()=>{downstream++;throw Error('unexpected submission')}},
+  stageApprovalPr:async()=>{stageCount++;return {state:'STATE_UNKNOWN',
+   code:'CI_APPROVAL_PRIOR_BRANCH_WITHOUT_PR'};}};
+ const result=await publishConfiguredControllerApproval(e,args);
+ assert.equal(result.state,'PUBLICATION_PROCESSED');
+ assert.equal(result.results[0].status,'STATE_UNKNOWN');
+ assert.equal(result.results[0].code,'CI_APPROVAL_PRIOR_BRANCH_WITHOUT_PR');
+ assert.equal(ciPublicationExitCode(result,{publish:true}),1);
+ assert.equal(stageCount,1);assert.equal(downstream,0);
+});
+test('staged approval preserves fixed publisher errors but never leaks arbitrary failures',async()=>{
+ const e=event(),policy={targetSha:'c'.repeat(40),sourcePrNumber:28};
+ const source={number:28,merged:true,merge_commit_sha:'b'.repeat(40),
+  base:{ref:'main',repo:repository},head:{repo:repository,sha:e.workflow_run.head_sha}};
+ const args={policy,runId:123,attempt:1,emitReceipt:()=>assert.fail('receipt'),
+  getJson:async route=>route==='pulls/28'?source:e.workflow_run,
+  ports:{readRepository:()=>assert.fail('must not submit')}};
+ for(const [staged,expected] of [
+  [async()=>{throw Error('CI_APPROVAL_DIFF_DENIED')},'CI_APPROVAL_DIFF_DENIED'],
+  [async()=>({state:'STATE_UNKNOWN',code:'UNTRUSTED_INJECTED'}),'CI_APPROVAL_PR_PUBLICATION_UNVERIFIED'],
+  [async()=>{throw Error('raw secret value')},'CI_PUBLICATION_ADAPTER_FAILED']
+ ]){
+  const result=await publishConfiguredControllerApproval(e,{...args,stageApprovalPr:staged});
+  assert.equal(result.results[0].status,'STATE_UNKNOWN');
+  assert.equal(result.results[0].code,expected);
+  assert.equal(ciPublicationExitCode(result,{publish:true}),1);
+ }
+});
+
 test('matched source event enters existing merge and submit path, not generic push intake',async()=>{
  const e=event(),policy={targetSha:'c'.repeat(40),approvalPrNumber:29,sourcePrNumber:28};
  const source={number:28,merged:true,merge_commit_sha:'b'.repeat(40),base:{ref:'main',repo:repository},
