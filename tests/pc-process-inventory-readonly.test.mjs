@@ -430,7 +430,8 @@ test('CI installed policy readback never exposes the CI installed policy or loca
   ciControllerBPolicy:{...policy,workflowBlobSha:'BAD'}})));
  assert.equal(invalid.policyState,'INVALID');
  for(const value of [invalid,absent,present])
-  assert.doesNotMatch(JSON.stringify(value),/PRIVATE|TOKEN|credential|E:\\/|430972394|dddddddd/i);
+  assert.doesNotMatch(JSON.stringify(value),/PRIVATE|TOKEN|credential|430972394|dddddddd/i);
+ for(const value of [invalid,absent,present])assert.equal(JSON.stringify(value).includes('E:/'),false);
  for(const unverified of [
   inspectCiControllerBReceiverReadOnly(fake('invalid JSON')),
   inspectCiControllerBReceiverReadOnly(fake(JSON.stringify(base),{link:true})),
