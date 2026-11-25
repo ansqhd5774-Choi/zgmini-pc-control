@@ -7,6 +7,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {decideStandbyPromotion as decide,watchdogIdentityMatches,
  verifyStandbySource} from '../controller/standby.mjs';
 import {assertSupervisorOwner} from '../controller/common.mjs';
+import {provenOldRunnerExit} from '../tools/runner-watchdog.mjs';
 
 const eligible=()=>({
  sourceVerified:true,watchdogBound:true,supervisorLeasePresent:false,
@@ -121,4 +122,28 @@ test('Watchdog still leaves old registration path intact without standby activat
  const src=fs.readFileSync(new URL('../tools/runner-watchdog.mjs',import.meta.url),'utf8');
  assert.match(src,/if\(standbyMode\)\{[\s\S]*?return;[\s\S]*?const out=fs\.openSync\(path\.join\(home,'SUPERVISOR_OUTPUT\.log'\)/);
  assert.match(src,/const child=spawn\(node,\[path\.join\(control,'controller\/supervisor\.mjs'\)\]/);
+});
+
+test('Standby never promotes from missing, partial or ambiguous Runner heartbeat',()=>{
+ const owner={pid:8810,nonce:randomUUID()};
+ const children=Array.from({length:6},(_,i)=>({seat:i+1,pid:10010+i,alive:false}));
+ const hb={pid:8810,children};
+ const exited=()=>false;
+ assert.equal(provenOldRunnerExit({owner,heartbeat:hb,pidAlive:exited}),true);
+ assert.equal(provenOldRunnerExit({owner,heartbeat:null,pidAlive:exited}),false);
+ assert.equal(provenOldRunnerExit({owner:null,heartbeat:hb,pidAlive:exited}),false);
+ assert.equal(provenOldRunnerExit({owner,heartbeat:{pid:8810,children:[]},pidAlive:exited}),false);
+ assert.equal(provenOldRunnerExit({owner,heartbeat:{pid:8810,children:children.slice(0,5)},pidAlive:exited}),false);
+ assert.equal(provenOldRunnerExit({owner,heartbeat:{pid:8811,children},pidAlive:exited}),false);
+ const duplicate=children.map(x=>({...x}));duplicate[5].seat=1;
+ assert.equal(provenOldRunnerExit({owner,heartbeat:{pid:8810,children:duplicate},pidAlive:exited}),false);
+ const duplicatePid=children.map(x=>({...x}));duplicatePid[5].pid=10010;
+ assert.equal(provenOldRunnerExit({owner,heartbeat:{pid:8810,children:duplicatePid},pidAlive:exited}),false);
+ assert.equal(provenOldRunnerExit({owner,heartbeat:hb,pidAlive:pid=>pid===10014?true:false}),false);
+ assert.equal(provenOldRunnerExit({owner,heartbeat:hb,pidAlive:pid=>pid===10014?null:false}),false);
+});
+test('Watchdog promotion must call exact six-seat exit proof, not accept empty heartbeat',()=>{
+ const source=fs.readFileSync(new URL('../tools/runner-watchdog.mjs',import.meta.url),'utf8');
+ assert.match(source,/if\(standbyMode&&!provenOldRunnerExit\(\{owner,heartbeat:hb\}\)\)/);
+ assert.match(source,/heartbeat\.children\.length!==6/);
 });
