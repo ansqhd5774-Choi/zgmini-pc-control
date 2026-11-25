@@ -23,6 +23,7 @@ validateControllerConfigTransition,controllerAdmissionForPurpose,
  R6_HOST_SOURCE_SHA,R6_HOST_SOURCE_MANIFEST_SHA256,
  selectPreservedRecoveryProtection,recoveryProtectedSnapshotStillPinned,
  verifiedRunningPostcheckFailure,classifyMaintenancePostcheckLink,
+ classifyMaintenancePostcheckWorkflowRegistration,
  summarizeMaintenancePostcheckLocalPointer,
  R6_HOST_CANDIDATE_SHA256,validateR54BIssueEnvelope,
  validateR54BManifestRequest,R54_B_ISSUE_TITLE,R54_B_OPERATION,
@@ -1656,6 +1657,14 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
        requestId:issue.requestId,issueNumber:postIssueNumber,
        operation:manifest.postOperation,sourceBranch:manifest.postSourceBranch,
        sourceSha:manifest.postSourceSha,issue:liveIssue,runs,jobs});
+      if(link.state==='NO_RUN'){
+       // Observe the *existing* workflow registration. Disabled and active
+       // are distinct from successful issue delivery; neither is PASS.
+       let registration;
+       try{registration=github('actions/workflows/pc-job.yml');}catch{}
+       link.workflowRegistration=
+        classifyMaintenancePostcheckWorkflowRegistration(registration);
+      }
       // Only an exactly correlated Run/attempt/PC seat can select a local
       // pointer. A missing/partial or redirected file is never treated as PASS.
       if(['ENTRY_REJECT','UPLOAD_MISSING'].includes(link.state)&&selected){
@@ -1688,8 +1697,10 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
       // Store a bounded, nonsecret observation only when the evidence moves.
       // A temporarily failed GitHub lookup must not erase earlier evidence.
       const prior=liveLedger.postcheckLink;
+      const comparable=prior&&Object.fromEntries(
+       Object.entries(prior).filter(([key])=>key!=='observedAtUtc'));
       if(link.state!=='STATE_UNKNOWN' &&
-       (!prior||Object.entries(link).some(([key,value])=>prior[key]!==value))){
+       JSON.stringify(comparable)!==JSON.stringify(link)){
        writeJson(ledgerFile,{...liveLedger,postcheckLink:{
         ...link,observedAtUtc:new Date().toISOString()}});
       }
