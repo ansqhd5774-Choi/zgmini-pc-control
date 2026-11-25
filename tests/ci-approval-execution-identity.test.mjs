@@ -95,3 +95,23 @@ test('bot name alone and non-controller title cannot mint a capability',async()=
   assert.equal(r.state,'REJECTED');assert.equal(r.authorization,undefined);
  }
 });
+
+test('closed completed CI request remains authenticated only in recovery mode',async()=>{
+ const f=issueFixture(),{getJson,readJobLogs,policy}=f.opts;
+ const actual={...f.actual,state:'closed',state_reason:'completed'};
+ const normal=await authenticateControllerBIssue(actual,{getJson,readJobLogs,policy});
+ assert.equal(normal.state,'REJECTED');
+ const recovery=await authenticateControllerBIssue(actual,{getJson,readJobLogs,policy,recovery:true});
+ assert.equal(recovery.state,'CI_WORKLOAD_IDENTITY_VERIFIED_ONLY');
+ assert.equal(recovery.canExecute,false);
+ assert.equal(validateMaintenanceRequest(f.request,{actor:CI_CONTROLLER_ACTOR,ciAuthorization:recovery.authorization}).requestId,f.request.requestId);
+});
+test('cancelled or unverified historical CI request cannot authenticate for recovery',async()=>{
+ const f=issueFixture(),{getJson,readJobLogs,policy}=f.opts;
+ const options={getJson,readJobLogs,policy,recovery:true};
+ const actual={...f.actual,state:'closed',state_reason:'not_planned'};
+ assert.equal((await authenticateControllerBIssue(actual,options)).state,'REJECTED');
+ actual.state_reason='completed';
+ assert.equal((await authenticateControllerBIssue(actual,{...options,readJobLogs:async()=>''})).state,'EVIDENCE_MISSING');
+ assert.equal((await authenticateControllerBIssue({...actual,body:'{}'},options)).state,'REJECTED');
+});

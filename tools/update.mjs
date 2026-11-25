@@ -1931,17 +1931,20 @@ function finishApprovedControllerEnvelope({data,raw,actual,liveRequest},{recover
   controlRepository,installedSha:recovery?manifest.installedSha:installedManifest().installedSha});
  return {...data,issue:validated.request,manifest:validated.manifest};
 }
-// Preserve the synchronous owner-only recovery contract. CI recovery needs a
-// separately reviewed durable recovery route; do not waive original identity.
+// Preserve the synchronous owner-only compatibility contract for historical
+// fixed recovery cases. Generic independent rollback uses the authenticated
+// async reader below and must still pass its exact recovery approval.
 export function loadApprovedPackage(requestId,file,{recovery=false}={}){
  const envelope=readApprovedControllerEnvelope(requestId,file);
  need(envelope.data.actor==='ansqhd5774-Choi','MAINTENANCE_ACTOR_NOT_APPROVED');
  return finishApprovedControllerEnvelope(envelope,{recovery});
 }
-async function loadAuthenticatedApprovedPackage(requestId,file){
+export async function loadAuthenticatedApprovedPackage(requestId,file,{recovery=false}={}){
  const envelope=readApprovedControllerEnvelope(requestId,file);
- if(envelope.data.actor==='ansqhd5774-Choi')return finishApprovedControllerEnvelope(envelope);
- const proof=await authenticateControllerBIssue(envelope.actual,{getJson:github,
+ if(envelope.data.actor==='ansqhd5774-Choi')return finishApprovedControllerEnvelope(envelope,{recovery});
+ // The flag is only supplied by the independent exact-approval rollback
+ // entry, never by an Issue or ordinary apply/preflight command.
+ const proof=await authenticateControllerBIssue(envelope.actual,{recovery,getJson:github,
   readJobLogs:jobId=>execFileSync(gh,['api',`repos/${controlRepository}/actions/jobs/${jobId}/logs`],
    {encoding:'utf8',windowsHide:true,timeout:60000,maxBuffer:16000000})});
  need(proof.state==='CI_WORKLOAD_IDENTITY_VERIFIED_ONLY',proof.code);
@@ -1950,7 +1953,7 @@ async function loadAuthenticatedApprovedPackage(requestId,file){
  const found=github('contents/approvals/controller-updates/'+envelope.data.issue.targetControllerSha+'.json?ref=main');
  need(found?.type==='file'&&found.encoding==='base64'&&typeof found.content==='string'&&
   Buffer.from(found.content,'base64').equals(envelope.raw),'APPROVAL_MANIFEST_HASH_MISMATCH');
- return finishApprovedControllerEnvelope(envelope,{ciAuthorization:proof.authorization});
+ return finishApprovedControllerEnvelope(envelope,{recovery,ciAuthorization:proof.authorization});
 }
 
 // A read-only, fixed-root view of exactly one update's preserved artifacts.

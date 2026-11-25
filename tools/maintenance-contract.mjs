@@ -139,11 +139,13 @@ const ciAuthorizations=new WeakMap();
 // mint this in-process capability. A package cannot serialize/replay it.
 // The caller must supply the authenticated GitHub read ports. Production
 // callers use only the installed policy above, never a request-provided pin.
-export async function authenticateControllerBIssue(actual,{policy=CI_CONTROLLER_POLICY,getJson,readJobLogs}={}){
+export async function authenticateControllerBIssue(actual,{policy=CI_CONTROLLER_POLICY,getJson,readJobLogs,recovery=false}={}){
  const denied=code=>({state:'REJECTED',code});
  if(!policy)return {state:'DISABLED',code:'CI_IDENTITY_POLICY_NOT_CONFIGURED'};
  if(actual?.user?.login!==CI_CONTROLLER_ACTOR||actual.user.type!=='Bot'||actual.user.id!==41898282||
-    actual.title!=='pc-controller-update'||actual.state!=='open'||actual.pull_request||
+    actual.title!=='pc-controller-update'||
+    !(actual.state==='open'||(recovery===true&&actual.state==='closed'&&actual.state_reason==='completed'))||
+    actual.pull_request||
     !actual.labels?.some(x=>x.name==='pc-maintenance')||typeof actual.body!=='string'||
     Buffer.byteLength(actual.body)>32768)return denied('CI_ISSUE_ORIGIN_DENIED');
  let request;try{request=JSON.parse(actual.body);}catch{return denied('CI_ISSUE_BODY_INVALID');}
