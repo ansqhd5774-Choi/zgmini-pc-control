@@ -45,6 +45,24 @@ export function decide({paused,owner,live,heartbeat,now=Date.now()}){
  }
  return 'RECOVER';
 }
+// A stale or partial heartbeat is not a complete inventory of children.
+// A crashed Supervisor can leave Runner.Listeners alive after its own PID dies.
+// Standby promotion is allowed only if the last exact six-seat inventory is
+// present, tied to the old owner, and every recorded child is proven exited.
+// Other active Workers remain protected by their existing request/seat leases.
+export function provenOldRunnerExit({owner,heartbeat,pidAlive=alive}={}){
+ if(!owner||!Number.isSafeInteger(owner.pid)||owner.pid<=0||
+   heartbeat?.pid!==owner.pid||!Array.isArray(heartbeat.children)||
+   heartbeat.children.length!==6)return false;
+ const seen=new Set(),pids=new Set();
+ for(const child of heartbeat.children){
+  if(!Number.isSafeInteger(child?.seat)||child.seat<1||child.seat>6||
+    seen.has(child.seat)||!Number.isSafeInteger(child.pid)||child.pid<=0||
+    pids.has(child.pid)||pidAlive(child.pid)!==false)return false;
+  seen.add(child.seat);pids.add(child.pid);
+ }
+ return seen.size===6;
+}
 export function archiveDeadLease(directory,isAlive=alive,destination=null){
  if(!fs.existsSync(directory))return null;
  const original=fs.readFileSync(path.join(directory,'owner.json'));
@@ -309,10 +327,9 @@ export async function main(){
    if(standbyMode&&(!standby||!standby.ready||standby.promoting)){
     status('BLOCKED_STANDBY_NOT_READY');return;
    }
-   if(standbyMode&&((owner&&(hb?.pid!==owner.pid||!Array.isArray(hb.children)))||
-    (Array.isArray(hb?.children)&&hb.children.some(c=>
-     !Number.isSafeInteger(c.pid)||c.pid<=0||alive(c.pid)!==false)))){
-    // Dead Supervisor != proven exited Runner children. Never kill them.
+   if(standbyMode&&!provenOldRunnerExit({owner,heartbeat:hb})){
+    // A missing/partial old heartbeat is not proof that six Runners exited.
+    // Preserve their leases and never restart a second seat owner on guesswork.
     status('BLOCKED_OLD_RUNNER_CHILD_UNVERIFIED');return;
    }
    if(!workflowActive()){status('PAUSED_WORKFLOW');return;}
