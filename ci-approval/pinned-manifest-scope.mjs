@@ -94,6 +94,9 @@ export async function inspectSelectiveTree(input,{getJson,readFileBytes}={}){
    return out('REJECTED','SELECTIVE_APPROVAL_PR_NOT_MERGED');
   if(!ancestor(await compare(pr.merge_commit_sha,revision),pr.merge_commit_sha,revision))
    return out('REJECTED','SELECTIVE_APPROVAL_NOT_ON_MAIN');
+  const mergedManifest=await readFileBytes(repo,pr.merge_commit_sha,snapshot.pin.path);
+  if(!Buffer.isBuffer(mergedManifest)||!mergedManifest.equals(snapshot.observation.bytes))
+   return out('REJECTED','SELECTIVE_APPROVAL_MANIFEST_BYTES_MISMATCH');
   const mergedPin=await readFileBytes(repo,pr.merge_commit_sha,snapshot.selectivePin.path);
   if(!Buffer.isBuffer(mergedPin)||!mergedPin.equals(snapshot.selectiveObservation.bytes))
    return out('REJECTED','SELECTIVE_APPROVAL_PIN_BYTES_MISMATCH');
