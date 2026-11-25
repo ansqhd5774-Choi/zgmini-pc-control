@@ -22,7 +22,8 @@ validateControllerConfigTransition,controllerAdmissionForPurpose,
  decideR6RecoveryReentry,sameR6RecoveryClaim,verifyR6HistoricCompletion,
  R6_HOST_SOURCE_SHA,R6_HOST_SOURCE_MANIFEST_SHA256,
  selectPreservedRecoveryProtection,recoveryProtectedSnapshotStillPinned,
- verifiedRunningPostcheckFailure,
+ verifiedRunningPostcheckFailure,classifyMaintenancePostcheckLink,
+ summarizeMaintenancePostcheckLocalPointer,
  R6_HOST_CANDIDATE_SHA256,validateR54BIssueEnvelope,
  validateR54BManifestRequest,R54_B_ISSUE_TITLE,R54_B_OPERATION,
  R54_B_SOURCE_FILES,SOURCE_BUNDLE_OPERATION,SOURCE_BUNDLE_ISSUE_TITLE,
@@ -1250,7 +1251,16 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
  const result={request,ports:{
   fingerprint:x=>sha256(JSON.stringify({issue,manifest,targetSha:x.targetSha})),
   read:async id=>fs.existsSync(path.join(recordDir,id+'.json'))?json(path.join(recordDir,id+'.json')):null,
-  persist:async x=>writeJson(ledgerFile,{...x,issueNumber,postIssueNumber}),
+  persist:async x=>{
+   // The coordinator persists a new phase after postcheck returns/throws.
+   // Retain only this request's latest observed execution link, never reuse
+   // a previous Issue or mistake an observation for postcheck PASS.
+   const prior=fs.existsSync(ledgerFile)?json(ledgerFile):null;
+   const postcheckLink=prior?.postcheckLink?.requestId===request.requestId?
+    prior.postcheckLink:null;
+   writeJson(ledgerFile,{...x,issueNumber,postIssueNumber,
+    ...(postcheckLink?{postcheckLink}:{})});
+  },
   // Capture a read-only baseline BEFORE acquiring the install lease, while
   // immutable source/owner/protected-state evidence is available. This does
   // not change Core tasks, supervisor processes or the intake workflow.
@@ -1579,7 +1589,10 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
       }catch{}
       if(!postIssueNumber)throw Object.assign(Error('POSTCHECK_OUTCOME_UNKNOWN'),{code:'POSTCHECK_OUTCOME_UNKNOWN'});
     }
-    writeJson(ledgerFile,{...ledger,postIssueNumber});
+    writeJson(ledgerFile,{...json(ledgerFile),postIssueNumber,postcheckLink:{
+     schema:'ZGMINI_MAINTENANCE_POSTCHECK_LINK_V1',requestId:issue.requestId,
+     issueNumber:postIssueNumber,state:'ISSUE_CREATED',code:'POSTCHECK_ISSUE_CREATED',
+     runId:null,jobId:null,observedAtUtc:new Date().toISOString()}});
    }
    for(let n=0;n<100;n++){
     let comments;
@@ -1597,33 +1610,89 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
      const protectedStateUnchanged=JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore);
      const runnerState=apiRunners();
      const runnerSetVerified=dedicatedPcRunnerRows(runnerState,{requireOnline:true})!==null;
+     const postSourceVerified=result.requestedSourceSha===manifest.postSourceSha&&
+       result.sourceRepository==='ansqhd5774-Choi/zgmini'&&
+       result.sourceBranch===manifest.postSourceBranch&&
+       result.controlSourceSha===manifest.targetSha;
+     // The bot-reported payload is a different event from verified execution.
+     // Preserve the observed status/source comparison without retroactive PASS,
+     // and retain any already correlated Run/Job identity.
+     const current=json(ledgerFile);
+     writeJson(ledgerFile,{...current,postcheckLink:{
+      ...(current.postcheckLink??{}),
+      schema:'ZGMINI_MAINTENANCE_POSTCHECK_LINK_V1',
+      requestId:issue.requestId,issueNumber:postIssueNumber,
+      state:'RESULT_REPORTED',code:'POSTCHECK_BOT_RESULT_OBSERVED',
+      reportedStatus:['PASS','FAIL','BLOCKED'].includes(result.status)?result.status:null,
+      postSourceVerified,observedAtUtc:new Date().toISOString()}});
      return {status:result.status,code:result.code,actualExecutionSha:result.actualExecutionSha,
        issueNumber:postIssueNumber,protectedStateUnchanged,runnerSetVerified,
-       postSourceVerified:result.requestedSourceSha===manifest.postSourceSha&&
-         result.sourceRepository==='ansqhd5774-Choi/zgmini'&&
-         result.sourceBranch===manifest.postSourceBranch&&
-         result.controlSourceSha===manifest.targetSha};
+       postSourceVerified};
     }
-    // Missing upload is not an unknown execution when the exact original
-    // Actions job proves its execution step failed. Observe, never resubmit.
+    // Existing request only: bounded Run/Job observation explains the first
+    // missing link. No repost, label re-drive, workflow toggle or lease write.
     if(n%5===0){
      let confirmed=null;
      try{
       const liveIssue=github('issues/'+postIssueNumber);
       const runs=readAllMaintenancePages(page=>github(
-       `actions/workflows/pc-job.yml/runs?event=issues&status=completed&created=${encodeURIComponent('>='+liveIssue.created_at)}&per_page=100&page=${page}`).workflow_runs)
-       .filter(r=>r.display_title===`PC Update ${issue.requestId} postcheck`&&r.conclusion==='failure');
-      const liveLedger=json(ledgerFile);
-      for(const run of runs){
-       const jobs=readAllMaintenancePages(page=>github(
-        `actions/runs/${run.id}/jobs?per_page=100&page=${page}`).jobs);
-       for(const job of jobs)if(verifiedRunningPostcheckFailure({
-        ledger:liveLedger,manifest,issue:liveIssue,run,job})){
-        confirmed={issueNumber:postIssueNumber,runId:run.id,jobId:job.id,runnerName:job.runner_name};break;
+       `actions/workflows/pc-job.yml/runs?event=issues&created=${encodeURIComponent('>='+liveIssue.created_at)}&per_page=100&page=${page}`).workflow_runs,
+       {maxPages:3});
+      const expectedTitle=`PC Update ${issue.requestId} postcheck`;
+      const linkedRuns=runs.filter(r=>r.event==='issues'&&r.display_title===expectedTitle&&
+       Number.isFinite(Date.parse(r.created_at))&&
+       Date.parse(r.created_at)>=Date.parse(liveIssue.created_at));
+      const selected=linkedRuns.length===1?linkedRuns[0]:null;
+      const jobs=selected?readAllMaintenancePages(page=>github(
+       `actions/runs/${selected.id}/jobs?per_page=100&page=${page}`).jobs,
+       {maxPages:3}):null;
+      const link=classifyMaintenancePostcheckLink({
+       requestId:issue.requestId,issueNumber:postIssueNumber,
+       operation:manifest.postOperation,sourceBranch:manifest.postSourceBranch,
+       sourceSha:manifest.postSourceSha,issue:liveIssue,runs,jobs});
+      // Only an exactly correlated Run/attempt/PC seat can select a local
+      // pointer. A missing/partial or redirected file is never treated as PASS.
+      if(['ENTRY_REJECT','UPLOAD_MISSING'].includes(link.state)&&selected){
+       const matched=jobs?.filter(j=>j.run_id===selected.id&&j.name==='approved-pc-job')??[];
+       const seatNumber=matched.length===1?
+        Number(matched[0].runner_name?.match(/^zgmini-pc-0([1-6])$/)?.[1]):null;
+       const attempt=selected.run_attempt;
+       if(Number.isSafeInteger(seatNumber)&&seatNumber>=1&&seatNumber<=6&&
+        Number.isSafeInteger(attempt)&&attempt>=1&&attempt<=999){
+        const file=path.join(controlRoot,'reports',
+         `${selected.id}-${attempt}-${seatNumber}.json`);
+        try{
+         const stat=fs.lstatSync(file);
+         need(stat.isFile()&&!stat.isSymbolicLink()&&stat.nlink===1&&
+          stat.size>0&&stat.size<=131072,'POSTCHECK_LOCAL_POINTER_UNSAFE');
+         const pointer=json(file);
+         const local=summarizeMaintenancePostcheckLocalPointer({
+          pointer,requestId:issue.requestId,issueNumber:postIssueNumber,
+          runId:selected.id,attempt,seat:seatNumber,operation:manifest.postOperation,
+          sourceBranch:manifest.postSourceBranch,sourceSha:manifest.postSourceSha,
+          controllerSha:manifest.targetSha});
+         if(local.status==='LOCAL_RESULT_MATCHED'){
+          link.localResult=local;
+          link.next='VERIFY_AND_UPLOAD_EXISTING_RESULT_NO_REEXECUTION';
+         }
+        }catch{/* The local receipt remains unverified; no new PC job. */}
        }
-       if(confirmed)break;
       }
-     }catch{/* A failed observation is still UNKNOWN, never a rollback signal. */}
+      const liveLedger=json(ledgerFile);
+      // Store a bounded, nonsecret observation only when the evidence moves.
+      // A temporarily failed GitHub lookup must not erase earlier evidence.
+      const prior=liveLedger.postcheckLink;
+      if(link.state!=='STATE_UNKNOWN' &&
+       (!prior||Object.entries(link).some(([key,value])=>prior[key]!==value))){
+       writeJson(ledgerFile,{...liveLedger,postcheckLink:{
+        ...link,observedAtUtc:new Date().toISOString()}});
+      }
+      for(const job of jobs??[])if(selected&&verifiedRunningPostcheckFailure({
+       ledger:liveLedger,manifest,issue:liveIssue,run:selected,job})){
+       confirmed={issueNumber:postIssueNumber,runId:selected.id,jobId:job.id,
+        runnerName:job.runner_name};break;
+      }
+     }catch{/* Failed observation remains UNKNOWN, not installation failure. */}
      if(confirmed)throw Object.assign(Error('POSTCHECK_EXECUTION_FAILED_VERIFIED'),{
       code:'POSTCHECK_EXECUTION_FAILED_VERIFIED',postcheckFailureEvidence:confirmed});
     }
