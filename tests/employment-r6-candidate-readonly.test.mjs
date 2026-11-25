@@ -109,6 +109,41 @@ test('PIT-08 chart metadata rejects invalid date without adding a legacy gate',a
   assert.equal(result.code,'R6_RESULT_INVALID');
 });
 
+test('optional missing-reference date passes only for partial score and never returns raw rows',async t=>{
+  const cases=[
+    {status:'PARTIAL_HISTORY',date:'2026-10-01',ok:true},
+    {status:'PARTIAL_HISTORY',date:'2026-11-31',ok:false},
+    {status:'PARTIAL_HISTORY',date:'2026-11-03',ok:false},
+    {status:'READY',date:'2026-10-01',ok:false},
+  ];
+  const output="fs.writeFileSync(path.join(out,'EMPLOYMENT_R6_RUNNER_fixture.json'),JSON.stringify(result));";
+  for(const item of cases){
+    const f=fixture(t);
+    const injected="result.indicators[0].scoreStatus="+JSON.stringify(item.status)+";"+
+      "result.indicators[0].firstMissingReferenceDate="+JSON.stringify(item.date)+";\n"+output;
+    const current=fs.readFileSync(f.script,'utf8');
+    assert.equal(current.includes(output),true);
+    const source=current.replace(output,injected);
+    fs.writeFileSync(f.script,source);
+    const root=f.host.approvedSources[SHA].root;
+    const bytes=Buffer.from(JSON.stringify({files:{[ENTRY]:hash(Buffer.from(source))}},null,2)+'\n');
+    fs.writeFileSync(path.join(root,'manifest.json'),bytes);
+    f.host.approvedSources[SHA].manifestSha256=hash(bytes);
+    const result=await inspectEmploymentR6Candidate(f.request,f);
+    if(item.ok){
+      assert.equal(result.status,'PASS');
+      assert.equal(result.indicators[0].scoreStatus,'PARTIAL_HISTORY');
+      assert.equal(result.indicators[0].firstMissingReferenceDate,item.date);
+      assert.equal(Object.hasOwn(result.indicators[1],'firstMissingReferenceDate'),false);
+      assert.doesNotMatch(JSON.stringify(result),/PRIVATE_PROVIDER_RAW_BODY_MUST_NOT_LEAK|SECRET_DO_NOT_LEAK/);
+      assert.equal(result.operationalWrites,0);
+    }else{
+      assert.equal(result.status,'FAIL');
+      assert.equal(result.code,'R6_RESULT_INVALID');
+    }
+  }
+});
+
 test('source, host, manifest and immutable path checks reject unapproved inputs',t=>{
   const f=fixture(t);
   assert.doesNotThrow(()=>validateBundle(f.request,f));
