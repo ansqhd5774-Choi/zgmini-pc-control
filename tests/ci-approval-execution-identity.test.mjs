@@ -63,7 +63,7 @@ function issueFixture(){
  const actual={number:42,user:{id:41898282,type:'Bot',login:CI_CONTROLLER_ACTOR},title:'pc-controller-update',
   state:'open',labels:[{name:'pc-maintenance'}],body:JSON.stringify(request)};
  f.logs='2026-11-26T00:00:00Z '+controllerBReceiptMarker(42,Buffer.from(actual.body));
- return {...f,actual,request,bytes,manifest,old};
+ return Object.assign(f,{actual,request,bytes,manifest,old});
 }
 test('production default is disabled; authenticated scoped receipt is process-local and exact',async()=>{
  const f=issueFixture(),{getJson,readJobLogs,policy}=f.opts;
