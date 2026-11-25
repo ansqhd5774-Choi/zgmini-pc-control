@@ -4,6 +4,7 @@
 import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
+import {resolveControllerApprovalCI} from '../tools/maintenance-request.mjs';
 
 const repo='ansqhd5774-Choi/zgmini-pc-control';
 const repositoryId=1442936296;
@@ -67,8 +68,21 @@ export async function observePublishedControllerApprovals(event,{getJson}={}){
     if(bytes.length===0||bytes.length>65536||blob!==file.sha||
        manifest?.schema!=='ZGMINI_PC_UPDATE_V1'||manifest.targetSha!==match[1])
      throw Error('APPROVAL_BYTES_MISMATCH');
-    entries.push({...item,state:'EXISTING_MANIFEST_OBSERVED_ONLY',blobSha:blob,
-     manifestSha256:createHash('sha256').update(bytes).digest('hex')});
+    const observed={...item,state:'EXISTING_MANIFEST_OBSERVED_ONLY',blobSha:blob,
+     manifestSha256:createHash('sha256').update(bytes).digest('hex')};
+    // Match the approval's own merged PR to its successful CI; no execution
+    // identity, request allocation, or write access is needed for this step.
+    try{
+     observed.sourceCI=await resolveControllerApprovalCI(manifest.approval?.ref,{
+      readApprovalPr:n=>getJson('pulls/'+n),
+      listRuns:head=>getJson('actions/workflows/'+workflowId+'/runs?head_sha='+head+'&event=pull_request&status=success&per_page=100'),
+      readRun:n=>getJson('actions/runs/'+n)});
+     observed.ciState='SOURCE_CI_MATCH_ONLY';
+    }catch(error){
+     observed.ciState='SOURCE_CI_UNVERIFIED';
+     observed.ciCode=/^MAINTENANCE_CI_[A-Z0-9_]+$/.test(error?.message??'')?error.message:'SOURCE_CI_READ_FAILED';
+    }
+    entries.push(observed);
    }catch{entries.push({...item,state:'APPROVAL_READ_UNVERIFIED'});}
   }
   return out(entries.length?'APPROVAL_PUBLICATION_OBSERVED_ONLY':'IGNORED',
