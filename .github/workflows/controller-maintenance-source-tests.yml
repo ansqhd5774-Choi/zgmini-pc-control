@@ -7,6 +7,7 @@ on:
       - 'tests/ci-approval-completed-run-intake.test.mjs'
       - 'tests/ci-approval-execution-identity.test.mjs'
       - '.github/workflows/ci-approval-event-intake.yml'
+      - '.github/workflows/ci-approval-controller-b.yml'
       - 'tests/ci-approval-shadow-decision.test.mjs'
       - 'tests/ci-approval-contract-adapter.test.mjs'
       - 'tests/ci-approval-github-ci-evidence.test.mjs'

@@ -1,4 +1,5 @@
 import {test} from 'node:test';
+import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {observeCompletedRun,observePublishedControllerApprovals,createControllerPublicationPorts,publishExistingControllerApprovals} from '../ci-approval/completed-run-intake.mjs';
@@ -148,4 +149,19 @@ test('non-main publication cannot call publisher even if caller supplies ports',
  const result=await publishExistingControllerApprovals(v.event,{getJson:()=>assert.fail('read'),ports:{},
   runId:123,attempt:1,emitReceipt:()=>assert.fail('receipt')});
  assert.equal(result.state,'IGNORED');assert.deepEqual(result.results,[]);
+});
+
+test('submission workflow is activation-gated, push-only and pinned to reviewed publisher source',()=>{
+ const y=readFileSync(new URL('../.github/workflows/ci-approval-controller-b.yml',import.meta.url),'utf8');
+ const trigger=y.slice(0,y.indexOf('\npermissions:'));
+ assert.match(trigger,/push:\s+branches: \[main\]/);
+ assert.doesNotMatch(trigger,/workflow_run:|pull_request:|workflow_dispatch:|schedule:/);
+ assert.match(y,/permissions: \{\}/);
+ assert.match(y,/vars\.ZGMINI_CI_CONTROLLER_B_ENABLED == 'true'/);
+ assert.match(y,/name: submit-controller-b/);
+ assert.match(y,/name: Record Controller B request receipt/);
+ assert.match(y,/ref: [a-f0-9]{40}\s+persist-credentials: false/);
+ assert.match(y,/run: node ci-approval\/completed-run-intake\.mjs --publish-existing/);
+ assert.match(y,/cancel-in-progress: false/);
+ assert.doesNotMatch(y,/contents: write|id-token: write/);
 });
