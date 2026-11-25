@@ -1,4 +1,3 @@
-import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
