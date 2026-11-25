@@ -1,0 +1,305 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-45597878497-1-seat-6",
+  "requestId": "pc-9b14d682-a4ab-49f9-9c38-478edadaa996",
+  "startedAt": "2026-11-25T10:45:00.980Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "83679b013ac9a9820331d93311ec97e572b18e13",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "249dd6ab57561fe3a512906a770f402918e8c376",
+  "sourceBranch": "main",
+  "operation": "employment-r6-raw-run-attestation-readonly",
+  "seat": 6,
+  "status": "PASS",
+  "code": "R6_RAW_RUN_AGGREGATE_READONLY",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": true,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-w04-history-pc-job-recovered-20261125",
+  "effectClass": "REGISTERED_OPERATION",
+  "pcOperationalApprovedSha": "d8ac245003e7b8e006c2345382d5c639c6d5f18b",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "R6_RAW_RUN_AGGREGATE_READONLY",
+    "sqliteOpened": true,
+    "scope": "W04_R6_RAW_RUN_FIXED_AGGREGATE_ONLY",
+    "dbIdentityTag": "b6fb111e0ff0378b",
+    "attestation": {
+      "status": "HASH_AND_RUN_LINKS_VERIFIED_NOT_PIT",
+      "checkedAt": "2026-11-25T10:45:15.732Z",
+      "metadataKeys": 99,
+      "bodyVerifiedKeys": 71,
+      "runCertifiedKeys": 71,
+      "invalidBodyKeys": 28,
+      "validWithoutRunKeys": 0,
+      "invalidReasonCounts": {
+        "CHUNK_OR_COUNT_INVALID": 0,
+        "HASH_FORMAT_INVALID": 0,
+        "SOURCE_FIELDS_INVALID": 0,
+        "TIME_INVALID": 0,
+        "RESPONSE_HASH_MISSING": 1,
+        "RESPONSE_HASH_VALUE_MISMATCH": 27,
+        "SNAPSHOT_ID_MISMATCH": 0,
+        "BODY_SHA_MISMATCH": 0
+      },
+      "invalidReasonOrdinals": [
+        {
+          "ordinal": 1,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 17,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 18,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 19,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 29,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 30,
+          "reason": "RESPONSE_HASH_MISSING"
+        },
+        {
+          "ordinal": 32,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 36,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 39,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 45,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 54,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 56,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 60,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 64,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 71,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 72,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 74,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 75,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 80,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 83,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 84,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 85,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 87,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 91,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 92,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 97,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 98,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 99,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        }
+      ],
+      "invalidReasonTruncated": false,
+      "invalidLineageGroups": [
+        {
+          "reason": "RESPONSE_HASH_MISSING",
+          "provider": "DOL_ETA",
+          "releaseGroup": "DOL_UI_WEEKLY_CLAIMS",
+          "retrievedMonth": "2026-11",
+          "collectorRevision": "EMP-R6-COLLECTOR-R1",
+          "count": 1
+        },
+        {
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH",
+          "provider": "BLS_BED",
+          "releaseGroup": "BLS_BED",
+          "retrievedMonth": "2026-11",
+          "collectorRevision": "EMP-R6-COLLECTOR-R1",
+          "count": 27
+        }
+      ],
+      "invalidLineageScope": "DIAGNOSTIC_NOT_PIT",
+      "mismatchIntegrity": {
+        "checked": 27,
+        "bodyShaMatched": 27,
+        "bodyShaMismatched": 0,
+        "idMatched": 27,
+        "idMismatched": 0,
+        "scope": "INDEPENDENT_HASH_CHECKS_NOT_PIT"
+      },
+      "legacyBedProof": {
+        "examined": 27,
+        "canonicalMatched": 27,
+        "canonicalMismatched": 0,
+        "invalidJson": 0,
+        "bodyOrIdInvalid": 0,
+        "runLinked": 27,
+        "scope": "LEGACY_BED_CANONICAL_COMPATIBILITY_NOT_PIT"
+      },
+      "missingHistoryLineage": {
+        "status": "OBSERVED",
+        "scope": "MISSING_HISTORY_KEY_SOURCE_LINKS_NOT_PIT",
+        "missingHistoryKeys": 2880,
+        "groups": [
+          {
+            "provider": "DOL_ETA",
+            "logicalSeriesId": "STATE_INITIAL_CLAIMS",
+            "missingHistoryKeys": 2880,
+            "rawRunLinked": 0,
+            "metadataInvalid": 0,
+            "rawRunLinkMissing": 2880,
+            "availableTimeMissing": 2880,
+            "availableTimeAfterRetrieval": 0,
+            "observedMissingWeeks": 57,
+            "earliestMissingWeek": "2025-07-26",
+            "latestMissingWeek": "2026-08-22",
+            "latestMissingWeekCounts": [
+              {
+                "week": "2026-08-22",
+                "missingKeys": 24
+              },
+              {
+                "week": "2026-08-15",
+                "missingKeys": 51
+              },
+              {
+                "week": "2026-08-08",
+                "missingKeys": 51
+              },
+              {
+                "week": "2026-08-01",
+                "missingKeys": 51
+              },
+              {
+                "week": "2026-07-25",
+                "missingKeys": 51
+              },
+              {
+                "week": "2026-07-18",
+                "missingKeys": 51
+              },
+              {
+                "week": "2026-07-11",
+                "missingKeys": 51
+              },
+              {
+                "week": "2026-07-04",
+                "missingKeys": 51
+              },
+              {
+                "week": "2026-06-27",
+                "missingKeys": 51
+              },
+              {
+                "week": "2026-06-20",
+                "missingKeys": 51
+              },
+              {
+                "week": "2026-06-13",
+                "missingKeys": 51
+              },
+              {
+                "week": "2026-06-06",
+                "missingKeys": 51
+              },
+              {
+                "week": "2026-05-30",
+                "missingKeys": 51
+              },
+              {
+                "week": "2026-05-23",
+                "missingKeys": 51
+              },
+              {
+                "week": "2026-05-16",
+                "missingKeys": 51
+              },
+              {
+                "week": "2026-05-09",
+                "missingKeys": 51
+              }
+            ],
+            "missingWeekCountsTruncated": true,
+            "invalidWeekDateKeys": 0,
+            "weekScope": "CURRENT_ONLY_KEYS_NOT_PIT"
+          }
+        ],
+        "rawRecordValuesReparsed": false,
+        "pitAttested": false,
+        "repairAuthorized": false
+      }
+    },
+    "operationalWrites": 0,
+    "providerCalls": 0,
+    "d1Writes": 0
+  },
+  "protectedBeforeSha256": "c3f37ad6b759146c1159c7637c428b704eac1383658071f7b1927697ade3c4b8",
+  "protectedAfterSha256": "c3f37ad6b759146c1159c7637c428b704eac1383658071f7b1927697ade3c4b8",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "83679b013ac9a9820331d93311ec97e572b18e13",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-25T10:45:51.892Z",
+  "durationMs": 50912
+}
