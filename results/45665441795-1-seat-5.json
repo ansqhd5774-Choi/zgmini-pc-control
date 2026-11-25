@@ -1,0 +1,92 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-45665441795-1-seat-5",
+  "requestId": "pc-87fd4f19-5f27-4204-b530-ad14f6275c20",
+  "startedAt": "2026-11-25T17:30:27.118Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "f50de351af0ef1502aeca99a913a6a9153fd3f10",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "a0735cac4a4dc56f0da0d3d0f82a93fd5b4486c7",
+  "sourceBranch": "main",
+  "operation": "w05-five-key-d1-api-readback-readonly",
+  "seat": 5,
+  "status": "STATE_UNKNOWN",
+  "code": "W05_FIVE_KEY_STRUCTURAL_ONLY_DEPLOYMENT_UNVERIFIED",
+  "lastPass": "ALLOWLISTED_WORKER_STARTED",
+  "firstFail": "ALLOWLISTED_OPERATION",
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-w04-post-repair-production-api-20261126",
+  "effectClass": "REGISTERED_OPERATION",
+  "pcOperationalApprovedSha": "d8ac245003e7b8e006c2345382d5c639c6d5f18b",
+  "exitCode": 0,
+  "result": {
+    "status": "STATE_UNKNOWN",
+    "code": "W05_FIVE_KEY_STRUCTURAL_ONLY_DEPLOYMENT_UNVERIFIED",
+    "keysChecked": 5,
+    "results": [
+      {
+        "slot": "inflation19",
+        "status": "STRUCTURAL_MATCH_NOT_RUNTIME_PROOF",
+        "d1BodySha256": "287e9b0ea7c8fd6be0c15f500eb1795f8c358f73a66c1572d3cea455d436dece",
+        "d1StoredAt": 1795471907939,
+        "d1ReadAt": "2026-11-25T17:30:35.807Z",
+        "apiObservedAt": "2026-11-25T17:30:36.524Z"
+      },
+      {
+        "slot": "inflation7",
+        "status": "STRUCTURAL_MATCH_NOT_RUNTIME_PROOF",
+        "d1BodySha256": "dff3a07c19019df83020dd089bd37c1cd5b73c2bf92788efaf5884c9be406c2e",
+        "d1StoredAt": 1795345763749,
+        "d1ReadAt": "2026-11-25T17:30:36.810Z",
+        "apiObservedAt": "2026-11-25T17:30:36.973Z"
+      },
+      {
+        "slot": "calendar",
+        "status": "STRUCTURAL_MATCH_NOT_RUNTIME_PROOF",
+        "d1BodySha256": "bfaa78a153b1d1827c0b1f4521a0d28e98553e51598a7976b5643841d4491b1d",
+        "d1StoredAt": 1795609542359,
+        "d1ReadAt": "2026-11-25T17:30:37.212Z",
+        "apiObservedAt": "2026-11-25T17:30:37.474Z"
+      },
+      {
+        "slot": "theme",
+        "status": "STRUCTURAL_MATCH_NOT_RUNTIME_PROOF",
+        "d1BodySha256": "6fec1f962e4e2ae3149f1757bb41b6d934efcc413716e371ddb4e20079dcca89",
+        "d1StoredAt": 1795582811081,
+        "d1ReadAt": "2026-11-25T17:30:37.735Z",
+        "apiObservedAt": "2026-11-25T17:30:38.172Z",
+        "rollingAndSidecarsVerified": false
+      },
+      {
+        "slot": "employment",
+        "status": "STRUCTURAL_MATCH_NOT_RUNTIME_PROOF",
+        "d1BodySha256": "c73cb5098224d5e23d51c503555055bb6f6108d448ff6365e3574fe2e6b3ae26",
+        "d1StoredAt": 1795614654757,
+        "d1ReadAt": "2026-11-25T17:30:38.390Z",
+        "apiObservedAt": "2026-11-25T17:30:38.545Z"
+      }
+    ],
+    "liveD1ApiCompared": true,
+    "sourceCheckoutVerified": true,
+    "ownerAuthorizationVerified": false,
+    "deploymentIdentityVerified": false,
+    "runtimeVerified": false,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "operationalWrites": 0,
+    "sqliteOpened": false,
+    "sourceSha": "d8ac245003e7b8e006c2345382d5c639c6d5f18b",
+    "structuralMatches": 5
+  },
+  "protectedBeforeSha256": "c3f37ad6b759146c1159c7637c428b704eac1383658071f7b1927697ade3c4b8",
+  "protectedAfterSha256": "c3f37ad6b759146c1159c7637c428b704eac1383658071f7b1927697ade3c4b8",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "f50de351af0ef1502aeca99a913a6a9153fd3f10",
+  "next": "INSPECT_FIRST_FAIL_NO_AUTOMATIC_RETRY",
+  "finishedAt": "2026-11-25T17:30:41.534Z",
+  "durationMs": 14416
+}

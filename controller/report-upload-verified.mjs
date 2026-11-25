@@ -157,29 +157,39 @@ export async function uploadVerifiedReportPair({api,repository,runId,attempt,sea
  for(const [extension,contents] of [['json',json],['txt',txt]]){
   const file=base+'.'+extension,resource='contents/'+file;
   const bytes=Buffer.from(contents,'utf8');
-  let verified=false;
-  for(let n=0;n<3&&!verified;n++){
+  let verified=false,maxAttempts=3;
+  const evidence={extension,initialGetStatus:null,putStatus:null,postPutGetStatus:null,putOutcomeUnknown:false};
+  for(let n=0;n<maxAttempts&&!verified;n++){
    try{
     const existing=await api(resource);
+    evidence.initialGetStatus=Number.isInteger(existing?.status)?existing.status:null;
     if(verifyRemoteFile(existing,bytes)){verified=true;break;}
     if(existing.status!==404)fail('REPORT_CONTENT_LOOKUP_FAILED');
     // A timed-out PUT can already have committed. Every attempt is followed
     // by a GET and a byte comparison; never infer success from HTTP 201/200.
     try{
-     await api(resource,'PUT',{
+     const put=await api(resource,'PUT',{
       message:`report: PC job ${runId}-${attempt} seat ${seat}`,
       content:bytes.toString('base64'),branch:'main'});
-    }catch{/* ambiguous PUT: the following readback resolves it */}
+     evidence.putStatus=Number.isInteger(put?.status)?put.status:null;
+     // GitHub can reject a stale branch tip while other workflows commit.
+     if([409,422,429,500,502,503,504].includes(put?.status))maxAttempts=5;
+    }catch{evidence.putOutcomeUnknown=true;/* following GET checks ambiguous PUT */}
     const after=await api(resource);
+    evidence.postPutGetStatus=Number.isInteger(after?.status)?after.status:null;
     if(verifyRemoteFile(after,bytes)){verified=true;break;}
     if(after.status!==404)fail('REPORT_CONTENT_LOOKUP_FAILED');
    }catch(error){
     if(['REPORT_REMOTE_INVALID','REPORT_REMOTE_CONTENT_CHANGED'].includes(error?.code))
      throw error;
    }
-   if(n<2)await wait(250*(n+1)+Number(seat)*80);
+   if(n<maxAttempts-1)await wait(250*(n+1)+Number(seat)*80);
   }
-  if(!verified)fail('REPORT_FILE_READBACK_NOT_VERIFIED');
+  if(!verified)throw Object.assign(new Error('REPORT_FILE_READBACK_NOT_VERIFIED'),{
+   code:'REPORT_FILE_READBACK_NOT_VERIFIED',
+   // Transport status only, never raw response, report bytes or credentials.
+   evidence:{...evidence,maxAttempts},
+  });
   links.push(`https://github.com/${repository}/blob/main/${file}`);
  }
  return links;

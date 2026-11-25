@@ -1,0 +1,13 @@
+{
+  "schema": "ZGMINI_PC_MAINTENANCE_RESULT_V1",
+  "requestId": "pc-update-78dab3c1-0c66-4ea7-94bd-5107b6a28b95",
+  "targetControllerSha": "60f37de24cbad4adc0b6ee9eee3c98a43160443d",
+  "status": "SUCCEEDED",
+  "code": "BUNDLE_REGISTERED",
+  "lastPass": "HOST_CAS_READBACK",
+  "firstFail": "NONE",
+  "actualControllerSha": "60f37de24cbad4adc0b6ee9eee3c98a43160443d",
+  "recoverySha": null,
+  "protectedStateUnchanged": null,
+  "workflowEnabled": null
+}

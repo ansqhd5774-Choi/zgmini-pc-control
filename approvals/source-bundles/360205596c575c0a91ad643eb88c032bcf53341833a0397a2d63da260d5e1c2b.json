@@ -1,0 +1,24 @@
+{
+  "schema": "ZGMINI_PC_SOURCE_BUNDLE_B_APPROVAL_V2",
+  "operation": "pc-source-bundle-register",
+  "scope": "HOST_APPROVED_SOURCES_SINGLE_CAS_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "codex/w04-pit-readonly-conflict-vintage-20261125",
+  "sourceSha": "551640c3094738f7803d6a7f799098a55c21523c",
+  "sourceManifestPath": "approvals/source-bundles/manifests/551640c3094738f7803d6a7f799098a55c21523c.json",
+  "sourceManifestSha256": "508ce1aa31163ea73f7c658ab03adea50235c8dca38fa5dd12f670f114edd751",
+  "entrypoint": "scripts/pc-writer/employment-r6-runner-stage.mjs",
+  "installedControllerSha": "60f37de24cbad4adc0b6ee9eee3c98a43160443d",
+  "hostPath": "E:/ZGmini/automation/pc-control/host.json",
+  "stageBundle": "E:/ZGmini/automation/pc-control/source-bundles/source-551640c3094738f7803d6a7f799098a55c21523c",
+  "backupDirectory": "E:/ZGmini/automation/pc-control/backups/source-pc-update-78dab3c1-0c66-4ea7-94bd-5107b6a28b95",
+  "approval": {
+    "grade": "B",
+    "scope": "HOST_APPROVED_SOURCES_SINGLE_CAS_ONLY",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3647"
+  },
+  "backup": {
+    "strategy": "VERSIONED_SNAPSHOT",
+    "rollback": "RESTORE_HOST_SHA256"
+  }
+}

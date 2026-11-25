@@ -50,7 +50,7 @@ jobs:
         with:
           node-version: '22'
       - name: Verify DOL-only authorization and existing registered data regressions
-        run: node --test --test-concurrency=1 r6-registered-data-b/dol-manual-v1.test.mjs r6-registered-data-b/operation.test.mjs r6-registered-data-b/operation-injected.test.mjs r6-registered-data-b/report.test.mjs
+        run: node --test --test-concurrency=1 r6-registered-data-b/dol-manual-v1.test.mjs r6-registered-data-b/operation.test.mjs r6-registered-data-b/operation-injected.test.mjs r6-registered-data-b/report.test.mjs r6-registered-data-b/history-repair.test.mjs
       - name: Verify fixed W04 National error metadata remains bounded and readonly
         run: node --test --test-concurrency=1 tests/employment-r6-collection-evidence-readonly.test.mjs
       - name: Verify bounded raw/run hash attestation without candidate DB

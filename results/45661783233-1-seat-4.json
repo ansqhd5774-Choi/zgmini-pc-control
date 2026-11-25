@@ -1,0 +1,213 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-45661783233-1-seat-4",
+  "requestId": "pc-8426c663-1dec-4dc2-b4ad-efc5f441cc8f",
+  "startedAt": "2026-11-25T17:09:59.485Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "717e242d769c9de3ed122b7fb636d38daaef48eb",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "b6049aac81b3442a58b08050ee138921f87a09e6",
+  "sourceBranch": "main",
+  "operation": "w05-cloudflare-rum-readonly",
+  "seat": 4,
+  "status": "STATE_UNKNOWN",
+  "code": "CF_RUM_FIELD_INCOMPLETE",
+  "lastPass": "ALLOWLISTED_WORKER_STARTED",
+  "firstFail": "ALLOWLISTED_OPERATION",
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-rum-event-scope-verify-20261126",
+  "effectClass": "REGISTERED_OPERATION",
+  "pcOperationalApprovedSha": "d8ac245003e7b8e006c2345382d5c639c6d5f18b",
+  "exitCode": 0,
+  "result": {
+    "status": "STATE_UNKNOWN",
+    "code": "CF_RUM_FIELD_INCOMPLETE",
+    "phase": "DONE",
+    "host": "zgmini.kr",
+    "source": "CLOUDFLARE_RUM_FIELD_GROUPS_PROVISIONAL",
+    "window": {
+      "startUtc": "2026-11-18T00:00:00.000Z",
+      "endUtc": "2026-11-25T00:00:00.000Z"
+    },
+    "fieldP75ValuesPresent": false,
+    "siteGoodCertified": false,
+    "metricSampleSizesVerified": false,
+    "cruxEquivalent": false,
+    "mergeBlocking": false,
+    "observations": [
+      {
+        "route": "/",
+        "device": "mobile",
+        "groupEventCount": 12,
+        "metricSpecificSampleCounts": "UNAVAILABLE",
+        "metricReportedTotals": {
+          "lcpMs": 12,
+          "inpMs": 10,
+          "cls": 11
+        },
+        "groupSampling": {
+          "scope": "WEB_VITALS_EVENT_GROUP_ONLY",
+          "averageSampleInterval": 1,
+          "countConfidence95": {
+            "estimate": 12,
+            "lower": 12,
+            "upper": 12,
+            "sampleSize": 12
+          }
+        },
+        "metrics": {
+          "lcpMs": {
+            "p75": 1652,
+            "goodLimit": 2500,
+            "state": "AT_OR_BELOW_GOOD_REFERENCE"
+          },
+          "inpMs": {
+            "p75": 80,
+            "goodLimit": 200,
+            "state": "AT_OR_BELOW_GOOD_REFERENCE"
+          },
+          "cls": {
+            "p75": 0.01,
+            "goodLimit": 0.1,
+            "state": "AT_OR_BELOW_GOOD_REFERENCE"
+          }
+        }
+      },
+      {
+        "route": "/",
+        "device": "desktop",
+        "groupEventCount": 41,
+        "metricSpecificSampleCounts": "UNAVAILABLE",
+        "metricReportedTotals": {
+          "lcpMs": 38,
+          "inpMs": 9,
+          "cls": 38
+        },
+        "groupSampling": {
+          "scope": "WEB_VITALS_EVENT_GROUP_ONLY",
+          "averageSampleInterval": 1,
+          "countConfidence95": {
+            "estimate": 41,
+            "lower": 41,
+            "upper": 41,
+            "sampleSize": 41
+          }
+        },
+        "metrics": {
+          "lcpMs": {
+            "p75": 1436,
+            "goodLimit": 2500,
+            "state": "AT_OR_BELOW_GOOD_REFERENCE"
+          },
+          "inpMs": {
+            "p75": 96,
+            "goodLimit": 200,
+            "state": "AT_OR_BELOW_GOOD_REFERENCE"
+          },
+          "cls": {
+            "p75": 0.001,
+            "goodLimit": 0.1,
+            "state": "AT_OR_BELOW_GOOD_REFERENCE"
+          }
+        }
+      },
+      {
+        "route": "/economic-indicators/",
+        "device": "mobile",
+        "groupEventCount": 2,
+        "metricSpecificSampleCounts": "UNAVAILABLE",
+        "metricReportedTotals": {
+          "lcpMs": 2,
+          "inpMs": 0,
+          "cls": 2
+        },
+        "groupSampling": {
+          "scope": "WEB_VITALS_EVENT_GROUP_ONLY",
+          "averageSampleInterval": 1,
+          "countConfidence95": {
+            "estimate": 2,
+            "lower": 2,
+            "upper": 2,
+            "sampleSize": 2
+          }
+        },
+        "metrics": {
+          "lcpMs": {
+            "p75": 712,
+            "goodLimit": 2500,
+            "state": "AT_OR_BELOW_GOOD_REFERENCE"
+          },
+          "inpMs": {
+            "p75": null,
+            "goodLimit": 200,
+            "state": "UNVERIFIED",
+            "missingKind": "PROVIDER_NEGATIVE"
+          },
+          "cls": {
+            "p75": 0.002,
+            "goodLimit": 0.1,
+            "state": "AT_OR_BELOW_GOOD_REFERENCE"
+          }
+        }
+      },
+      {
+        "route": "/economic-indicators/",
+        "device": "desktop",
+        "groupEventCount": 4,
+        "metricSpecificSampleCounts": "UNAVAILABLE",
+        "metricReportedTotals": {
+          "lcpMs": 4,
+          "inpMs": 1,
+          "cls": 4
+        },
+        "groupSampling": {
+          "scope": "WEB_VITALS_EVENT_GROUP_ONLY",
+          "averageSampleInterval": 1,
+          "countConfidence95": {
+            "estimate": 4,
+            "lower": 4,
+            "upper": 4,
+            "sampleSize": 4
+          }
+        },
+        "metrics": {
+          "lcpMs": {
+            "p75": 432,
+            "goodLimit": 2500,
+            "state": "AT_OR_BELOW_GOOD_REFERENCE"
+          },
+          "inpMs": {
+            "p75": 8,
+            "goodLimit": 200,
+            "state": "AT_OR_BELOW_GOOD_REFERENCE"
+          },
+          "cls": {
+            "p75": 0.037,
+            "goodLimit": 0.1,
+            "state": "AT_OR_BELOW_GOOD_REFERENCE"
+          }
+        }
+      }
+    ],
+    "cloudflareApiCalls": 1,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "operationalWrites": 0,
+    "sqliteOpened": false,
+    "nonTargetDeviceGroups": {
+      "tablet": 0,
+      "unrecognized": 0
+    }
+  },
+  "protectedBeforeSha256": "c3f37ad6b759146c1159c7637c428b704eac1383658071f7b1927697ade3c4b8",
+  "protectedAfterSha256": "c3f37ad6b759146c1159c7637c428b704eac1383658071f7b1927697ade3c4b8",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "717e242d769c9de3ed122b7fb636d38daaef48eb",
+  "next": "INSPECT_FIRST_FAIL_NO_AUTOMATIC_RETRY",
+  "finishedAt": "2026-11-25T17:10:14.426Z",
+  "durationMs": 14942
+}
