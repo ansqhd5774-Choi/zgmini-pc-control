@@ -281,3 +281,45 @@ test('normal four-group response has zero non-target device groups',()=>{
  assert.deepEqual(out.nonTargetDeviceGroups,{tablet:0,unrecognized:0});
  assert.equal(out.fieldP75ValuesPresent,true);
 });
+
+import {buildRumBrowserQuery,parseRumBrowserGraphql,
+ RUM_BROWSER_QUERY} from '../controller/cloudflare-rum-field-parser.mjs';
+
+test('browser diagnostic is fixed to existing Cloudflare RUM dataset and mobile economic route',()=>{
+ const q=buildRumBrowserQuery({accountTag:'a'.repeat(32),startUtc,endUtc});
+ assert.equal(q.endpoint,GRAPHQL_ENDPOINT);
+ assert.match(RUM_BROWSER_QUERY,/requestPath: "\/economic-indicators\//);
+ assert.match(RUM_BROWSER_QUERY,/deviceType: "mobile", bot: 0/);
+ assert.match(RUM_BROWSER_QUERY,/userAgentBrowser browserVersion browserEngine browserEngineVersion/);
+ assert.match(RUM_BROWSER_QUERY,/sum \{inpTotal\}/);
+ assert.doesNotMatch(RUM_BROWSER_QUERY,/mutation|subscription/i);
+ assert.deepEqual(q.variables,{account:'a'.repeat(32),start:startUtc,end:endUtc});
+});
+test('browser grouping retains only bounded in-scope aggregate evidence, never a root cause',()=>{
+ const r={data:{viewer:{accounts:[{rumWebVitalsEventsAdaptiveGroups:[
+  {count:2,dimensions:{requestHost:'zgmini.kr',requestPath:'/economic-indicators/',
+   deviceType:'mobile',userAgentBrowser:'Safari',browserVersion:'18.6',
+   browserEngine:'WebKit',browserEngineVersion:'620.3'},
+   sum:{inpTotal:0}},
+  {count:1,dimensions:{requestHost:'evil.example',requestPath:'/economic-indicators/',
+   deviceType:'mobile',userAgentBrowser:'UNTRUSTED',browserVersion:'9',
+   browserEngine:'Blink',browserEngineVersion:'9'},sum:{inpTotal:1}},
+ ]}]}}};
+ const x=parseRumBrowserGraphql(r,{startUtc,endUtc});
+ assert.equal(x.status,'BROWSER_GROUPS_PRESENT');
+ assert.deepEqual(x.groups,[{browser:'Safari',browserVersion:'18.6',
+  browserEngine:'WebKit',browserEngineVersion:'620.3',
+  groupEventCount:2,reportedInpTotal:0}]);
+ assert.equal(x.metricSampleSizesVerified,false);
+ assert.equal(x.actualInputObserved,'UNVERIFIED');
+ assert.equal(x.rootCause,'UNVERIFIED');
+ assert.equal(JSON.stringify(x).includes('evil.example'),false);
+ const redacted={...r,data:{viewer:{accounts:[{
+  rumWebVitalsEventsAdaptiveGroups:[{
+   ...r.data.viewer.accounts[0].rumWebVitalsEventsAdaptiveGroups[0],
+   dimensions:{...r.data.viewer.accounts[0].rumWebVitalsEventsAdaptiveGroups[0].dimensions,
+    userAgentBrowser:'javascript:secret/credential'}}]}]}}};
+ assert.equal(parseRumBrowserGraphql(redacted,{startUtc,endUtc}).groups[0].browser,'UNVERIFIED');
+ assert.throws(()=>parseRumBrowserGraphql({errors:[{message:'secret'}]},{startUtc,endUtc}),
+  /CF_RUM_BROWSER_GRAPHQL_INVALID/);
+});
