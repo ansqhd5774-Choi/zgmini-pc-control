@@ -12,6 +12,10 @@ const PINNED_SOURCE='a6dd77d19ccfcb79ddcdd0b4a6f495ec3888e24a';
 // The original 2026-11-06 *collector-ordered* digest, not the A audit's
 // legacy ticker-alphabetical digest. Never re-date a raw observation.
 const ORIGINAL_474_ASOF='2026-11-06';
+// Earliest original collector action began 2026-11-06 12:50:01 UTC
+// (GitHub Actions 42220548112). Later raw input is not that observation.
+const ORIGINAL_474_FIRST_RUN_START='2026-11-06T12:50:01.000Z';
+const ORIGINAL_474_CUTOFF_MS=Date.parse(ORIGINAL_474_FIRST_RUN_START);
 const ORIGINAL_474_COLLECTOR_SHA='548d5c68e00af32d933a327b521e6b05a89f3bb37eac3ccb100e6af9b74ad255';
 const PC_HOME=String.raw`E:\ZGmini\data\pc-writer`;
 const DAYS=Array.from({length:30},(_,i)=>`2026-11-${String(i+1).padStart(2,'0')}`);
@@ -66,10 +70,153 @@ function storedHistory(input,symbol){
       if(p.validation===undefined&&rejected||p.validation!==undefined&&
         (p.validation?.validRows!==rows.length||p.validation?.rejectedRows!==rejected))
         return {kind:'INVALID',rows:[]};
-      return {kind:'READ',rows,rejected};
+      return {kind:'READ',rows,rejected,storedAt:p.storedAt};
     }catch{return {kind:'INVALID',rows:[]}}
   }
   return {kind:'MISSING',rows:[]};
+}
+
+
+// A-grade: reconstruct the original date-pinned November candidate set only
+// from stored historical SQLite rows and existing private files, never GET.
+// If any historical input is unavailable, the original hash is NOT VERIFIED.
+export async function inspectOriginalNov6InputVintage({
+  pcHome=PC_HOME,readDatedCore
+}={}){
+  const r={
+    schema:'ZGMINI_NOV30_474_INPUT_VINTAGE_A_V1',
+    status:'NOT_VERIFIED',code:'NOV30_474_VINTAGE_NOT_STARTED',
+    asOf:ORIGINAL_474_ASOF,cutoff:ORIGINAL_474_FIRST_RUN_START,
+    validDays:0,privateDays:0,coreVintageDays:0,
+    missingDays:0,invalidDays:0,eventRows:0,
+    candidateSymbols:null,collectorOrderedCandidateSetSha256:null,
+    original474CohortHashComparison:'NOT_EVALUATED',
+    originalCohortCachedSymbols:null,originalCohortMissingSymbols:null,
+    originalCohortInvalidFiles:null,
+    originalCohortStoredBeforeRun:null,
+    originalCohortStoredAfterRun:null,
+    providerCalls:0,coreWrites:0,d1Writes:0,schedulerWrites:0
+  };
+  if(typeof pcHome!=='string'||!path.isAbsolute(pcHome)){
+    r.code='NOV30_474_VINTAGE_PC_HOME_STOP';return r;
+  }
+  const input=path.join(pcHome,'er1-input');
+  let db;
+  try{
+    if(readDatedCore!==undefined&&typeof readDatedCore!=='function'){
+      r.code='NOV30_474_VINTAGE_READER_STOP';return r;
+    }
+    if(!readDatedCore){
+      const dbFile=path.join(pcHome,'storage','core.sqlite');
+      if(!safeFile(dbFile,Number.MAX_SAFE_INTEGER)){
+        r.code='NOV30_474_VINTAGE_DB_NOT_FOUND';return r;
+      }
+      const {DatabaseSync}=await import('node:sqlite');
+      db=new DatabaseSync(dbFile,{readOnly:true,timeout:1000});
+      db.exec('PRAGMA query_only=ON; PRAGMA busy_timeout=1000;');
+      // Only immutable YYYY-MM-DD input vintages. Never use "current" and
+      // never select any row written after the original collector started.
+      const stmt=db.prepare(
+        "SELECT body,stored_at,snapshot_key FROM public_feed_snapshots_v1"+
+        " WHERE kind='input' AND feed_key=?"+
+        " AND snapshot_key GLOB '????-??-??' AND snapshot_key<=?"+
+        " AND stored_at<=? ORDER BY stored_at DESC,snapshot_key DESC LIMIT 1");
+      readDatedCore=day=>{
+        const v=stmt.get('release-calendar:earnings-api:'+day,
+          ORIGINAL_474_ASOF,ORIGINAL_474_CUTOFF_MS);
+        if(!v)return null;
+        if(typeof v.body!=='string'||Buffer.byteLength(v.body,'utf8')>2_501_024)
+          throw Error('NOV30_474_VINTAGE_BODY_STOP');
+        const wrapper=JSON.parse(v.body);
+        if(wrapper?.requestedDate!==day||typeof wrapper.text!=='string'||
+          Buffer.byteLength(wrapper.text,'utf8')>2_000_000)
+          throw Error('NOV30_474_VINTAGE_WRAPPER_STOP');
+        return {body:JSON.parse(wrapper.text),
+          storedAt:v.stored_at,snapshotKey:v.snapshot_key};
+      };
+    }
+    const firstDate=new Map();
+    for(const day of DAYS){
+      const file=path.join(input,'nov30-forward-days',day+'.json');
+      let body=null,fromPrivate=false;
+      // An unsafe or post-cutoff archive is NOT replaced by today's Core row.
+      if(fs.existsSync(file)){
+        if(!safeFile(file,2_501_024)){
+          r.invalidDays++;continue;
+        }
+        try{
+          const p=JSON.parse(fs.readFileSync(file,'utf8'));
+          const at=Date.parse(p?.storedAt);
+          if(!Number.isFinite(at)||at>Date.parse(ORIGINAL_474_FIRST_RUN_START)||
+            at<Date.parse('2026-10-30T00:00:00Z')){
+            r.invalidDays++;continue;
+          }
+          body=p.body;fromPrivate=true;
+        }catch{r.invalidDays++;continue}
+      }else{
+        let v;
+        try{v=readDatedCore(day)}catch{r.invalidDays++;continue}
+        if(!v){r.missingDays++;continue}
+        const at=Number(v.storedAt);
+        if(!Number.isSafeInteger(at)||at< Date.parse('2026-10-30T00:00:00Z')||
+          at>ORIGINAL_474_CUTOFF_MS||
+          !validDay(v.snapshotKey)||v.snapshotKey>ORIGINAL_474_ASOF){
+          r.invalidDays++;continue;
+        }
+        body=v.body;
+      }
+      const rows=calendarRows(body,day);
+      if(!rows||r.eventRows+rows.length>5000){
+        r.invalidDays++;continue;
+      }
+      r.validDays++;r.eventRows+=rows.length;
+      if(fromPrivate)r.privateDays++;else r.coreVintageDays++;
+      if(day>ORIGINAL_474_ASOF){
+        for(const row of rows){
+          const prior=firstDate.get(row.symbol);
+          if(!prior||day<prior)firstDate.set(row.symbol,day);
+        }
+      }
+    }
+    if(r.validDays!==30||r.missingDays||r.invalidDays){
+      r.code='NOV30_474_VINTAGE_INCOMPLETE';return r;
+    }
+    const symbols=[...firstDate].sort((a,b)=>
+      a[1].localeCompare(b[1])||a[0].localeCompare(b[0]))
+      .map(([symbol])=>symbol);
+    r.candidateSymbols=symbols.length;
+    r.collectorOrderedCandidateSetSha256=sha256(JSON.stringify(symbols));
+    r.original474CohortHashComparison=
+      r.collectorOrderedCandidateSetSha256===ORIGINAL_474_COLLECTOR_SHA?
+        'MATCH':'MISMATCH';
+    if(r.original474CohortHashComparison!=='MATCH'){
+      r.status='NOT_VERIFIED';
+      r.code='NOV30_474_HISTORICAL_COHORT_DIFFERENT';
+      return r;
+    }
+    // Cohort membership is verified only on a matching immutable hash.
+    // Read existing files only. A file today is not necessarily an old PIT row.
+    let present=0,missing=0,invalid=0,before=0,after=0;
+    for(const symbol of symbols){
+      const history=storedHistory(input,symbol);
+      if(history.kind==='INVALID')invalid++;
+      else if(history.kind==='MISSING')missing++;
+      else{
+        present++;
+        if(Date.parse(history.storedAt)<=ORIGINAL_474_CUTOFF_MS)before++;
+        else after++;
+      }
+    }
+    r.originalCohortCachedSymbols=present;
+    r.originalCohortMissingSymbols=missing;
+    r.originalCohortInvalidFiles=invalid;
+    r.originalCohortStoredBeforeRun=before;
+    r.originalCohortStoredAfterRun=after;
+    r.status='PASS';r.code='NOV30_474_ORIGINAL_COHORT_HASH_VERIFIED';
+  }catch{
+    r.status='NOT_VERIFIED';r.code='NOV30_474_VINTAGE_READ_STOP';
+  }finally{try{db?.close()}catch{}}
+  return r;
 }
 
 export async function inspectSavedActual({pcHome=PC_HOME,
@@ -255,14 +402,18 @@ export function validIssue(event,env){
     !event.issue.labels.some(x=>x.name==='pc-er1-approved'))
     stop('NOV30_SAVED_AUDIT_ISSUE_STOP');
   let req;try{req=JSON.parse(event.issue.body)}catch{stop('NOV30_SAVED_AUDIT_JSON_STOP')}
-  const original474=req?.schema==='ZGMINI_ER1_NOV30_ORIGINAL_COHORT_A_V1';
+  const vintage474=req?.schema==='ZGMINI_ER1_NOV30_ORIGINAL_VINTAGE_A_V1';
+  const original474=vintage474||req?.schema==='ZGMINI_ER1_NOV30_ORIGINAL_COHORT_A_V1';
   const keys=original474?
     ['schema','operation','sourceSha','requestId','chatId','originalIssueNumber']:
     ['schema','operation','sourceSha','requestId','chatId'];
   if(!req||Array.isArray(req)||Object.keys(req).sort().join('|')!==keys.sort().join('|')||
     (original474?
-      req.schema!=='ZGMINI_ER1_NOV30_ORIGINAL_COHORT_A_V1'||
-      req.operation!=='original-cohort-read-only'||req.originalIssueNumber!==474:
+      (vintage474?
+        req.operation!=='original-vintage-read-only':
+        req.schema!=='ZGMINI_ER1_NOV30_ORIGINAL_COHORT_A_V1'||
+        req.operation!=='original-cohort-read-only')||
+      req.originalIssueNumber!==474:
       req.schema!=='ZGMINI_ER1_NOV30_SAVED_ACTUAL_A_V1'||
       req.operation!=='read-only')||
     req.sourceSha!==PINNED_SOURCE||
@@ -270,7 +421,8 @@ export function validIssue(event,env){
     !UUID.test(req.requestId.slice(16))||
     !req.chatId?.startsWith('chat-')||!UUID.test(req.chatId.slice(5)))
     stop('NOV30_SAVED_AUDIT_CONTRACT_STOP');
-  return {...req,pinnedAsOf:original474?ORIGINAL_474_ASOF:null};
+  return {...req,pinnedAsOf:original474?ORIGINAL_474_ASOF:null,
+    inspectOriginalVintage:vintage474};
 }
 
 function verifySource(workspace){
@@ -298,6 +450,8 @@ export async function execute({env=process.env}={}){
     const {scoreER1Issuers}=await import(pathToFileURL(scoreFile).href);
     report=await inspectSavedActual({
       asOf:request.pinnedAsOf??undefined,score:scoreER1Issuers});
+    if(request.inspectOriginalVintage)
+      report.originalNov6InputVintage=await inspectOriginalNov6InputVintage();
   }catch(e){
     const code=e?.message;
     report.code=/^NOV30_SAVED_AUDIT_[A-Z_]+$/.test(code)?code:
