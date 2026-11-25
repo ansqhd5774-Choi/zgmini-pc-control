@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {controllerBReceiptMarker,verifyControllerBIdentity,authenticateControllerBIssue,CI_CONTROLLER_ACTOR} from '../ci-approval/ci-execution-identity.mjs';
-import {validateMaintenanceRequest,validateUpdateRequest,manifestFingerprint} from '../tools/maintenance-contract.mjs';
+import {validateMaintenanceRequest,validateUpdateRequest,manifestFingerprint,installedControllerBPolicy} from '../tools/maintenance-contract.mjs';
 const repo='ansqhd5774-Choi/zgmini-pc-control',path='.github/workflows/ci-approval-controller-b.yml',head='a'.repeat(40);
 function fixture(){
  const requestBytes=Buffer.from('{"requestId":"fixture"}'),workflowBytes=Buffer.from('reviewed immutable workflow fixture\n');
@@ -114,4 +114,43 @@ test('cancelled or unverified historical CI request cannot authenticate for reco
  actual.state_reason='completed';
  assert.equal((await authenticateControllerBIssue(actual,{...options,readJobLogs:async()=>''})).state,'EVIDENCE_MISSING');
  assert.equal((await authenticateControllerBIssue({...actual,body:'{}'},options)).state,'REJECTED');
+});
+
+test('CI workload policy is disabled unless explicitly installed in the trusted maintainer manifest',async()=>{
+ const f=fixture(),installed={schema:'ZGMINI_PC_MAINTENANCE_INSTALL_V1',
+  sourceSha:'c'.repeat(40),startupSha256:'d'.repeat(64),
+  files:Object.fromEntries(['a','b','c','d','e','f','g'].map(x=>['tools/'+x+'.mjs','e'.repeat(64)]))};
+ assert.equal(installedControllerBPolicy(installed),null);
+ const approved={...installed,ciControllerBPolicy:{schema:'ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V1',
+  enabled:true,workflowId:f.opts.policy.workflowId,
+  workflowBlobSha:f.opts.policy.workflowBlobSha,
+  workflowPath:'.github/workflows/ci-approval-controller-b.yml'}};
+ const found=installedControllerBPolicy(approved);
+ assert.deepEqual(found,f.opts.policy);
+ assert.equal(Object.isFrozen(found),true);
+ const verified=await verifyControllerBIdentity({...f.opts,policy:found});
+ assert.equal(verified.state,'CI_WORKLOAD_IDENTITY_VERIFIED_ONLY');
+ // The former default is still disabled and an Issue cannot override it.
+ assert.equal((await verifyControllerBIdentity({...f.opts,policy:null})).state,'DISABLED');
+});
+test('installed CI policy fails closed when identity, schema or manifest is changed',()=>{
+ const f=fixture(),base={schema:'ZGMINI_PC_MAINTENANCE_INSTALL_V1',sourceSha:'a'.repeat(40),
+  startupSha256:'b'.repeat(64),
+  files:Object.fromEntries(['a','b','c','d','e','f','g'].map(x=>['tools/'+x+'.mjs','c'.repeat(64)])),
+  ciControllerBPolicy:{schema:'ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V1',
+    enabled:true,workflowId:f.opts.policy.workflowId,
+    workflowBlobSha:f.opts.policy.workflowBlobSha,
+    workflowPath:'.github/workflows/ci-approval-controller-b.yml'}};
+ for(const alter of [
+  x=>x.ciControllerBPolicy.enabled=false,
+  x=>x.ciControllerBPolicy.workflowBlobSha='0'.repeat(40)+'wrong',
+  x=>x.ciControllerBPolicy.workflowPath='../other.yml',
+  x=>x.ciControllerBPolicy.workflowId='22',
+  x=>x.ciControllerBPolicy.extra=true,
+  x=>x.files={},
+  x=>x.sourceSha='bad'
+ ]){
+  const altered=structuredClone(base);alter(altered);
+  assert.throws(()=>installedControllerBPolicy(altered),/CI_INSTALLED_POLICY_INVALID/);
+ }
 });

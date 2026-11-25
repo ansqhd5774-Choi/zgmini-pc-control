@@ -11,7 +11,7 @@ import {TextDecoder} from 'node:util';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {applyApprovedUpdate,maintenanceCliFailureReport} from './maintenance-apply.mjs';
 import {validateUpdateRequest,validateMaintenanceRequest,
- authenticateControllerBIssue,CI_CONTROLLER_ACTOR,
+ authenticateControllerBIssue,CI_CONTROLLER_ACTOR,installedControllerBPolicy,
 validateControllerConfigTransition,controllerAdmissionForPurpose,
   readAllMaintenancePages,validateInfrastructureDelta,
   validateControllerOnlyInstallDelta,validateControllerSelectivePin,
@@ -1944,7 +1944,20 @@ export async function loadAuthenticatedApprovedPackage(requestId,file,{recovery=
  if(envelope.data.actor==='ansqhd5774-Choi')return finishApprovedControllerEnvelope(envelope,{recovery});
  // The flag is only supplied by the independent exact-approval rollback
  // entry, never by an Issue or ordinary apply/preflight command.
- const proof=await authenticateControllerBIssue(envelope.actual,{recovery,getJson:github,
+ // Independently re-read the same installed policy as the receiver.
+ // Do not inherit a serializable proof, Issue field, GitHub event or caller
+ // environment variable. The prior self-manifest and seven-file CAS stay in
+ // the existing independent maintenance path.
+ const policyFile=path.join(maintenanceRoot,'MAINTENANCE_INSTALL.json');
+ const stat=fs.lstatSync(policyFile);
+ need(stat.isFile()&&!stat.isSymbolicLink()&&stat.size>0&&stat.size<=131072,
+  'CI_INSTALLED_POLICY_UNVERIFIED');
+ let policy;
+ try{policy=installedControllerBPolicy(json(policyFile));}
+ catch{throw Object.assign(Error('CI_INSTALLED_POLICY_UNVERIFIED'),
+  {code:'CI_INSTALLED_POLICY_UNVERIFIED'});}
+ need(policy!==null,'CI_IDENTITY_POLICY_NOT_CONFIGURED');
+ const proof=await authenticateControllerBIssue(envelope.actual,{policy,recovery,getJson:github,
   readJobLogs:jobId=>execFileSync(gh,['api',`repos/${controlRepository}/actions/jobs/${jobId}/logs`],
    {encoding:'utf8',windowsHide:true,timeout:60000,maxBuffer:16000000})});
  need(proof.state==='CI_WORKLOAD_IDENTITY_VERIFIED_ONLY',proof.code);

@@ -9,7 +9,7 @@ import path from "node:path";
 import {fileURLToPath,pathToFileURL} from "node:url";
 
 import {validateMaintenanceRequest,validateUpdateRequest,
-  authenticateControllerBIssue,CI_CONTROLLER_ACTOR,CI_CONTROLLER_POLICY,
+  authenticateControllerBIssue,CI_CONTROLLER_ACTOR,installedControllerBPolicy,
   validateR6HostIssueEnvelope,validateR6HostRegistrationRequest,
   validateR54BIssueEnvelope,validateR54BManifestRequest,
   R54_B_ISSUE_TITLE,R54_B_OPERATION,R54_B_SOURCE_FILES,
@@ -877,10 +877,24 @@ export function createMaintenanceAgent({
   async function processIssue(issue){
     if(issue?.title===INSTALLED_RECOVERY_ISSUE_TITLE)
       return processInstalledRecoveryIssue(issue);
-    const ciCandidate=CI_CONTROLLER_POLICY!==null&&issue?.title===ISSUE_TITLE&&issue.state==='OPEN'&&
+    const ciOrigin=issue?.title===ISSUE_TITLE&&issue.state==='OPEN'&&
       Number.isSafeInteger(issue.number)&&issue.number>0&&
       [CI_CONTROLLER_ACTOR,'app/github-actions'].includes(issue.author?.login)&&
       issue.labels?.some(x=>x.name===label);
+    let ciPolicy=null;
+    if(ciOrigin){
+      try{
+        // The installed seven-file source must still match its existing CAS.
+        verifyInstalledSource();
+        const file=path.join(root,'MAINTENANCE_INSTALL.json'),stat=fs.lstatSync(file);
+        if(!stat.isFile()||stat.isSymbolicLink()||stat.size<1||stat.size>131072)
+          throw coded('CI_INSTALLED_POLICY_UNVERIFIED');
+        ciPolicy=installedControllerBPolicy(JSON.parse(fs.readFileSync(file,'utf8')));
+      }catch{
+        return {status:'BLOCKED',code:'CI_INSTALLED_POLICY_UNVERIFIED',issueNumber:issue.number};
+      }
+    }
+    const ciCandidate=ciOrigin&&ciPolicy!==null;
     if(![ISSUE_TITLE,R6_HOST_ISSUE_TITLE,R54_B_ISSUE_TITLE,SOURCE_BUNDLE_ISSUE_TITLE].includes(issue?.title)
       ||(!ciCandidate&&!issueIsTrusted(issue,{allowedActors,title:issue.title,label})))
       return {status:"IGNORED",issueNumber:issue?.number};
@@ -889,7 +903,7 @@ export function createMaintenanceAgent({
       const actual=await githubJson(["api",`repos/${repo}/issues/${issue.number}`],"GITHUB_ISSUE_READ_FAILED");
       if(actual.number!==issue.number||actual.body!==issue.body)
         return {status:"BLOCKED",code:"CI_ISSUE_READBACK_MISMATCH",issueNumber:issue.number};
-      const checked=await authenticateControllerBIssue(actual,{
+      const checked=await authenticateControllerBIssue(actual,{policy:ciPolicy,
         getJson:route=>githubJson(["api",`repos/${repo}/${route}`],"CI_IDENTITY_READ_FAILED"),
         readJobLogs:async jobId=>(await github(["api",`repos/${repo}/actions/jobs/${jobId}/logs`])).stdout,
       });

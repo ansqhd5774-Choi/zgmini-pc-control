@@ -62,6 +62,29 @@ export const CONTROL_ACTOR="ansqhd5774-Choi";
 // approved installed pin are available. Neither Issue nor GitHub event may
 // set this policy. This preserves the current seven-file installation layout.
 export const CI_CONTROLLER_POLICY=null;
+// The independent maintainer's already verified installation manifest is the
+// only local activation source. Absent policy remains disabled. Neither a
+// GitHub Issue, incoming event, candidate PR nor environment variable may
+// configure the receiver. The installed manifest is written only by the
+// approved independent maintenance handoff.
+export function installedControllerBPolicy(installed){
+ if(installed?.ciControllerBPolicy===undefined)return null;
+ const policy=installed.ciControllerBPolicy;
+ const keys=['schema','enabled','workflowId','workflowBlobSha','workflowPath'];
+ if(installed?.schema!=='ZGMINI_PC_MAINTENANCE_INSTALL_V1'||
+    !/^[a-f0-9]{40}$/.test(installed.sourceSha??'')||
+    !/^[a-f0-9]{64}$/.test(installed.startupSha256??'')||
+    !installed.files||typeof installed.files!=='object'||Array.isArray(installed.files)||
+    Object.keys(installed.files).length!==7||
+    !policy||typeof policy!=='object'||Array.isArray(policy)||
+    Object.keys(policy).length!==keys.length||!keys.every(k=>Object.hasOwn(policy,k))||
+    policy.schema!=='ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V1'||policy.enabled!==true||
+    !Number.isSafeInteger(policy.workflowId)||policy.workflowId<=0||
+    !/^[a-f0-9]{40}$/.test(policy.workflowBlobSha??'')||
+    policy.workflowPath!=='.github/workflows/ci-approval-controller-b.yml')
+  throw Error('CI_INSTALLED_POLICY_INVALID');
+ return Object.freeze({workflowId:policy.workflowId,workflowBlobSha:policy.workflowBlobSha});
+}
 export const CI_CONTROLLER_ACTOR='github-actions[bot]';
 const ciWorkload=(()=>{
 const REPO='ansqhd5774-Choi/zgmini-pc-control',REPO_ID=1442936296;
