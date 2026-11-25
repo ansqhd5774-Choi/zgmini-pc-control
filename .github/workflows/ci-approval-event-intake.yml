@@ -1,0 +1,47 @@
+name: ZGMINI CI Approval Event Intake
+on:
+  workflow_run:
+    workflows: [ZGMINI Controller Maintenance Source Tests]
+    types: [completed]
+  push:
+    branches: [main]
+    paths: ['approvals/controller-updates/*.json']
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read # Existing private approval PR metadata only; no write access.
+jobs:
+  observe-source-completion:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.id == 1442936296 &&
+      github.event.repository.private == true &&
+      ((github.event_name == 'workflow_run' &&
+      github.event.workflow_run.workflow_id == 416355595 &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.id == 1442936296) ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      github.event.forced == false && github.event.deleted == false))
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 4
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Confirm isolated read-only intake host
+        run: |
+          if /I NOT "%COMPUTERNAME%"=="DESKTOP-N62L0NG" exit /b 5
+      # workflow_run supplies the default-branch revision, not the candidate.
+      # Never fetch or execute the completed run's head or artifacts here.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Observe source CI or published approval without operational writes
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node ci-approval/completed-run-intake.mjs
