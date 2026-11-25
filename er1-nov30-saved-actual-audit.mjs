@@ -9,6 +9,10 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 
 const CONTROL='ansqhd5774-Choi/zgmini-pc-control';
 const PINNED_SOURCE='a6dd77d19ccfcb79ddcdd0b4a6f495ec3888e24a';
+// The original 2026-11-06 *collector-ordered* digest, not the A audit's
+// legacy ticker-alphabetical digest. Never re-date a raw observation.
+const ORIGINAL_474_ASOF='2026-11-06';
+const ORIGINAL_474_COLLECTOR_SHA='548d5c68e00af32d933a327b521e6b05a89f3bb37eac3ccb100e6af9b74ad255';
 const PC_HOME=String.raw`E:\ZGmini\data\pc-writer`;
 const DAYS=Array.from({length:30},(_,i)=>`2026-11-${String(i+1).padStart(2,'0')}`);
 const GROUPS=['pre','after','notSupplied'];
@@ -73,7 +77,9 @@ export async function inspectSavedActual({pcHome=PC_HOME,
   const result={schema:'ZGMINI_NOV30_SAVED_ACTUAL_READONLY_V1',status:'BLOCKED',
     code:'NOV30_SAVED_AUDIT_NOT_STARTED',asOf,dayCount:0,coreDays:0,
     privateDays:0,eventRows:0,scheduledSymbols:0,futureSymbols:0,
-    candidateSetSha256:null,priorCalendarRowsBothActual:0,
+    candidateSetSha256:null,collectorOrderedCandidateSetSha256:null,
+    original474CohortHashComparison:'NOT_EVALUATED',
+    priorCalendarRowsBothActual:0,
     futureCalendarRowsBothActual:0,
     calendarForecastEPSNumberRows:0,calendarForecastEPSNullOrMissingRows:0,
     calendarForecastRevenueNumberRows:0,calendarForecastRevenueNullOrMissingRows:0,
@@ -114,7 +120,7 @@ export async function inspectSavedActual({pcHome=PC_HOME,
         };
       }else readCore=()=>null;
     }
-    const future=new Set(),all=new Set();
+    const future=new Set(),all=new Set(),firstFutureDate=new Map();
     const futureEPSForecast=new Set(),futureRevenueForecast=new Set();
     const futureBothForecast=new Set();
     for(const day of DAYS){
@@ -136,7 +142,11 @@ export async function inspectSavedActual({pcHome=PC_HOME,
       result.eventRows+=rows.length;
       for(const r of rows){
         all.add(r.symbol);
-        if(day>asOf)future.add(r.symbol);
+        if(day>asOf){
+          future.add(r.symbol);
+          const prior=firstFutureDate.get(r.symbol);
+          if(!prior||day<prior)firstFutureDate.set(r.symbol,day);
+        }
         const epsForecast=typeof r.epsEstimate==='number'&&
           Number.isFinite(r.epsEstimate);
         const revenueForecast=typeof r.revenueEstimate==='number'&&
@@ -174,6 +184,17 @@ export async function inspectSavedActual({pcHome=PC_HOME,
     result.futureSymbolsWithoutBothForecast=future.size-futureBothForecast.size;
     const symbols=[...future].sort();
     result.candidateSetSha256=sha256(JSON.stringify(symbols));
+    // Exact selection order of original source:
+    // selectFutureNovemberSymbols(): earliest scheduled date, then ticker.
+    const collectorOrder=[...firstFutureDate].sort((a,b)=>
+      a[1].localeCompare(b[1])||a[0].localeCompare(b[0]))
+      .map(([symbol])=>symbol);
+    result.collectorOrderedCandidateSetSha256=
+      sha256(JSON.stringify(collectorOrder));
+    if(asOf===ORIGINAL_474_ASOF&&result.dayCount===30)
+      result.original474CohortHashComparison=
+        result.collectorOrderedCandidateSetSha256===ORIGINAL_474_COLLECTOR_SHA?
+          'MATCH':'MISMATCH';
     const issuerMap=new Map();
     const earliestRecent=new Date(Date.parse(asOf+'T00:00:00Z')-
       140*86400_000).toISOString().slice(0,10);
@@ -226,7 +247,7 @@ export async function inspectSavedActual({pcHome=PC_HOME,
   return result;
 }
 
-function validIssue(event,env){
+export function validIssue(event,env){
   if(env.GITHUB_REPOSITORY!==CONTROL||env.GITHUB_ACTOR!=='ansqhd5774-Choi'||
     env.GITHUB_EVENT_NAME!=='issues'||env.GITHUB_EVENT_ACTION!=='opened'||
     event?.action!=='opened'||event.issue?.user?.login!=='ansqhd5774-Choi'||
@@ -234,15 +255,22 @@ function validIssue(event,env){
     !event.issue.labels.some(x=>x.name==='pc-er1-approved'))
     stop('NOV30_SAVED_AUDIT_ISSUE_STOP');
   let req;try{req=JSON.parse(event.issue.body)}catch{stop('NOV30_SAVED_AUDIT_JSON_STOP')}
-  const keys=['schema','operation','sourceSha','requestId','chatId'];
+  const original474=req?.schema==='ZGMINI_ER1_NOV30_ORIGINAL_COHORT_A_V1';
+  const keys=original474?
+    ['schema','operation','sourceSha','requestId','chatId','originalIssueNumber']:
+    ['schema','operation','sourceSha','requestId','chatId'];
   if(!req||Array.isArray(req)||Object.keys(req).sort().join('|')!==keys.sort().join('|')||
-    req.schema!=='ZGMINI_ER1_NOV30_SAVED_ACTUAL_A_V1'||
-    req.operation!=='read-only'||req.sourceSha!==PINNED_SOURCE||
+    (original474?
+      req.schema!=='ZGMINI_ER1_NOV30_ORIGINAL_COHORT_A_V1'||
+      req.operation!=='original-cohort-read-only'||req.originalIssueNumber!==474:
+      req.schema!=='ZGMINI_ER1_NOV30_SAVED_ACTUAL_A_V1'||
+      req.operation!=='read-only')||
+    req.sourceSha!==PINNED_SOURCE||
     !req.requestId?.startsWith('pc-nov30-actual-')||
     !UUID.test(req.requestId.slice(16))||
     !req.chatId?.startsWith('chat-')||!UUID.test(req.chatId.slice(5)))
     stop('NOV30_SAVED_AUDIT_CONTRACT_STOP');
-  return req;
+  return {...req,pinnedAsOf:original474?ORIGINAL_474_ASOF:null};
 }
 
 function verifySource(workspace){
@@ -261,14 +289,15 @@ export async function execute({env=process.env}={}){
   try{
     if(process.platform!=='win32')stop('NOV30_SAVED_AUDIT_WINDOWS_ONLY');
     const event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
-    validIssue(event,env);
+    const request=validIssue(event,env);
     issue=event.issue.number;
     if(!Number.isSafeInteger(issue)||issue<1||!path.isAbsolute(env.GITHUB_WORKSPACE))
       stop('NOV30_SAVED_AUDIT_WORKSPACE_STOP');
     output=path.join(env.GITHUB_WORKSPACE,resultName(issue));
     const scoreFile=verifySource(env.GITHUB_WORKSPACE);
     const {scoreER1Issuers}=await import(pathToFileURL(scoreFile).href);
-    report=await inspectSavedActual({score:scoreER1Issuers});
+    report=await inspectSavedActual({
+      asOf:request.pinnedAsOf??undefined,score:scoreER1Issuers});
   }catch(e){
     const code=e?.message;
     report.code=/^NOV30_SAVED_AUDIT_[A-Z_]+$/.test(code)?code:
