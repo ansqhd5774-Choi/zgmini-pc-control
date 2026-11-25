@@ -115,6 +115,13 @@ export function scanControllerRunnersReadOnly({run=execFileSync,systemRoot=proce
  }catch{return 'UNVERIFIED';}
 }
 
+// An initial installation has no previous Supervisor and no heartbeat.
+// This is different from a malformed/missing owner *with a prior heartbeat*.
+// WMI executable absence and the real atomic Supervisor lease are separate
+// mandatory checks before any candidate may start new Runner listeners.
+export function verifiedColdStandbyStart({owner,heartbeat}={}){
+ return owner===null&&heartbeat===null;
+}
 export function archiveDeadLease(directory,isAlive=alive,destination=null){
  if(!fs.existsSync(directory))return null;
  const original=fs.readFileSync(path.join(directory,'owner.json'));
@@ -379,9 +386,11 @@ export async function main(){
    if(standbyMode&&(!standby||!standby.ready||standby.promoting)){
     status('BLOCKED_STANDBY_NOT_READY');return;
    }
-   if(standbyMode&&!provenOldRunnerExit({owner,heartbeat:hb})){
-    // A missing/partial old heartbeat is not proof that six Runners exited.
-    // Preserve their leases and never restart a second seat owner on guesswork.
+   if(standbyMode&&!verifiedColdStandbyStart({owner,heartbeat:hb})&&
+     !provenOldRunnerExit({owner,heartbeat:hb})){
+    // A partial/ambiguous past owner needs full six-seat exit evidence.
+    // A verified first start (no owner AND no historical heartbeat) is
+    // handled separately, still requiring the independent WMI check below.
     status('BLOCKED_OLD_RUNNER_CHILD_UNVERIFIED');return;
    }
    if(standbyMode&&scanControllerRunnersReadOnly()!=='NO_CONTROLLER_RUNNER_PROCESS'){
