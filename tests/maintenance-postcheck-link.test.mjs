@@ -33,11 +33,23 @@ test('no Run is observed as NO_RUN, not failed installation or synthetic PASS',(
 
 test('a nonmatching Run or a Run predating the Issue is never attached',()=>{
  for(const r of [run({display_title:'same title for another request'}),
-  run({event:'push'}),run({created_at:'2026-11-24T23:59:59Z'})]){
+  run({event:'push'}),run({created_at:'2026-11-24T23:59:59Z'}),
+  run({created_at:'2026-11-25T01:15:01Z'})]){
   assert.equal(result({runs:[r],jobs:null}).state,'NO_RUN');
  }
  assert.equal(result({runs:[run(),run({id:999})],jobs:null}).code,
   'POSTCHECK_RUN_IDENTITY_AMBIGUOUS');
+});
+
+test('run at exactly existing 15-minute provenance boundary remains eligible',()=>{
+ assert.equal(result({runs:[run({created_at:'2026-11-25T01:15:00Z'})]}).runId,777);
+});
+
+test('GitHub lookup is bounded by the same original postcheck provenance window',()=>{
+ const src=fs.readFileSync(fileURLToPath(new URL('../tools/update.mjs',import.meta.url)),'utf8');
+ assert.match(src,/const untilAt=openedAt\+900000/);
+ assert.match(src,/encodeURIComponent\(window\)/);
+ assert.doesNotMatch(src,/encodeURIComponent\('>='\+liveIssue\.created_at\)/);
 });
 
 test('unverified Issue identity never produces NO_RUN',()=>{
