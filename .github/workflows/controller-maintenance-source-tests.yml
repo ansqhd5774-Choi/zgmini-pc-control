@@ -48,6 +48,8 @@ on:
       - 'tests/earnings-c-checkpoint-readonly.test.mjs'
       - 'tests/earnings-bea-mfg-archive-readonly.test.mjs'
       - 'controller/cloudflare-rum-field-parser.mjs'
+      - 'controller/w05-cloudflare-rum-readonly.mjs'
+      - 'tests/w05-cloudflare-rum-readonly.test.mjs'
       - 'tests/cloudflare-rum-field-parser.test.mjs'
       - 'controller/w05-wpsfd42-service-readonly.mjs'
       - 'controller/w05-five-key-d1-api-readback-readonly.mjs'
@@ -342,6 +344,8 @@ jobs:
         run: node --test --test-concurrency=1 tests/w05-cloudflare-deployment-readonly.test.mjs
       - name: Validate read-only RUM P75 response contract without calling Cloudflare
         run: node --test --test-concurrency=1 tests/cloudflare-rum-field-parser.test.mjs
+      - name: Verify fixed Cloudflare RUM A single-call OAuth and redaction without operational I/O
+        run: node --test --test-concurrency=1 tests/w05-cloudflare-rum-readonly.test.mjs
       - name: Verify W05 immutable service-only BLS source adapter and isolated PC workspace
         if: steps.scope.outputs.w05 == 'true'
         run: node --test --test-concurrency=1 tests/w05-wpsfd42-service-readonly.test.mjs
