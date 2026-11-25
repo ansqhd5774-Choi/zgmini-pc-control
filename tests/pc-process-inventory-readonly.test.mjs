@@ -16,6 +16,7 @@ import {inspect3160RecoveryCasReadonly} from '../tools/pc-process-inventory-read
 import {inspect3160RollbackPreflightReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 import {projectCnnSidecarStaticGuard} from '../tools/pc-process-inventory-readonly.mjs';
 import {inspectR3WatchdogPreimageReadonly} from '../tools/pc-process-inventory-readonly.mjs';
+import {classifyR3RunnerWmiRows,inspectR3RunnerWmiReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
  const request={schema:SCHEMA,operation:ROLE_OPERATION,role,
@@ -2304,4 +2305,66 @@ test('R3 Watchdog A distinguishes mismatched source, manifest, alias and missing
   assert.equal(absent.status,'STATE_UNKNOWN');
   assert.equal(absent.sourceSha256,null);
  }finally{fs.rmSync(home,{recursive:true,force:true});}
+});
+
+test('R3 fixed operating A WMI probe authenticates without arbitrary path or role',()=>{
+ const original=event('operating'),body=JSON.parse(original.issue.body);
+ const requested={...original,issue:{...original.issue,body:JSON.stringify({
+  ...body,probe:'controller-standby-runner-wmi-readonly'})}};
+ assert.equal(authenticateProcess(requested,env,'operating').standbyRunnerWmi,true);
+ assert.throws(()=>authenticateProcess(requested,env,'handoff'));
+ for(const probe of ['controller-standby-runner-wmi-readonly;whoami',
+  'controller-standby-runner-wmi-test-only']){
+  const bad={...original,issue:{...original.issue,body:JSON.stringify({...body,probe})}};
+  assert.throws(()=>authenticateProcess(bad,env,'operating'));
+ }
+ const pathAttack={...original,issue:{...original.issue,body:JSON.stringify({
+  ...body,probe:'controller-standby-runner-wmi-readonly',path:'C:/Windows/secrets'})}};
+ assert.throws(()=>authenticateProcess(pathAttack,env,'operating'));
+});
+
+test('R3 WMI classifier returns only bounded category counts, no PID or executable path',()=>{
+ const canonicalize=p=>p;
+ const fixture={rows:[
+  {pid:4311,name:'Runner.Listener.exe',
+   executablePath:'E:\\ZGmini\\automation\\pc-control\\runners\\seat-1\\Runner.Listener.exe'},
+  {pid:4312,name:'Runner.Worker.exe',
+   executablePath:'E:\\ZGmini\\automation\\pc-control\\runners\\seat-2\\Runner.Worker.exe'},
+  {pid:4313,name:'Runner.Listener.exe',
+   executablePath:'C:\\DifferentRunner\\Runner.Listener.exe'}]};
+ const observed=classifyR3RunnerWmiRows(fixture,{canonicalize});
+ assert.equal(observed.status,'PASS');
+ assert.equal(observed.code,'STANDBY_WMI_EXECUTABLE_PATHS_CLASSIFIED');
+ assert.equal(observed.controllerListenerCount,1);
+ assert.equal(observed.controllerWorkerCount,1);
+ assert.equal(observed.unknownPathCount,0);
+ assert.equal(observed.promotionApproved,false);
+ assert.doesNotMatch(JSON.stringify(observed),/4311|seat-1|DifferentRunner|executablePath/i);
+ for(const wrong of [
+  null,{rows:'bad'},{rows:[...fixture.rows,fixture.rows[0]]},
+  {rows:[{pid:4314,name:'node.exe',executablePath:'E:\\runner.exe'}]},
+  {rows:[{pid:4314,name:'Runner.Listener.exe',executablePath:''}]},
+  {rows:Array.from({length:257},(_,i)=>({pid:1000+i,name:'Runner.Worker.exe',
+   executablePath:'E:\\ZGmini\\automation\\pc-control\\runners\\seat-1\\Runner.Worker.exe'}))}
+ ]){
+  assert.equal(classifyR3RunnerWmiRows(wrong,{canonicalize}).status,'STATE_UNKNOWN');
+ }
+ const inaccessible=classifyR3RunnerWmiRows(fixture,{canonicalize:p=>{
+  if(p.includes('DifferentRunner'))throw Error('EPERM');return p;}});
+ assert.equal(inaccessible.status,'STATE_UNKNOWN');
+});
+
+test('R3 WMI Windows source uses fixed no-shell CIM executable and fails closed',()=>{
+ const script=inspectR3RunnerWmiReadonly({
+  env:{SystemRoot:'C:\\Windows'},run:()=>({status:0,stdout:'{}'}),
+  filesystem:{statSync:()=>({isFile:()=>true})},canonicalize:p=>p});
+ // Off-host CI must not mistake synthetic inputs for real WMI proof.
+ if(process.platform!=='win32'){
+  assert.equal(script.status,'STATE_UNKNOWN');
+  assert.equal(script.code,'STANDBY_WMI_WINDOWS_SCOPE_UNVERIFIED');
+ }else{
+  assert.equal(script.status,'STATE_UNKNOWN');
+  assert.equal(script.code,'STANDBY_WMI_ROWS_UNVERIFIED');
+ }
+ assert.equal(script.promotionApproved,false);
 });
