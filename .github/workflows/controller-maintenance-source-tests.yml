@@ -13,6 +13,7 @@ on:
       - 'tests/ci-approval-integration-tree-evidence.test.mjs'
       - 'tests/ci-approval-owner-delegation.test.mjs'
       - 'tests/ci-approval-delegation-evidence-reader.test.mjs'
+      - 'tests/ci-approval-controller-candidate-review.test.mjs'
       - 'controller/common.mjs'
       - 'controller/entry.mjs'
       - 'controller/upload.mjs'
@@ -280,6 +281,9 @@ jobs:
       - name: Verify read-only delegation and changed-file collection
         if: hashFiles('ci-approval/delegation-evidence-reader.mjs', 'tests/ci-approval-delegation-evidence-reader.test.mjs') != ''
         run: node --test --test-concurrency=1 tests/ci-approval-delegation-evidence-reader.test.mjs
+      - name: Verify end-to-end Controller candidate shadow review
+        if: hashFiles('ci-approval/controller-candidate-review.mjs', 'tests/ci-approval-controller-candidate-review.test.mjs') != ''
+        run: node --test --test-concurrency=1 tests/ci-approval-controller-candidate-review.test.mjs
       - name: Verify W05 independent operator receipt without operational access
         # Historical PR integration trees can predate this W05 fixture.
         # Test it whenever it is present; do not fail unrelated older heads.
