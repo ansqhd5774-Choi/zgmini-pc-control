@@ -20,10 +20,10 @@ export const RECOVERY = Object.freeze({
   chatId: 'chat-ci1582-cf-active-readback-20261126',
   operation: 'w05-cloudflare-deployment-readonly',
   resultCode: 'CF_ACTIVE_DEPLOYMENT_READONLY_VERIFIED',
-  sourceSha: '8cb18dfe4d839d42fd62b3650334dd12d83511b73',
+  sourceSha: '8cb18dfe4d839d42fd62b540334dd12d83511b73',
   originalExecutionSha: '60f37de24cbad4adc0b6ee9eee3c98a43160443d',
   trigger: '/zgmini-recover-3650-once',
-  commentMarker: '<!-- zgmini-pc-result:45649058563:1:3 -->',
+  commentMarker: '<!-- zgmini-pc-result:45649058563:1:6 -->',
 });
 
 function fail(code){throw Object.assign(new Error(code), {code});}

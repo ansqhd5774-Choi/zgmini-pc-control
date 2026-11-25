@@ -8,6 +8,21 @@ import {digest} from '../controller/common.mjs';
 import {RECOVERY,validateTrigger,verifyRetainedOriginal,
   verifyInstalledRuntime,recoverOriginal} from '../controller/report-recovery-3650-once.mjs';
 
+test('immutable #3650 original Issue and Actions job identities are exact',()=>{
+ assert.equal(RECOVERY.issueNumber,3650);
+ assert.equal(RECOVERY.runId,'45649058563');
+ assert.equal(RECOVERY.attempt,'1');
+ assert.equal(RECOVERY.seat,'6');
+ assert.equal(RECOVERY.jobId,'run-45649058563-1-seat-6');
+ assert.equal(RECOVERY.requestId,'pc-9632a7d8-4b11-4e9a-8fb5-0ecb18df26ab');
+ assert.equal(RECOVERY.chatId,'chat-ci1582-cf-active-readback-20261126');
+ assert.equal(RECOVERY.operation,'w05-cloudflare-deployment-readonly');
+ assert.equal(RECOVERY.resultCode,'CF_ACTIVE_DEPLOYMENT_READONLY_VERIFIED');
+ assert.equal(RECOVERY.sourceSha,'8cb18dfe4d839d42fd62b540334dd12d83511b73');
+ assert.equal(RECOVERY.originalExecutionSha,'60f37de24cbad4adc0b6ee9eee3c98a43160443d');
+ assert.equal(RECOVERY.commentMarker,'<!-- zgmini-pc-result:45649058563:1:6 -->');
+});
+
 const policy={controlRepository:RECOVERY.repository,maxReportBytes:32768};
 const env={GITHUB_REPOSITORY:RECOVERY.repository,GITHUB_EVENT_NAME:'issue_comment',
   GITHUB_ACTOR:RECOVERY.actor,GITHUB_RUN_ID:'987654321',

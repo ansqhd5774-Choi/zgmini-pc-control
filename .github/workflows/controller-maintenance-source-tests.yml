@@ -8,6 +8,8 @@ on:
       - 'controller/upload.mjs'
       - 'controller/report-upload-verified.mjs'
       - 'tests/report-upload-verified.test.mjs'
+      - 'controller/report-recovery-3650-once.mjs'
+      - 'tests/report-recovery-3650-once.test.mjs'
       - 'controller/preimage-manifest-stager.mjs'
       - '.github/workflows/pc-job.yml'
       - 'tests/pc-job-late-label-intake.test.mjs'
