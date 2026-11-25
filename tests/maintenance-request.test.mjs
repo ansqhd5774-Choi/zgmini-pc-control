@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {createHash} from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {test} from 'node:test';
 import {manifestFingerprint,validateControllerImportClosure,controllerImportScanRoots} from '../tools/maintenance-contract.mjs';
-import {prepareMaintenanceIssue,verifyMaintenanceIssue,submitMaintenanceIssue,submitPreparedMaintenanceIssue,submitCiPreparedMaintenanceIssue,reconcileMaintenanceIssue,main} from '../tools/maintenance-request.mjs';
+import {prepareMaintenanceIssue,verifyMaintenanceIssue,submitMaintenanceIssue,submitPreparedMaintenanceIssue,submitCiPreparedMaintenanceIssue,submitExistingControllerApprovalFromCi,reconcileMaintenanceIssue,main} from '../tools/maintenance-request.mjs';
 const OLD='a'.repeat(40),NEXT='b'.repeat(40),OWNER='ansqhd5774-Choi';
 function manifest(){
  const allowFiles=[{path:'controller/operations.mjs',sha256:'c'.repeat(64)}];
@@ -256,4 +257,62 @@ test('incomplete existing-request search does not authorize a fresh CI POST',asy
  p.findIssues=async()=>{throw Error('MAINTENANCE_SEARCH_INCOMPLETE_NO_REPOST');};
  await assert.rejects(()=>submitCiPreparedMaintenanceIssue(f.expected,p),/SEARCH_INCOMPLETE_NO_REPOST/);
  assert.equal(f.posts,0);assert.equal(f.saved,null);
+});
+
+function workloadPublisherFixture(){
+ const repo='ansqhd5774-Choi/zgmini-pc-control',head='d'.repeat(40),merged='e'.repeat(40);
+ const m=JSON.parse(manifest());m.controllerOnlyInstall=true;
+ m.selectiveSource={schema:'ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1',branch:'codex/example-selective',mainSha:head,customPaths:[]};
+ const bytes=Buffer.from(JSON.stringify(m)),owner={login:OWNER,id:327938088,type:'User'};
+ const pr={number:28,merged:true,merged_by:owner,merge_commit_sha:merged,base:{ref:'main',repo:{full_name:repo}},head:{sha:head,repo:{full_name:repo}}};
+ const run={id:123,workflow_id:416355595,path:'.github/workflows/controller-maintenance-source-tests.yml',
+  event:'pull_request',status:'completed',conclusion:'success',repository:{id:1442936296,full_name:repo},
+  head_repository:{id:1442936296},head_sha:head};
+ const f={input:{targetSha:NEXT,approvalSha256:createHash('sha256').update(bytes).digest('hex'),runId:456,attempt:1},
+  bytes,pr,run,owner,posts:0,saved:null,actual:null,prior:[]};
+ f.ports={readRepository:async()=>({id:1442936296,full_name:repo,private:true,owner}),
+  readManifest:async()=>f.bytes,readMergedManifest:async()=>f.bytes,readApprovalPr:async()=>pr,
+  listRuns:async()=>({workflow_runs:[run]}),readRun:async()=>run,
+  loadReceipt:async()=>f.saved,findPriorRequests:async()=>f.prior,
+  saveReceipt:async(key,r,{exclusive=false}={})=>{assert.match(key,/^[a-f0-9]{64}$/);if(exclusive&&f.saved)throw Error('EEXIST');f.saved=structuredClone(r);},
+  createIssue:async e=>{f.posts++;assert.equal(f.saved.phase,'CREATING');f.actual={number:42,state:'open',
+   user:{login:'github-actions[bot]',id:41898282,type:'Bot'},title:e.title,body:e.body,labels:e.labels.map(name=>({name}))};return {number:42};},
+  readIssue:async()=>f.actual};
+ return f;
+}
+test('CI publisher creates exact existing B request once and records request-bound receipt',async()=>{
+ const f=workloadPublisherFixture(),result=await submitExistingControllerApprovalFromCi(f.input,f.ports);
+ assert.equal(result.status,'REQUEST_READBACK_VERIFIED');assert.equal(f.posts,1);
+ assert.equal(f.saved.phase,'READBACK_VERIFIED');assert.match(result.receiptMarker,/^ZGMINI_CI_CONTROLLER_B_RECEIPT=42:[a-f0-9]{64}$/);
+ assert.equal(JSON.parse(f.actual.body).chatId,'chat-ci-456-1');
+ const retry=await submitExistingControllerApprovalFromCi({...f.input,runId:789},f.ports);
+ assert.equal(retry.code,'MAINTENANCE_CI_EXISTING_RECEIPT_NO_REPOST');assert.equal(f.posts,1);
+ assert.equal(retry.effectKey,result.effectKey);assert.equal(retry.receiptMarker,undefined);
+});
+test('existing manual request is reused without issuing a CI receipt',async()=>{
+ const f=workloadPublisherFixture();
+ f.prior=[{number:123,state:'closed',user:f.owner,title:'pc-controller-update',body:JSON.stringify({targetControllerSha:NEXT})}];
+ const result=await submitExistingControllerApprovalFromCi(f.input,f.ports);
+ assert.equal(result.status,'EXISTING_REQUEST_REUSED');assert.deepEqual(result.issueNumbers,[123]);assert.equal(f.posts,0);
+});
+test('unknown CI POST preserves original durable receipt and forbids retry',async()=>{
+ const f=workloadPublisherFixture();f.ports.createIssue=async()=>{f.posts++;throw Error('lost response');};
+ assert.equal((await submitExistingControllerApprovalFromCi(f.input,f.ports)).code,'MAINTENANCE_CREATE_OUTCOME_UNKNOWN');
+ assert.equal(f.saved.phase,'CREATION_UNKNOWN');
+ assert.equal((await submitExistingControllerApprovalFromCi(f.input,f.ports)).code,'MAINTENANCE_CI_EXISTING_RECEIPT_NO_REPOST');
+ assert.equal(f.posts,1);
+});
+for(const [name,edit,code] of [
+ ['untrusted merger',f=>{f.pr.merged_by={login:'github-actions[bot]'}},'EXISTING_APPROVAL_PROVENANCE_DENIED'],
+ ['changed approval bytes',f=>{f.ports.readMergedManifest=async()=>Buffer.from('{}')},'EXISTING_APPROVAL_BYTES_MISMATCH'],
+ ['failed CI',f=>{f.run.conclusion='failure'},'CI_SUCCESS_NOT_FOUND'],
+ ['prior inventory unavailable',f=>{f.ports.findPriorRequests=async()=>null},'PRIOR_REQUEST_READ_UNVERIFIED']
+])test('CI publisher denies '+name,async()=>{
+ const f=workloadPublisherFixture();edit(f);
+ await assert.rejects(()=>submitExistingControllerApprovalFromCi(f.input,f.ports),new RegExp(code));assert.equal(f.posts,0);
+});
+test('CI publisher never records identity for wrong issue readback',async()=>{
+ const f=workloadPublisherFixture();f.ports.readIssue=async()=>({...f.actual,user:f.owner});
+ const result=await submitExistingControllerApprovalFromCi(f.input,f.ports);
+ assert.equal(result.code,'MAINTENANCE_CREATED_ISSUE_NOT_VERIFIED');assert.equal(result.receiptMarker,undefined);assert.equal(f.posts,1);
 });

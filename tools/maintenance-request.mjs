@@ -1,10 +1,11 @@
 // Owner-side request submission. This is not a PC installer or approval source.
 import fs from 'node:fs';
+import {createHash} from 'node:crypto';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
 import {prepareControllerUpdateRequest,validateMaintenanceRequest,validateUpdateRequest,
- CONTROL_ACTOR,CONTROL_REPOSITORY} from './maintenance-contract.mjs';
+ CONTROL_ACTOR,CONTROL_REPOSITORY,CI_CONTROLLER_ACTOR,controllerBReceiptMarker} from './maintenance-contract.mjs';
 
 const TITLE='pc-controller-update',LABEL='pc-maintenance';
 const fail=code=>{throw Error(code)};
@@ -31,7 +32,10 @@ export function verifyMaintenanceIssue(expected,actual,{allowClosed=false}={}){
 }
 // Persist the exact request before the only POST. An uncertain POST is never
 // retried; reconcile performs reads and retains the original requestId.
-export async function submitMaintenanceIssue(expected,{createIssue,readIssue,saveReceipt}){
+export async function submitMaintenanceIssue(expected,ports){
+ return submitExactEnvelope(expected,ports,verifyMaintenanceIssue);
+}
+async function submitExactEnvelope(expected,{createIssue,readIssue,saveReceipt},verifyReadback){
  requestOf(expected);
  const receipt={schema:'ZGMINI_MAINTENANCE_SUBMISSION_V1',phase:'CREATING',expected,issueNumber:null};
  await saveReceipt(receipt,{exclusive:true});
@@ -44,7 +48,7 @@ export async function submitMaintenanceIssue(expected,{createIssue,readIssue,sav
  receipt.phase='READBACK_PENDING';await saveReceipt(receipt);
  try{
   if(!receipt.issueNumber)fail('MAINTENANCE_CREATE_RESPONSE_UNVERIFIED');
-  const verified=verifyMaintenanceIssue(expected,await readIssue(receipt.issueNumber));
+  const verified=verifyReadback(expected,await readIssue(receipt.issueNumber));
   receipt.phase='READBACK_VERIFIED';await saveReceipt(receipt);return verified;
  }catch(error){
   return {status:'AUTOMATION_BLOCKED',code:'MAINTENANCE_CREATED_ISSUE_NOT_VERIFIED',
@@ -149,6 +153,76 @@ export async function submitCiPreparedMaintenanceIssue(expected,{runId,readRun,l
  // exact request before its original atomic receipt and only POST.
  // A moved or altered approval cannot reuse the prior CI evidence.
  return submitPreparedMaintenanceIssue(snapshot,ports);
+}
+// CI publisher for an EXISTING independently approved manifest only. It does
+// not create business authorization, invent a live installed SHA, or activate
+// the receiver. The fixed reviewed workflow must supply authenticated GitHub
+// read ports and an exclusive durable per-effect receipt store.
+const digest=b=>createHash('sha256').update(b).digest('hex');
+const sha40=x=>typeof x==='string'&&/^[a-f0-9]{40}$/.test(x);
+const ownerIdentity=x=>x?.login===CONTROL_ACTOR&&x.id===327938088&&x.type==='User';
+const botIdentity=x=>x?.login===CI_CONTROLLER_ACTOR&&x.id===41898282&&x.type==='Bot';
+function verifyCiIssue(expected,actual){
+ if(!botIdentity(actual?.user))fail('MAINTENANCE_ISSUE_READBACK_ACTOR_MISMATCH');
+ if(!Number.isSafeInteger(actual.number)||actual.number<=0||actual.pull_request||
+    actual.title!==TITLE||actual.body!==expected.body||actual.state!=='open'||
+    !actual.labels?.some(x=>x.name===LABEL))fail('MAINTENANCE_CI_ISSUE_READBACK_MISMATCH');
+ return {status:'REQUEST_READBACK_VERIFIED',requestId:requestOf(expected).requestId,
+  issueNumber:actual.number,execution:'NOT_ASSERTED',next:'FOLLOW_ORIGINAL_REQUEST_ONLY'};
+}
+export async function submitExistingControllerApprovalFromCi({targetSha,approvalSha256,runId,attempt},ports){
+ if(!sha40(targetSha)||typeof approvalSha256!=='string'||!/^[a-f0-9]{64}$/.test(approvalSha256)||
+    !Number.isSafeInteger(runId)||runId<=0||!Number.isSafeInteger(attempt)||attempt<=0)
+  fail('MAINTENANCE_CI_PUBLISH_INPUT_INVALID');
+ const repo=await ports.readRepository();
+ if(repo?.id!==1442936296||repo.full_name!==CONTROL_REPOSITORY||repo.private!==true||
+    !ownerIdentity(repo.owner))fail('MAINTENANCE_CI_REPOSITORY_DENIED');
+ const bytes=await ports.readManifest(targetSha);
+ if(!Buffer.isBuffer(bytes)||digest(bytes)!==approvalSha256)fail('MAINTENANCE_CI_MANIFEST_PIN_MISMATCH');
+ const manifest=JSON.parse(bytes.toString('utf8'));
+ // This is schema validation, not a live CAS assertion. Both receiver and
+ // updater independently read the actual installed SHA before any mutation.
+ const expected=prepareMaintenanceIssue(bytes,{installedSha:manifest.installedSha,chatId:'chat-ci-'+runId+'-'+attempt});
+ const q=JSON.parse(expected.body);
+ if(q.targetControllerSha!==targetSha||manifest.purpose!=='pc-controller-maintenance'||
+    manifest.controllerOnlyInstall!==true||!manifest.selectiveSource||
+    !manifest.allowFiles.every(f=>/^controller\/[a-z][a-z0-9-]*\.mjs$/.test(f.path)))
+  fail('MAINTENANCE_CI_PILOT_SCOPE_DENIED');
+ const prNumber=Number(manifest.approval.ref.split('/').at(-1));
+ const pr=await ports.readApprovalPr(prNumber);
+ // An exact already-approved main manifest, not a newly generated candidate.
+ // A CI success or bot-written record alone cannot issue business approval.
+ if(pr?.number!==prNumber||pr.merged!==true||pr.base?.ref!=='main'||
+    pr.base?.repo?.full_name!==CONTROL_REPOSITORY||pr.head?.repo?.full_name!==CONTROL_REPOSITORY||
+    !ownerIdentity(pr.merged_by)||!sha40(pr.merge_commit_sha))
+  fail('MAINTENANCE_CI_EXISTING_APPROVAL_PROVENANCE_DENIED');
+ const approvedBytes=await ports.readMergedManifest(targetSha,pr.merge_commit_sha);
+ if(!Buffer.isBuffer(approvedBytes)||!approvedBytes.equals(bytes))
+  fail('MAINTENANCE_CI_EXISTING_APPROVAL_BYTES_MISMATCH');
+ await resolveControllerApprovalCI(manifest.approval.ref,{readApprovalPr:ports.readApprovalPr,
+  listRuns:ports.listRuns,readRun:ports.readRun});
+ // The effect key is independent of a retry, approval publication event, or
+ // mutable chat trace. The existing receiver-side effect claim still applies.
+ const effectKey=digest(JSON.stringify([CONTROL_REPOSITORY,manifest.installedSha,targetSha]));
+ const old=await ports.loadReceipt(effectKey);
+ if(old!==null)return {status:'STATE_UNKNOWN',code:'MAINTENANCE_CI_EXISTING_RECEIPT_NO_REPOST',effectKey,
+  issueNumber:Number.isSafeInteger(old?.issueNumber)?old.issueNumber:null,next:'RECONCILE_SAME_RECEIPT_NO_NEW_POST'};
+ const prior=await ports.findPriorRequests(targetSha);
+ if(!Array.isArray(prior))fail('MAINTENANCE_CI_PRIOR_REQUEST_READ_UNVERIFIED');
+ const matches=prior.filter(x=>{
+  if(x?.pull_request||x?.title!==TITLE||!(ownerIdentity(x.user)||botIdentity(x.user)))return false;
+  try{return JSON.parse(x.body).targetControllerSha===targetSha;}catch{return false;}
+ });
+ if(matches.length)return {status:'EXISTING_REQUEST_REUSED',effectKey,
+  issueNumbers:matches.map(x=>x.number).filter(Number.isSafeInteger),next:'FOLLOW_ORIGINAL_REQUEST_ONLY'};
+ const current=await ports.readManifest(targetSha);
+ if(!Buffer.isBuffer(current)||!current.equals(bytes))fail('MAINTENANCE_CI_MANIFEST_PIN_MISMATCH');
+ const result=await submitExactEnvelope(expected,{createIssue:ports.createIssue,readIssue:ports.readIssue,
+  saveReceipt:(receipt,options)=>ports.saveReceipt(effectKey,receipt,options)},verifyCiIssue);
+ if(result.status!=='REQUEST_READBACK_VERIFIED')return {...result,effectKey};
+ // Only the exact new successful run emits this receipt; historical requests
+ // and uncertain POSTs are never given fresh execution identity.
+ return {...result,effectKey,receiptMarker:controllerBReceiptMarker(result.issueNumber,Buffer.from(expected.body))};
 }
 export async function reconcileMaintenanceIssue(receipt,{findIssues,readIssue,saveReceipt}){
  if(receipt?.schema!=='ZGMINI_MAINTENANCE_SUBMISSION_V1')fail('MAINTENANCE_RECEIPT_INVALID');
