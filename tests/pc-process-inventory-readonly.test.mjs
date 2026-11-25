@@ -14,6 +14,7 @@ import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,proj
 import {inspect3160RecoveryCasReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 import {inspect3160RollbackPreflightReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 import {projectCnnSidecarStaticGuard} from '../tools/pc-process-inventory-readonly.mjs';
+import {inspectR3WatchdogPreimageReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
  const request={schema:SCHEMA,operation:ROLE_OPERATION,role,
@@ -2201,4 +2202,68 @@ test('W04 #3516 lease lineage requires original Issue/postcheck/target/marker ch
  assert.equal(assess3516OriginalLeaseLineage(ledger,owner,{...marker,nonce:'wrong'}).correlated,false);
  assert.equal(assess3516OriginalLeaseLineage(ledger,owner,
   {...marker,at:'2026-11-25T08:32:03.250Z'}).correlated,false);
+});
+
+test('R3 exact operating A probe only admits fixed Watchdog preimage, no commands',()=>{
+ const e=event(),p=JSON.parse(e.issue.body);
+ const scoped={...e,issue:{...e.issue,body:JSON.stringify({
+  ...p,probe:'controller-standby-watchdog-preimage-readonly'})}};
+ assert.equal(authenticateProcess(scoped,env,'operating').watchdogR3Preimage,true);
+ assert.throws(()=>authenticateProcess(scoped,env,'handoff'));
+ for(const probe of ['controller-standby-watchdog-preimage-readonly;cmd',
+  'controller-standby-watchdog-preimage-readonly/../secret']){
+  assert.throws(()=>authenticateProcess({...e,issue:{...e.issue,
+   body:JSON.stringify({...p,probe})}},env,'operating'));
+ }
+ assert.throws(()=>authenticateProcess({...e,issue:{...e.issue,
+  body:JSON.stringify({...p,probe:'controller-standby-watchdog-preimage-readonly',
+   path:'E:/outside'})}},env,'operating'));
+});
+test('R3 Watchdog A attests fixed source bytes, matching raw manifest and scope',()=>{
+ const home=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-r3-watchdog-preimage-'));
+ const code=Buffer.from('// faithful source fixture only, no runner or worker spawn');
+ const hash=b=>createHash('sha256').update(b).digest('hex');
+ try{
+  fs.writeFileSync(path.join(home,'runner-watchdog.mjs'),code);
+  const manifest={sha256:hash(code),scope:'RUNNER_RECOVERY_AND_MAINTENANCE_HANDOFF_V1'};
+  const raw=Buffer.from(JSON.stringify(manifest));
+  fs.writeFileSync(path.join(home,'INSTALL.json'),raw);
+  const r=inspectR3WatchdogPreimageReadonly({watchdogHome:home});
+  assert.equal(r.status,'PASS');
+  assert.equal(r.installedMatch,true);
+  assert.equal(r.sourceSha256,hash(code));
+  assert.equal(r.manifestSha256,hash(raw));
+  assert.equal(r.declaredSha256,manifest.sha256);
+  assert.equal(r.scope,manifest.scope);
+  assert.equal(r.operationalWrites,0);
+  assert.equal(r.providerCalls,0);
+  assert.equal(r.d1Writes,0);
+  const txt=toText({schema:'ZGMINI_PC_PROCESS_INVENTORY_RESULT_V1',
+   watchdogR3Preimage:r});
+  assert.match(txt,/watchdogSourceSha256=/);
+  assert.doesNotMatch(txt,/faithful source|INSTALL\.json|E:\\\\ZGmini/);
+  assert.ok(Buffer.byteLength(JSON.stringify(r))<2048);
+ }finally{fs.rmSync(home,{recursive:true,force:true});}
+});
+test('R3 Watchdog A distinguishes mismatched source, manifest, alias and missing files',()=>{
+ const home=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-r3-watchdog-denied-'));
+ const code='// fixed watchdog source, one file, no other changes';
+ const hash=b=>createHash('sha256').update(b).digest('hex');
+ try{
+  fs.writeFileSync(path.join(home,'runner-watchdog.mjs'),code);
+  const f=path.join(home,'INSTALL.json');
+  fs.writeFileSync(f,JSON.stringify({sha256:hash(code),scope:'RUNNER_RECOVERY_ONLY'}));
+  assert.equal(inspectR3WatchdogPreimageReadonly({watchdogHome:home}).status,'PASS');
+  fs.writeFileSync(path.join(home,'runner-watchdog.mjs'),code+' changed');
+  const mismatch=inspectR3WatchdogPreimageReadonly({watchdogHome:home});
+  assert.equal(mismatch.status,'STATE_UNKNOWN');
+  assert.equal(mismatch.installedMatch,false);
+  assert.notEqual(mismatch.sourceSha256,mismatch.declaredSha256);
+  fs.writeFileSync(f,JSON.stringify({sha256:hash(code+' changed'),scope:'UNTRUSTED'}));
+  assert.equal(inspectR3WatchdogPreimageReadonly({watchdogHome:home}).status,'STATE_UNKNOWN');
+  fs.rmSync(f);
+  const absent=inspectR3WatchdogPreimageReadonly({watchdogHome:home});
+  assert.equal(absent.status,'STATE_UNKNOWN');
+  assert.equal(absent.sourceSha256,null);
+ }finally{fs.rmSync(home,{recursive:true,force:true});}
 });

@@ -52,6 +52,54 @@ const CNN_B_PINS_PROBE='cnn-sidecar-b-preimage-pins-readonly';
 const CNN_B_RESOURCE_PROBE='cnn-sidecar-b-resource-readonly';
 const CNN_B_CORE_PROBE='cnn-sidecar-b-core-readonly';
 const MAX_BYTES=32768;
+const R3_WATCHDOG_PREIMAGE_PROBE='controller-standby-watchdog-preimage-readonly';
+// One additional scope of the existing approved A inventory; no job,
+// schedule, service or runtime source changes. No raw bytes or credentials
+// are exported, and any read uncertainty stays explicitly unverified.
+export function inspectR3WatchdogPreimageReadonly({
+ filesystem=fs,watchdogHome='E:/ZGmini/automation/pc-watchdog'
+}={}){
+ const unknown=(code)=>({schema:'ZGMINI_R3_WATCHDOG_PREIMAGE_A_V1',
+  status:'STATE_UNKNOWN',code,sourceSha256:null,manifestSha256:null,
+  declaredSha256:null,scope:'UNVERIFIED',installedMatch:false,
+  operationalWrites:0,providerCalls:0,d1Writes:0});
+ const root=path.resolve(watchdogHome);
+ try{
+  const dir=filesystem.lstatSync(root);
+  if(!dir.isDirectory()||dir.isSymbolicLink())return unknown('WATCHDOG_PREIMAGE_ROOT_UNSAFE');
+  const files=['runner-watchdog.mjs','INSTALL.json'];
+  const readBytes=(name,max)=>{
+   const filename=path.join(root,name),st=filesystem.lstatSync(filename);
+   if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1||
+     st.size<10||st.size>max)throw Error('WATCHDOG_PREIMAGE_UNSAFE_FILE');
+   const bytes=filesystem.readFileSync(filename);
+   if(!Buffer.isBuffer(bytes)||bytes.length!==st.size)
+    throw Error('WATCHDOG_PREIMAGE_CHANGED_DURING_READ');
+   const after=filesystem.lstatSync(filename);
+   if(after.size!==st.size||after.mtimeMs!==st.mtimeMs||
+     after.ino!==st.ino)throw Error('WATCHDOG_PREIMAGE_CHANGED_DURING_READ');
+   return bytes;
+  };
+  const source=readBytes(files[0],262144);
+  const manifest=readBytes(files[1],16384);
+  const sourceSha256=createHash('sha256').update(source).digest('hex');
+  const manifestSha256=createHash('sha256').update(manifest).digest('hex');
+  const installed=JSON.parse(manifest.toString('utf8'));
+  const declaredSha256=/^[a-f0-9]{64}$/.test(installed?.sha256??'')?
+    installed.sha256:null;
+  const scope=['RUNNER_RECOVERY_ONLY','RUNNER_RECOVERY_AND_MAINTENANCE_HANDOFF_V1']
+   .includes(installed?.scope)?installed.scope:'UNVERIFIED';
+  const installedMatch=declaredSha256!==null&&sourceSha256===declaredSha256&&
+   scope!=='UNVERIFIED';
+  return {schema:'ZGMINI_R3_WATCHDOG_PREIMAGE_A_V1',
+   status:installedMatch?'PASS':'STATE_UNKNOWN',
+   code:installedMatch?'WATCHDOG_PREIMAGE_SOURCE_AND_MANIFEST_MATCH':
+    'WATCHDOG_PREIMAGE_SOURCE_OR_SCOPE_UNVERIFIED',
+   sourceSha256,manifestSha256,declaredSha256,scope,installedMatch,
+   operationalWrites:0,providerCalls:0,d1Writes:0};
+ }catch(error){return unknown(error.message==='WATCHDOG_PREIMAGE_CHANGED_DURING_READ'?
+  'WATCHDOG_PREIMAGE_CHANGED_DURING_READ':'WATCHDOG_PREIMAGE_READ_UNVERIFIED');}
+}
 const KNOWN_PROCESSES=new Set([
  'runner.listener.exe','runner.worker.exe','node.exe','wscript.exe','cscript.exe',
  'powershell.exe','pwsh.exe','cmd.exe','conhost.exe','git.exe','gh.exe','python.exe',
@@ -125,10 +173,11 @@ export function authenticateProcess(event,env,role){
   const isCnnBPins=withW05&&raw.probe===CNN_B_PINS_PROBE;
   const isCnnBResources=withW05&&raw.probe===CNN_B_RESOURCE_PROBE;
   const isCnnBCore=withW05&&raw.probe===CNN_B_CORE_PROBE;
+  const isR3Watchdog=withW05&&raw.probe===R3_WATCHDOG_PREIMAGE_PROBE;
  if(!raw||(!basic&&!withJobs&&!withW05)||
    raw.schema!==SCHEMA||raw.operation!==ROLE_OPERATION||raw.role!==role||
    (withJobs&&role!=='operating')||
-   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!is3409&&!isEr1Postcheck&&!is3516&&!isD05Writer&&!isD05PrivateReceipt&&!isD05Theme&&!isD05Registration&&!is3160&&!isCnnStaticGuard&&!isCnnGitPredicates&&!isCnnBPins&&!isCnnBResources&&!isCnnBCore))))
+   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!is3409&&!isEr1Postcheck&&!is3516&&!isD05Writer&&!isD05PrivateReceipt&&!isD05Theme&&!isD05Registration&&!is3160&&!isCnnStaticGuard&&!isCnnGitPredicates&&!isCnnBPins&&!isCnnBResources&&!isCnnBCore&&!isR3Watchdog))))
   fail('REQUEST_SCOPE_INVALID');
  const runnerJobRefs=withJobs?validateRunnerJobRefs(raw.runnerJobRefs):null;
  const normalized=structuredClone(event);
@@ -152,7 +201,8 @@ export function authenticateProcess(event,env,role){
    ...(isCnnGitPredicates?{cnnSidecarGitPredicates:true}:{}),
    ...(isCnnBPins?{cnnSidecarBPreimagePins:true}:{}),
    ...(isCnnBResources?{cnnSidecarBResources:true}:{}),
-   ...(isCnnBCore?{cnnSidecarBCore:true}:{})};
+   ...(isCnnBCore?{cnnSidecarBCore:true}:{}),
+   ...(isR3Watchdog?{watchdogR3Preimage:true}:{})};
 }
 export function sanitizeProbe(raw){
  if(!raw||raw.schema!=='ZGMINI_PC_PROCESS_PROBE_V1')fail('PROBE_SCHEMA_INVALID');
@@ -2243,6 +2293,10 @@ export function collect(role,ctx,env=process.env){
  if(identity!=='MATCH'||(role==='operating'&&host!=='PC')){
   return {...base,status:'BLOCKED',code:identity==='MATCH'?'HOST_NOT_CANONICAL':identity};
  }
+ if(ctx.watchdogR3Preimage===true){
+  const proof=inspectR3WatchdogPreimageReadonly();
+  return {...base,status:proof.status,code:proof.code,watchdogR3Preimage:proof};
+ }
  if(ctx.cnnSidecarBCore===true){
   const observed=inspectSidecarBCoreReadinessReadonly();
   return {...base,status:observed.status,code:observed.code,
@@ -2414,6 +2468,12 @@ export function toText(r){
   ...(r.c3160LocalPreflight?[
    'c3160LocalApproval='+r.c3160LocalPreflight.localApproval,
    'c3160RecoveryClaim='+r.c3160LocalPreflight.recoveryClaim]:[]),
+  ...(r.watchdogR3Preimage?[
+   'watchdogR3Preimage='+r.watchdogR3Preimage.code,
+   'watchdogSourceSha256='+(r.watchdogR3Preimage.sourceSha256??'UNKNOWN'),
+   'watchdogManifestSha256='+(r.watchdogR3Preimage.manifestSha256??'UNKNOWN'),
+   'watchdogSourceMatchesManifest='+r.watchdogR3Preimage.installedMatch
+  ]:[]),
   'maintenanceSourceSha='+(r.maintenance?.maintenanceSourceSha??'UNKNOWN'),
   'installLockHeld='+(r.maintenance?.installLockHeld??'UNKNOWN'),
   'c2094StageEvidence='+(r.c2094StageEvidence?.status??'NOT_APPLICABLE'),
