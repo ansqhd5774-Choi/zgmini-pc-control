@@ -1,6 +1,9 @@
 
 # ZGMINI 차세대 CI 및 GitHub Actions 40종 도입 검토 R1
 
+<!-- ZGMINI_CI_R1_R2_FINAL_SCOPE_20261126 -->
+> **2026-11-26 최종 범위 확정:** [1차 R1 8개·2차 R2 11개 최종 적용 목록](CI_R1_R2_FINAL_LIST_20261126.md). 사용자 결정으로 R2 **#8 웹 스피드/Good/P75/Performance Budget** 제외·전용 CI 삭제. **R1 8/8, R2 11/11, 합계 19/19(변경된 적용 범위)**. 원안 20개 중 #8은 '제외'이며 성공으로 집계하지 않는다. [삭제 PR #1631](https://github.com/ansqhd5774-Choi/zgmini/pull/1631) 병합 SHA `29851041f6103adabaaedf458a2451ec0a995cbf`, 정확 HEAD CI 5/5 및 병합 후 주요 CI 5/5·Cloudflare 빌드·SEO 검증 완료. **아래 2026-11-25의 19/20·#8 진행 중 내용은 과거 시점 이력**으로 보존한다.
+
 <!-- ZGMINI_CI_R1_8_R2_12_HISTORY_CORRECTION_20261125 -->
 <!-- ZGMINI_CI_INTEGRATED_19_OF_20_STATUS_20261125 -->
 **통합 작업 현황 (사용자 확인, 2026-11-25): 20개 중 완료 19개, 작업 중 1개, 전체 진행률 95%.**
