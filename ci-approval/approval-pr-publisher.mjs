@@ -54,6 +54,7 @@ export async function publishExactControllerApprovalPair({
  const seed=Buffer.from(JSON.stringify({schema:'ZGMINI_CI_APPROVAL_PR_BOOTSTRAP_V1',
   targetSha,sourcePrNumber,sourceMainSha})+'\n');
  let existing=await io.readBranch(name);
+ const branchAlreadyThere=existing!==null;
  let pr=null;
  if(existing===null){
   // Only a bootstrap marker is written. It fails the Controller B schema
@@ -84,7 +85,7 @@ export async function publishExactControllerApprovalPair({
    fail('CI_APPROVAL_BOOTSTRAP_CONFLICT');
   // A persisted branch from an older attempt is not proof of a missing PR.
   // Caller must reconcile the existing original PR rather than retry.
-  if(existing.wasPresentBefore===true)
+  if(branchAlreadyThere)
    return {state:'STATE_UNKNOWN',code:'CI_APPROVAL_PRIOR_BRANCH_WITHOUT_PR',branch:name};
   await io.createPr({head:name,base:'main',
    title:'Controller B exact selective approval '+targetSha,

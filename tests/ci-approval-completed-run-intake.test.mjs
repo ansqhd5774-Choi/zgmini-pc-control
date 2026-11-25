@@ -1,4 +1,5 @@
 import {test} from 'node:test';
+import {publishExactControllerApprovalPair} from '../ci-approval/approval-pr-publisher.mjs';
 import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
@@ -261,4 +262,97 @@ test('matched source event enters existing merge and submit path, not generic pu
  assert.deepEqual(reads,['repo']);
  assert.equal(result.results[0].code,'MAINTENANCE_CI_REPOSITORY_DENIED');
  assert.equal(ciPublicationExitCode(result,{publish:true}),1);
+});
+
+function exactPrPublisherFixture(){
+ const main='a'.repeat(40),target='b'.repeat(40),
+  paths=['approvals/controller-updates/'+target+'.json',
+   'approvals/controller-selective-targets/'+target+'.json'];
+ const branch='codex/ci-controller-b-'+target,events=[],state={
+  branchSha:null,pr:null,seed:null,final:false,created:0,updates:0,commits:new Map(),trees:new Map()};
+ let next=3;
+ const head=()=>String(next++).padStart(40,'c');
+ const prepare=async number=>({state:'SELECTIVE_APPROVAL_FILES_PREPARED',files:[
+  {path:paths[0],bytes:Buffer.from(JSON.stringify({schema:'manifest',approvalPr:number}))},
+  {path:paths[1],bytes:Buffer.from(JSON.stringify({schema:'pin',approvalPr:number}))}
+ ]});
+ const io={
+  readRepository:async()=>({id:1442936296,full_name:repository.full_name,private:true,
+   owner:{login:'ansqhd5774-Choi'}}),
+  readMain:async()=>({commit:{sha:main}}),
+  readCommit:async sha=>sha===main?{sha,tree:{sha:'d'.repeat(40)}}:
+   {sha,tree:{sha:state.commits.get(sha)?.tree??'e'.repeat(40)}},
+  readBranch:async name=>state.branchSha?{
+   ref:'refs/heads/'+name,object:{type:'commit',sha:state.branchSha}}:null,
+  readPrs:async()=>state.pr?[state.pr]:[],
+  readPr:async number=>({...state.pr,head:{...state.pr.head,sha:state.branchSha}}),
+  readPrFiles:async()=>state.final?paths.map(filename=>({filename,status:'added'})):
+   [{filename:paths[0],status:'added'}],
+  readBytes:async(ref,path)=>{
+   if(ref!==state.branchSha)return null;
+   if(state.final)return (await prepare(state.pr.number)).files.find(f=>f.path===path)?.bytes??null;
+   if(path===paths[0])return state.seed;
+   return null;
+  },
+  createTree:async args=>{
+   events.push('tree');const sha=head();state.trees.set(sha,args.tree);
+   if(args.tree.length===1)state.seed=Buffer.from(args.tree[0].content);
+   return {sha};
+  },
+  createCommit:async args=>{
+   events.push('commit');const sha=head();state.commits.set(sha,args);
+   return {sha};
+  },
+  createBranch:async args=>{events.push('branch');state.branchSha=args.sha;},
+  createPr:async args=>{
+   events.push('pr');state.created++;
+   state.pr={number:42,state:'open',merged:false,draft:false,
+    head:{ref:branch,repo:{full_name:repository.full_name},sha:state.branchSha},
+    base:{ref:'main',repo:{full_name:repository.full_name}}};
+  },
+  updateBranch:async(name,args)=>{events.push('update');state.updates++;
+   state.branchSha=args.sha;state.final=true;}
+ };
+ return {state,events,io,prepare,target,main,paths};
+}
+test('two-stage exact approval publisher creates one PR and only two final files',async()=>{
+ const f=exactPrPublisherFixture();
+ const input={targetSha:f.target,sourcePrNumber:15,sourceMainSha:f.main,
+  prepare:f.prepare,io:f.io};
+ const first=await publishExactControllerApprovalPair(input);
+ assert.equal(first.state,'EXACT_APPROVAL_PR_READY');
+ assert.equal(first.prNumber,42);assert.equal(f.state.created,1);
+ assert.equal(f.state.updates,1);
+ assert.deepEqual(f.events,['tree','commit','branch','pr','tree','commit','update']);
+ const second=await publishExactControllerApprovalPair(input);
+ assert.equal(second.state,'EXACT_APPROVAL_PR_READY');
+ assert.equal(second.existing,true);assert.equal(f.state.created,1);
+ assert.equal(f.state.updates,1);
+});
+test('publisher never writes a branch when independent approval preparation fails',async()=>{
+ const f=exactPrPublisherFixture();
+ await assert.rejects(()=>publishExactControllerApprovalPair({
+  targetSha:f.target,sourceMainSha:f.main,sourcePrNumber:15,
+  prepare:async()=>({state:'EVIDENCE_MISSING'}),io:f.io
+ }),/CI_APPROVAL_PREPARATION_DENIED/);
+ assert.deepEqual(f.events,[]);
+});
+test('uncertain previous seeded branch without PR is not silently retried',async()=>{
+ const f=exactPrPublisherFixture(),args={targetSha:f.target,sourceMainSha:f.main,
+  sourcePrNumber:15,prepare:f.prepare,io:f.io};
+ f.io.createPr=async()=>{throw Error('API lost response')};
+ await assert.rejects(()=>publishExactControllerApprovalPair(args),/API lost response/);
+ const count=f.events.length;
+ const result=await publishExactControllerApprovalPair(args);
+ assert.equal(result.code,'CI_APPROVAL_PRIOR_BRANCH_WITHOUT_PR');
+ assert.equal(f.events.length,count);
+});
+test('publisher rejects a PR that brings an unrelated file into the final diff',async()=>{
+ const f=exactPrPublisherFixture(),orig=f.io.readPrFiles;
+ f.io.readPrFiles=async()=>[{filename:f.paths[0],status:'added'},
+  {filename:'tools/maintenance-agent.mjs',status:'modified'}];
+ const args={targetSha:f.target,sourceMainSha:f.main,sourcePrNumber:15,
+  prepare:f.prepare,io:f.io};
+ await assert.rejects(()=>publishExactControllerApprovalPair(args),/CI_APPROVAL_DIFF_DENIED/);
+ assert.equal(f.state.updates,0);
 });
