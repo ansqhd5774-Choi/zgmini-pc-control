@@ -29,10 +29,10 @@ test('gitleaks scanner failure remains fail-closed with sanitized distinct class
 });
 
 test('gitleaks template metadata strips matches and fails closed on unexpected output',()=>{
- const summary=summarizeRuleOnlyOutput('generic-api-key\\naws-access-token\\ngeneric-api-key\\n');
+ const summary=summarizeRuleOnlyOutput('generic-api-key\naws-access-token\ngeneric-api-key\n');
  assert.deepEqual(summary,{findingCount:3,ruleIds:['aws-access-token','generic-api-key']});
- for(const bad of ['', 'generic-api-key\\nUNEXPECTED_OR_RAW', 'unexpected=value',
-  'aws-access-token\\nnot usable', 1, null]){
+ for(const bad of ['', 'generic-api-key\nUNEXPECTED_OR_RAW', 'unexpected=value',
+  'aws-access-token\nnot usable', 1, null]){
   assert.throws(()=>summarizeRuleOnlyOutput(bad),/GITLEAKS_REPORT_UNSAFE/);
  }
 });
