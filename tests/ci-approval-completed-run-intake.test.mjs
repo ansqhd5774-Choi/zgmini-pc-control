@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {observeCompletedRun,observePublishedControllerApprovals,createControllerPublicationPorts,publishExistingControllerApprovals} from '../ci-approval/completed-run-intake.mjs';
+import {observeCompletedRun,observePublishedControllerApprovals,createControllerPublicationPorts,publishExistingControllerApprovals,ciPublicationExitCode} from '../ci-approval/completed-run-intake.mjs';
 
 const repository={id:1442936296,full_name:'ansqhd5774-Choi/zgmini-pc-control',private:true};
 const event=()=>({action:'completed',repository:{...repository},workflow_run:{
@@ -164,4 +164,22 @@ test('submission workflow is activation-gated, push-only and pinned to reviewed 
  assert.match(y,/run: node ci-approval\/completed-run-intake\.mjs --publish-existing/);
  assert.match(y,/cancel-in-progress: false/);
  assert.doesNotMatch(y,/contents: write|id-token: write/);
+});
+
+test('CI publisher process exit fails on withheld or uncertain effects, not reused original requests',()=>{
+ const processed=results=>({state:'PUBLICATION_PROCESSED',results});
+ for(const status of ['STATE_UNKNOWN','NOT_SUBMITTED','AUTOMATION_BLOCKED']){
+  assert.equal(ciPublicationExitCode(processed([{status}])),1,status);
+  assert.equal(ciPublicationExitCode(processed([
+   {status:'REQUEST_READBACK_VERIFIED'},{status}])) ,1,'mixed '+status);
+ }
+ assert.equal(ciPublicationExitCode(processed([
+  {status:'REQUEST_READBACK_VERIFIED'},{status:'EXISTING_REQUEST_REUSED'}])),0);
+ assert.equal(ciPublicationExitCode(processed([])),1);
+ assert.equal(ciPublicationExitCode(processed(null)),1);
+ assert.equal(ciPublicationExitCode({state:'EVIDENCE_MISSING'}),1);
+ assert.equal(ciPublicationExitCode({state:'IGNORED'}),0);
+ assert.equal(ciPublicationExitCode({state:'DISABLED'}),0);
+ const moduleText=readFileSync(new URL('../ci-approval/completed-run-intake.mjs',import.meta.url),'utf8');
+ assert.match(moduleText,/process\.exitCode=ciPublicationExitCode\(result\)/);
 });
