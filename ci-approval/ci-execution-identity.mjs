@@ -1,65 +1,72 @@
-// Request-bound CI workload identity. Not business approval or execution authority.
-// Verify a short-lived proof in memory; never persist or log the bearer token.
-import {createHash,createPublicKey,verify} from 'node:crypto';
-const issuer='https://token.actions.githubusercontent.com';
-const repo='ansqhd5774-Choi/zgmini-pc-control';
-const workflow=repo+'/.github/workflows/ci-approval-controller-b.yml@';
+// Durable workload receipt for the existing asynchronous maintenance receiver.
+// Trust is the authenticated GitHub read port and independently installed pin
+// of the reviewed workflow (including pinned transitive code), not an Issue
+// author name, a caller-supplied workflow pin, or an expiring bearer token.
+// Identity alone does not confer business approval or bypass manifest/CAS/lease.
+import {createHash} from 'node:crypto';
+const REPO='ansqhd5774-Choi/zgmini-pc-control',REPO_ID=1442936296;
+const WORKFLOW='.github/workflows/ci-approval-controller-b.yml';
+const JOB='submit-controller-b',STEP='Record Controller B request receipt';
+const MARKER='ZGMINI_CI_CONTROLLER_B_RECEIPT=';
 const sha=x=>typeof x==='string'&&/^[a-f0-9]{40}$/.test(x);
-const positive=x=>typeof x==='string'&&/^[1-9]\d*$/.test(x);
-const deny=code=>{throw Error(code)};
-function decode(s){
- if(!/^[A-Za-z0-9_-]+$/.test(s))deny('CI_IDENTITY_ENCODING_INVALID');
- const b=Buffer.from(s,'base64url');
- if(b.toString('base64url')!==s)deny('CI_IDENTITY_ENCODING_INVALID');
- return b;
+const id=x=>Number.isSafeInteger(x)&&x>0;
+const hash=b=>createHash('sha256').update(b).digest('hex');
+const bytesOk=b=>Buffer.isBuffer(b)&&b.length>0&&b.length<=32768;
+const out=(state,code,extra={})=>Object.freeze({state,code,canPublish:false,canExecute:false,...extra});
+export function controllerBReceiptMarker(issueNumber,requestBytes){
+ if(!id(issueNumber)||!bytesOk(requestBytes))throw Error('CI_RECEIPT_INPUT_INVALID');
+ return MARKER+issueNumber+':'+hash(requestBytes);
 }
-export function controllerBAudience(requestBytes){
- if(!Buffer.isBuffer(requestBytes)||!requestBytes.length||requestBytes.length>32768)
-  deny('CI_IDENTITY_REQUEST_BYTES_INVALID');
- return 'urn:zgmini:controller-b:'+createHash('sha256').update(requestBytes).digest('hex');
-}
-export async function readGitHubOIDCKeys(){
- const res=await fetch(issuer+'/.well-known/jwks',{redirect:'error',signal:AbortSignal.timeout(10000)});
- if(!res.ok)deny('CI_IDENTITY_KEYS_UNAVAILABLE');
- return res.json();
-}
-// The pin comes from independently installed receiver policy, never a request,
-// token or candidate PR. The pinned reusable workflow must run only trusted code.
-export async function verifyControllerBIdentity({token,requestBytes,trustedWorkflowSha,now=Math.floor(Date.now()/1000),readKeys=readGitHubOIDCKeys}={}){
- if(!sha(trustedWorkflowSha))deny('CI_IDENTITY_POLICY_NOT_CONFIGURED');
- if(typeof token!=='string'||token.length>16000||!Number.isSafeInteger(now))
-  deny('CI_IDENTITY_TOKEN_INVALID');
- const parts=token.split('.');
- if(parts.length!==3)deny('CI_IDENTITY_TOKEN_INVALID');
- let header,claims;
- try{header=JSON.parse(decode(parts[0]));claims=JSON.parse(decode(parts[1]));}
- catch{deny('CI_IDENTITY_TOKEN_INVALID');}
- if(header?.alg!=='RS256'||typeof header.kid!=='string'||!header.kid||header.crit!==undefined||
-    header.jku!==undefined||header.jwk!==undefined||header.x5u!==undefined)
-  deny('CI_IDENTITY_HEADER_DENIED');
- const keys=await readKeys();
- const matches=Array.isArray(keys?.keys)?keys.keys.filter(k=>k.kid===header.kid&&k.kty==='RSA'&&
-  (k.alg===undefined||k.alg==='RS256')&&(k.use===undefined||k.use==='sig')):[];
- if(matches.length!==1)deny('CI_IDENTITY_KEY_DENIED');
- let valid=false;
- try{const key=createPublicKey({key:matches[0],format:'jwk'});
-  valid=key.asymmetricKeyType==='rsa'&&key.asymmetricKeyDetails.modulusLength>=2048&&
-   verify('RSA-SHA256',Buffer.from(parts[0]+'.'+parts[1]),key,decode(parts[2]));
- }catch{deny('CI_IDENTITY_SIGNATURE_DENIED');}
- if(!valid)deny('CI_IDENTITY_SIGNATURE_DENIED');
- if(claims?.iss!==issuer||claims.aud!==controllerBAudience(requestBytes)||
-    claims.repository!==repo||claims.repository_id!=='1442936296'||claims.repository_owner_id!=='327938088'||
-    claims.repository_visibility!=='private'||claims.ref!=='refs/heads/main'||
-    !['workflow_run','push'].includes(claims.event_name)||
-    claims.job_workflow_ref!==workflow+trustedWorkflowSha||claims.job_workflow_sha!==trustedWorkflowSha||
-    !positive(claims.run_id)||!positive(claims.run_attempt)||typeof claims.jti!=='string'||!claims.jti)
-  deny('CI_IDENTITY_SCOPE_DENIED');
- if(![claims.iat,claims.nbf,claims.exp].every(Number.isSafeInteger)||claims.iat>now+30||
-    claims.nbf>now+30||claims.exp<=now||claims.exp<=claims.iat||claims.exp<=claims.nbf||
-    claims.exp-claims.iat>600)
-  deny('CI_IDENTITY_TIME_DENIED');
- return Object.freeze({state:'CI_WORKLOAD_IDENTITY_VERIFIED_ONLY',runId:claims.run_id,
-  runAttempt:claims.run_attempt,workflowSha:trustedWorkflowSha,
-  requestSha256:createHash('sha256').update(requestBytes).digest('hex'),
-  canPublish:false,canExecute:false});
+// Only the fixed reviewed workflow emits the marker after creating and reading
+// back the exact Issue. The receiver reads the historical attempt, not a later
+// rerun. A pending attempt is queued, not considered an authentication failure.
+export async function verifyControllerBIdentity({issueNumber,requestBytes,runId,attempt,policy,getJson,readJobLogs}={}){
+ if(!id(policy?.workflowId)||!sha(policy?.workflowBlobSha))
+  return out('DISABLED','CI_IDENTITY_POLICY_NOT_CONFIGURED');
+ if(!id(runId)||!id(attempt)||!id(issueNumber)||!bytesOk(requestBytes)||
+    typeof getJson!=='function'||typeof readJobLogs!=='function')
+  return out('REJECTED','CI_RECEIPT_INPUT_INVALID');
+ const expected=controllerBReceiptMarker(issueNumber,requestBytes),route='actions/runs/'+runId+'/attempts/'+attempt;
+ try{
+  const run=await getJson(route);
+  if(run?.id!==runId||run.run_attempt!==attempt||run.workflow_id!==policy.workflowId||
+     run.path!==WORKFLOW||run.repository?.id!==REPO_ID||run.repository?.full_name!==REPO||
+     run.repository?.private!==true||run.head_repository?.id!==REPO_ID||
+     run.head_branch!=='main'||!sha(run.head_sha)||!['push','workflow_run'].includes(run.event))
+   return out('REJECTED','CI_RUN_IDENTITY_MISMATCH');
+  if(run.status!=='completed')return out('QUEUED','CI_RUN_NOT_COMPLETED');
+  if(run.conclusion!=='success')return out('REJECTED','CI_RUN_NOT_SUCCESS');
+  // Independently read the caller workflow at its immutable run revision.
+  // The installed pin must cover a workflow that only checks out fixed reviewed
+  // source and never executes a candidate or accepts arbitrary marker text.
+  const file=await getJson('contents/'+WORKFLOW+'?ref='+run.head_sha);
+  if(file?.type!=='file'||file.path!==WORKFLOW||file.sha!==policy.workflowBlobSha||
+     file.encoding!=='base64'||typeof file.content!=='string'||file.content.length>131072)
+   return out('REJECTED','CI_WORKFLOW_PIN_MISMATCH');
+  const bytes=Buffer.from(file.content,'base64');
+  const blob=createHash('sha1').update(Buffer.concat([Buffer.from('blob '+bytes.length+'\0'),bytes])).digest('hex');
+  if(blob!==policy.workflowBlobSha)return out('REJECTED','CI_WORKFLOW_BYTES_MISMATCH');
+  const jobs=await getJson(route+'/jobs?per_page=100');
+  if(!Array.isArray(jobs?.jobs)||!id(jobs.total_count)||jobs.total_count!==jobs.jobs.length)
+   return out('EVIDENCE_MISSING','CI_JOBS_INCOMPLETE');
+  const matched=jobs.jobs.filter(j=>j?.name===JOB);
+  if(matched.length!==1)return out('REJECTED','CI_JOB_IDENTITY_MISMATCH');
+  const job=matched[0];
+  if(!id(job.id)||job.run_id!==runId||job.run_attempt!==attempt||job.head_sha!==run.head_sha||
+     job.status!=='completed'||job.conclusion!=='success')
+   return out('REJECTED','CI_JOB_IDENTITY_MISMATCH');
+  const steps=Array.isArray(job.steps)?job.steps.filter(s=>s?.name===STEP):[];
+  if(steps.length!==1||steps[0].status!=='completed'||steps[0].conclusion!=='success')
+   return out('REJECTED','CI_RECEIPT_STEP_NOT_SUCCESS');
+  const logs=await readJobLogs(job.id);
+  if(typeof logs!=='string'||!logs.length||logs.length>16000000)
+   return out('EVIDENCE_MISSING','CI_RECEIPT_LOG_UNAVAILABLE');
+  const marks=logs.split(/\r?\n/).flatMap(line=>{
+   const m=line.match(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z (ZGMINI_CI_CONTROLLER_B_RECEIPT=[1-9]\d*:[a-f0-9]{64})$/);
+   return m?[m[1]]:[];
+  });
+  if(!marks.includes(expected))return out('REJECTED','CI_RECEIPT_ISSUE_OR_BYTES_MISMATCH');
+  return out('CI_WORKLOAD_IDENTITY_VERIFIED_ONLY','CI_RECEIPT_MATCH',{runId,attempt,jobId:job.id,
+    issueNumber,requestSha256:hash(requestBytes),workflowBlobSha:blob,runHeadSha:run.head_sha});
+ }catch{return out('EVIDENCE_MISSING','CI_IDENTITY_READ_FAILED')}
 }

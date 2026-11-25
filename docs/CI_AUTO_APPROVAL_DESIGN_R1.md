@@ -35,6 +35,13 @@
 
 실제 승인 원본과 정규 인증을 확보하지 못했다면 추가 shadow 검증으로 전체 진행률을 올리지 않는다. 운영 활성화 결정이 남은 상태에서 기존 승인된 다른 업무를 멈추거나 새 전역 Gate를 추가하지 않는다.
 
+## 0-B. 2026-11-26 사용자 승인 및 비동기 인증 정정 (현행 우선)
+
+- 사용자가 신규 개발 지시 자체를 최초 업무 승인으로 인정하고 승인 범위의 A/B 자동 승인·실행을 명시 승인했다. 단계별 재승인은 제거한다. 범위 외 효과/C/관리자 권한 확대는 제외한다. 이 대화 기록은 운영 수신기에 공급된 기계 판독 승인 원본과 구분한다.
+- 기존 OIDC 직접 검증 후보는 미활성 상태에서 교체한다. 독립 유지보수기의 비동기 Issue polling에 단명 bearer proof를 넣으면 만료/노출 문제가 생긴다. 토큰 저장, 사용자 자격증명 복제, 새로운 네트워크 서비스, 추가 예약을 하지 않는다.
+- 제한 Controller B 경로: 고정 신뢰 workflow가 정확 Issue를 생성하고 readback 후 Issue 번호와 원문 SHA-256만 작업 로그에 기록한다. 유지보수기는 기존 인증된 GitHub API로 해당 run/attempt, 고정 workflow blob 원본, 성공한 job 및 실제 receipt를 대조한다. workflow pin은 독립 설치 정책에서 제공하며 후보 PR/Issue가 설정하지 않는다. pin이 신뢰하는 workflow 및 전이 실행 코드의 고정 SHA 검토가 선행되어야 한다. 관련 CI와 업무 승인, 기존 manifest/CAS/lease/rollback/효과 원장은 별도로 유지한다.
+- 현행 구현은 receipt 생성/검증 계약과 회귀시험이며 실제 workflow 발행/수신기 통합/독립 pin 설치/운영 적용은 미완료. 이전 OIDC 파일은 운영에 반영된 적 없다. 기존 소유자 제출 경로는 변경하지 않는다.
+
 ## 1. 기존 계약 승계
 - 정본: PC_AUTOMATION_STANDARD.md §5, CONTROLLER_AUTO_UPDATE.md, GENERAL_CHAT_START.md, writer-b/README.md, AGENTS.md.
 - A: 등록된 고정 operation과 pc-job Issue → Actions → Controller → TXT/JSON. 이미 가능한 작업에 새 Gate를 추가하지 않는다.
