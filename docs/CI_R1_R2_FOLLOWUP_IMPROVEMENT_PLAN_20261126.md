@@ -116,3 +116,13 @@
 - #25 실제 페이지 색 대비의 자동 판정 불가 (`color-contrast` 모바일 노드 3·데스크톱 노드 1)는 **UI 실제 적합성 미입증**이며 새로운 CI 미완료나 강제 Gate로 승격하지 않는다.
 - 기존 채택 R1 8/8·R2 11/11=19/19의 실행 계약 보존. 사용자 제외한 R2 #8 Good/P75/Performance Budget 재도입 없음.
 - 이 원장은 기존 자동화 담당 전용 브랜치의 해당 문서에만 반영한다. 전체 오래된 브랜치의 무단 `main` 병합, 예약·Runner·PC·Cloudflare·원자료/DB/D1 운영 변경·유료 서비스 추가는 수행하지 않았다.
+
+## 8. #25 실제 UI 색 대비 별도 후속 검증 — 2026-11-26
+
+**원래 CI 개선 6/6 완료 판정은 보존한다.** 사용자가 추가로 작업을 지시하여 #25 검사 결과에 남아 있던 실제 색 대비 미확정 범위를, 기존 접근성 정책과 UI 소스에서 별도 조사했다. 조사와 직접 발견된 UI 결함을 구분한다.
+
+- 기존 [Browser Run #45688120760](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45688120760)의 `ci-accessibility/summary.json`: `violatedRules=0`, `incomplete color-contrast`는 모바일 390px 3노드/데스크톱 1440px 1노드. 현재 CI는 `OBSERVED_ONLY_NO_GATING` 및 미확정을 유지하며, 자동 검사만으로 전체 페이지 적합성 확정 불가.
+- 같은 Run의 기존 `fear-greed-education/search-about-390.png`, `search-about-1440.png` 실제 스크린샷과 웹 `main`의 `app/about/page.tsx`, `app/about/about.module.css`를 비교. 기본 페이지 배경 `#10171c`에 `hello #8bbba9`, `lead #cbd4db`, `h1 #f5f7fa` 등의 명시 대비는 각각 8.42:1·12.04:1·16.85:1(배경 장식 합성 전)로 일반·큰 텍스트 기준 충족. 모바일 장식 이미지의 opacity 0.18로 흰색 최대 합성색을 가정한 `hello` 대비는 최소 4.82:1. **이는 해당 색상 조합의 수학적 검증으로, axe 미확정 개별 노드를 확정 PASS로 소급 변경하지 않는다.**
+- **별도 실제 결함 발견:** `/about/` 하단 `시장 대시보드 보기` 링크의 기본 `#f8fffc` / `#08785b` 대비 **5.38:1**이지만 `:hover` `#f8fffc` / `#0c956e`는 **3.74:1**로 16px 텍스트 WCAG AA 4.5:1 미달. 정적 axe 원래 스캔은 hover 동작을 자동 포함하지 않으므로 기존 위반 0건과 모순되지 않는다.
+- [웹 전용 PR #1638](https://github.com/ansqhd5774-Choi/zgmini/pull/1638): 수정 대상은 `app/about/about.module.css`의 hover 색상 1개(`#0a8062`, 계산 대비 **4.84:1**)와 기존 `tests/fear-greed-education-browser-r4.mjs`의 390/1440 실제 브라우저 `getComputedStyle`·hover 검증 추가. 새 Workflow·글로벌 Gate·#8 Good/P75 재도입 없음.
+- **상태: RUNNING**. PR 정확 HEAD CI·병합 SHA·`main` 재조회 전에는 운영 반영·완료로 계산하지 않는다. 원래 axe incomplete 규칙의 원인이 이번 hover라고 단정하지 않고 별도 미확인으로 보존한다.
