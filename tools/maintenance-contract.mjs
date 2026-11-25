@@ -942,7 +942,7 @@ export function verifiedRunningPostcheckFailure({ledger,manifest,issue,run,job}=
 // replaying an Issue, modifying a Controller, or treating a missing run as FAIL.
 // This is a snapshot; the next bounded observation may advance its state.
 export function classifyMaintenancePostcheckLink({requestId,issueNumber,operation,
- sourceSha,issue,runs,jobs}={}){
+ sourceBranch,sourceSha,issue,runs,jobs}={}){
  const out=(state,code,runId=null,jobId=null)=>({
   schema:'ZGMINI_MAINTENANCE_POSTCHECK_LINK_V1',
   requestId,issueNumber,state,code,runId,jobId,
@@ -968,7 +968,7 @@ export function classifyMaintenancePostcheckLink({requestId,issueNumber,operatio
   !Number.isFinite(origin)||
   body?.schema!=='ZGMINI_PC_JOB_V1'||body.requestId!==requestId+'-postcheck'||
   body.operation!==operation||body.sourceRepository!=='ansqhd5774-Choi/zgmini'||
-  body.sourceSha!==sourceSha)
+  body.sourceBranch!==sourceBranch||body.sourceSha!==sourceSha)
   return out('STATE_UNKNOWN','POSTCHECK_ISSUE_CONTRACT_UNVERIFIED');
  if(!Array.isArray(runs))return out('STATE_UNKNOWN','POSTCHECK_RUN_LOOKUP_UNVERIFIED');
  const matches=runs.filter(run=>Number.isSafeInteger(run?.id)&&run.id>0&&
