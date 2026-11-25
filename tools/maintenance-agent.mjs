@@ -30,10 +30,14 @@ export const INSTALLED_RECOVERY_SOURCE_SHA='e6c96e8d19bd9084b8021c7df31678f56ef1
 export const INSTALLED_RECOVERY_CONTROLLER_SHA='b9a423cf38d0967d6ed336912a66433f79502d3d';
 export const INSTALLED_RECOVERY_MANIFEST_PATH=
  'approvals/maintenance-recoveries/'+INSTALLED_RECOVERY_ORIGINAL_ID+'.installed.json';
-// Only these two previously established installed-state cases may be routed.
+// These exact historical installed-state cases require separate approval.
+// #3516 uses its independently attested operating A rather than a fake postcheck.
 export const W04_INSTALLED_RECOVERY_ORIGINAL_ID='pc-update-71ea39dc-7048-4e10-9d11-d4be7f6c3ec0';
 export const W04_INSTALLED_RECOVERY_SOURCE_SHA='fcb098d20fb9a6c48f371786c69f7f1fdf5bc34a';
 export const W04_INSTALLED_RECOVERY_CONTROLLER_SHA='6b3c9c0ce77354d81babe4c9ea7785663c6c2cb4';
+export const W04_3516_INSTALLED_RECOVERY_ORIGINAL_ID='pc-update-c087fa10-88e2-42e3-bc60-c758ab93f0c1';
+export const W04_3516_INSTALLED_RECOVERY_SOURCE_SHA='ec9009be720f3da33c3300a81aaf54be1e18c683';
+export const W04_3516_INSTALLED_RECOVERY_CONTROLLER_SHA='83679b013ac9a9820331d93311ec97e572b18e13';
 const INSTALLED_RECOVERY_CASES=Object.freeze([
  Object.freeze({originalId:INSTALLED_RECOVERY_ORIGINAL_ID,
   sourceSha:INSTALLED_RECOVERY_SOURCE_SHA,controllerSha:INSTALLED_RECOVERY_CONTROLLER_SHA,
@@ -45,6 +49,12 @@ const INSTALLED_RECOVERY_CASES=Object.freeze([
   issueNumber:3409,proof:Object.freeze({issueNumber:3438,runId:45457196689,
    jobId:138669741465,runnerName:'zgmini-pc-03',
    resultPath:'results/45457196689-1-seat-3.json'})}),
+ Object.freeze({originalId:W04_3516_INSTALLED_RECOVERY_ORIGINAL_ID,
+  sourceSha:W04_3516_INSTALLED_RECOVERY_SOURCE_SHA,
+  controllerSha:W04_3516_INSTALLED_RECOVERY_CONTROLLER_SHA,
+  issueNumber:3516,proof:Object.freeze({issueNumber:3528,runId:45579963186,
+   jobId:139087219551,runnerName:'zgmini-pc-03',
+   resultPath:'results/pc-process-inventory-45579963186-1-operating.json'})}),
 ]);
 const recoveryCaseForTarget=sha=>INSTALLED_RECOVERY_CASES.find(c=>c.controllerSha===sha)??null;
 const recoveryCaseForApproval=a=>{

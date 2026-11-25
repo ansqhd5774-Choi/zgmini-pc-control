@@ -9,14 +9,16 @@ import {
  INSTALLED_RECOVERY_ORIGINAL_ID,INSTALLED_RECOVERY_SOURCE_SHA,
  INSTALLED_RECOVERY_CONTROLLER_SHA,INSTALLED_RECOVERY_MANIFEST_PATH,
  W04_INSTALLED_RECOVERY_ORIGINAL_ID,W04_INSTALLED_RECOVERY_SOURCE_SHA,
- W04_INSTALLED_RECOVERY_CONTROLLER_SHA,verifyInstalledRecoveryLocalSource,
+ W04_INSTALLED_RECOVERY_CONTROLLER_SHA,
+ W04_3516_INSTALLED_RECOVERY_ORIGINAL_ID,W04_3516_INSTALLED_RECOVERY_SOURCE_SHA,
+ W04_3516_INSTALLED_RECOVERY_CONTROLLER_SHA,verifyInstalledRecoveryLocalSource,
  prepareInstalledRecoveryRequest,validateInstalledRecoveryIssueEnvelope,
 } from '../tools/maintenance-agent.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control',ACTOR='ansqhd5774-Choi';
 const digest=b=>createHash('sha256').update(b).digest('hex');
 const approved=(mutate=x=>x,which='legacy')=>{
- const w04=which==='w04';
+ const w04=which==='w04',next=which==='w04-3516';
  const casKeys=['ledgerSha256','ownerSha256','markerSha256','backlogSha256',
   'snapshotSha256','protectionSha256','writerSha256'];
  const casDigests=Object.fromEntries(casKeys.map(k=>[k,'a'.repeat(64)]));
@@ -26,16 +28,21 @@ const approved=(mutate=x=>x,which='legacy')=>{
  const payload={
   schema:'ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V1',approved:true,
   operation:'RECONCILE_INSTALLED',
-  requestId:w04?W04_INSTALLED_RECOVERY_ORIGINAL_ID:INSTALLED_RECOVERY_ORIGINAL_ID,
-  issueNumber:w04?3409:2960,
-  sourceSha:w04?W04_INSTALLED_RECOVERY_SOURCE_SHA:INSTALLED_RECOVERY_SOURCE_SHA,
-  targetControllerSha:w04?W04_INSTALLED_RECOVERY_CONTROLLER_SHA:INSTALLED_RECOVERY_CONTROLLER_SHA,
+  requestId:next?W04_3516_INSTALLED_RECOVERY_ORIGINAL_ID:
+   w04?W04_INSTALLED_RECOVERY_ORIGINAL_ID:INSTALLED_RECOVERY_ORIGINAL_ID,
+  issueNumber:next?3516:w04?3409:2960,
+  sourceSha:next?W04_3516_INSTALLED_RECOVERY_SOURCE_SHA:
+   w04?W04_INSTALLED_RECOVERY_SOURCE_SHA:INSTALLED_RECOVERY_SOURCE_SHA,
+  targetControllerSha:next?W04_3516_INSTALLED_RECOVERY_CONTROLLER_SHA:
+   w04?W04_INSTALLED_RECOVERY_CONTROLLER_SHA:INSTALLED_RECOVERY_CONTROLLER_SHA,
   approvedCurrentWriterConfigSha256:casDigests.writerSha256,
   files,casDigests,proof:{
-   issueNumber:w04?3438:2982,runId:w04?45457196689:45186420113,
-   jobId:w04?138669741465:137733094098,
-   runnerName:w04?'zgmini-pc-03':'zgmini-pc-04',
-   resultPath:w04?'results/45457196689-1-seat-3.json':'results/45186420113-1-seat-4.json',
+   issueNumber:next?3528:w04?3438:2982,
+   runId:next?45579963186:w04?45457196689:45186420113,
+   jobId:next?139087219551:w04?138669741465:137733094098,
+   runnerName:next||w04?'zgmini-pc-03':'zgmini-pc-04',
+   resultPath:next?'results/pc-process-inventory-45579963186-1-operating.json':
+    w04?'results/45457196689-1-seat-3.json':'results/45186420113-1-seat-4.json',
    resultSha256:'c'.repeat(64),
   },
  };
@@ -68,7 +75,12 @@ function setup(t,{wrongApproval=false,throwAfterExec=false,approvalMutation=null
  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  const leaseRoot=path.join(root,'leases');fs.mkdirSync(leaseRoot);
  const manifest=approved(approvalMutation??(x=>x),which),request=prepareInstalledRecoveryRequest(manifest);
- const fixed=which==='w04'?{
+ const fixed=which==='w04-3516'?{
+  originalId:W04_3516_INSTALLED_RECOVERY_ORIGINAL_ID,
+  sourceSha:W04_3516_INSTALLED_RECOVERY_SOURCE_SHA,
+  controllerSha:W04_3516_INSTALLED_RECOVERY_CONTROLLER_SHA,
+  path:'approvals/maintenance-recoveries/'+W04_3516_INSTALLED_RECOVERY_ORIGINAL_ID+'.installed.json',
+ }:which==='w04'?{
   originalId:W04_INSTALLED_RECOVERY_ORIGINAL_ID,sourceSha:W04_INSTALLED_RECOVERY_SOURCE_SHA,
   controllerSha:W04_INSTALLED_RECOVERY_CONTROLLER_SHA,
   path:'approvals/maintenance-recoveries/'+W04_INSTALLED_RECOVERY_ORIGINAL_ID+'.installed.json',
@@ -271,4 +283,42 @@ test('GitHub API line-wrapped base64 remains valid under strict decoding',async 
  const result=await f.agent.pollOnce();
  assert.equal(result[0].status,'SUCCEEDED',JSON.stringify(result));
  assert.equal(f.stats.recoveries,1);
+});
+
+test('W04 #3516 exact approved independent operating A routes a single Windows recovery',async t=>{
+ const env=prepareInstalledRecoveryRequest(approved(x=>x,'w04-3516'),
+  {chatId:'chat-w04-3516-recovery-test'});
+ assert.equal(env.targetControllerSha,W04_3516_INSTALLED_RECOVERY_CONTROLLER_SHA);
+ assert.notEqual(env.requestId,W04_3516_INSTALLED_RECOVERY_ORIGINAL_ID);
+ const f=setup(t,{which:'w04-3516'});
+ const first=await f.agent.pollOnce();
+ assert.equal(first[0].status,'SUCCEEDED',JSON.stringify(first));
+ assert.equal(f.stats.recoveries,1);
+ const child=f.calls.find(x=>x.file===process.execPath&&x.args.includes('reconcile-installed'));
+ assert.ok(child);
+ assert.equal(child.args[child.args.indexOf('--request-id')+1],
+  W04_3516_INSTALLED_RECOVERY_ORIGINAL_ID);
+ assert.equal(child.args[child.args.indexOf('--source-sha')+1],
+  W04_3516_INSTALLED_RECOVERY_SOURCE_SHA);
+ await f.agent.pollOnce();assert.equal(f.stats.recoveries,1);
+});
+test('W04 #3516 tampered approval fails before a recovery claim',async t=>{
+ for(const mutant of [
+  x=>({...x,proof:{...x.proof,issueNumber:3409}}),
+  x=>({...x,proof:{...x.proof,resultPath:'results/unapproved.json'}}),
+ ])await t.test('tampered proof or source',async t2=>{
+  const f=setup(t2,{which:'w04-3516',approvalMutation:mutant});
+  const out=await f.agent.pollOnce();
+  assert.equal(out[0].status,'BLOCKED',JSON.stringify(out));
+  assert.equal(f.stats.recoveries,0);
+  assert.equal(f.agent.loadLedger(f.request.requestId),null);
+ });
+});
+
+test('W04 #3516 wrong approval identity is rejected before Issue construction',()=>{
+ for(const mutant of [
+  x=>({...x,sourceSha:'f'.repeat(40)}),
+  x=>({...x,requestId:W04_INSTALLED_RECOVERY_ORIGINAL_ID}),
+  x=>({...x,approved:false})
+ ])assert.throws(()=>prepareInstalledRecoveryRequest(approved(mutant,'w04-3516')));
 });
