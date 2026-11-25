@@ -1,0 +1,57 @@
+name: W04 3516 Approved Recovery Source-Only Packet
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - '.github/workflows/w04-3516-source-packet.yml'
+      - 'tools/maintenance-source-packet.mjs'
+      - 'tests/maintenance-source-packet.test.mjs'
+
+permissions:
+  contents: read
+
+jobs:
+  source-packet-only:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.event.pull_request.user.login == 'ansqhd5774-Choi' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/3516-independent-source-packet-20261125'
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 6
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Confirm existing isolated source-only CI host
+        run: |
+          if /I "%COMPUTERNAME%"=="DESKTOP-N62L0NG" (
+            echo W04_3516_SOURCE_PACKET_ISOLATED_CI=TRUE
+          ) else (
+            echo W04_3516_SOURCE_PACKET_ISOLATED_CI=FALSE
+            exit /b 5
+          )
+      - name: Checkout immutable Git ancestry in CI sandbox only
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Use existing pinned Node runtime in isolated CI
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Test exact manifest provenance and deny incomplete packet
+        run: node --test --test-concurrency=1 tests/maintenance-source-packet.test.mjs
+      - name: Stage exact source and approved manifest outside repository
+        run: node tools/maintenance-source-packet.mjs --prepare-3516
+      - name: Publish private, non-executable source-only packet
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: W04_3516_APPROVED_SOURCE_ONLY_ec9009be
+          path: ${{ runner.temp }}/ZGMINI_3516_SOURCE_ONLY/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
