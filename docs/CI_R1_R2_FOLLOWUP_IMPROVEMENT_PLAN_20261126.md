@@ -54,12 +54,12 @@
 |---|---|---|---|---|
 | #23 | 완료 | 기존 정상·오류 fixture 확인 | **DONE_NO_CHANGE** — 관측형 계약 의도 확인 | 기존 Run 성공 재사용, 코드 수정 없음 |
 | #25 | 완료 | 기존 incomplete·violation fixture 확인 | **확인 중** — 관측형 보고는 정합, 실제 미확정 규칙 원인 추가 분류 | 코드 수정 없음, 기존 Run 성공 재사용 |
-| #1 | 완료 | 미착수 | 미판정 | 미착수 |
-| #19 | 완료 | 전체 최근 100건 혼잡 조건 및 회귀시험 작성 | **수정 필요** — 대상 실행 누락 위험 확인 | [PC PR #3721](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3721) 생성, 정확 HEAD CI 검증 진행 |
+| #1 | 완료 | 실제 홈·레이아웃 공유 파일 7개 트리거 누락 확인 | **수정 필요** — 직접 UI 의존 경로 누락 | [웹 PR #1635](https://github.com/ansqhd5774-Choi/zgmini/pull/1635), 정확 HEAD CI 진행 |
+| #19 | 완료 | 전체 최근 100건 혼잡 조건 및 회귀시험 작성 | **DONE_FIXED** — Workflow별 범위 조회로 교정 | [PC PR #3721](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3721) CI 2/2·Node 회귀 11/11 PASS, main 병합 `9d8dcf906c938c41f6acde6f1ad4288652bcd890` |
 | #29 | 완료 | 미착수 | 미판정 | 미착수 |
 | #12 | 완료 | 미착수 | 미판정 | 미착수 |
 
-**계획 수립: 6/6**, **후속 판정·필수 검증 완료: 1/6 (#23, DONE_NO_CHANGE)**, **수정 PR 진행: 1/6 (#19)**. 기존 CI 도입 완료 19/19를 감소시키지 않는다. 사용자가 요청하지 않은 새 예약 검증을 후속 개선 완료조건으로 추가하지 않는다.
+**계획 수립: 6/6**, **후속 판정·필수 검증 완료: 2/6 (#23 DONE_NO_CHANGE, #19 DONE_FIXED)**, **수정 PR 진행: 1/6 (#1)**. 기존 CI 도입 완료 19/19를 감소시키지 않는다. 사용자가 요청하지 않은 새 예약 검증을 후속 개선 완료조건으로 추가하지 않는다.
 
 **첫 실행 대상:** #23의 `finalizeCrossBrowser`에 `javascriptErrors=1`을 주입한 기존 계약 테스트와 현재 요구된 합격 조건을 비교한다. 결과가 관측-only 정책과 일치하면 차단 추가 없이 `DONE_NO_CHANGE` 또는 별도 결정 필요로 처리하고 다음 독립 후보를 진행한다.
 
@@ -81,5 +81,11 @@
 ### #19 CI Observability — 수정 PR 진행
 
 - [PC `scripts/ci-job-metrics.mjs`](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/scripts/ci-job-metrics.mjs)는 저장소 전체 최근 `actions/runs?per_page=100`을 읽은 후 Workflow 이름을 선별했다. 격리 PC 제어 저장소에서 인계/관제 실행이 다량 섞인 실제 첫 페이지를 확인했고, **실제 대상 실행이 101번째 이후일 때 빈 결과가 되는 조건**을 가설로 분리했다. 현재 관측에서 모든 대상이 누락됐다는 주장은 아니다.
-- [별도 최신 main 기반 PR #3721](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3721): 기존 공식 GET으로 Workflow 이름→고유 ID를 검증한 뒤 해당 Workflow 실행 100건을 조회하도록 최소 수정. 인벤토리 누락·동명·잘못된 ID·대상 외 실행은 fail-closed. 관련 시험 11건으로 회귀 확장. **정확 HEAD CI 미확정 단계이므로 완료로 계산하지 않는다.**
+- [별도 최신 main 기반 PR #3721](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3721): 기존 공식 GET으로 Workflow 이름→고유 ID를 검증한 뒤 해당 Workflow 실행 100건을 조회하도록 최소 수정. 인벤토리 누락·동명·잘못된 ID·대상 외 실행은 fail-closed. 관련 시험 11건으로 회귀 확장. **정확 HEAD `c7bd264fb3fe0d5725e7fed1dc2c37590628a0bd` C996·Secret Scan 2/2 SUCCESS, C996 직접 선택 테스트 11/11 PASS(0 FAIL); main `9d8dcf906c938c41f6acde6f1ad4288652bcd890` 병합 및 기록 확인.**
 - 새로운 Runner·예약·소스 설치·운영 데이터/권한·요금제 변경 없음.
+
+### #1 Dynamic CI — 누락 경로 실제 확인, 웹 PR 검증 중
+
+- 최신 웹 `main` `app/page.tsx`, `app/dashboard-ui.tsx`, `app/layout.tsx`, `app/about/page.tsx`의 **실존하는 직접 import**와 [`community-chat-browser.yml`](https://github.com/ansqhd5774-Choi/zgmini/blob/main/.github/workflows/community-chat-browser.yml)의 `pull_request.paths`를 비교. `components/site-header.tsx`, `components/site-footer.tsx`, `components/dashboard-side-rails.tsx`, `components/live-score-value.tsx`, `components/score-arrow-provider.tsx`, `app/responsive.css`, `app/about/about.module.css`는 실제 파일이면서 브라우저 트리거 목록에서 빠져 있었음.
+- [웹 PR #1635](https://github.com/ansqhd5774-Choi/zgmini/pull/1635): 기존 Workflow 경로 7개 추가와 `tests/browser-ci-trigger-scope.test.mjs`의 직접 의존 경로 회귀만 변경. **새 Workflow·전역 Gate·#8 성능예산 재도입 없음**.
+- 검증: 정확 HEAD `6b2df32e8e68f14ae8c7329040f0e450b643b97a`의 Node/Browser/CodeQL/Secret 실제 CI 완료 후 합격 판정·병합 여부를 갱신. 지금 단계는 **RUNNING**, 완료로 계산하지 않음.
