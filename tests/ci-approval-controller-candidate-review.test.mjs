@@ -36,3 +36,20 @@ const cases=[
  ['missing delegation',v=>{v.delegation.pin=null},'INVALID']
 ];
 for(const [name,edit,state] of cases)test(name,async()=>{const v=fixture();edit(v);const r=await review(v);assert.equal(r.state,state);assert.equal(r.canPublish,false);assert.equal(r.canExecute,false);if(state==='CANDIDATE_REVIEW_MATCH_ONLY')assert.equal(r.candidate.status,'PROPOSED_NOT_APPROVED');else assert.equal(Object.hasOwn(r,'candidate'),false);});
+
+test('source review does not require a live operating PC snapshot',async()=>{
+ const v=fixture();delete v.live;
+ const r=await review(v);
+ assert.equal(r.state,'SOURCE_REVIEW_MATCH_ONLY');
+ assert.equal(r.reason,'LIVE_CHECKS_DEFERRED_TO_EXECUTION');
+ assert.equal(r.candidate.status,'PROPOSED_NOT_APPROVED');
+ assert.equal(r.canPublish,false);assert.equal(r.canExecute,false);
+});
+test('source-only review still rejects failed CI',async()=>{
+ const v=fixture();delete v.live;v.ci.run.conclusion='failure';
+ const r=await review(v);assert.equal(r.state,'REJECTED');assert.equal(r.canExecute,false);
+});
+test('invalid provided live snapshot cannot become source-only',async()=>{
+ const v=fixture();v.live=null;
+ const r=await review(v);assert.equal(r.state,'EVIDENCE_MISSING');assert.equal(r.canExecute,false);
+});
