@@ -43,7 +43,7 @@ test('W04 conditional manifest and pin are consistent but require ER1 installed 
  assert.deepEqual(manifest.allowFiles,files);
  assert.deepEqual(manifest.backup,{strategy:'VERSIONED_SNAPSHOT',rollback:{kind:'RESTORE_INSTALLED_SHA',sha:installed}});
  assert.equal(manifest.checks.manifestSha256,fingerprint);
- assert.equal(manifest.approval.ref,'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3576');
+ assert.equal(manifest.approval.ref,'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3588');
  const request={schema:'ZGMINI_PC_MAINTENANCE_REQUEST_V1',
   requestId:'pc-update-eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
   chatId:'chat-w04-readonly3-provisional-pin-test',operation:'controller-update',
@@ -66,4 +66,19 @@ test('W04 approval JSON is LF-stable and CRLF changes immutable digest',()=>{
   const transformed=createHash('sha256').update(Buffer.from(bytes.toString('utf8').replace(/\n/g,'\r\n'))).digest('hex');
   assert.notEqual(original,transformed,dir);
  }
+});
+
+test('W04 postcheck references the validated zgmini app source, not the Controller repository',()=>{
+ const target='1543e13fdebb18267a76ebb4653535c87438c3f0';
+ const manifest=JSON.parse(fs.readFileSync(path.join(root,'approvals/controller-updates',target+'.json'),'utf8'));
+ const prior=JSON.parse(fs.readFileSync(path.join(root,'approvals/controller-updates','3d42f226fcffde1f09885da552f9b003ea30e57e.json'),'utf8'));
+ assert.equal(manifest.postOperation,'core-status');
+ assert.equal(manifest.postSourceBranch,'main');
+ assert.equal(prior.postOperation,'core-status');
+ assert.equal(prior.postSourceBranch,'main');
+ assert.equal(manifest.postSourceSha,'b6049aac81b3442a58b08050ee138921f87a09e6');
+ assert.equal(manifest.postSourceSha,prior.postSourceSha,
+  'reuse previously successful zgmini/core-status A postcheck provenance');
+ assert.notEqual(manifest.postSourceSha,manifest.selectiveSource.mainSha,
+  'pc-control main SHA must never be supplied as zgmini postcheck sourceSha');
 });
