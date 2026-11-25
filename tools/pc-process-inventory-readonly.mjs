@@ -8,6 +8,7 @@ import {fileURLToPath} from 'node:url';
 import {authenticate,validateSeat} from './pc-host-inventory-readonly.mjs';
 import {uploadResultPairAtomic} from '../writer-config-b/result-pair-atomic.mjs';
 import {collectAutomationStatus} from './automation-status.mjs';
+import {installedControllerBPolicy} from './maintenance-contract.mjs';
 import {inspectProviderActivity} from '../controller/provider-activity-runtime-readonly.mjs';
 import {inspectHttp32TwoHostCheckpoints} from '../controller/http32-two-host-checkpoints-readonly.mjs';
 import {inspectSidecarSourceGate} from '../controller/fear-greed-archive-readonly.mjs';
@@ -964,6 +965,34 @@ export function compactD05WriterResult(base,status){
   code:status?.code??'D05_WRITER_CHECKPOINT_UNVERIFIED',
   d05WriterCheckpoint:status??{status:'STATE_UNKNOWN',
    code:'D05_WRITER_CHECKPOINT_UNVERIFIED',recoveryEligible:false}};
+}
+
+// Fixed existing install-root A readback. Never returns policy bytes, filesystem
+// paths, owner identity, credentials or issuer authority. Only the independent
+// maintenance handoff can install the actual receiver policy.
+export function inspectCiControllerBReceiverReadOnly(filesystem=fs){
+ const result=(policyState,manifestReadable)=>({
+  schema:'ZGMINI_CI_CONTROLLER_B_RECEIVER_READONLY_V1',
+  policyState,manifestReadable,executionAuthorized:false,
+  installedSourceIntegrityAsserted:false,operationalWrites:0,providerCalls:0,d1Writes:0
+ });
+ try{
+  const fixed='E:/ZGmini/automation/pc-maintenance/MAINTENANCE_INSTALL.json';
+  const stat=filesystem.lstatSync(fixed);
+  if(!stat.isFile()||stat.isSymbolicLink()||stat.size<1||stat.size>131072)
+   return result('UNVERIFIED',false);
+  const manifest=JSON.parse(filesystem.readFileSync(fixed,'utf8'));
+  if(manifest?.schema!=='ZGMINI_PC_MAINTENANCE_INSTALL_V1'||
+    !SHA40.test(manifest.sourceSha??'')||
+    typeof manifest.files!=='object'||manifest.files===null||Array.isArray(manifest.files))
+   return result('UNVERIFIED',false);
+  if(!Object.hasOwn(manifest,'ciControllerBPolicy'))
+   return result('ABSENT_IN_INSTALLED_MANIFEST',true);
+  try{
+   if(!installedControllerBPolicy(manifest))return result('UNVERIFIED',true);
+   return result('PRESENT_FORMAT_ONLY',true);
+  }catch{return result('INVALID',true);}
+ }catch{return result('UNVERIFIED',false);}
 }
 
 function collectMaintenanceStatusReadonly(){
@@ -2356,6 +2385,7 @@ export function collect(role,ctx,env=process.env){
  }
  const withMaintenance=role==='operating'?{...base,
   maintenance:collectMaintenanceStatusReadonly(),
+  ciControllerBReceiver:inspectCiControllerBReceiverReadOnly(),
   ...(ctx.w052960MaintenanceStatus?{
    w052960MaintenanceStatus:inspect2960MaintenanceStatusReadonly()}:{}),
   c2505RecoveryCheckpoint:inspect2505RecoveryReadonly(),
