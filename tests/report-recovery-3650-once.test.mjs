@@ -256,3 +256,20 @@ test('source pinning rejects scratch execution; synthetic installed contract val
   assert.throws(()=>verifyInstalledRuntime({root:f.root,scriptPath:source}),
     {code:'RECOVERY_SOURCE_DRIFT'});
 });
+
+
+test('one-time #3650 recovery workflow is owner-only, original issue-only and upload-only',()=>{
+  const workflow=fs.readFileSync(new URL('../.github/workflows/pc-report-recovery-3650-once.yml',import.meta.url),'utf8');
+  assert.match(workflow,/issue_comment:/);
+  assert.match(workflow,/github\.event\.repository\.private == true/);
+  assert.match(workflow,/github\.actor == 'ansqhd5774-Choi'/);
+  assert.match(workflow,/github\.event\.issue\.number == 3650/);
+  assert.match(workflow,/github\.event\.issue\.pull_request == null/);
+  assert.match(workflow,/github\.event\.comment\.user\.login == 'ansqhd5774-Choi'/);
+  assert.match(workflow,/github\.event\.comment\.body == '\/zgmini-recover-3650-once'/);
+  assert.match(workflow,/controller\\report-recovery-3650-once\.mjs/);
+  assert.doesNotMatch(workflow,/controller\\entry\.mjs/);
+  assert.doesNotMatch(workflow,/schedule:|workflow_dispatch:/);
+  assert.match(workflow,/cancel-in-progress: false/);
+  assert.equal(RECOVERY.issueNumber,3650);
+});
