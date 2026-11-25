@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import path from 'node:path';
-import {summarizeAutomation,dedicatedPcRunnersOnline,classifyRunnerQueryError,safeRuntimeSignals,operatingPcRunnerEvidence,inspectWatchdogReadOnly,summarizeSupervisorReadOnly,summarizeRequestedRecoveryEvidence,summarizeRequestProgress} from '../tools/automation-status.mjs';
+import {summarizeAutomation,dedicatedPcRunnersOnline,classifyRunnerQueryError,scopedRunnerRosterCliOptions,safeRuntimeSignals,operatingPcRunnerEvidence,inspectWatchdogReadOnly,summarizeSupervisorReadOnly,summarizeRequestedRecoveryEvidence,summarizeRequestProgress} from '../tools/automation-status.mjs';
 const healthy=()=>({installLock:{held:false},actualControllerSha:'a'.repeat(40),
  controllerFilesVerified:true,supervisorAlive:true,supervisorIdentityVerified:true,
  supervisorFresh:true,supervisorChildrenVerified:true,runnerSetOnline:true,workflowState:'active',installedOperations:['core-status']});
@@ -65,6 +65,28 @@ test('runner API permission failures are distinct from offline runner status',()
  assert.equal(summarizeAutomation({...healthy(),runnerSetOnline:null}).runtimeState,'UNVERIFIED');
 });
 
+test('the fixed operating inventory runner GET may use existing scoped gh OAuth without exposing tokens',()=>{
+ const env={GITHUB_ACTIONS:'true',GITHUB_EVENT_NAME:'issues',
+  GITHUB_REPOSITORY:'ansqhd5774-Choi/zgmini-pc-control',
+  GITHUB_ACTOR:'ansqhd5774-Choi',
+  GITHUB_WORKFLOW_REF:'ansqhd5774-Choi/zgmini-pc-control/.github/workflows/pc-process-inventory-readonly.yml@refs/heads/main',
+  RUNNER_NAME:'zgmini-pc-03',GITHUB_TOKEN:'WORKFLOW_ONLY',GH_HOST:'github.com'};
+ const options=scopedRunnerRosterCliOptions('actions/runners?per_page=100',env);
+ assert.ok(options.env);
+ assert.equal(Object.hasOwn(options.env,'GITHUB_TOKEN'),false);
+ assert.equal(options.env.GH_HOST,'github.com');
+ assert.equal(env.GITHUB_TOKEN,'WORKFLOW_ONLY');
+ assert.deepEqual(scopedRunnerRosterCliOptions('actions/workflows/pc-job.yml',env),{});
+ for(const [key,value] of Object.entries({
+  GITHUB_ACTIONS:'false',GITHUB_EVENT_NAME:'pull_request',
+  GITHUB_REPOSITORY:'other/repo',GITHUB_ACTOR:'untrusted',
+  GITHUB_WORKFLOW_REF:'ansqhd5774-Choi/zgmini-pc-control/.github/workflows/pc-job.yml@refs/heads/main',
+  RUNNER_NAME:'zgmini-handoff-ci-spare-01',GITHUB_TOKEN:'',GH_TOKEN:'OTHER_CREDENTIAL'})){
+  assert.deepEqual(scopedRunnerRosterCliOptions('actions/runners?per_page=100',{...env,[key]:value}),{},key);
+ }
+ assert.deepEqual(scopedRunnerRosterCliOptions('actions/runners?per_page=100',
+  {...env,GH_TOKEN:'EXPLICIT_OTHER_TOKEN'}),{});
+});
 test('403 roster permission remains scoped without introducing a new next-step gate',()=>{
  const r=summarizeAutomation({...healthy(),runnerSetOnline:null,
   runnerQueryError:'HTTP_403_FORBIDDEN',maintenanceFilesVerified:true,

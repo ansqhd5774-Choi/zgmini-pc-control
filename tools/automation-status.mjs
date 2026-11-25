@@ -194,6 +194,24 @@ export function safeRuntimeSignals(state){
 
 // Normalize only error classes from gh stderr: never export raw messages,
 // URLs, credentials or execution paths. A 403 does NOT prove six offline seats.
+// Scoped to the owner-opened operating-PC inventory workflow and the fixed
+// GitHub Runner roster GET. Workflow GITHUB_TOKEN is intentionally kept for
+// issue/result uploads; it cannot grant repository Administration:read.
+// The fixed read may use the PC user's previously authorized gh OAuth only
+// in this trusted context. Never read or return credentials.
+export function scopedRunnerRosterCliOptions(route,env=process.env){
+ if(route!=='actions/runners?per_page=100'||
+  env?.GITHUB_ACTIONS!=='true'||
+  env?.GITHUB_EVENT_NAME!=='issues'||
+  env?.GITHUB_REPOSITORY!==repo||
+  env?.GITHUB_ACTOR!=='ansqhd5774-Choi'||
+  env?.GITHUB_WORKFLOW_REF!==repo+'/.github/workflows/pc-process-inventory-readonly.yml@refs/heads/main'||
+  !operatingNames.includes(env?.RUNNER_NAME)||
+  typeof env?.GITHUB_TOKEN!=='string'||!env.GITHUB_TOKEN||
+  (typeof env?.GH_TOKEN==='string'&&env.GH_TOKEN.length>0))return {};
+ const {GITHUB_TOKEN:workflowToken,...cliEnv}=env;
+ return {env:cliEnv};
+}
 export function classifyRunnerQueryError(error){
  const msg=String(error?.stderr??error?.message??'');
  if(/\bHTTP\s*403\b|\b403\s+Forbidden\b/i.test(msg))return 'HTTP_403_FORBIDDEN';
@@ -288,7 +306,7 @@ export function collectAutomationStatus(args=process.argv.slice(2)){
  const supervisor=observe('SUPERVISOR_STATUS_UNAVAILABLE',()=>read(control+'/SUPERVISOR_STATUS.json'));
  const owner=observe('SUPERVISOR_OWNER_UNAVAILABLE',()=>read(control+'/leases/supervisor/owner.json'));
  const lock=observe('INSTALL_LEASE_UNAVAILABLE',()=>maintenanceLockStatus(maintenance,'controller-install'));
- const github=route=>JSON.parse(execFileSync(gh,['api',`repos/${repo}/${route}`],{encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:2e6}));
+ const github=route=>JSON.parse(execFileSync(gh,['api',`repos/${repo}/${route}`],{encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:2e6,...scopedRunnerRosterCliOptions(route)}));
  const rows=observe('RUNNERS_QUERY_UNAVAILABLE',()=>github('actions/runners?per_page=100').runners);
  const workflow=observe('WORKFLOW_QUERY_UNAVAILABLE',()=>github('actions/workflows/pc-job.yml').state);
  const operations=observe('INSTALLED_OPERATIONS_UNAVAILABLE',()=>Object.keys(read(control+'/config/operations.json').operations));
