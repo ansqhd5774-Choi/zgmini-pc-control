@@ -974,7 +974,7 @@ export function classifyMaintenancePostcheckLink({requestId,issueNumber,operatio
  const matches=runs.filter(run=>Number.isSafeInteger(run?.id)&&run.id>0&&
   run.event==='issues'&&run.display_title===title&&
   Number.isFinite(Date.parse(run.created_at??''))&&
-  Date.parse(run.created_at)>=origin);
+  Date.parse(run.created_at)>=origin&&Date.parse(run.created_at)-origin<=900000);
  if(matches.length===0)return out('NO_RUN','POSTCHECK_RUN_NOT_OBSERVED');
  if(matches.length!==1)return out('STATE_UNKNOWN','POSTCHECK_RUN_IDENTITY_AMBIGUOUS');
  const run=matches[0],runId=run.id;
