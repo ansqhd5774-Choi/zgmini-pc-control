@@ -144,3 +144,33 @@
 5. **실행 상태 구분:** 최종 PR HEAD `47b44ea1d39fc0c514bf296527afd20ee8f10be5`의 [Browser Run #45706019640](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45706019640) 첫 실행은 W05 BEA **Production 원자료 KST 레이블 비교 실패**로 Job FAIL. 같은 HEAD의 Node·CodeQL·Secret은 SUCCESS이며, 이전 성공 HEAD `4608ffbd8b675925226e9daf3b65901eb15780ab`과 최종 HEAD 사이 변경은 임시 `ci-accessibility-axe.mjs` 진단 출력 복원 1파일뿐. 따라서 첫 실패를 #25 색 대비 회귀로 오판하지 않는다. **같은 최종 HEAD의 Browser Run #45706019640 attempt 2가 2026-11-25 21:59 UTC에 SUCCESS로 종료**되었으며 첫 실패 단계인 W05 Production KST 레이블 비교도 이번에는 SUCCESS. 이로써 최종 PR HEAD의 Node·Browser(재실행)·CodeQL·Secret **4/4 SUCCESS** 확보. 단회 재실행은 최초 실패를 지우지 않으며, 시점에 따른 운영 UI/응답 차이 가능성의 원인은 이번 #25 범위에서 미확정이다. W05 실제 UI·원자료 수정은 별도 범위다.
 
 **최종 HEAD 독립 readback:** Run #45706019640 **attempt 2**의 브라우저 아티팩트 ID `15067176798` 원본 ZIP `ci-accessibility/summary.json` 확인. `schemaVersion=1`, `OBSERVED_ONLY_NO_GATING`, 모바일 390px `color-contrast incomplete=2`, 데스크톱 1440px `incomplete=1`, 양쪽 `violatedRules=0`. 390px/1440px 기존 브라우저 접근성·크로스브라우저 단계도 완료 SUCCESS. 모바일 2·데스크톱 1은 실제 UI 오류로 확정된 건이 아닌 **자동 판정 불가**, 전부 해결됐다는 주장은 하지 않는다.\n\n**#25 판정:** 확인된 UI hover 색 대비 결함 및 텍스트 배경 투명으로 인한 접근성 확인 한계는 각각 [PR #1638](https://github.com/ansqhd5774-Choi/zgmini/pull/1638), [#1640](https://github.com/ansqhd5774-Choi/zgmini/pull/1640)에서 제한적으로 처리. **자동 미확정 2/1은 미확정 그대로이며, 전부 해결됨·색 대비 위반으로 확정됨을 주장하지 않는다.** 기존 CI 관측형 정책·R2 #8 제외·Runner/예약/DB/D1/Cloudflare 비변경 유지.
+
+## 10. Issue·PR 잔여 감사 — 2026-11-26
+
+이 부분은 CI 19개 도입 및 후속 개선 6/6의 정상 소스·CI 완료와 **Issue/PR 이력 정리**를 구분하기 위한 실조회다. 업무 미해결·실패 원장·실제 변경 PR을 숫자만으로 일괄 종결하지 않는다.
+
+### GitHub 초기 원본 집합과 실제 정리
+
+- 최초 OPEN: `ansqhd5774-Choi/zgmini` Issue **6**, PR **0**; `ansqhd5774-Choi/zgmini-pc-control` Issue **15**, PR **2**. 합계 **23**(Issue 21/PR 2).
+- 웹 Issue [#1643](https://github.com/ansqhd5774-Choi/zgmini/issues/1643), [#1642](https://github.com/ansqhd5774-Choi/zgmini/issues/1642): 동일 원본 Run의 2차 재검증 **Browser SUCCESS**, 실패 이력 보존 댓글 후 **CLOSED/completed**.
+- 웹 [#1641](https://github.com/ansqhd5774-Choi/zgmini/issues/1641): 추가 [/about 수정 PR #1640](https://github.com/ansqhd5774-Choi/zgmini/pull/1640) 병합·정확 HEAD 화면 회귀 PASS 확인 후 **CLOSED/completed**.
+- 웹 [#1637](https://github.com/ansqhd5774-Choi/zgmini/issues/1637): R2 #29 수정 [PR #1636](https://github.com/ansqhd5774-Choi/zgmini/pull/1636) 병합 및 정확 HEAD Node 회귀 0 FAIL 증거 후 **CLOSED/completed**.
+- 웹 [#1627](https://github.com/ansqhd5774-Choi/zgmini/issues/1627): 19개 구형 브라우저 단계 및 `continue-on-error` 충돌 포함 **비채택** CI R2 #8 과거 후보. 현재 `main`은 승인된 18 E2E+해당 보호문구 부재, 브라우저 CI 성공. 사용자 명시 #8 제외를 유지해 **CLOSED/not_planned**; 과거 HEAD 수정 PASS를 위장하지 않음.
+- 웹 [#1625](https://github.com/ansqhd5774-Choi/zgmini/issues/1625): W04 과거 source-only 후보의 SQLite `query_only` null-prototype vs plain-object strict fixture 오류. 해당 테스트는 현재 `main`에 부재(404), W04 종료 결정 및 현재 Node CI 성공과 구분해 **CLOSED/not_planned**; 과거 원본 Run 실패는 보존.
+- 웹 총 **6/6 건 댓글+정규 종결**. 원격 OPEN Issue **0/PR 0** 재조회. "과거 실패 모두 원천적으로 존재하지 않았다"는 주장 아님.
+
+### PC 제어 — 남은 15 Issue / 2 PR 보호 분류
+
+| 대상 | OPEN 수 | 근거·다음 필수 행동 |
+|---|---:|---|
+| C996 Zizmor [#3728](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3728), [#3724](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3724) | 2 | 각 원본 CI `ZIZMOR_ACTION_SECURITY_FAILED_14`; 대상 브랜치 보안 검사 위반의 실제 내용·최소 수정·정확 CI 재검증 전 종료 금지 |
+| 자동 승인 개발 [#3718](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3718), [#3702](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3702), [#3701](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3701) | 3 | [PR #3545](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3545) 관련 구형 실패. 특히 `REQUEST_READBACK_VERIFIED` 기대 vs `STATE_UNKNOWN` 실제 원인·병합/승인/설치 결과를 분리; 정상 소스 테스트만으로 운영 활성화 완료 아님 |
+| Windows fixture [#3688](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3688), [#3685](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3685) | 2 | 운영 Windows `symlinkSync EPERM` 회귀 실패. 안전 검사/권한 무단 우회 없이 관련 분기 source·환경 검증 후 결정 |
+| PC Secret Scan [#3648](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3648), [#3633](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3633), [#3630](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3630) | 3 | 각 고유 HEAD의 `generic-api-key` 감지 1건; 같은 규칙이더라도 원문 동일/오탐 불명. 보안정보 기록·검사 우회 없이 별도 원본 식별·해소 증거 필요 |
+| Controller manifest [#3635](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3635) | 1 | 원본 실패 HEAD에는 manifest 부재, 현재 `main`에는 존재하나 정확 원인·동일 테스트 재검증은 종전 원장상 미확정 |
+| 중앙/관측 원장 [#68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68), [#1743](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1743), [#2426](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2426), [#2427](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2427) | 4 | 중앙 Controller 인계·월별 관측 원장으로 현재 사용·운영 지침에서 OPEN 보존. 과거 15분 예약 장애 연구 재개 승인 아님 |
+| 진행 PR [#3545](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3545), Draft [#3719](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3719) | 2 | #3545 운영 승인/활성화 미완결, #3719 과거 CI 사고 연결 신규 코드의 CI·리뷰/병합 미확인. 증거 없이 강제 병합·폐기 금지 |
+
+- 최종 실조회 OPEN: 웹 Issue/PR **0/0**, PC Issue/PR **15/2**, 전체 **17**.
+- 실제 이번 정리 6건은 기존 실패 시점/원본 Run·브랜치와 이후 완료·대체 증거를 댓글로 남겼다. PC 11 CI 사고는 해결 근거 미충족, 4 원장·2 PR은 계속 필요한 별도 목적이다.
+- 후속 순서: (1) 해당 PC 브랜치 Zizmor·비밀 탐지 개별 실제 실패 조건 해결 및 재시험 (2) 자동 승인 #3545 정규 병합/운영 증거 구분 후 역사 CI Issue 재판정 (3) Windows/manifest 원본-수정 연결 (4) 기존 월별 원장은 유지하되 실제 사용 계약 변화가 있을 때만 정리. 무관 CI 신규 기능이나 예약/PC 변경을 새 완료 조건으로 추가하지 않는다.
