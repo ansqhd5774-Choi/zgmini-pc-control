@@ -273,7 +273,7 @@ export async function main(){
     if(message?.type==='READY'&&message.pid===child.pid&&
       message.sourceSha===sourceSha)current.ready=true;
     if(message?.type==='PROMOTION_ATTEMPTED'&&message.pid===child.pid)
-     standby=null; // No longer a passive Standby; Supervisor must own lease.
+     current.promoting=true; // Stay pinned until real Supervisor owner readback.
     if(message?.type==='PROMOTION_BLOCKED'||message?.type==='PROMOTION_FAILED'){
      current.ready=false;current.error=message.code??'STANDBY_PROMOTION_UNVERIFIED';
     }
@@ -292,6 +292,9 @@ export async function main(){
     ||fs.readdirSync(path.join(control,'leases')).some(x=>x!=='supervisor'&&!x.startsWith('supervisor.dead-'));
    const state=decide({paused,owner,live:owner?alive(owner.pid):false,heartbeat:hb?.pid===owner?.pid?hb?.at:null});
    if(state==='HEALTHY'){
+    // Promote proof is the real Supervisor lease + fresh heartbeat, not IPC.
+    if(standbyMode&&standby?.promoting&&standby.child.pid===owner.pid)
+     standby=null; // The promoted child is Active; rearm one new passive candidate.
     healthySince??=Date.now();
     if(Date.now()-healthySince>600000&&history.length){history=[];write(path.join(home,'RESTART_HISTORY.json'),history);}
     status(state,{supervisorPid:owner.pid,heartbeatAt:hb.at});return;
@@ -301,10 +304,9 @@ export async function main(){
    if(standbyMode&&(!standby||!standby.ready||standby.promoting)){
     status('BLOCKED_STANDBY_NOT_READY');return;
    }
-   if(standbyMode&&owner&&(
-    hb?.pid!==owner.pid||!Array.isArray(hb.children)||
-    hb.children.some(c=>!Number.isSafeInteger(c.pid)||c.pid<=0||
-     alive(c.pid)!==false))){
+   if(standbyMode&&((owner&&(hb?.pid!==owner.pid||!Array.isArray(hb.children)))||
+    (Array.isArray(hb?.children)&&hb.children.some(c=>
+     !Number.isSafeInteger(c.pid)||c.pid<=0||alive(c.pid)!==false)))){
     // Dead Supervisor != proven exited Runner children. Never kill them.
     status('BLOCKED_OLD_RUNNER_CHILD_UNVERIFIED');return;
    }
