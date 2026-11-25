@@ -32,6 +32,10 @@ const TARGET2960='pc-update-e8767e20-6bad-4418-97c6-561cf79a8213';
 const PROBE2960='w05-2960-maintenance-status-readonly';
 const TARGET3409='pc-update-71ea39dc-7048-4e10-9d11-d4be7f6c3ec0';
 const PROBE3409='w04-3409-maintenance-status-readonly';
+const TARGET3516='pc-update-c087fa10-88e2-42e3-bc60-c758ab93f0c1';
+const PROBE3516='w04-3516-maintenance-status-readonly';
+const CONTROLLER3516='83679b013ac9a9820331d93311ec97e572b18e13';
+const BEFORE3516='6b3c9c0ce77354d81babe4c9ea7785663c6c2cb4';
 const D05_WRITER_PROBE='d05-writer-checkpoint-readonly';
 const D05_PRIVATE_RECEIPT_PROBE='d05-private-final-events-readonly';
 const D05_THEME_PROBE='d05-theme-final-outputs-readonly';
@@ -104,6 +108,7 @@ export function authenticateProcess(event,env,role){
   const isOperator=withW05&&raw.probe==='w05-operator-topology-readonly';
   const is2960=withW05&&raw.probe===PROBE2960;
    const is3409=withW05&&raw.probe===PROBE3409;
+  const is3516=withW05&&raw.probe===PROBE3516;
   const isD05Writer=withW05&&raw.probe===D05_WRITER_PROBE;
   const isD05PrivateReceipt=withW05&&raw.probe===D05_PRIVATE_RECEIPT_PROBE;
   const isD05Theme=withW05&&raw.probe===D05_THEME_PROBE;
@@ -117,7 +122,7 @@ export function authenticateProcess(event,env,role){
  if(!raw||(!basic&&!withJobs&&!withW05)||
    raw.schema!==SCHEMA||raw.operation!==ROLE_OPERATION||raw.role!==role||
    (withJobs&&role!=='operating')||
-   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!is3409&&!isD05Writer&&!isD05PrivateReceipt&&!isD05Theme&&!isD05Registration&&!is3160&&!isCnnStaticGuard&&!isCnnGitPredicates&&!isCnnBPins&&!isCnnBResources&&!isCnnBCore))))
+   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!is3409&&!is3516&&!isD05Writer&&!isD05PrivateReceipt&&!isD05Theme&&!isD05Registration&&!is3160&&!isCnnStaticGuard&&!isCnnGitPredicates&&!isCnnBPins&&!isCnnBResources&&!isCnnBCore))))
   fail('REQUEST_SCOPE_INVALID');
  const runnerJobRefs=withJobs?validateRunnerJobRefs(raw.runnerJobRefs):null;
  const normalized=structuredClone(event);
@@ -130,6 +135,7 @@ export function authenticateProcess(event,env,role){
   ...(isOperator?{w05OperatorTopology:true}:{}),
    ...(is2960?{w052960MaintenanceStatus:true}:{}),
     ...(is3409?{w043409MaintenanceStatus:true}:{}),
+   ...(is3516?{w043516MaintenanceStatus:true}:{}),
    ...(isD05Writer?{d05WriterCheckpoint:true}:{}),
    ...(isD05PrivateReceipt?{d05PrivateFinalReceipt:true}:{}),
    ...(isD05Theme?{d05ThemeFinalOutputs:true}:{}),
@@ -411,6 +417,18 @@ export function project3409MaintenanceStatus(raw){
  return projectFixedMaintenanceStatus(raw,{requestId:TARGET3409,
   schema:'ZGMINI_W04_3409_MAINTENANCE_READONLY_V1',codePrefix:'W04_3409'});
 }
+// Fixed #3516 recovery observation, never a substitute for the original postcheck.
+// Identity mismatches leave a bounded STATE_UNKNOWN report rather than false PASS.
+export function project3516MaintenanceStatus(raw){
+ const out=projectFixedMaintenanceStatus(raw,{requestId:TARGET3516,
+  schema:'ZGMINI_W04_3516_MAINTENANCE_READONLY_V1',codePrefix:'W04_3516'});
+ if(out.status==='READ_ONLY_OBSERVED'&&
+   (out.actualControllerSha!==CONTROLLER3516||
+    out.historicalRequest?.postIssueNumber!==3519||
+    out.recoveryEvidence?.postIssueNumber!==3519))
+  return {...out,status:'STATE_UNKNOWN',code:'W04_3516_IDENTITY_UNVERIFIED'};
+ return out;
+}
 // Compare only the exact #2960 approved protected snapshot, never dump its
 // file hashes, local paths, secrets or current operating configuration.
 // Null means the baseline/current observation cannot be compared, not drift.
@@ -481,6 +499,11 @@ export function assess3409OriginalLeaseLineage(ledger,owner,marker){
  return assessFixedOriginalLeaseLineage(ledger,owner,marker,{
   requestId:TARGET3409,issueNumber:3409,postIssueNumber:3410,
   targetSha:'6b3c9c0ce77354d81babe4c9ea7785663c6c2cb4'});
+}
+export function assess3516OriginalLeaseLineage(ledger,owner,marker){
+ return assessFixedOriginalLeaseLineage(ledger,owner,marker,{
+  requestId:TARGET3516,issueNumber:3516,postIssueNumber:3519,
+  targetSha:CONTROLLER3516});
 }
 /** Only exact #3409 intake pause windows; never raw backlog or credentials. */
 export function project3409PauseWindows(backlog){
@@ -558,6 +581,10 @@ function inspect3409RecoveryCasReadonly(){
  return inspectFixedRecoveryCasReadonly(TARGET3409,assess3409OriginalLeaseLineage,
   '3c20e036ffa56a9a9670916d68c30451d6a699bc',true);
 }
+function inspect3516RecoveryCasReadonly(){
+ return inspectFixedRecoveryCasReadonly(TARGET3516,assess3516OriginalLeaseLineage,
+  BEFORE3516);
+}
 
 /** Exact #2960 receipt only: skip 32-KiB general inventory payload. */
 export function compact2960ProcessResult(base,status){
@@ -586,6 +613,12 @@ export function compact3409ProcessResult(base,status){
   status:status?.status==='READ_ONLY_OBSERVED'?'PASS':'PARTIAL',
   code:status?.code??'W04_3409_EVIDENCE_INCOMPLETE',
   w043409MaintenanceStatus:status??project3409MaintenanceStatus(null)};
+}
+export function compact3516ProcessResult(base,status){
+ return {...base,observedAtUtc:new Date().toISOString(),
+  status:status?.status==='READ_ONLY_OBSERVED'?'PASS':'PARTIAL',
+  code:status?.code??'W04_3516_EVIDENCE_INCOMPLETE',
+  w043516MaintenanceStatus:status??project3516MaintenanceStatus(null)};
 }
 function inspect3409ProtectedBaselineReadonly(){
  const unknown={unchanged:null,differenceClass:'UNVERIFIED'};
@@ -618,6 +651,32 @@ function inspect3409MaintenanceStatusReadonly(){
    recoveryArchive,operatorFileSafety,
    sourcePreflight:inspectW043409SourcePreflightReadonly()};
  }catch{return project3409MaintenanceStatus(null);}
+}
+
+// Installed-target and lease CAS only. No mutation or generic request path.
+function inspect3516MaintenanceStatusReadonly(){
+ try{
+  const observed=project3516MaintenanceStatus(
+   collectAutomationStatus(['--request-id',TARGET3516]));
+  if(observed.status!=='READ_ONLY_OBSERVED')return observed;
+  const control='E:/ZGmini/automation/pc-control';
+  const protectedFile=path.join(control,'backups',
+   'controller-update-'+TARGET3516,'PROTECTED_BEFORE.json');
+  let unchanged=null,differenceClass='UNVERIFIED';
+  try{
+   const saved=readFixedReadonlyBytes(protectedFile,
+    {verifiedRoot:control,minBytes:1,maxBytes:65536});
+   if(saved.ok===true){
+    const baseline=JSON.parse(saved.bytes.toString('utf8'));
+    const current=protectedSnapshot();
+    unchanged=compare2960ProtectedBaseline(baseline,current);
+    differenceClass=classify2960ProtectionDifference(baseline,current);
+   }
+  }catch{/* Absence remains unverified, not a permitted install. */}
+  return {...observed,protectedStateUnchanged:unchanged,
+   protectedDifferenceClass:differenceClass,
+   recoveryCas:inspect3516RecoveryCasReadonly()};
+ }catch{return project3516MaintenanceStatus(null);}
 }
 
 const D05_STAGE_STATUSES=new Set(['LOCAL_STORED','UNCHANGED','PREVIOUS_RELEASE_PRESERVED',
@@ -2158,6 +2217,8 @@ export function collect(role,ctx,env=process.env){
   return compact2960ProcessResult(base,inspect2960MaintenanceStatusReadonly());
  if(ctx.w043409MaintenanceStatus===true)
   return compact3409ProcessResult(base,inspect3409MaintenanceStatusReadonly());
+ if(ctx.w043516MaintenanceStatus===true)
+  return compact3516ProcessResult(base,inspect3516MaintenanceStatusReadonly());
  if(ctx.d05WriterCheckpoint===true)
   return compactD05WriterResult(base,inspectD05WriterCheckpointReadonly());
  if(ctx.d05PrivateFinalReceipt===true){
@@ -2226,6 +2287,13 @@ export function toText(r){
   'memoryGroupCoverage='+(r.snapshot?.memoryGroupCoverage??'UNAVAILABLE'),
   'otherSubgroupCoverage='+(r.snapshot?.otherSubgroupCoverage??'UNAVAILABLE'),
   'maintenanceStatus='+(r.maintenance?.status??'NOT_APPLICABLE'),
+  ...(r.w043516MaintenanceStatus?[
+   'w043516Status='+r.w043516MaintenanceStatus.status,
+   'w043516HistoricalPhase='+(r.w043516MaintenanceStatus.historicalRequest?.phase??'UNKNOWN'),
+   'w043516LeaseHeld='+(r.w043516MaintenanceStatus.recoveryEvidence?.leaseHeld??'UNKNOWN'),
+   'w043516RecoveryRequired='+(r.w043516MaintenanceStatus.recoveryEvidence?.recoveryRequired??'UNKNOWN'),
+   'w043516Protection='+(r.w043516MaintenanceStatus.protectedDifferenceClass??'UNVERIFIED'),
+   'w043516LeaseCorrelation='+(r.w043516MaintenanceStatus.recoveryCas?.status??'UNVERIFIED')]:[]),
   ...(r.w043409MaintenanceStatus?[
    'w043409Status='+r.w043409MaintenanceStatus.status,
    'w043409HistoricalPhase='+(r.w043409MaintenanceStatus.historicalRequest?.phase??'UNKNOWN'),
