@@ -16,6 +16,7 @@ on:
       - 'controller/supervisor.mjs'
       - 'controller/standby.mjs'
       - 'tests/controller-standby.test.mjs'
+      - 'tests/controller-standby-windows-isolation.test.mjs'
       - 'controller/pc-source-readonly.mjs'
       - 'tests/pc-source-readonly.test.mjs'
       - 'controller/pc-source-origin-readonly.mjs'
@@ -430,6 +431,9 @@ jobs:
       - name: Regression test six operating runners without PC writes
         if: steps.scope.outputs.core == 'true'
         run: node --test --test-concurrency=1 tests/maintenance-recovery.test.mjs
+      - name: Exercise R3 Standby Windows temp-only process contention and fencing
+        if: steps.scope.outputs.core == 'true'
+        run: node --test --test-concurrency=1 tests/controller-standby-windows-isolation.test.mjs
       - name: Validate fixed Watchdog B module syntax without PC writes
         if: steps.scope.outputs.watchdog == 'true'
         run: |
