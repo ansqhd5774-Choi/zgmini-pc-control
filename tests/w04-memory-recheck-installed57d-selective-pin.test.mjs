@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
 import {
  manifestFingerprint,validateControllerOnlyInstallDelta,
  validateControllerSelectivePin,validateUpdateRequest,
@@ -69,7 +70,12 @@ test('W04 installed-57d selective pin and B manifest bind exact one-file overlay
 
 test('B approved manifest/pin retain original LF bytes and exact B file-scope only',()=>{
  for(const folder of ['controller-updates','controller-selective-targets']){
-  const bytes=fs.readFileSync(path.join(root,'approvals',folder,target+'.json'));
+  const relative=path.posix.join('approvals',folder,target+'.json');
+  // B approval hashes the Git object bytes, never CRLF-adjusted Windows checkout bytes.
+  const bytes=execFileSync('git',['show','HEAD:'+relative],{cwd:root,maxBuffer:65536});
+  const attr=execFileSync('git',['check-attr','eol','--',relative],
+   {cwd:root,encoding:'utf8'});
+  assert.match(attr,/: eol: lf\s*$/);
   assert.equal(bytes.includes(13),false,folder);
   assert.notEqual(digest(bytes),
    digest(Buffer.from(bytes.toString('utf8').replace(/\n/g,'\r\n'))));
