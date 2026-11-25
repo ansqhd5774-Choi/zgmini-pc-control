@@ -172,9 +172,9 @@ export async function triage({event,repository=REPO,request}){
   if(!closedHistory)closedHistory=await closedCiCandidates(request);
   const related=recurrenceCandidates(closedHistory.issues,{
    workflow:clean(run.name),job:incident.jobName,step:incident.stepName});
-  const recurrenceNote='\\n- 이전 종결 CI 관측 후보 ('+
+  const recurrenceNote='\n- 이전 종결 CI 관측 후보 ('+
    closedHistory.scope+'): '+(related.length?related.map(n=>'#'+n).join(', '):'확인되지 않음')+
-   '\\n- 재발 판정: 미확인 — Workflow/Job/Step 동일성은 근본 원인 일치 증거가 아님.';
+   '\n- 재발 판정: 미확인 — Workflow/Job/Step 동일성은 근본 원인 일치 증거가 아님.';
 
   const created=await request('issues',{method:'POST',
    body:{title,body:[marker,evidence,crossLink,recurrenceNote,
