@@ -165,7 +165,7 @@ test('submission workflow is activation-gated, source-event driven and pinned to
  assert.match(y,/name: Record Controller B request receipt/);
  // Keep the privileged workflow on the last reviewed 4/4-green publisher source.
  // A publisher implementation change requires an explicit new fixed pin.
- assert.match(y,/ref: ee707147c70794b2d3900615c2f015f2f480289e\s+persist-credentials: false/);
+ assert.match(y,/ref: 4f4c59872d4123160208d46f73cb7338beea3ac1\s+persist-credentials: false/);
  assert.match(y,/run: node ci-approval\/completed-run-intake\.mjs --publish-existing/);
  assert.match(y,/cancel-in-progress: false/);
  assert.match(y,/github\.event\.workflow_run\.conclusion == 'success'/);
