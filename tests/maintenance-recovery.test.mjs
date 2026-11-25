@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto';
 import {classifyRecovery,archiveUntouched,
  verifyMaintenanceManifest as recoveryInventory,verifyOperatingRunners,inspectOperatingRunners,inspectEvidenceFile,fixedInstalledRecoveryCase,permittedInstalledRecoveryProtection} from '../tools/maintenance-recovery.mjs';
 import {verifyMaintenanceManifest as statusInventory} from '../tools/automation-status.mjs';
-test('fixed installed reconciliation admits only original #2960 and W04 #3409 identities',()=>{
+test('fixed installed reconciliation admits only original #2960, #3409 and exact #3516 identities',()=>{
  const a=fixedInstalledRecoveryCase('pc-update-e8767e20-6bad-4418-97c6-561cf79a8213');
  assert.equal(a.issueNumber,2960);assert.equal(a.postIssueNumber,2965);
  assert.equal(a.targetSha,'b9a423cf38d0967d6ed336912a66433f79502d3d');
@@ -23,9 +23,20 @@ test('fixed installed reconciliation admits only original #2960 and W04 #3409 id
  assert.deepEqual(w.proof,{issueNumber:3438,runId:45457196689,jobId:138669741465,
   runnerName:'zgmini-pc-03',resultPath:'results/45457196689-1-seat-3.json'});
  assert.equal(w.allowUnchangedBaseline,true);assert.equal(Object.isFrozen(w),true);
+ const n=fixedInstalledRecoveryCase('pc-update-c087fa10-88e2-42e3-bc60-c758ab93f0c1');
+ assert.equal(n.issueNumber,3516);assert.equal(n.postIssueNumber,3519);
+ assert.equal(n.targetSha,'83679b013ac9a9820331d93311ec97e572b18e13');
+ assert.equal(n.postSourceBranch,'main');
+ assert.equal(n.postSourceSha,'b6049aac81b3442a58b08050ee138921f87a09e6');
+ assert.equal(n.proofType,'OPERATING_PROCESS_INVENTORY');
+ assert.equal(n.proofSourceSha,'8bd11c9a396e19e7881ce7d21cd52c3cb520f6e2');
+ assert.deepEqual(n.proof,{issueNumber:3528,runId:45579963186,jobId:139087219551,
+  runnerName:'zgmini-pc-03',resultPath:'results/pc-process-inventory-45579963186-1-operating.json'});
+ assert.equal(n.allowUnchangedBaseline,true);assert.equal(Object.isFrozen(n),true);
  for(const id of [null,undefined,'','pc-update-71ea39dc-7048-4e10-9d11-d4be7f6c3ec1',
   'pc-update-71ea39dc-7048-4e10-9d11-d4be7f6c3ec0-postcheck',
-  'pc-update-e8767e20-6bad-4418-97c6-561cf79a8214'])
+  'pc-update-e8767e20-6bad-4418-97c6-561cf79a8214',
+  'pc-update-c087fa10-88e2-42e3-bc60-c758ab93f0c2'])
   assert.equal(fixedInstalledRecoveryCase(id),null);
 });
 test('W04 exact unchanged protection never accepts Writer drift; legacy remains narrow',()=>{
@@ -172,4 +183,25 @@ test('W01 runner inventory malformed/missing remains unknown; valid six verified
  const busy=inspectOperatingRunners(()=>({runners:operating().map((x,i)=>i===1?{...x,busy:true}:x)}));
  assert.equal(busy.runnerSetVerified,true);
  assert.equal(busy.runnersIdle,false);
+});
+
+test('independent #3516 A result remains original postcheck UNKNOWN; no synthetic PASS',()=>{
+ const fixed=fixedInstalledRecoveryCase('pc-update-c087fa10-88e2-42e3-bc60-c758ab93f0c1');
+ const receipt=JSON.parse(fs.readFileSync(
+  new URL('../results/pc-process-inventory-45579963186-1-operating.json',import.meta.url)));
+ const claim=receipt.w043516MaintenanceStatus;
+ assert.equal(receipt.schema,'ZGMINI_PC_PROCESS_INVENTORY_RESULT_V1');
+ assert.equal(receipt.issueNumber,3528);
+ assert.equal(receipt.runId,String(fixed.proof.runId));
+ assert.equal(receipt.status,'PASS');
+ assert.equal(receipt.code,'W04_3516_STATUS_OBSERVED');
+ assert.equal(claim.requestId,'pc-update-c087fa10-88e2-42e3-bc60-c758ab93f0c1');
+ assert.equal(claim.actualControllerSha,fixed.targetSha);
+ assert.equal(claim.historicalRequest.status,'RECOVERY_REQUIRED');
+ assert.equal(claim.historicalRequest.code,'POSTCHECK_OUTCOME_UNKNOWN');
+ assert.equal(claim.historicalRequest.postIssueNumber,fixed.postIssueNumber);
+ assert.equal(claim.recoveryCas.status,'LINEAGE_CORRELATED');
+ assert.equal(claim.recoveryCas.recoveryEligible,false);
+ assert.equal(claim.protectedStateUnchanged,true);
+ assert.equal(Object.keys(claim.recoveryCas.casDigests).length,7);
 });
