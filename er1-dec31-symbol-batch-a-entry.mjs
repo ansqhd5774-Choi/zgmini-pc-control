@@ -168,10 +168,8 @@ export function validatePairRequest(event,env){
     r.operation!=='resume-december-2026-tol-casy-private-only'||
     r.sourceSha!==PAIR_SOURCE_SHA||r.originalIssueNumber!==173||
     r.from!=='2026-12-01'||r.through!=='2026-12-31'||
-    !new RegExp('^pc-dec31-pair-'+PAIR_UUID+'
-).test(r.requestId)||
-    !new RegExp('^chat-'+PAIR_UUID+'
-).test(r.chatId))
+    !new RegExp('^pc-dec31-pair-'+PAIR_UUID+String.fromCharCode(36)).test(r.requestId)||
+    !new RegExp('^chat-'+PAIR_UUID+String.fromCharCode(36)).test(r.chatId))
     pairStop('DEC31_PAIR_REQUEST_CONTRACT_STOP');
   return r;
 }
