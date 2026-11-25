@@ -13,6 +13,7 @@ export const GRAPHQL_QUERY=[
  'filter: {datetime_geq: $start, datetime_leq: $end, requestHost: "zgmini.kr",',
  'requestPath_in: ["/", "/economic-indicators/"], bot: 0}) {',
  'count dimensions {requestHost requestPath deviceType}',
+ 'sum {lcpTotal inpTotal clsTotal}',
  'quantiles {largestContentfulPaintP75 interactionToNextPaintP75 cumulativeLayoutShiftP75}',
  '} } } }'
 ].join(' ');
@@ -46,8 +47,19 @@ const metric=(value,limit,scale)=>{
    raw<=limit?'AT_OR_BELOW_GOOD_REFERENCE':'EXCEEDS_GOOD_REFERENCE',
   ...(missingKind===null?{}:{missingKind})};
 };
+// These are Cloudflare adaptive SUM metric totals, not attested unsampled
+// interaction counts. Keep metric-specific sample certification separate.
+const providerTotals=sum=>{
+ if(sum===undefined||sum===null)return 'UNAVAILABLE';
+ if(!obj(sum))fail('CF_RUM_METRIC_TOTALS_INVALID');
+ const fields=['lcpTotal','inpTotal','clsTotal'];
+ if(fields.some(k=>typeof sum[k]!=='number'||!Number.isFinite(sum[k])||sum[k]<0))
+  fail('CF_RUM_METRIC_TOTALS_INVALID');
+ return {lcpMs:sum.lcpTotal,inpMs:sum.inpTotal,cls:sum.clsTotal};
+};
 const empty=(route,device,missingKind='NO_MATCHING_GROUP')=>({route,device,groupEventCount:0,
  metricSpecificSampleCounts:'UNAVAILABLE',
+ metricReportedTotals:'UNAVAILABLE',
  metrics:Object.fromEntries(Object.entries(GOOD).map(([k,limit])=>[
   k,{p75:null,goodLimit:limit,state:'UNVERIFIED',missingKind}]))});
 export function parseRumGraphql(response,{startUtc,endUtc}={}){
@@ -93,7 +105,8 @@ export function parseRumGraphql(response,{startUtc,endUtc}={}){
    inpMs:metric(q.interactionToNextPaintP75,GOOD.inpMs,1000),
    cls:metric(q.cumulativeLayoutShiftP75,GOOD.cls,1)};
   seen.set(key,{route:requestPath,device,groupEventCount:row.count,
-   metricSpecificSampleCounts:'UNAVAILABLE',metrics});
+   metricSpecificSampleCounts:'UNAVAILABLE',
+   metricReportedTotals:providerTotals(row.sum),metrics});
  }
  const observations=RUM_PATHS.flatMap(route=>RUM_DEVICES.map(device=>
   seen.get(route+'|'+device)??empty(route,device)));
