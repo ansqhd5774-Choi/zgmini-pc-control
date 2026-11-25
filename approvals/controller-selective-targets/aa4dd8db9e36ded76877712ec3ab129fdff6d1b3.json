@@ -1,0 +1,15 @@
+{
+  "schema": "ZGMINI_CONTROLLER_SELECTIVE_PIN_V1",
+  "installedSha": "f611243f7b830f273e053c1085110ad06b5fdf79",
+  "targetSha": "aa4dd8db9e36ded76877712ec3ab129fdff6d1b3",
+  "sourceMainSha": "cb9963e6c94d295a721c5a1407241293a6c4c314",
+  "targetBranch": "codex/rum-missing-kind-after-w04-20261125",
+  "customPaths": [],
+  "allowFiles": [
+    {
+      "path": "controller/cloudflare-rum-field-parser.mjs",
+      "sha256": "8d7a454d5274fdb9e5332ba1601b436e71df3518fc8e93471568450da2f45605"
+    }
+  ],
+  "approvalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3615"
+}
