@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
-import {prepareScopedRequestPreview as prepare} from '../ci-approval/request-preview.mjs';
+import {prepareScopedRequestPreview as prepare,prepareExistingApprovalRequest as prepareExisting} from '../ci-approval/request-preview.mjs';
 import {manifestFingerprint,CONTROLLER_POST_OPERATIONS} from '../tools/maintenance-contract.mjs';
 import {verifyMaintenanceIssue} from '../tools/maintenance-request.mjs';
 const repo='ansqhd5774-Choi/zgmini-pc-control';
@@ -53,3 +53,30 @@ for(const [name,edit,state] of [
  ['wrong revision',v=>{v.selectivePin.revision='e'.repeat(40)},'REJECTED']
 ])test('selective preview '+name,()=>{const v=selectiveFixture();edit(v);const r=prepare(v);check(r,state);assert.equal(Object.hasOwn(r,'preview'),false);});
 test('Writer does not accept unrelated selective pin',()=>{const v=fixture();v.selectivePin=selectiveFixture().selectivePin;const r=prepare(v);check(r,'REJECTED');assert.equal(Object.hasOwn(r,'preview'),false);});
+
+function existingInput(v){
+ const {request,...scope}=v;
+ return {...scope,requestIdentity:{requestId:request.requestId,chatId:request.chatId}};
+}
+for(const [name,make] of [
+ ['Controller',()=>fixture('B_CONTROLLER_INSTALL')],
+ ['Writer',()=>fixture()],
+ ['selective Controller',selectiveFixture]
+])test(name+' existing approval reuses exact request identity across CI reruns',()=>{
+ const v=make(),input=existingInput(v),r=prepareExisting(input);
+ assert.deepEqual(r,prepare(v));
+ assert.deepEqual(prepareExisting(input),r);
+ assert.equal(r.requestId,v.request.requestId);
+ assert.equal(r.canPublish,false);assert.equal(r.canExecute,false);
+});
+for(const [name,edit,state] of [
+ ['missing identity',v=>{delete v.requestIdentity},'EVIDENCE_MISSING'],
+ ['two identity sources',v=>{v.request=fixture().request},'INVALID'],
+ ['consumed',v=>{v.requestState='CONSUMED'},'WAIT_RESOURCE'],
+ ['unknown',v=>{v.requestState='UNKNOWN'},'WAIT_RESOURCE'],
+ ['invalid identity',v=>{v.requestIdentity.requestId='invalid'},'REJECTED'],
+ ['changed bytes',v=>{v.observation.bytes=Buffer.from('{}')},'REJECTED']
+])test('existing approval '+name,()=>{
+ const v=existingInput(fixture());edit(v);const r=prepareExisting(v);
+ check(r,state);assert.equal(Object.hasOwn(r,'preview'),false);
+});
