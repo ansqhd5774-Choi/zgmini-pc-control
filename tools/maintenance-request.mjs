@@ -297,8 +297,29 @@ export async function submitExistingControllerApprovalFromCi({targetSha,approval
   if(x?.pull_request||x?.title!==TITLE||!(ownerIdentity(x.user)||botIdentity(x.user)))return false;
   try{return JSON.parse(x.body).targetControllerSha===targetSha;}catch{return false;}
  });
- if(matches.length)return {status:'EXISTING_REQUEST_REUSED',effectKey,
-  issueNumbers:matches.map(x=>x.number).filter(Number.isSafeInteger),next:'FOLLOW_ORIGINAL_REQUEST_ONLY'};
+ if(matches.length){
+  // The target SHA alone is not an effect identity. Only the exact approval
+  // manifest and structural request fields (excluding per-run trace IDs) may
+  // reuse a historical owner/bot request as a successful CI outcome.
+  const exact=matches.every(x=>{
+   try{
+    const previous=JSON.parse(x.body);
+    return Number.isSafeInteger(x.number)&&x.number>0&&
+     ['open','closed'].includes(x.state)&&
+     x.labels?.some(label=>label.name===LABEL)&&
+     Object.keys(previous).length===Object.keys(q).length&&
+     typeof previous.requestId==='string'&&previous.requestId.startsWith('pc-update-')&&
+     typeof previous.chatId==='string'&&previous.chatId.startsWith('chat-')&&
+     ['schema','operation','controlRepository','targetControllerSha','approvalManifestSha256']
+      .every(key=>previous[key]===q[key]);
+   }catch{return false;}
+  });
+  const issueNumbers=matches.map(x=>x.number).filter(Number.isSafeInteger);
+  if(!exact)return {status:'STATE_UNKNOWN',code:'MAINTENANCE_CI_PRIOR_EFFECT_UNVERIFIED_NO_REPOST',
+   effectKey,issueNumbers,next:'INSPECT_ORIGINAL_REQUEST_NO_NEW_POST'};
+  return {status:'EXISTING_REQUEST_REUSED',effectKey,issueNumbers,
+   next:'FOLLOW_ORIGINAL_REQUEST_ONLY'};
+ }
  const current=await ports.readManifest(targetSha);
  if(!Buffer.isBuffer(current)||!current.equals(bytes))fail('MAINTENANCE_CI_MANIFEST_PIN_MISMATCH');
  const result=await submitExactEnvelope(expected,{createIssue:ports.createIssue,readIssue:ports.readIssue,
