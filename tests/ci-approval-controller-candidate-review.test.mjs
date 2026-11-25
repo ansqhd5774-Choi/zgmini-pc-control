@@ -1,8 +1,8 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {manifestFingerprint,CONTROLLER_POST_OPERATIONS} from '../tools/maintenance-contract.mjs';
-import {reviewControllerCandidate as review} from '../ci-approval/controller-candidate-review.mjs';
+import {manifestFingerprint,CONTROLLER_POST_OPERATIONS,prepareControllerUpdateRequest,validateControllerSelectivePin} from '../tools/maintenance-contract.mjs';
+import {reviewControllerCandidate as review,prepareSelectiveApprovalPublication} from '../ci-approval/controller-candidate-review.mjs';
 const repo='ansqhd5774-Choi/zgmini-pc-control',root='repos/'+repo;
 const hash=b=>createHash('sha256').update(b).digest('hex');
 function fixture(){
@@ -52,4 +52,59 @@ test('source-only review still rejects failed CI',async()=>{
 test('invalid provided live snapshot cannot become source-only',async()=>{
  const v=fixture();v.live=null;
  const r=await review(v);assert.equal(r.state,'EVIDENCE_MISSING');assert.equal(r.canExecute,false);
+});
+
+function publicationFixture(){
+ const v=fixture(),p=v.plan,sourceHead='1'.repeat(40),sourceMainSha='2'.repeat(40),merged='3'.repeat(40);
+ p.postOperation='core-status';
+ const original=v.getJson,workflow=Buffer.from('reviewed source workflow fixture');
+ const workflowBlobSha=createHash('sha1').update(Buffer.from('blob '+workflow.length+'\0')).update(workflow).digest('hex');
+ const repoData={full_name:repo,id:1442936296,private:true};
+ const pr={number:28,merged:true,merge_commit_sha:merged,head:{sha:sourceHead,repo:repoData},base:{ref:'main',repo:repoData}};
+ const run={...v.ci.run,head_sha:sourceHead,workflow_id:416355595,repository:repoData,head_repository:repoData};
+ const job={...v.ci.job,head_sha:sourceHead};
+ const tested={...v.ci.commit,parents:[{sha:p.installedSha},{sha:sourceHead}]};
+ const ancestor=(a,b)=>({status:a===b?'identical':'ahead',behind_by:0,base_commit:{sha:a},merge_base_commit:{sha:a}});
+ const inputs={plan:p,delegation:v.delegation,sourcePrNumber:28,approvalPrNumber:29,sourceMainSha,
+  policy:{sourceWorkflowBlobSha:workflowBlobSha,delegationPin:v.delegation.pin,
+   businessApprovalSha256:v.delegation.scope.businessApprovalSha256},
+  getJson:async route=>{
+   if(route===root+'/git/commits/'+p.targetSha)return {sha:p.targetSha,parents:[{sha:p.installedSha}]};
+   if(route===root+'/pulls/28')return pr;
+   if(route===root+'/actions/workflows/416355595/runs?head_sha='+sourceHead+'&event=pull_request&status=success&per_page=100')return {workflow_runs:[run]};
+   if(route===root+'/actions/runs/'+run.id)return run;
+   if(route===root+'/compare/'+merged+'...'+sourceMainSha)return ancestor(merged,sourceMainSha);
+   if(route===root+'/branches/main')return {commit:{sha:sourceMainSha}};
+   if(route===root+'/compare/'+sourceMainSha+'...'+sourceMainSha)return ancestor(sourceMainSha,sourceMainSha);
+   if(route===root+'/actions/runs/'+run.id+'/attempts/'+run.run_attempt+'/jobs?per_page=100')return {total_count:1,jobs:[job]};
+   if(route===root+'/git/commits/'+tested.sha)return tested;
+   return original(route);
+  },
+  readJobLogs:async()=>v.ci.logs,
+  readFileBytes:async(r,s,path)=>path.startsWith('.github/')?workflow:Buffer.from('export const value=1;')
+ };
+ return {inputs,v,sourceHead,sourceMainSha,run,pr,job,tested};
+}
+test('materializes exact existing manifest and selective pin from different source and overlay commits',async()=>{
+ const f=publicationFixture(),r=await prepareSelectiveApprovalPublication(f.inputs);
+ assert.equal(r.state,'SELECTIVE_APPROVAL_FILES_PREPARED',r.reason);
+ assert.equal(r.canPublish,false);assert.equal(r.canExecute,false);
+ assert.notEqual(r.testedSha,r.targetSha);assert.equal(r.sourcePrNumber,28);assert.equal(r.approvalPrNumber,29);
+ const [m,p]=r.files,manifest=JSON.parse(m.bytes),pin=JSON.parse(p.bytes);
+ assert.equal(manifest.approval.ref,'https://github.com/'+repo+'/pull/29');
+ assert.equal(manifest.selectiveSource.mainSha,f.sourceMainSha);
+ assert.equal(m.sha256,hash(m.bytes));assert.equal(p.sha256,hash(p.bytes));
+ assert.equal(prepareControllerUpdateRequest(m.bytes,{installedSha:f.v.plan.installedSha}).targetControllerSha,f.v.plan.targetSha);
+ assert.equal(validateControllerSelectivePin(manifest,pin),true);
+});
+for(const [name,edit,state] of [
+ ['missing independently installed policy',f=>{delete f.inputs.policy},'EVIDENCE_MISSING'],
+ ['unrelated business scope',f=>{f.inputs.policy.businessApprovalSha256='0'.repeat(64)},'REJECTED'],
+ ['same PR used for both roles',f=>{f.inputs.approvalPrNumber=28},'EVIDENCE_MISSING'],
+ ['different tested file',f=>{const read=f.inputs.readFileBytes;f.inputs.readFileBytes=async(r,s,p)=>s===f.tested.sha&&!p.startsWith('.github/')?Buffer.from('changed'):read(r,s,p)},'REJECTED'],
+ ['untrusted CI workflow bytes',f=>{f.inputs.policy.sourceWorkflowBlobSha='0'.repeat(40)},'REJECTED'],
+ ['non-merged source PR',f=>{f.pr.merged=false},'EVIDENCE_MISSING']
+])test('selective publication rejects '+name,async()=>{
+ const f=publicationFixture();edit(f);const r=await prepareSelectiveApprovalPublication(f.inputs);
+ assert.equal(r.state,state,r.reason);assert.equal(r.files,undefined);assert.equal(r.canExecute,false);
 });
