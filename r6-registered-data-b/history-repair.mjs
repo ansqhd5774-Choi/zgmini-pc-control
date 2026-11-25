@@ -142,9 +142,17 @@ export async function performHistoryRepair({auth,acquire,claim,load=loadRegister
   out={...base,status:'SUCCESS',code:'W04_HISTORY_REPAIR_COMMITTED',sqlite:'HISTORY_REPAIR_VERIFIED',
    historyRowsAdded:r.inserted,backupVerified:true,lastPass:'HISTORY_READBACK',firstFail:null};
  }catch(e){
+  // The shared Core lock contract uses R6_B_CORE_LOCK_OCCUPIED. Preserve its
+  // bounded category instead of turning a five-minute wait into an opaque
+  // W04_REPAIR_EXECUTION_STOP. Never publish owner/PID/lock contents.
+  const cause=e?.code??e?.message??'';
+  const lockOccupied=cause==='R6_B_CORE_LOCK_OCCUPIED';
+  const code=lockOccupied?'W04_REPAIR_CORE_LOCK_OCCUPIED':
+   /^W04_REPAIR_[A-Z0-9_]+$/.test(cause)?cause:'W04_REPAIR_EXECUTION_STOP';
   out={...base,status:claimed||claimStarted||committed?'STATE_UNKNOWN':'BLOCKED',
-   code:/^W04_REPAIR_[A-Z0-9_]+$/.test(e?.code??e?.message??'')?(e.code??e.message):'W04_REPAIR_EXECUTION_STOP',
-   backupVerified:snap?.backupVerified===true,lastPass:claimed?'ONE_SHOT_CLAIMED':null,firstFail:'HISTORY_REPAIR'};
+   code,backupVerified:snap?.backupVerified===true,
+   lastPass:claimed?'ONE_SHOT_CLAIMED':null,
+   firstFail:lockOccupied?'CORE_LOCK':'HISTORY_REPAIR'};
  }finally{
   try{handle?.db.close();}catch{out={...base,status:'STATE_UNKNOWN',code:'W04_REPAIR_CLOSE_STOP'};}
   if(lock&&!lock.release())out={...base,status:'STATE_UNKNOWN',code:'W04_REPAIR_LEASE_RELEASE_STOP'};
