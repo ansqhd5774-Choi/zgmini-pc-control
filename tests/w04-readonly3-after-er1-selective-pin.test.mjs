@@ -56,3 +56,14 @@ test('W04 conditional manifest and pin are consistent but require ER1 installed 
  assert.throws(()=>validateControllerSelectivePin(valid.manifest,{...pin,
   installedSha:'3d42f226fcffde1f09885da552f9b003ea30e57e'}),/SELECTIVE_PIN_MISMATCH/);
 });
+
+test('W04 approval JSON is LF-stable and CRLF changes immutable digest',()=>{
+ const target='1543e13fdebb18267a76ebb4653535c87438c3f0';
+ for(const dir of ['approvals/controller-updates','approvals/controller-selective-targets']){
+  const bytes=fs.readFileSync(path.join(root,dir,target+'.json'));
+  assert.equal(bytes.includes(13),false,dir);
+  const original=createHash('sha256').update(bytes).digest('hex');
+  const transformed=createHash('sha256').update(Buffer.from(bytes.toString('utf8').replace(/\n/g,'\r\n'))).digest('hex');
+  assert.notEqual(original,transformed,dir);
+ }
+});
