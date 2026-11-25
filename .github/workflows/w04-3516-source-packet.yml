@@ -55,3 +55,48 @@ jobs:
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
+
+  operator-bundle-only:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.event.pull_request.user.login == 'ansqhd5774-Choi' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/w04-3516-operator-delivery-20261125'
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 4
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Require existing isolated source CI PC, never operating PC
+        run: |
+          if /I not "%COMPUTERNAME%"=="DESKTOP-N62L0NG" exit /b 5
+      - name: Checkout exactly verified merged operator source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: '2a13b25cd5eec6710cbe9e4ef88ffb6e57cd6f16'
+          persist-credentials: false
+      - name: Setup existing isolated Node for exact guard tests
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify exact operator source, two raw Git blobs and launcher guard
+        run: |
+          for /f %%H in ('git rev-parse HEAD') do set "ZG_RELEASE=%%H"
+          if not "%ZG_RELEASE%"=="2a13b25cd5eec6710cbe9e4ef88ffb6e57cd6f16" exit /b 21
+          for /f %%H in ('git hash-object tools/operator-packets/w04-3516-recovery-once.mjs') do set "ZG_JS_BLOB=%%H"
+          if not "%ZG_JS_BLOB%"=="824adec90634b127b3c460a06980f150840cf7ec" exit /b 22
+          for /f %%H in ('git hash-object tools/operator-packets/W04_3516_INDEPENDENT_RECOVERY_ONCE_V1.cmd') do set "ZG_CMD_BLOB=%%H"
+          if not "%ZG_CMD_BLOB%"=="b8a3185c68b9b64888ca10e17b6dad667042b315" exit /b 23
+          node --test --test-concurrency=1 tests/w04-3516-operator-once.test.mjs
+      - name: Publish exact source-only C operator handoff archive
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: W04_3516_INDEPENDENT_OPERATOR_ONCE_2a13b25c
+          path: |
+            tools/operator-packets/W04_3516_INDEPENDENT_RECOVERY_ONCE_V1.cmd
+            tools/operator-packets/w04-3516-recovery-once.mjs
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
