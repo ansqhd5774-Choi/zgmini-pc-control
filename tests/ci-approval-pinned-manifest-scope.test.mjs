@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
-import {inspectPinnedManifestScope as inspect} from '../ci-approval/pinned-manifest-scope.mjs';
+import {inspectPinnedManifestScope as inspect,inspectSelectiveTree} from '../ci-approval/pinned-manifest-scope.mjs';
 import {manifestFingerprint,CONTROLLER_POST_OPERATIONS} from '../tools/maintenance-contract.mjs';
 const repo='ansqhd5774-Choi/zgmini-pc-control';
 const hash=(algorithm,bytes)=>createHash(algorithm).update(bytes).digest('hex');
@@ -69,3 +69,39 @@ for(const [name,change,expected] of [
 ])test(name,()=>{const fixture=selectiveFixture();change(fixture);const r=inspect(fixture.v);assert.equal(r.state,expected);assert.equal(r.mode,'SHADOW_ONLY');assert.equal(r.canPublish,false);assert.equal(r.canExecute,false);});
 test('selective config remains outside delegation pilot',()=>{const r=inspect(selectiveFixture({config:true}).v);assert.equal(r.state,'OUT_OF_SCOPE');assert.equal(r.canPublish,false);assert.equal(r.canExecute,false);});
 test('nonselective request rejects unexpected selective pin',()=>{const v=make('B_CONTROLLER_INSTALL');v.selectivePin=selectiveFixture().v.selectivePin;assert.equal(inspect(v).state,'REJECTED');});
+
+function treeFixture(){
+ const {v,s,source}=selectiveFixture(),m=JSON.parse(v.observation.bytes),file=Buffer.from('export const value=1;\n');
+ m.allowFiles[0].sha256=hash('sha256',file);m.checks.manifestSha256=manifestFingerprint(m.allowFiles).sha256;
+ s.allowFiles=m.allowFiles;
+ [v.pin,v.observation]=source(v.pin.path,m);v.request.approvalManifestSha256=v.pin.sha256;
+ [v.selectivePin,v.selectiveObservation]=source(v.selectivePin.path,s);
+ const root='repos/'+repo,merge='d'.repeat(40),rev=v.pin.revision;
+ const lineage=(base,head)=>({status:base===head?'identical':'ahead',base_commit:{sha:base},merge_base_commit:{sha:base},behind_by:0,ahead_by:base===head?0:1});
+ const overlay={...lineage(m.installedSha,m.targetSha),total_commits:1,commits:[{sha:m.targetSha}],files:[{filename:m.allowFiles[0].path,status:'modified'}]};
+ const data={
+  [root+'/branches/main']:{name:'main',commit:{sha:rev}},
+  [root+'/branches/'+encodeURIComponent(m.selectiveSource.branch)]:{name:m.selectiveSource.branch,commit:{sha:m.targetSha}},
+  [root+'/git/commits/'+m.targetSha]:{sha:m.targetSha,parents:[{sha:m.installedSha}]},
+  [root+'/compare/'+m.installedSha+'...'+m.targetSha]:overlay,
+  [root+'/pulls/1']:{number:1,merged:true,base:{ref:'main',repo:{full_name:repo}},merge_commit_sha:merge},
+  [root+'/compare/'+m.selectiveSource.mainSha+'...'+rev]:lineage(m.selectiveSource.mainSha,rev),
+  [root+'/compare/'+merge+'...'+rev]:lineage(merge,rev)
+ };
+ const f={v,m,s,root,merge,rev,overlay,data,file,ports:{getJson:async p=>{if(!Object.hasOwn(data,p))throw Error('missing');return structuredClone(data[p]);},readFileBytes:async (r,sha,p)=>p===v.selectivePin.path&&sha===merge?v.selectiveObservation.bytes:file}};
+ return f;
+}
+for(const [name,edit,state] of [
+ ['exact selective tree',()=>{},'SELECTIVE_TREE_MATCH_ONLY'],
+ ['wrong parent',f=>{f.data[f.root+'/git/commits/'+f.m.targetSha].parents.push({sha:f.rev})},'REJECTED'],
+ ['extra diff path',f=>{f.overlay.files.push({filename:'docs/extra.md',status:'added'})},'REJECTED'],
+ ['incomplete compare',f=>{f.overlay.total_commits=2},'EVIDENCE_MISSING'],
+ ['branch drift',f=>{f.data[f.root+'/branches/main'].commit.sha='e'.repeat(40)},'EVIDENCE_MISSING'],
+ ['source not on main',f=>{f.data[f.root+'/compare/'+f.m.selectiveSource.mainSha+'...'+f.rev].status='diverged'},'REJECTED'],
+ ['unmerged approval',f=>{f.data[f.root+'/pulls/1'].merged=false},'REJECTED'],
+ ['approval not on main',f=>{f.data[f.root+'/compare/'+f.merge+'...'+f.rev].status='diverged'},'REJECTED'],
+ ['merged pin mismatch',f=>{f.ports.readFileBytes=async()=>Buffer.from('{}')},'REJECTED'],
+ ['source bytes mismatch',f=>{const read=f.ports.readFileBytes;f.ports.readFileBytes=async(r,s,p)=>s===f.m.selectiveSource.mainSha?Buffer.from('wrong'):read(r,s,p)},'REJECTED'],
+ ['branch moves during read',f=>{const read=f.ports.getJson;let count=0;f.ports.getJson=async p=>{const v=await read(p);if(p===f.root+'/branches/main'&&++count===2)v.commit.sha='e'.repeat(40);return v}},'EVIDENCE_MISSING'],
+ ['unknown request',f=>{f.v.requestState='UNKNOWN'},'WAIT_RESOURCE']
+])test('tree '+name,async()=>{const f=treeFixture();edit(f);const r=await inspectSelectiveTree(f.v,f.ports);assert.equal(r.state,state);assert.equal(r.canPublish,false);assert.equal(r.canExecute,false);});
