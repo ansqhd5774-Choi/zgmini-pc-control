@@ -109,3 +109,9 @@ A는 기존 정규 접수/판정에 필요한 확인만 재사용한다. B는 �
 - 2cd580251b4658a991e0d1e81981713e6caea61a CI 3종 SUCCESS(45601617713/45601617937/45601617740), 승인 관련 140건 PASS. 05808ce9b47a8ea03cbfc1067ce180bb3bc0c45e을 기존 PR #3545에 통합하여 150건 CI를 시작했다.
 - controller-candidate-review.mjs: 후보 생성기, live 전제, 위임·diff 수집기, CI 통합 tree 검증기를 한 경로로 연결. 정확 target/base/파일 manifest digest, 실제 diff 파일 목록 및 후보/통합 tree 양쪽의 파일 SHA256을 대조한다. 신규 10건 통합 모의 시험(총 160건 준비). 모든 결과 SHADOW_ONLY; 승인 발행/제출 없음. Writer는 별도 본체 저장소 CI 증거와 로컬 합성 SHA 계약 때문에 동일한 Controller CI를 전용하지 않는다. A 기존 조회 경로 변경 없음.
 - 최종 운영 활성화의 핵심 미해결 조건: (1) 기존 사용자 업무 승인에 연결된 실제 구조화 위임 원본 및 독립 pin, (2) 신뢰된 실행 주체가 독립 확인한 실제 CI 대상과 필요한 업무별 단계, live 상태, 권한 변경 부재, (3) 기존 소유자 인증과 원자적 단회 제출 원장의 상시 운영 연결. 이 통합 모의 판정은 위 조건을 인증하지 않으며, 자동 발행 권한을 자체 생성할 수 없다. 명세서 후보를 APPROVED_B로 간주하지 않는다. 운영 0%, 전체 추정 75% 유지. 기존 PR 실행 중 CI를 보호하기 위해 준비 브랜치 보존.
+
+### 2026-11-25 후속 — Writer B 통합 모의 판정
+- 05808ce의 Controller job 139163617160 위임 수집 단계 14 SUCCESS 확인. C996 및 Secret Scan SUCCESS. 전체 Controller CI 종료 및 후속 통합은 별도 확인한다.
+- 본체 실제 Node CI 45583189319 / job 139098078904의 push head 249dd6ab57561fe3a512906a770f402918e8c376, workflow ID 377770281, repo ID 1398455648, checkout log의 git log -1 --format=%H 직후 동일 SHA를 확인. Writer는 Controller CI 결과를 재사용하지 않는다.
+- writer-candidate-review.mjs: 본체 정확 push CI 및 workflow blob pin, 원격 diff, 로컬 HEAD/config·파일별 preimage·보호 파일, 후보 SHA256을 대조한다. 원격 diff base와 운영 로컬 overlay base는 분리한다. 초기 신규 자동화 후보는 자연 유휴 전체 파일 overlay에 한정하고 기존 승인된 insertion/유지보수 창 경로는 그대로 유지한다. 실제 자동 발행 없음. 12건 추가(총 172건 준비), 신규 Node 시험 미확인.
+- 실질 차단: 구조화 위임 원본/독립 pin, 검증된 상시 제출 주체와 실제 PC 상태가 아직 미확보. 추가 모의 시험 수로 진행률을 올리지 않는다. 기존 승인 범위/실행기/운영 PC/main 변경 없음. 자동화 권한이 자체적으로 자신을 승인하지 않도록 한다.
