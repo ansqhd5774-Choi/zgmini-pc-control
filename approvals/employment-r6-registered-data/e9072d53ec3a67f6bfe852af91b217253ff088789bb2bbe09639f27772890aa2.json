@@ -1,0 +1,21 @@
+{
+  "schema": "ZGMINI_W04_HISTORY_REPAIR_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "CORE_MISSING_STATE_CLAIMS_HISTORY_ONLY",
+  "sourceSha": "551640c3094738f7803d6a7f799098a55c21523c",
+  "sourceManifestSha256": "508ce1aa31163ea73f7c658ab03adea50235c8dca38fa5dd12f670f114edd751",
+  "receiptSha256": "2163132e165e45e08edff062722465dac1ff3a2d17ce999ec98a479d6e32547b",
+  "evidenceDigest": "30afbbec30466fa3e93442c78514ccb5125ca57ae4609dfdd5b9f44716c3acc5",
+  "selectionSha256": "3dcefb4b49650574ab295022b9db68d8a556a89ebc83cfdc54915bfef0cd13b8",
+  "approvedCount": 2880,
+  "effects": {
+    "historyInserts": true,
+    "coreBackup": true,
+    "providerCalls": false,
+    "d1Writes": false,
+    "currentWrites": false,
+    "schemaWrites": false,
+    "taskWrites": false,
+    "sourceWrites": false
+  }
+}
