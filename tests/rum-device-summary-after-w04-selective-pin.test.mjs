@@ -23,7 +23,7 @@ test('RUM excluded-device selective candidate uses reviewed single-file parser b
  assert.throws(()=>validateControllerOnlyInstallDelta([parserPath,'controller/operations.mjs'],files),/ALLOWFILE_DIFF_MISMATCH/);
 });
 
-test('RUM post-W04 provisional manifest is internally pinned but not B-admissible',()=>{
+test('RUM post-W04 manifest is admissible only against the exact conditional W04 installed SHA',()=>{
  const raw=fs.readFileSync(path.join(root,'approvals/controller-updates',target+'.json'));
  const manifest=JSON.parse(raw);
  const pin=JSON.parse(fs.readFileSync(path.join(root,'approvals/controller-selective-targets',target+'.json'),'utf8'));
@@ -31,7 +31,7 @@ test('RUM post-W04 provisional manifest is internally pinned but not B-admissibl
  assert.equal(manifest.targetSha,target);
  assert.deepEqual(manifest.allowFiles,files);
  assert.equal(manifest.checks.manifestSha256,fingerprint);
- assert.equal(manifest.checks.status,'PENDING');
+ assert.equal(manifest.checks.status,'PASS');
  assert.equal(manifest.selectiveSource.branch,'codex/rum-device-groups-after-w04-20261125');
  assert.equal(manifest.selectiveSource.mainSha,'15849445508961ec93165fcfd854c7d642772d7f');
  assert.deepEqual(manifest.selectiveSource.customPaths,[]);
@@ -44,14 +44,15 @@ test('RUM post-W04 provisional manifest is internally pinned but not B-admissibl
   chatId:'chat-rum-excluded-device-provisional-test',operation:'controller-update',
   controlRepository:'ansqhd5774-Choi/zgmini-pc-control',targetControllerSha:target,
   approvalManifestSha256:createHash('sha256').update(raw).digest('hex')};
- assert.throws(()=>validateUpdateRequest(request,raw,
-   {actor:'ansqhd5774-Choi',installedSha:installed}),/UPDATE_TARGET_CHECKS_NOT_VERIFIED/);
+ const valid=validateUpdateRequest(request,raw,
+   {actor:'ansqhd5774-Choi',installedSha:installed});
+ assert.equal(validateControllerSelectivePin(valid.manifest,pin),true);
  assert.throws(()=>validateUpdateRequest(request,raw,
    {actor:'ansqhd5774-Choi',installedSha:'3d42f226fcffde1f09885da552f9b003ea30e57e'}),/UPDATE_INSTALLED_SOURCE_DRIFT/);
  assert.throws(()=>validateControllerSelectivePin(manifest,{...pin,installedSha:'3d42f226fcffde1f09885da552f9b003ea30e57e'}),/SELECTIVE_PIN_MISMATCH/);
 });
 
-test('provisional RUM approval JSON retains exact LF bytes',()=>{
+test('RUM approval JSON retains exact LF bytes',()=>{
  for(const dir of ['approvals/controller-updates','approvals/controller-selective-targets']){
   const raw=fs.readFileSync(path.join(root,dir,target+'.json'));
   assert.equal(raw.includes(13),false,dir);

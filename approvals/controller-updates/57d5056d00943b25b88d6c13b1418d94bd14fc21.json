@@ -23,7 +23,7 @@
   },
   "checks": {
     "targetSha": "57d5056d00943b25b88d6c13b1418d94bd14fc21",
-    "status": "PENDING",
+    "status": "PASS",
     "manifestSha256": "c9fa54df00426c82f9e18eec88257de142596fe1dd4bcb14bde1cc56c050cac3"
   },
   "backup": {
