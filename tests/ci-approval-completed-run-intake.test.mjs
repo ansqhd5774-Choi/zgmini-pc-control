@@ -180,6 +180,8 @@ test('CI publisher process exit fails on withheld or uncertain effects, not reus
  assert.equal(ciPublicationExitCode({state:'EVIDENCE_MISSING'}),1);
  assert.equal(ciPublicationExitCode({state:'IGNORED'}),0);
  assert.equal(ciPublicationExitCode({state:'DISABLED'}),0);
+ assert.equal(ciPublicationExitCode({state:'DISABLED'}, {publish:true}),1);
+ assert.equal(ciPublicationExitCode({state:'IGNORED'}, {publish:true}),0);
  const moduleText=readFileSync(new URL('../ci-approval/completed-run-intake.mjs',import.meta.url),'utf8');
- assert.match(moduleText,/process\.exitCode=ciPublicationExitCode\(result\)/);
+ assert.match(moduleText,/process\.exitCode=ciPublicationExitCode\(result,\{publish:process\.argv\[2\]===\'--publish-existing\'\}\)/);
 });
