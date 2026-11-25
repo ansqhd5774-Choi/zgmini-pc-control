@@ -8,6 +8,17 @@ import {execFileSync,spawnSync} from 'node:child_process';
 
 export const GITLEAKS_VERSION='8.30.1';
 export const GITLEAKS_ZIP_SHA256='d29144deff3a68aa93ced33dddf84b7fdc26070add4aa0f4513094c8332afc4e';
+// Reserve a distinct result code for actual findings while treating all tool
+// execution failures as hard errors. No findings, stderr or secrets are logged.
+export const GITLEAKS_FINDINGS_EXIT_CODE=2;
+export function requireGitleaksClean(scan){
+  if(!scan||scan.error||scan.signal||scan.status===null||scan.status===undefined)
+    throw Error('GITLEAKS_EXECUTION_FAILED');
+  if(scan.status===0)return true;
+  if(scan.status===GITLEAKS_FINDINGS_EXIT_CODE)
+    throw Error('GITLEAKS_FINDINGS_DETECTED');
+  throw Error('GITLEAKS_SCAN_EXECUTION_FAILED');
+}
 const RELEASE_URL='https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_windows_x64.zip';
 const SHA=/^[0-9a-f]{40}$/;
 export function prCommitRange(event,actualHead){
@@ -49,10 +60,10 @@ export function scanPr(){
     if(!fs.existsSync(exe))throw Error('GITLEAKS_EXE_MISSING');
     // Never log findings, raw matches, reports or unredacted tool stderr.
     const scan=spawnSync(exe,['git','--redact=100','--no-banner','--no-color',
-      '--exit-code=1',`--log-opts=${range.base}..${range.head}`],{
+      `--exit-code=${GITLEAKS_FINDINGS_EXIT_CODE}`,`--log-opts=${range.base}..${range.head}`],{
       cwd:process.cwd(),windowsHide:true,stdio:'pipe',encoding:'utf8',
       maxBuffer:8*1024*1024});
-    if(scan.error||scan.status!==0)throw Error('GITLEAKS_SOURCE_SCAN_FAILED');
+    requireGitleaksClean(scan);
     console.log('PASS: Gitleaks source PR commit-range scan, details withheld.');
   }finally{
     fs.rmSync(folder,{recursive:true,force:true});
