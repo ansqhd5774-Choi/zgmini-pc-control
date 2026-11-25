@@ -1589,7 +1589,7 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
       }catch{}
       if(!postIssueNumber)throw Object.assign(Error('POSTCHECK_OUTCOME_UNKNOWN'),{code:'POSTCHECK_OUTCOME_UNKNOWN'});
     }
-    writeJson(ledgerFile,{...ledger,postIssueNumber,postcheckLink:{
+    writeJson(ledgerFile,{...json(ledgerFile),postIssueNumber,postcheckLink:{
      schema:'ZGMINI_MAINTENANCE_POSTCHECK_LINK_V1',requestId:issue.requestId,
      issueNumber:postIssueNumber,state:'ISSUE_CREATED',code:'POSTCHECK_ISSUE_CREATED',
      runId:null,jobId:null,observedAtUtc:new Date().toISOString()}});
