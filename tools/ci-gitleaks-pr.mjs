@@ -73,7 +73,7 @@ export function scanPr(){
     // The official reporter writes rule IDs only to captured stdout, never to
     // an Actions log or a file containing raw findings. Template is inert.
     const template=path.join(folder,'gitleaks-rule-only.tmpl');
-    fs.writeFileSync(template,'{{range .}}{{.RuleID}}\\n{{end}}',{flag:'wx',mode:0o600});
+    fs.writeFileSync(template,'{{range .}}{{.RuleID}}\n{{end}}',{flag:'wx',mode:0o600});
     const scan=spawnSync(exe,['git','--redact=100','--no-banner','--no-color',
       `--exit-code=${GITLEAKS_FINDINGS_EXIT_CODE}`,'--report-format=template',`--report-template=${template}`,'--report-path=-',`--log-opts=${range.base}..${range.head}`],{
       cwd:process.cwd(),windowsHide:true,stdio:'pipe',encoding:'utf8',
