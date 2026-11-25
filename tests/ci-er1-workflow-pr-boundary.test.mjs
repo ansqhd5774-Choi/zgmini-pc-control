@@ -16,6 +16,11 @@ test('PC ER1 execution remains restricted to original owner-issued issue event',
  assert.match(operational,/runs-on: \[self-hosted, Windows, X64, zgmini-pc-control\]/);
  assert.doesNotMatch(operational,/pair-contract-tests:|if: github\.event_name == 'pull_request'/);
  assert.match(operational,/issues: write/);
+ const header=operational.slice(0,operational.indexOf('\njobs:'));
+ assert.match(header,/^permissions:\n  contents: read\nconcurrency:/m);
+ assert.doesNotMatch(header,/issues:\s*write/);
+ const scoped=[...operational.matchAll(/^    permissions:\n      contents: read\n      issues: write\n    runs-on: \[self-hosted, Windows, X64, zgmini-pc-control\]/gm)];
+ assert.equal(scoped.length,2,'both operational upload jobs must be explicitly scoped');
 });
 
 test('offline PR verification uses hosted runner, read-only token and credential-free source',()=>{
