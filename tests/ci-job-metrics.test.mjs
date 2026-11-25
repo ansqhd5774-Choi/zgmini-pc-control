@@ -21,7 +21,7 @@ test('measures GitHub Job queue separately from execution and retains failed run
  const calls=[];
  const data={'actions/workflows?per_page=100':catalog([
   {id:workflowId,name:workflow},{id:9124,name:'Other Workflow'}
- ]),'actions/workflows/'+workflowId+'/runs?per_page=100':namedRuns([
+ ]),['actions/workflows/'+workflowId+'/runs?per_page=100']:namedRuns([
   run(123,'success'),run(124,'failure',workflow,2),run(125,'success','Other Workflow')
  ]),'actions/runs/123/attempts/1/jobs?per_page=100':{total_count:1,jobs:[
   job('success',date('00'),date('03'),date('13'))
