@@ -23,7 +23,7 @@ validateControllerConfigTransition,controllerAdmissionForPurpose,
  R6_HOST_SOURCE_SHA,R6_HOST_SOURCE_MANIFEST_SHA256,
  selectPreservedRecoveryProtection,recoveryProtectedSnapshotStillPinned,
  verifiedRunningPostcheckFailure,classifyMaintenancePostcheckLink,
- classifyMaintenancePostcheckWorkflowRegistration,
+ selectMaintenancePostcheckRun,classifyMaintenancePostcheckWorkflowRegistration,
  summarizeMaintenancePostcheckLocalPointer,
  R6_HOST_CANDIDATE_SHA256,validateR54BIssueEnvelope,
  validateR54BManifestRequest,R54_B_ISSUE_TITLE,R54_B_OPERATION,
@@ -1649,7 +1649,7 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
       const linkedRuns=runs.filter(r=>r.event==='issues'&&r.display_title===expectedTitle&&
        Number.isFinite(Date.parse(r.created_at))&&
        Date.parse(r.created_at)>=openedAt&&Date.parse(r.created_at)<=untilAt);
-      const selected=linkedRuns.length===1?linkedRuns[0]:null;
+      const selected=selectMaintenancePostcheckRun(linkedRuns);
       const jobs=selected?readAllMaintenancePages(page=>github(
        `actions/runs/${selected.id}/jobs?per_page=100&page=${page}`).jobs,
        {maxPages:3}):null;
