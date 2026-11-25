@@ -7,7 +7,7 @@ const from=rows=>({data:{viewer:{accounts:[{rumWebVitalsEventsAdaptiveGroups:row
 const row=(path='/',device='mobile',q={
  largestContentfulPaintP75:2400000,interactionToNextPaintP75:180000,
  cumulativeLayoutShiftP75:0.08},count=1234)=>({count,dimensions:{
- requestHost:RUM_HOST,requestPath:path,deviceType:device,bot:0},quantiles:q});
+ requestHost:RUM_HOST,requestPath:path,deviceType:device},quantiles:q});
 const all=()=>['/','/economic-indicators/'].flatMap(path=>
  ['mobile','desktop'].map(device=>row(path,device)));
 const parse=r=>parseRumGraphql(r,{startUtc,endUtc});
@@ -18,7 +18,8 @@ test('static query is host-scoped, account-scoped, bounded, and not executable i
  assert.match(GRAPHQL_QUERY,/requestHost: "zgmini.kr"/);
  assert.match(GRAPHQL_QUERY,/requestPath_in: \["\/", "\/economic-indicators\/"\]/);
  assert.match(GRAPHQL_QUERY,/bot: 0/);
- assert.match(GRAPHQL_QUERY,/dimensions \{requestHost requestPath deviceType bot\}/);
+ assert.match(GRAPHQL_QUERY,/dimensions \{requestHost requestPath deviceType\}/);
+ assert.doesNotMatch(GRAPHQL_QUERY,/dimensions\s*\{[^}]*\bbot\b/);
  // Cloudflare's Analytics schema uses the custom lowercase `string` scalar.
  assert.match(GRAPHQL_QUERY,/\$account: string!/);
  assert.doesNotMatch(GRAPHQL_QUERY,/\$account: String!/);
@@ -109,6 +110,16 @@ test('missing all field observations remains UNVERIFIED, never synthetic Good',(
  assert(x.observations.every(z=>z.metrics.inpMs.p75===null));
 });
 
+test('real Cloudflare grouped rows omit bot dimension and must retain P75 values',()=>{
+ const rows=all();
+ assert(rows.every(r=>!Object.hasOwn(r.dimensions,'bot')));
+ const x=parse(from(rows));
+ assert.equal(x.fieldP75ValuesPresent,true);
+ assert.equal(x.code,'CF_RUM_ALL_SCOPED_METRICS_WITHIN_REFERENCE');
+ assert.equal(x.observations.length,4);
+ assert(x.observations.every(o=>o.groupEventCount===1234));
+ assert(x.observations.every(o=>o.metrics.inpMs.p75===180));
+});
 test('bot-classified events never influence field P75 even if API returns them',()=>{
  const observed=parse(from([...all(),{...row('/other','mobile'),
   dimensions:{requestHost:RUM_HOST,requestPath:'/',deviceType:'tablet',bot:1}}]));
