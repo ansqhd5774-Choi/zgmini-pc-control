@@ -170,6 +170,54 @@ function verifyCiIssue(expected,actual){
  return {status:'REQUEST_READBACK_VERIFIED',requestId:requestOf(expected).requestId,
   issueNumber:actual.number,execution:'NOT_ASSERTED',next:'FOLLOW_ORIGINAL_REQUEST_ONLY'};
 }
+// Existing exclusive receipt semantics, keyed by exact effect rather than
+// invocation. The root must already exist, be separately registered for the
+// isolated host and survive workflow checkout/cleanup. No automatic directory
+// creation, TTL, deletion, or relocation of unresolved claims.
+export function createCiEffectReceiptStore(root){
+ if(typeof root!=='string'||!path.isAbsolute(root))fail('MAINTENANCE_CI_RECEIPT_ROOT_UNVERIFIED');
+ const stat=fs.lstatSync(root);
+ if(!stat.isDirectory()||stat.isSymbolicLink())fail('MAINTENANCE_CI_RECEIPT_ROOT_UNVERIFIED');
+ const resolved=fs.realpathSync(root);
+ const sameRoot=()=>{if(fs.realpathSync(root)!==resolved||!fs.lstatSync(root).isDirectory()||
+   fs.lstatSync(root).isSymbolicLink())fail('MAINTENANCE_CI_RECEIPT_ROOT_DRIFT');};
+ const fileFor=effectKey=>{
+  if(typeof effectKey!=='string'||!/^[a-f0-9]{64}$/.test(effectKey))fail('MAINTENANCE_CI_EFFECT_KEY_INVALID');
+  sameRoot();return path.join(resolved,effectKey+'.json');
+ };
+ function loadReceipt(effectKey){
+  const file=fileFor(effectKey);let st;
+  try{st=fs.lstatSync(file);}catch(e){if(e.code==='ENOENT')return null;throw e;}
+  if(!st.isFile()||st.isSymbolicLink()||st.size>65536||st.size===0)fail('MAINTENANCE_CI_RECEIPT_UNVERIFIED');
+  const receipt=JSON.parse(fs.readFileSync(file,'utf8'));
+  if(receipt?.schema!=='ZGMINI_MAINTENANCE_SUBMISSION_V1')fail('MAINTENANCE_CI_RECEIPT_UNVERIFIED');
+  requestOf(receipt.expected);
+  return receipt;
+ }
+ function saveReceipt(effectKey,receipt,{exclusive=false}={}){
+  const file=fileFor(effectKey);
+  if(receipt?.schema!=='ZGMINI_MAINTENANCE_SUBMISSION_V1')fail('MAINTENANCE_CI_RECEIPT_UNVERIFIED');
+  requestOf(receipt.expected);
+  const body=JSON.stringify(receipt,null,2)+'\n';
+  if(Buffer.byteLength(body)>65536)fail('MAINTENANCE_CI_RECEIPT_UNVERIFIED');
+  if(exclusive){
+   const fd=fs.openSync(file,'wx',0o600);
+   try{fs.writeFileSync(fd,body,'utf8');fs.fsyncSync(fd);}finally{fs.closeSync(fd);}
+   return;
+  }
+  const previous=loadReceipt(effectKey);
+  if(!previous||previous.expected.body!==receipt.expected.body||
+     (previous.issueNumber!==null&&previous.issueNumber!==receipt.issueNumber))
+   fail('MAINTENANCE_CI_RECEIPT_IDENTITY_DRIFT');
+  // If interruption occurs before rename, the original CREATING receipt
+  // remains; no process may treat that as a new submission.
+  const temp=file+'.'+process.pid+'.tmp';
+  const fd=fs.openSync(temp,'wx',0o600);
+  try{fs.writeFileSync(fd,body,'utf8');fs.fsyncSync(fd);}finally{fs.closeSync(fd);}
+  fs.renameSync(temp,file);
+ }
+ return Object.freeze({loadReceipt,saveReceipt});
+}
 export async function submitExistingControllerApprovalFromCi({targetSha,approvalSha256,runId,attempt},ports){
  if(!sha40(targetSha)||typeof approvalSha256!=='string'||!/^[a-f0-9]{64}$/.test(approvalSha256)||
     !Number.isSafeInteger(runId)||runId<=0||!Number.isSafeInteger(attempt)||attempt<=0)

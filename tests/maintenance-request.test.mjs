@@ -6,7 +6,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {test} from 'node:test';
 import {manifestFingerprint,validateControllerImportClosure,controllerImportScanRoots} from '../tools/maintenance-contract.mjs';
-import {prepareMaintenanceIssue,verifyMaintenanceIssue,submitMaintenanceIssue,submitPreparedMaintenanceIssue,submitCiPreparedMaintenanceIssue,submitExistingControllerApprovalFromCi,reconcileMaintenanceIssue,main} from '../tools/maintenance-request.mjs';
+import {prepareMaintenanceIssue,verifyMaintenanceIssue,submitMaintenanceIssue,submitPreparedMaintenanceIssue,submitCiPreparedMaintenanceIssue,submitExistingControllerApprovalFromCi,createCiEffectReceiptStore,reconcileMaintenanceIssue,main} from '../tools/maintenance-request.mjs';
 const OLD='a'.repeat(40),NEXT='b'.repeat(40),OWNER='ansqhd5774-Choi';
 function manifest(){
  const allowFiles=[{path:'controller/operations.mjs',sha256:'c'.repeat(64)}];
@@ -315,4 +315,46 @@ test('CI publisher never records identity for wrong issue readback',async()=>{
  const f=workloadPublisherFixture();f.ports.readIssue=async()=>({...f.actual,user:f.owner});
  const result=await submitExistingControllerApprovalFromCi(f.input,f.ports);
  assert.equal(result.code,'MAINTENANCE_CREATED_ISSUE_NOT_VERIFIED');assert.equal(result.receiptMarker,undefined);assert.equal(f.posts,1);
+});
+
+test('durable effect receipt survives independent submitter instances and preserves original POST',async t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-ci-effect-test-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const f=workloadPublisherFixture(),store=createCiEffectReceiptStore(root);
+ const first=await submitExistingControllerApprovalFromCi(f.input,{...f.ports,...store});
+ assert.equal(first.status,'REQUEST_READBACK_VERIFIED');assert.equal(f.posts,1);
+ const secondStore=createCiEffectReceiptStore(root);
+ const retry=await submitExistingControllerApprovalFromCi({...f.input,runId:999},{...f.ports,...secondStore});
+ assert.equal(retry.code,'MAINTENANCE_CI_EXISTING_RECEIPT_NO_REPOST');assert.equal(f.posts,1);
+ assert.equal(secondStore.loadReceipt(first.effectKey).issueNumber,42);
+});
+test('exclusive receipt claim survives an uncertain POST with no auto replay',async t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-ci-effect-test-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const f=workloadPublisherFixture();
+ f.ports.createIssue=async()=>{f.posts++;throw Error('lost');};
+ const first=await submitExistingControllerApprovalFromCi(f.input,{...f.ports,...createCiEffectReceiptStore(root)});
+ assert.equal(first.code,'MAINTENANCE_CREATE_OUTCOME_UNKNOWN');
+ const retry=await submitExistingControllerApprovalFromCi(f.input,{...f.ports,...createCiEffectReceiptStore(root)});
+ assert.equal(retry.code,'MAINTENANCE_CI_EXISTING_RECEIPT_NO_REPOST');assert.equal(f.posts,1);
+});
+test('existing receipt cannot be overwritten by a fresh exclusive claim or changed request',async t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-ci-effect-test-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const store=createCiEffectReceiptStore(root),f=setup(),key='a'.repeat(64);
+ const receipt={schema:'ZGMINI_MAINTENANCE_SUBMISSION_V1',phase:'CREATING',expected:f.expected,issueNumber:null};
+ store.saveReceipt(key,receipt,{exclusive:true});
+ assert.throws(()=>store.saveReceipt(key,receipt,{exclusive:true}),/EEXIST/);
+ const changed={...receipt,expected:setup().expected};
+ assert.throws(()=>store.saveReceipt(key,changed),/IDENTITY_DRIFT/);
+ assert.deepEqual(store.loadReceipt(key),receipt);
+});
+test('missing root, invalid effect key and corrupt receipt are not a new effect',t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-ci-effect-test-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ assert.throws(()=>createCiEffectReceiptStore(path.join(root,'missing')));
+ const store=createCiEffectReceiptStore(root),key='b'.repeat(64);
+ assert.throws(()=>store.loadReceipt('../bad'),/EFFECT_KEY_INVALID/);
+ fs.writeFileSync(path.join(root,key+'.json'),'broken');
+ assert.throws(()=>store.loadReceipt(key));
 });
