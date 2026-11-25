@@ -35,7 +35,9 @@ function exactPair(prepared,target,sourcePrNumber,approvalPrNumber){
  return prepared.files;
 }
 function safePr(pr,number,branch,baseSha){
- if(pr?.number!==number||pr?.state!=='open'||pr.merged!==false||
+ const pending=pr?.state==='open'&&pr.merged===false;
+ const completed=pr?.state==='closed'&&pr.merged===true&&sha(pr.merge_commit_sha);
+ if(pr?.number!==number||!(pending||completed)||
   pr.draft!==false||pr.base?.ref!=='main'||pr.base?.repo?.full_name!==REPO||
   pr.head?.ref!==branch||pr.head?.repo?.full_name!==REPO||
   !sha(pr.head?.sha)||!sha(baseSha))fail('CI_APPROVAL_PR_IDENTITY_DENIED');
@@ -69,8 +71,17 @@ export async function publishExactControllerApprovalPair({
   fail('CI_APPROVAL_MAIN_UNVERIFIED');
  const seed=Buffer.from(JSON.stringify({schema:'ZGMINI_CI_APPROVAL_PR_BOOTSTRAP_V1',
   targetSha,sourcePrNumber,sourceMainSha})+'\n');
+ // Check the original PR inventory BEFORE any branch creation. An
+ // already merged/deleted branch must never be silently recreated by a
+ // second source-CI or main-push event for the same approved effect.
+ const prior=await io.readPrs(name);
+ if(!Array.isArray(prior)||prior.length>1)
+  fail('CI_APPROVAL_PR_INVENTORY_UNVERIFIED');
  let existing=await io.readBranch(name);
  const branchAlreadyThere=existing!==null;
+ if(existing===null&&prior.length)
+  return {state:'STATE_UNKNOWN',code:'CI_APPROVAL_PRIOR_PR_WITHOUT_BRANCH_NO_REPOST',
+   branch:name,prNumber:id(prior[0]?.number)?prior[0].number:null};
  let pr=null;
  if(existing===null){
   // Only a bootstrap marker is written. It fails the Controller B schema
@@ -88,7 +99,7 @@ export async function publishExactControllerApprovalPair({
    fail('CI_APPROVAL_BRANCH_READBACK_UNKNOWN');
  }else branchRecord(existing,name);
  const oldHead=branchRecord(existing,name);
- const found=await io.readPrs(name);
+ const found=branchAlreadyThere?prior:await io.readPrs(name);
  if(!Array.isArray(found)||found.length>1)fail('CI_APPROVAL_PR_INVENTORY_UNVERIFIED');
  if(found.length){
   pr=found[0];
@@ -136,6 +147,7 @@ export async function publishExactControllerApprovalPair({
   return {state:'EXACT_APPROVAL_PR_READY',prNumber:pr.number,
    headSha:oldHead,branch:name,existing:true};
  }
+ if(original.merged===true)fail('CI_APPROVAL_MERGED_PAIR_UNVERIFIED');
  if(already.length!==1||already[0].filename!==paths[0]||already[0].status!=='added')
   fail('CI_APPROVAL_BOOTSTRAP_DIFF_DENIED');
  const old=await io.readBytes(oldHead,paths[0]);
