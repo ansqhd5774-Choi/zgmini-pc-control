@@ -76,6 +76,24 @@ function storedHistory(input,symbol){
   return {kind:'MISSING',rows:[]};
 }
 
+ 
+// For the fixed #474 2026-11-06 cohort, file existence is distinct from
+// available numeric EPS/revenue actuals. Dates on/after the original as-of
+// are not prior-report observations, regardless of when a file was stored.
+// Caller has already checked raw file shape; this function does not read files.
+export function summarizeOriginalPriorActualContent(history){
+  const rows=history?.kind==='READ'&&Array.isArray(history.rows)?history.rows:[];
+  let epsRows=0,revenueRows=0,bothRows=0;
+  for(const r of rows){
+    if(typeof r?.date!=='string'||r.date>=ORIGINAL_474_ASOF)continue;
+    const eps=typeof r.eps==='number'&&Number.isFinite(r.eps);
+    const revenue=typeof r.revenue==='number'&&Number.isFinite(r.revenue);
+    if(eps)epsRows++;
+    if(revenue)revenueRows++;
+    if(eps&&revenue)bothRows++;
+  }
+  return {epsRows,revenueRows,bothRows};
+}
 
 // A-grade: reconstruct the original date-pinned November candidate set only
 // from stored historical SQLite rows and existing private files, never GET.
@@ -95,6 +113,11 @@ export async function inspectOriginalNov6InputVintage({
     originalCohortInvalidFiles:null,
     originalCohortStoredBeforeRun:null,
     originalCohortStoredAfterRun:null,
+    originalCohortCachedWithPriorEPSActual:null,
+    originalCohortCachedWithPriorRevenueActual:null,
+    originalCohortCachedWithPriorBothActual:null,
+    originalCohortStoredBeforeRunWithPriorBothActual:null,
+    originalCohortPriorBothActualRows:null,
     providerCalls:0,coreWrites:0,d1Writes:0,schedulerWrites:0
   };
   if(typeof pcHome!=='string'||!path.isAbsolute(pcHome)){
@@ -202,16 +225,31 @@ export async function inspectOriginalNov6InputVintage({
     // Cohort membership is verified only on a matching immutable hash.
     // Read existing files only. A file today is not necessarily an old PIT row.
     let present=0,missing=0,invalid=0,before=0,after=0;
+    let withEPS=0,withRevenue=0,withBoth=0,beforeWithBoth=0,bothRows=0;
     for(const symbol of symbols){
       const history=storedHistory(input,symbol);
       if(history.kind==='INVALID')invalid++;
       else if(history.kind==='MISSING')missing++;
       else{
         present++;
-        if(Date.parse(history.storedAt)<=ORIGINAL_474_CUTOFF_MS)before++;
+        const storedBefore=Date.parse(history.storedAt)<=ORIGINAL_474_CUTOFF_MS;
+        if(storedBefore)before++;
         else after++;
+        const actual=summarizeOriginalPriorActualContent(history);
+        if(actual.epsRows>0)withEPS++;
+        if(actual.revenueRows>0)withRevenue++;
+        if(actual.bothRows>0){
+          withBoth++;
+          if(storedBefore)beforeWithBoth++;
+        }
+        bothRows+=actual.bothRows;
       }
     }
+    r.originalCohortCachedWithPriorEPSActual=withEPS;
+    r.originalCohortCachedWithPriorRevenueActual=withRevenue;
+    r.originalCohortCachedWithPriorBothActual=withBoth;
+    r.originalCohortStoredBeforeRunWithPriorBothActual=beforeWithBoth;
+    r.originalCohortPriorBothActualRows=bothRows;
     r.originalCohortCachedSymbols=present;
     r.originalCohortMissingSymbols=missing;
     r.originalCohortInvalidFiles=invalid;

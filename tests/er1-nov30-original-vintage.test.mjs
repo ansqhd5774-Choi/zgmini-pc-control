@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
-import {inspectOriginalNov6InputVintage,validIssue} from '../er1-nov30-saved-actual-audit.mjs';
+import {inspectOriginalNov6InputVintage,summarizeOriginalPriorActualContent,validIssue} from '../er1-nov30-saved-actual-audit.mjs';
 
 const digest=arr=>createHash('sha256').update(JSON.stringify(arr)).digest('hex');
 const EVENT_ENV={
@@ -118,4 +118,23 @@ test('original vintage A request is fixed to #474 and cannot choose dates or sou
   }
   const legacy=validIssue(original474Event(original474Request()),EVENT_ENV);
   assert.equal(legacy.inspectOriginalVintage,false);
+});
+
+test('fixed #474 prior actual aggregates exclude null and post-as-of earnings',()=>{
+  const history={kind:'READ',rows:[
+    {date:'2026-11-04',eps:0,revenue:0},
+    {date:'2026-11-05',eps:null,revenue:44},
+    {date:'2026-11-01',eps:3,revenue:null},
+    {date:'2026-11-06',eps:5,revenue:60},
+    {date:'2026-11-20',eps:8,revenue:80}
+  ]};
+  assert.deepEqual(summarizeOriginalPriorActualContent(history),{
+    epsRows:2,revenueRows:2,bothRows:1
+  });
+  assert.deepEqual(summarizeOriginalPriorActualContent({kind:'MISSING',rows:[]}),{
+    epsRows:0,revenueRows:0,bothRows:0
+  });
+  assert.deepEqual(summarizeOriginalPriorActualContent({kind:'INVALID',rows:history.rows}),{
+    epsRows:0,revenueRows:0,bothRows:0
+  });
 });
