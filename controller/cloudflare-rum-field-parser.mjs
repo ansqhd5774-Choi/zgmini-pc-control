@@ -14,6 +14,8 @@ export const GRAPHQL_QUERY=[
  'requestPath_in: ["/", "/economic-indicators/"], bot: 0}) {',
  'count dimensions {requestHost requestPath deviceType}',
  'sum {lcpTotal inpTotal clsTotal}',
+ 'avg {sampleInterval}',
+ 'confidence(level: 0.95) {count {estimate lower upper sampleSize}}',
  'quantiles {largestContentfulPaintP75 interactionToNextPaintP75 cumulativeLayoutShiftP75}',
  '} } } }'
 ].join(' ');
@@ -57,9 +59,28 @@ const providerTotals=sum=>{
   fail('CF_RUM_METRIC_TOTALS_INVALID');
  return {lcpMs:sum.lcpTotal,inpMs:sum.inpTotal,cls:sum.clsTotal};
 };
+// This confidence interval measures PAGE VIEW GROUPS only. It is not a
+// per-metric INP count and cannot attest raw user interaction sample sizes.
+const groupSampling=(avg,confidence)=>{
+ if(avg===undefined||avg===null||confidence===undefined||
+    confidence===null)return 'UNAVAILABLE';
+ if(!obj(avg)||!obj(confidence)||!obj(confidence.count))
+  fail('CF_RUM_SAMPLING_SHAPE_INVALID');
+ const interval=avg.sampleInterval, count=confidence.count;
+ const valid=x=>typeof x==='number'&&Number.isFinite(x)&&x>=0;
+ if(!valid(interval)||interval<1||
+   !Number.isSafeInteger(count.sampleSize)||count.sampleSize<0||
+   !valid(count.estimate)||!valid(count.lower)||!valid(count.upper)||
+   count.lower>count.upper)fail('CF_RUM_SAMPLING_SHAPE_INVALID');
+ return {scope:'PAGE_VIEW_GROUP_ONLY',
+  averageSampleInterval:interval,
+  countConfidence95:{estimate:count.estimate,lower:count.lower,
+   upper:count.upper,sampleSize:count.sampleSize}};
+};
 const empty=(route,device,missingKind='NO_MATCHING_GROUP')=>({route,device,groupEventCount:0,
  metricSpecificSampleCounts:'UNAVAILABLE',
  metricReportedTotals:'UNAVAILABLE',
+ groupSampling:'UNAVAILABLE',
  metrics:Object.fromEntries(Object.entries(GOOD).map(([k,limit])=>[
   k,{p75:null,goodLimit:limit,state:'UNVERIFIED',missingKind}]))});
 export function parseRumGraphql(response,{startUtc,endUtc}={}){
@@ -106,7 +127,8 @@ export function parseRumGraphql(response,{startUtc,endUtc}={}){
    cls:metric(q.cumulativeLayoutShiftP75,GOOD.cls,1)};
   seen.set(key,{route:requestPath,device,groupEventCount:row.count,
    metricSpecificSampleCounts:'UNAVAILABLE',
-   metricReportedTotals:providerTotals(row.sum),metrics});
+   metricReportedTotals:providerTotals(row.sum),
+   groupSampling:groupSampling(row.avg,row.confidence),metrics});
  }
  const observations=RUM_PATHS.flatMap(route=>RUM_DEVICES.map(device=>
   seen.get(route+'|'+device)??empty(route,device)));
