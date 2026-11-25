@@ -27,8 +27,8 @@ test('tampered external release hash is rejected before execution',()=>{
 });
 
 test('failed audit exposes only fixed-form rule IDs, never paths or source excerpts',()=>{
- const noisy="error[template-injection]: location private-path\\n"+
-  "   showing private snippet\\nwarning[excessive-permissions]: other-path\\n"+
+ const noisy="error[template-injection]: location private-path\n"+
+  "   showing private snippet\nwarning[excessive-permissions]: other-path\n"+
   "error[template-injection]: repeated";
  assert.deepEqual(summarizeZizmorRuleIds(noisy,''),[
   'excessive-permissions','template-injection'
