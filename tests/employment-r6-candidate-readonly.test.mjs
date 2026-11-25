@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import {validateBundle,inspectEmploymentR6Candidate,projectPit04KeyReview} from '../controller/employment-r6-candidate-readonly.mjs';
+import {validateBundle,inspectEmploymentR6Candidate,projectPit04KeyReview,projectPit04ConflictCauses,projectPit0605Aggregate} from '../controller/employment-r6-candidate-readonly.mjs';
 
 const ENTRY='scripts/pc-writer/employment-r6-runner-stage.mjs';
 const SHA='a'.repeat(40);
@@ -595,4 +595,61 @@ test('PIT-04-08 direct projection rejects forged region and offset, never publis
  assert.throws(()=>projectPit04KeyReview(p,{offset:8,asOfDate:'2026-11-02'}),/R6_PIT04_RESULT_INVALID/);
  assert.throws(()=>projectPit04KeyReview({...p,evidence:[{...p.evidence[0],observationDate:'2026-11-01'}]},
   {offset:0,asOfDate:'2026-11-02'}),/R6_PIT04_RESULT_INVALID/);
+});
+
+test('PIT-04-08 cause summary retains only safe counters and the existing opt-in scope',()=>{
+ const raw={kind:'W04_CANDIDATE_CURRENT_CAUSE_COUNTS_V1',total:14,
+  causes:{invalidNumericValue:0,providerOrSeriesDifferent:1,valueAndHashDifferent:6,
+   valueOnlyDifferent:2,hashOnlyDifferent:5},
+  changedFields:{numericValue:8,sourceHash:11,provider:1,
+   providerSeries:0,sourceRevision:3},
+  sourceScope:'READONLY_CORE_CANDIDATE_SAME_SNAPSHOT_NOT_PIT',
+  rawPitAttested:false,repairAuthorized:false,
+  source_hash:'SECRET_HASH',sourceValue:1234};
+ const result=projectPit04ConflictCauses(raw,{expectedTotal:14});
+ assert.equal(result.total,14);
+ assert.deepEqual(result.causes,raw.causes);
+ assert.equal(result.rawPitAttested,false);
+ assert.equal(result.repairAuthorized,false);
+ assert.doesNotMatch(JSON.stringify(result),/SECRET_HASH|sourceValue|source_hash/);
+ assert.throws(()=>projectPit04ConflictCauses({...raw,total:13},{expectedTotal:14}),
+  /R6_PIT0408_PRIVATE_REPORT_INVALID/);
+ assert.throws(()=>projectPit04ConflictCauses({...raw,rawPitAttested:true},{expectedTotal:14}),
+  /R6_PIT0408_PRIVATE_REPORT_INVALID/);
+ assert.throws(()=>projectPit04ConflictCauses({...raw,
+  causes:{...raw.causes,hashOnlyDifferent:6}},{expectedTotal:14}),
+  /R6_PIT0408_PRIVATE_REPORT_INVALID/);
+});
+test('PIT0605 raw receipt months cannot promote an unobserved original vintage',()=>{
+ const raw={kind:'ZGMINI_W04_PIT0605_AGGREGATE_ONLY_V1',
+  status:'HOLD_HISTORICAL_PIT_UNATTESTED',
+  checkedAt:'2026-11-25T14:05:00.000Z',
+  missingHistoryKeys:2880,checkedRawSnapshots:35,acceptedDOLSnapshots:12,
+  counts:{ORIGINAL_VERSION_AND_HISTORICAL_AVAILABILITY_PROVED:0,
+   RAW_OBSERVATION_MATCH_HISTORICAL_TIME_UNPROVEN:2880,
+   RAW_OBSERVATION_OR_REVISION_CONFLICT:0,RAW_NOT_FOUND_IN_CHECKED_SCOPE:0},
+  rejectedRawSnapshots:{bodyOrId:0,metadata:23,run:0,parser:0},
+  malformedRawSnapshotGroups:0,evidenceDigest:'a'.repeat(64),
+  historicalVersionAttested:false,repairAuthorized:false,
+  operationalWrites:0,providerCalls:0,d1Writes:0,
+  missingCandidateReceipts:{keys:255,exactRawMatched:255,
+   firstExactReceiptMonth:'2026-11',lastExactReceiptMonth:'2026-11',
+   exactReceiptFirstObserved2025:0,
+   scope:'EXACT_STORED_RAW_RECEIPT_NOT_HISTORICAL_PIT',
+   rawSnapshotHash:'PRIVATE_NEVER_LEAK'},
+ };
+ const projected=projectPit0605Aggregate(raw);
+ assert.equal(projected.missingCandidateReceipts.keys,255);
+ assert.equal(projected.missingCandidateReceipts.exactReceiptFirstObserved2025,0);
+ assert.equal(projected.historicalVersionAttested,false);
+ assert.equal(projected.repairAuthorized,false);
+ assert.doesNotMatch(JSON.stringify(projected),/PRIVATE_NEVER_LEAK/);
+ const old={...raw};delete old.missingCandidateReceipts;
+ assert.equal(Object.hasOwn(projectPit0605Aggregate(old),'missingCandidateReceipts'),false);
+ assert.throws(()=>projectPit0605Aggregate({...raw,
+  missingCandidateReceipts:{...raw.missingCandidateReceipts,exactRawMatched:3000}}),
+  /R6_PIT0605_REPORT_INVALID/);
+ assert.throws(()=>projectPit0605Aggregate({...raw,
+  missingCandidateReceipts:{...raw.missingCandidateReceipts,firstExactReceiptMonth:'2025-15'}}),
+  /R6_PIT0605_REPORT_INVALID/);
 });
