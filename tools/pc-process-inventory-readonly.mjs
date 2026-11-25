@@ -22,6 +22,7 @@ import {inspectW03PaidPrivateReadonly,inspectD05PaidThemeFinalOutputsReadonly,in
 import {validateRunnerJobRefs,inspectRunnerJobHistory} from './runner-job-history-readonly.mjs';
 import {inspectW043409SourcePreflightReadonly} from './w04-3409-source-preflight-readonly.mjs';
 import {inspect3409ArchivedReceiptReadonly} from './w04-3409-archive-receipt-readonly.mjs';
+import {inspect3516ArchivedReceiptReadonly} from './w04-3516-archive-receipt-readonly.mjs';
 import {inspect3409OperatorFileSafetyReadonly} from './w04-3409-operator-file-safety-readonly.mjs';
 
 export const TITLE='pc-process-inventory-readonly';
@@ -658,7 +659,10 @@ function inspect3516MaintenanceStatusReadonly(){
  try{
   const observed=project3516MaintenanceStatus(
    collectAutomationStatus(['--request-id',TARGET3516]));
-  if(observed.status!=='READ_ONLY_OBSERVED')return observed;
+  // Archive verification survives when the historical maintenance ledger is
+  // no longer classified as active after a valid independent C reconciliation.
+  const recoveryArchive=inspect3516ArchivedReceiptReadonly();
+  if(observed.status!=='READ_ONLY_OBSERVED')return {...observed,recoveryArchive};
   const control='E:/ZGmini/automation/pc-control';
   const protectedFile=path.join(control,'backups',
    'controller-update-'+TARGET3516,'PROTECTED_BEFORE.json');
@@ -675,8 +679,10 @@ function inspect3516MaintenanceStatusReadonly(){
   }catch{/* Absence remains unverified, not a permitted install. */}
   return {...observed,protectedStateUnchanged:unchanged,
    protectedDifferenceClass:differenceClass,
-   recoveryCas:inspect3516RecoveryCasReadonly()};
- }catch{return project3516MaintenanceStatus(null);}
+   recoveryCas:recoveryArchive.status==='ARCHIVE_VERIFIED'?null:
+    inspect3516RecoveryCasReadonly(),recoveryArchive};
+ }catch{return {...project3516MaintenanceStatus(null),
+  recoveryArchive:inspect3516ArchivedReceiptReadonly()};}
 }
 
 const D05_STAGE_STATUSES=new Set(['LOCAL_STORED','UNCHANGED','PREVIOUS_RELEASE_PRESERVED',
@@ -2293,7 +2299,9 @@ export function toText(r){
    'w043516LeaseHeld='+(r.w043516MaintenanceStatus.recoveryEvidence?.leaseHeld??'UNKNOWN'),
    'w043516RecoveryRequired='+(r.w043516MaintenanceStatus.recoveryEvidence?.recoveryRequired??'UNKNOWN'),
    'w043516Protection='+(r.w043516MaintenanceStatus.protectedDifferenceClass??'UNVERIFIED'),
-   'w043516LeaseCorrelation='+(r.w043516MaintenanceStatus.recoveryCas?.status??'UNVERIFIED')]:[]),
+   'w043516LeaseCorrelation='+(r.w043516MaintenanceStatus.recoveryCas?.status??'UNVERIFIED'),
+   'w043516RecoveryArchive='+(r.w043516MaintenanceStatus.recoveryArchive?.status??'UNVERIFIED'),
+   'w043516ArchiveRecord='+(r.w043516MaintenanceStatus.recoveryArchive?.archiveRecordVerified??'UNVERIFIED')]:[]),
   ...(r.w043409MaintenanceStatus?[
    'w043409Status='+r.w043409MaintenanceStatus.status,
    'w043409HistoricalPhase='+(r.w043409MaintenanceStatus.historicalRequest?.phase??'UNKNOWN'),

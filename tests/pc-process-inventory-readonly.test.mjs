@@ -1,4 +1,5 @@
 import './w04-3409-source-preflight-readonly.test.mjs';
+import './w04-3516-archive-receipt-readonly.test.mjs';
 import test from 'node:test';
 import {createHash} from 'node:crypto';
 import fs from 'node:fs';
@@ -2121,6 +2122,11 @@ test('W04 #3516 recovery attestation must bind exact issue, SHA and postcheck',(
  const text=toText(compact);
  assert.match(text,/w043516Status=READ_ONLY_OBSERVED/);
  assert.match(text,/w043516LeaseHeld=true/);
+ assert.match(text,/w043516RecoveryArchive=UNVERIFIED/);
+ const withArchive=compact3516ProcessResult({requestId:'safe'},
+  {...p,recoveryArchive:{status:'ARCHIVE_VERIFIED',archiveRecordVerified:true}});
+ assert.match(toText(withArchive),/w043516RecoveryArchive=ARCHIVE_VERIFIED/);
+ assert.match(toText(withArchive),/w043516ArchiveRecord=true/);
  assert.doesNotMatch(text,/SECRET_|nonce/i);
 });
 test('W04 #3516 lease lineage requires original Issue/postcheck/target/marker chronology',()=>{
