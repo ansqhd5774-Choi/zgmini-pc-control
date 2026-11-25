@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {observeCompletedRun,observePublishedControllerApprovals,createControllerPublicationPorts,publishExistingControllerApprovals,ciPublicationExitCode} from '../ci-approval/completed-run-intake.mjs';
+import {observeCompletedRun,observePublishedControllerApprovals,createControllerPublicationPorts,publishExistingControllerApprovals,createAutoApprovalContextReader,ciPublicationExitCode} from '../ci-approval/completed-run-intake.mjs';
 
 const repository={id:1442936296,full_name:'ansqhd5774-Choi/zgmini-pc-control',private:true};
 const event=()=>({action:'completed',repository:{...repository},workflow_run:{
@@ -166,12 +166,47 @@ test('submission workflow is activation-gated, push-only and pinned to reviewed 
  assert.doesNotMatch(y,/contents: write|id-token: write/);
 });
 
+test('configured auto approval context binds initial grant and exact PR scope',async()=>{
+ const v=publicationFixture(),repo=repository.full_name,head='d'.repeat(40);
+ const policy={targetSha:v.target,approvalPrNumber:29,sourcePrNumber:28,sourceWorkflowBlobSha:head,
+  businessApprovalSha256:'a'.repeat(64),policyRevision:head,sourceBranch:'codex/example-selective',
+  delegationPin:{issueNumber:123,commentId:456,bodySha256:'b'.repeat(64)},authorityChangesExcluded:true};
+ const manifest={targetSha:v.target,installedSha:'e'.repeat(40),purpose:'pc-controller-maintenance',
+  selectiveSource:{branch:policy.sourceBranch},allowFiles:[{path:'controller/example.mjs',sha256:'c'.repeat(64)}]};
+ const bytes=Buffer.from(JSON.stringify(manifest)),blob=createHash('sha1').update(Buffer.from('blob '+bytes.length+'\0')).update(bytes).digest('hex');
+ const read=createAutoApprovalContextReader({policy,getJson:async route=>{
+  if(route==='pulls/29')return {number:29,head:{sha:head,repo:{full_name:repo}},base:{ref:'main',repo:{full_name:repo}}};
+  if(route==='contents/'+v.path+'?ref='+head)return {path:v.path,type:'file',encoding:'base64',sha:blob,content:bytes.toString('base64')};
+  if(route==='issues/comments/456')return {id:456};
+  if(route==='compare/'+manifest.installedSha+'...'+v.target)return {status:'ahead'};
+  throw Error('unexpected route');
+ },readJobLogs:async()=>''});
+ const ctx=await read(v.target,29);
+ assert.deepEqual(ctx.delegation.pin,policy.delegationPin);
+ assert.equal(ctx.delegation.scope.businessApprovalSha256,policy.businessApprovalSha256);
+ assert.equal(ctx.delegation.scope.authorityChangesExcluded,true);
+ assert.equal((await ctx.getJson('repos/'+repo+'/issues/comments/456')).id,456);
+ assert.equal((await ctx.getJson('repos/'+repo+'/compare/'+manifest.installedSha+'...'+v.target)).status,'ahead');
+ assert.throws(()=>ctx.getJson('repos/'+repo+'/../secrets'),/SOURCE_INVALID/);
+ await assert.rejects(()=>read(v.target,30),/POLICY_SCOPE_MISMATCH/);
+ await assert.rejects(()=>ctx.readFileBytes('other/repo',head,v.path),/SOURCE_INVALID/);
+ assert.throws(()=>ctx.getJson('repos/'+repo+'/actions/secrets'),/SOURCE_INVALID/);
+ // Candidate bytes never replace the independently supplied policy.
+ policy.delegationPin.bodySha256='0'.repeat(64);
+ assert.equal((await read(v.target,29)).delegation.pin.bodySha256,'b'.repeat(64));
+});
+test('missing independent policy does not create an automated approval read port',()=>{
+ const ports=createControllerPublicationPorts({getJson:()=>{},postIssue:()=>{},store:{}});
+ assert.equal(ports.readAutoApprovalContext,undefined);
+ assert.throws(()=>createAutoApprovalContextReader({policy:{},getJson:()=>{},readJobLogs:()=>{}}),/AUTO_POLICY_UNVERIFIED/);
+});
+
 test('CI publisher process exit fails on withheld or uncertain effects, not reused original requests',()=>{
  const processed=results=>({state:'PUBLICATION_PROCESSED',results});
  for(const status of ['STATE_UNKNOWN','NOT_SUBMITTED','AUTOMATION_BLOCKED']){
   assert.equal(ciPublicationExitCode(processed([{status}])),1,status);
   assert.equal(ciPublicationExitCode(processed([
-   {status:'REQUEST_READBACK_VERIFIED'},{status}])) ,1,'mixed '+status);
+   {status:'REQUEST_READBACK_VERIFIED'},{status}])),1,'mixed '+status);
  }
  assert.equal(ciPublicationExitCode(processed([
   {status:'REQUEST_READBACK_VERIFIED'},{status:'EXISTING_REQUEST_REUSED'}])),0);
