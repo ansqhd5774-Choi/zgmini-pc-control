@@ -1,0 +1,13 @@
+{
+  "schema": "ZGMINI_PC_MAINTENANCE_RESULT_V1",
+  "requestId": "pc-update-c087fa10-88e2-42e3-bc60-c758ab93f0c1",
+  "targetControllerSha": "83679b013ac9a9820331d93311ec97e572b18e13",
+  "status": "UNKNOWN",
+  "code": "POSTCHECK_OUTCOME_UNKNOWN",
+  "lastPass": "RECOVERY_REQUIRED",
+  "firstFail": "POSTCHECK_PENDING",
+  "actualControllerSha": "83679b013ac9a9820331d93311ec97e572b18e13",
+  "recoverySha": null,
+  "protectedStateUnchanged": null,
+  "workflowEnabled": null
+}
