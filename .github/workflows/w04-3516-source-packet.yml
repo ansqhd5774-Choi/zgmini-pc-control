@@ -55,3 +55,44 @@ jobs:
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
+
+  operator-bundle-only:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.event.pull_request.user.login == 'ansqhd5774-Choi' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/w04-3516-operator-delivery-20261125'
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 4
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Require existing isolated source CI PC, never operating PC
+        run: |
+          if /I not "%COMPUTERNAME%"=="DESKTOP-N62L0NG" exit /b 5
+      - name: Checkout exactly verified merged operator source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: '2a13b25cd5eec6710cbe9e4ef88ffb6e57cd6f16'
+          persist-credentials: false
+      - name: Setup existing isolated Node for exact guard tests
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Validate independent Windows operator guards without operating PC access
+        run: node --test --test-concurrency=1 tests/w04-3516-operator-once.test.mjs
+      - name: Stage immutable Git object bytes in isolated CI TEMP without checkout EOL filters
+        env:
+          ZG_OPERATOR_BUNDLE_DIR: ${{ runner.temp }}/ZGMINI_3516_OPERATOR_ONCE
+        run: |
+          node -e "const fs=require('node:fs'),p=require('node:path'),c=require('node:crypto'),e=require('node:child_process');const release='2a13b25cd5eec6710cbe9e4ef88ffb6e57cd6f16';const files=[['tools/operator-packets/w04-3516-recovery-once.mjs','824adec90634b127b3c460a06980f150840cf7ec'],['tools/operator-packets/W04_3516_INDEPENDENT_RECOVERY_ONCE_V1.cmd','b8a3185c68b9b64888ca10e17b6dad667042b315']];if(e.execFileSync('git',['rev-parse','HEAD']).toString().trim()!==release)process.exit(21);const out=process.env.ZG_OPERATOR_BUNDLE_DIR;if(!out||fs.existsSync(out)||!p.isAbsolute(out)||!p.normalize(out).startsWith(p.normalize(process.env.RUNNER_TEMP)+p.sep))process.exit(24);const source=files.map(([name,expected])=>{const b=e.execFileSync('git',['show',release+':'+name],{encoding:null,maxBuffer:1000000});const actual=c.createHash('sha1').update(Buffer.from('blob '+b.length+'\0')).update(b).digest('hex');if(actual!==expected)process.exit(22);return [name,b]});if(!source[1][1].toString().includes('ZG_JS_BLOB='+files[0][1]))process.exit(23);fs.mkdirSync(out);for(const [name,bytes] of source)fs.writeFileSync(p.join(out,p.basename(name)),bytes,{flag:'wx'});console.log('W04_3516_PINNED_GIT_OBJECT_BUNDLE_PREPARED_ONLY');"
+      - name: Publish exact source-only C operator handoff archive
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: W04_3516_INDEPENDENT_OPERATOR_ONCE_2a13b25c
+          path: ${{ runner.temp }}/ZGMINI_3516_OPERATOR_ONCE/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0

@@ -1,0 +1,444 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-45641170637-1-seat-5",
+  "requestId": "pc-272c8c8f-4128-46c8-a1ce-4b858c11d511",
+  "startedAt": "2026-11-25T15:05:25.569Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "4c9a85d04497466f4773bff8ead9da91a30a68b3",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "39b54c38e5a842ddd5e7fd546e32950f52767de6",
+  "sourceBranch": "codex/w04-pit-readonly-conflict-vintage-20261125",
+  "operation": "employment-r6-candidate-stage-readonly",
+  "seat": 5,
+  "status": "PASS",
+  "code": "EMPLOYMENT_R6_READONLY_STAGE_COMPLETED",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": true,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-w04-pit0408-conflict-vintage-20261126",
+  "effectClass": "REGISTERED_OPERATION",
+  "memoryAdmission": {
+    "admitted": true,
+    "minimumFreeMiB": 1536,
+    "firstFreeMiB": 2686,
+    "freeMiB": 2686,
+    "minObservedMiB": 2686,
+    "samples": 1,
+    "waitedMs": 0.023700000000189902
+  },
+  "pcOperationalApprovedSha": "d8ac245003e7b8e006c2345382d5c639c6d5f18b",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "EMPLOYMENT_R6_READONLY_STAGE_COMPLETED",
+    "actualExecutionSha": "39b54c38e5a842ddd5e7fd546e32950f52767de6",
+    "sourceBundleSha": "39b54c38e5a842ddd5e7fd546e32950f52767de6",
+    "asOfDate": "2026-11-25",
+    "sqliteOpened": true,
+    "summary": {
+      "sourceFeatures": 29,
+      "recentlyObservedFeatures": 23,
+      "chartReadyFeatures": 23,
+      "chartPartialFeatures": 5,
+      "scoredFeatures": 20,
+      "recentlyScoredFeatures": 14
+    },
+    "pit": {
+      "coreCurrentRows": 40842,
+      "coreHistoryRevisions": 38883,
+      "coreCurrentKeys": 40842,
+      "coreHistoryAsOfUniqueKeys": 37962,
+      "coreHistoryPriorRevisionKeys": 883,
+      "coreHistoryPriorRevisionRows": 921,
+      "coreHistoryAmbiguousLatestKeys": 0,
+      "coreHistorySameInstantAdditionalRows": 0,
+      "coreCurrentHistoryMatchingKeys": 37962,
+      "coreCurrentHistoryConflictingKeys": 0,
+      "coreCurrentHistoryUnverifiedKeys": 0,
+      "coreCurrentHistoryMissingKeys": 2880,
+      "candidateHistoryAsOfUniqueKeys": 3700,
+      "candidateHistoryPriorRevisionKeys": 0,
+      "candidateHistoryPriorRevisionRows": 0,
+      "candidateHistoryAmbiguousLatestKeys": 0,
+      "candidateHistorySameInstantAdditionalRows": 0,
+      "coreCurrentKeysMissingHistory": 2880,
+      "missingKeysWithCandidateHistory": 2625,
+      "missingKeysWithMatchingCandidateValueAndHash": 2625,
+      "candidateCurrentKeys": 3700,
+      "candidateNewKeys": 0,
+      "candidateOverlapMatchingKeys": 3686,
+      "candidateOverlapConflictingKeys": 14,
+      "candidateOverlapUnverifiedKeys": 0,
+      "candidateNewKeysWithConsistentPITMetadata": 0,
+      "candidateNewKeysWithIncompletePITMetadata": 0,
+      "coreMissingHistoryKeysWithConsistentCandidateMetadata": 2625,
+      "coreMissingHistoryKeysWithoutConsistentCandidateMetadata": 255,
+      "rawSnapshotMetadataKeys": null,
+      "rawSnapshotCertifiedKeys": null,
+      "rawSnapshotInvalidBodyKeys": null,
+      "rawSnapshotValidWithoutRunKeys": null,
+      "coreCurrentRawLineageVerifiedKeys": null,
+      "coreCurrentRawLineageMissingSnapshotKeys": null,
+      "coreCurrentRawLineageConflictingKeys": null,
+      "coreCurrentRawLineageUnverifiedKeys": null,
+      "coreHistoryRawLineageTotalRows": null,
+      "coreHistoryRawLineageVerifiedRows": null,
+      "coreHistoryRawLineageMissingSnapshotRows": null,
+      "coreHistoryRawLineageConflictingRows": null,
+      "coreHistoryRawLineageUnverifiedRows": null,
+      "rawSnapshotByGroup": null,
+      "rawSnapshotByMonth": null,
+      "rawLineageEvidenceStatus": "NO_RUNTIME_EVIDENCE",
+      "candidateReconciliationPreviewStatus": "HOLD_CONFLICTING_REVISIONS"
+    },
+    "pit04KeyReview": {
+      "kind": "EMPLOYMENT_R6_PIT0408_KEY_REVIEW_SOURCE_ONLY_V1",
+      "status": "HOLD_KEY_CLASSIFICATION_NOT_RAW_PIT_ATTESTATION",
+      "counts": {
+        "coreKeys": 30702,
+        "coreHistoryMissing": 2880,
+        "coreHistoryConflict": 0,
+        "coreHistoryAmbiguous": 0,
+        "candidateOverlapConflicts": 1,
+        "missingCandidateInternalMatch": 2625,
+        "missingCandidateIncomplete": 0,
+        "missingWithoutCandidate": 255,
+        "duplicateCurrentKeys": 0
+      },
+      "evidenceTotal": 2881,
+      "offset": 0,
+      "pageSize": 8,
+      "nextOffset": 8,
+      "evidenceTruncated": true,
+      "evidence": [
+        {
+          "logicalSeriesId": "STATE_INITIAL_CLAIMS",
+          "geographyCode": "NE",
+          "observationDate": "2026-10-17",
+          "reason": "CANDIDATE_CURRENT_CONFLICT",
+          "coreHistoryMissing": false,
+          "candidateCurrentConflict": true,
+          "rawPitAttested": false,
+          "repairAuthorized": false
+        },
+        {
+          "logicalSeriesId": "STATE_INITIAL_CLAIMS",
+          "geographyCode": "AK",
+          "observationDate": "2025-07-26",
+          "reason": "MISSING_HISTORY_NO_CANDIDATE",
+          "coreHistoryMissing": true,
+          "candidateCurrentConflict": false,
+          "rawPitAttested": false,
+          "repairAuthorized": false
+        },
+        {
+          "logicalSeriesId": "STATE_INITIAL_CLAIMS",
+          "geographyCode": "AL",
+          "observationDate": "2025-07-26",
+          "reason": "MISSING_HISTORY_NO_CANDIDATE",
+          "coreHistoryMissing": true,
+          "candidateCurrentConflict": false,
+          "rawPitAttested": false,
+          "repairAuthorized": false
+        },
+        {
+          "logicalSeriesId": "STATE_INITIAL_CLAIMS",
+          "geographyCode": "AR",
+          "observationDate": "2025-07-26",
+          "reason": "MISSING_HISTORY_NO_CANDIDATE",
+          "coreHistoryMissing": true,
+          "candidateCurrentConflict": false,
+          "rawPitAttested": false,
+          "repairAuthorized": false
+        },
+        {
+          "logicalSeriesId": "STATE_INITIAL_CLAIMS",
+          "geographyCode": "AZ",
+          "observationDate": "2025-07-26",
+          "reason": "MISSING_HISTORY_NO_CANDIDATE",
+          "coreHistoryMissing": true,
+          "candidateCurrentConflict": false,
+          "rawPitAttested": false,
+          "repairAuthorized": false
+        },
+        {
+          "logicalSeriesId": "STATE_INITIAL_CLAIMS",
+          "geographyCode": "CA",
+          "observationDate": "2025-07-26",
+          "reason": "MISSING_HISTORY_NO_CANDIDATE",
+          "coreHistoryMissing": true,
+          "candidateCurrentConflict": false,
+          "rawPitAttested": false,
+          "repairAuthorized": false
+        },
+        {
+          "logicalSeriesId": "STATE_INITIAL_CLAIMS",
+          "geographyCode": "CO",
+          "observationDate": "2025-07-26",
+          "reason": "MISSING_HISTORY_NO_CANDIDATE",
+          "coreHistoryMissing": true,
+          "candidateCurrentConflict": false,
+          "rawPitAttested": false,
+          "repairAuthorized": false
+        },
+        {
+          "logicalSeriesId": "STATE_INITIAL_CLAIMS",
+          "geographyCode": "CT",
+          "observationDate": "2025-07-26",
+          "reason": "MISSING_HISTORY_NO_CANDIDATE",
+          "coreHistoryMissing": true,
+          "candidateCurrentConflict": false,
+          "rawPitAttested": false,
+          "repairAuthorized": false
+        }
+      ],
+      "rawPitAttested": false,
+      "promotionApproved": false,
+      "repairAuthorized": false
+    },
+    "pit04PrivateEvidenceDigest": "3dbf8726f58f126dd588ba456751d035bd5d3ef1e88b6e8800e70d818b04859e",
+    "evidenceFileSha256": "f80adb500e89014e8f2b9fe79f1a48c9dfc0d841a58aaba38c8b6db4f3104583",
+    "evidenceFileRef": "PC_WRITER_PIT_EVIDENCE/pit0408-pc-272c8c8f-4128-46c8-a1ce-4b858c11d511.json",
+    "privateEvidenceReadback": true,
+    "candidateConflictBreakdown": {
+      "kind": "W04_CANDIDATE_CURRENT_CAUSE_COUNTS_V1",
+      "total": 14,
+      "causes": {
+        "invalidNumericValue": 0,
+        "providerOrSeriesDifferent": 0,
+        "valueAndHashDifferent": 9,
+        "valueOnlyDifferent": 0,
+        "hashOnlyDifferent": 5
+      },
+      "changedFields": {
+        "numericValue": 9,
+        "sourceHash": 14,
+        "provider": 0,
+        "providerSeries": 0,
+        "sourceRevision": 9
+      },
+      "sourceScope": "READONLY_CORE_CANDIDATE_SAME_SNAPSHOT_NOT_PIT",
+      "rawPitAttested": false,
+      "repairAuthorized": false
+    },
+    "indicators": [
+      {
+        "id": "U3_UNEMPLOYMENT",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY",
+        "firstMissingReferenceDate": "2025-10-31"
+      },
+      {
+        "id": "U6_UNEMPLOYMENT",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY",
+        "firstMissingReferenceDate": "2025-10-31"
+      },
+      {
+        "id": "LFPR",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY",
+        "firstMissingReferenceDate": "2025-10-31"
+      },
+      {
+        "id": "EPOP",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY",
+        "firstMissingReferenceDate": "2025-10-31"
+      },
+      {
+        "id": "PAYEMS_MOM",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "PAYEMS_3M_AVG",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "PAYEMS_ACCEL",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "AVG_WEEKLY_HOURS",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "TEMP_HELP",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "INITIAL_CLAIMS",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY",
+        "firstMissingReferenceDate": "2026-10-31"
+      },
+      {
+        "id": "INITIAL_CLAIMS_4W",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY",
+        "firstMissingReferenceDate": "2026-10-31"
+      },
+      {
+        "id": "CONTINUED_CLAIMS",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY",
+        "firstMissingReferenceDate": "2026-10-31"
+      },
+      {
+        "id": "IUR",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY",
+        "firstMissingReferenceDate": "2026-10-31"
+      },
+      {
+        "id": "STATE_CLAIMS_BREADTH",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY",
+        "firstMissingReferenceDate": "2025-07-26"
+      },
+      {
+        "id": "JOLTS_OPENINGS_RATE",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "JOLTS_HIRES_RATE",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "JOLTS_QUITS_RATE",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "JOLTS_LAYOFFS_RATE",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "AHE_YOY",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "ECI_12M",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "INDUSTRY_DIFFUSION_3M",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "STATE_EMP_DIFFUSION_3M",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "MSA_EMP_DIFFUSION_3M",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "BED_GROSS_GAINS_RATE",
+        "rawStatus": "STALE",
+        "chartStatus": "PARTIAL",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "BED_GROSS_LOSSES_RATE",
+        "rawStatus": "STALE",
+        "chartStatus": "PARTIAL",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "BED_NET_GROSS_RATE",
+        "rawStatus": "STALE",
+        "chartStatus": "PARTIAL",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "BED_SMALL_FIRM_NET",
+        "rawStatus": "STALE",
+        "chartStatus": "PARTIAL",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "BED_STATE_BREADTH",
+        "rawStatus": "STALE",
+        "chartStatus": "PARTIAL",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "BED_BIRTH_DEATH_NET",
+        "rawStatus": "STALE",
+        "chartStatus": "UNAVAILABLE",
+        "scoreStatus": "READY"
+      }
+    ],
+    "bodyDigest": "3966e0edf2a12914afcd86e68674df3db6c186c8483e80a61bf7170c34cb09f1",
+    "walPreflight": {
+      "coreWalMode": true,
+      "candidateWalMode": false,
+      "coreWalSidecarsPreexisting": true,
+      "candidateWalSidecarsPreexisting": false
+    },
+    "promotionApproved": false,
+    "memoryTelemetry": {
+      "kind": "SYSTEM_RAM_SAMPLED_DURING_R6_CHILD_V1",
+      "intervalMs": 100,
+      "samples": 412,
+      "totalMiB": 16122,
+      "baselineFreeMiB": 2703,
+      "minimumFreeMiB": 1801,
+      "peakSystemUsedMiB": 14321,
+      "peakIncreaseFromBaselineMiB": 902,
+      "calculationPeakValid": true,
+      "measurementPhase": "COMPUTATION"
+    },
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "operationalWrites": 0
+  },
+  "protectedBeforeSha256": "c3f37ad6b759146c1159c7637c428b704eac1383658071f7b1927697ade3c4b8",
+  "protectedAfterSha256": "c3f37ad6b759146c1159c7637c428b704eac1383658071f7b1927697ade3c4b8",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "39b54c38e5a842ddd5e7fd546e32950f52767de6",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-25T15:06:14.233Z",
+  "durationMs": 48664
+}

@@ -12,7 +12,10 @@ export const GRAPHQL_QUERY=[
  'rumWebVitalsEventsAdaptiveGroups(limit: 30,',
  'filter: {datetime_geq: $start, datetime_leq: $end, requestHost: "zgmini.kr",',
  'requestPath_in: ["/", "/economic-indicators/"], bot: 0}) {',
- 'count dimensions {requestHost requestPath deviceType bot}',
+ 'count dimensions {requestHost requestPath deviceType}',
+ 'sum {lcpTotal inpTotal clsTotal}',
+ 'avg {sampleInterval}',
+ 'confidence(level: 0.95) {count {estimate lower upper sampleSize}}',
  'quantiles {largestContentfulPaintP75 interactionToNextPaintP75 cumulativeLayoutShiftP75}',
  '} } } }'
 ].join(' ');
@@ -35,16 +38,51 @@ const metric=(value,limit,scale)=>{
  if(value!==undefined&&value!==null&&
   (typeof value!=='number'||!Number.isFinite(value)))
   fail('CF_RUM_METRIC_SHAPE_INVALID');
- const raw=value===undefined||value===null||value<0?null:value/scale;
+ // Preserve the provider representation; an absent field, explicit null,
+ // and negative no-value marker are different observations, not INP causes.
+ const missingKind=value===undefined?'FIELD_OMITTED':
+  value===null?'PROVIDER_NULL':value<0?'PROVIDER_NEGATIVE':null;
+ const raw=missingKind===null?value/scale:null;
  const p75=raw===null?null:Math.round(raw*1e5)/1e5;
  // Compare ORIGINAL values: rounding a CLS 0.100001 must not yield Good.
  return {p75,goodLimit:limit,state:raw===null?'UNVERIFIED':
-   raw<=limit?'AT_OR_BELOW_GOOD_REFERENCE':'EXCEEDS_GOOD_REFERENCE'};
+   raw<=limit?'AT_OR_BELOW_GOOD_REFERENCE':'EXCEEDS_GOOD_REFERENCE',
+  ...(missingKind===null?{}:{missingKind})};
 };
-const empty=(route,device)=>({route,device,groupEventCount:0,
+// These are Cloudflare adaptive SUM metric totals, not attested unsampled
+// interaction counts. Keep metric-specific sample certification separate.
+const providerTotals=sum=>{
+ if(sum===undefined||sum===null)return 'UNAVAILABLE';
+ if(!obj(sum))fail('CF_RUM_METRIC_TOTALS_INVALID');
+ const fields=['lcpTotal','inpTotal','clsTotal'];
+ if(fields.some(k=>typeof sum[k]!=='number'||!Number.isFinite(sum[k])||sum[k]<0))
+  fail('CF_RUM_METRIC_TOTALS_INVALID');
+ return {lcpMs:sum.lcpTotal,inpMs:sum.inpTotal,cls:sum.clsTotal};
+};
+// This confidence interval measures PAGE VIEW GROUPS only. It is not a
+// per-metric INP count and cannot attest raw user interaction sample sizes.
+const groupSampling=(avg,confidence)=>{
+ if(avg===undefined||avg===null||confidence===undefined||
+    confidence===null)return 'UNAVAILABLE';
+ if(!obj(avg)||!obj(confidence)||!obj(confidence.count))
+  fail('CF_RUM_SAMPLING_SHAPE_INVALID');
+ const interval=avg.sampleInterval, count=confidence.count;
+ const valid=x=>typeof x==='number'&&Number.isFinite(x)&&x>=0;
+ if(!valid(interval)||interval<1||
+   !Number.isSafeInteger(count.sampleSize)||count.sampleSize<0||
+   !valid(count.estimate)||!valid(count.lower)||!valid(count.upper)||
+   count.lower>count.upper)fail('CF_RUM_SAMPLING_SHAPE_INVALID');
+ return {scope:'PAGE_VIEW_GROUP_ONLY',
+  averageSampleInterval:interval,
+  countConfidence95:{estimate:count.estimate,lower:count.lower,
+   upper:count.upper,sampleSize:count.sampleSize}};
+};
+const empty=(route,device,missingKind='NO_MATCHING_GROUP')=>({route,device,groupEventCount:0,
  metricSpecificSampleCounts:'UNAVAILABLE',
+ metricReportedTotals:'UNAVAILABLE',
+ groupSampling:'UNAVAILABLE',
  metrics:Object.fromEntries(Object.entries(GOOD).map(([k,limit])=>[
-  k,{p75:null,goodLimit:limit,state:'UNVERIFIED'}]))});
+  k,{p75:null,goodLimit:limit,state:'UNVERIFIED',missingKind}]))});
 export function parseRumGraphql(response,{startUtc,endUtc}={}){
  if(!validWindow(startUtc,endUtc))fail('CF_RUM_WINDOW_INVALID');
  if(!obj(response))fail('CF_RUM_RESPONSE_INVALID');
@@ -59,6 +97,9 @@ export function parseRumGraphql(response,{startUtc,endUtc}={}){
  const rows=accounts[0]?.rumWebVitalsEventsAdaptiveGroups;
  if(!Array.isArray(rows)||rows.length>30)fail('CF_RUM_GROUPS_INVALID');
  const seen=new Map();
+ // Count only non-empty, in-scope non-target device GROUPS; never expose
+ // raw non-target metrics or reclassify them as mobile/desktop observations.
+ const nonTargetDeviceGroups={tablet:0,unrecognized:0};
  for(const row of rows){
   if(!obj(row)||!obj(row.dimensions)||!obj(row.quantiles)||
    !Number.isSafeInteger(row.count)||row.count<0)
@@ -66,19 +107,28 @@ export function parseRumGraphql(response,{startUtc,endUtc}={}){
   const {requestHost,requestPath,deviceType}=row.dimensions;
   // Never expose another host/path or an untrusted URL in a public result.
   if(requestHost!==RUM_HOST||!RUM_PATHS.includes(requestPath))continue;
-  // API query also excludes bots; enforce the dimension in response independently.
-  if(row.dimensions.bot!==0)continue;
+  // `bot: 0` is a filter, NOT a selected RUM dimension. Standard GraphQL
+  // responses omit dimensions.bot; reject unexpected explicitly nonzero bots.
+  if(row.dimensions.bot!==undefined&&row.dimensions.bot!==0)continue;
   const device=typeof deviceType==='string'?deviceType.toLowerCase():null;
-  if(!RUM_DEVICES.includes(device))continue;
+  if(!RUM_DEVICES.includes(device)){
+   if(row.count>0){
+    if(device==='tablet')nonTargetDeviceGroups.tablet++;
+    else nonTargetDeviceGroups.unrecognized++;
+   }
+   continue;
+  }
   const key=requestPath+'|'+device;
   if(seen.has(key))fail('CF_RUM_DUPLICATE_GROUPS_UNVERIFIED');
   const q=row.quantiles;
-  const metrics=row.count===0?empty(requestPath,device).metrics:{
+  const metrics=row.count===0?empty(requestPath,device,'ZERO_GROUP_EVENTS').metrics:{
    lcpMs:metric(q.largestContentfulPaintP75,GOOD.lcpMs,1000),
    inpMs:metric(q.interactionToNextPaintP75,GOOD.inpMs,1000),
    cls:metric(q.cumulativeLayoutShiftP75,GOOD.cls,1)};
   seen.set(key,{route:requestPath,device,groupEventCount:row.count,
-   metricSpecificSampleCounts:'UNAVAILABLE',metrics});
+   metricSpecificSampleCounts:'UNAVAILABLE',
+   metricReportedTotals:providerTotals(row.sum),
+   groupSampling:groupSampling(row.avg,row.confidence),metrics});
  }
  const observations=RUM_PATHS.flatMap(route=>RUM_DEVICES.map(device=>
   seen.get(route+'|'+device)??empty(route,device)));
@@ -90,5 +140,6 @@ export function parseRumGraphql(response,{startUtc,endUtc}={}){
   source:'CLOUDFLARE_RUM_FIELD_GROUPS_PROVISIONAL',host:RUM_HOST,
   window:{startUtc,endUtc},fieldP75ValuesPresent:!missing,
   siteGoodCertified:false,cruxEquivalent:false,
-  metricSampleSizesVerified:false,mergeBlocking:false,observations};
+  metricSampleSizesVerified:false,mergeBlocking:false,
+  nonTargetDeviceGroups,observations};
 }

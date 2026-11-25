@@ -7,7 +7,7 @@ const from=rows=>({data:{viewer:{accounts:[{rumWebVitalsEventsAdaptiveGroups:row
 const row=(path='/',device='mobile',q={
  largestContentfulPaintP75:2400000,interactionToNextPaintP75:180000,
  cumulativeLayoutShiftP75:0.08},count=1234)=>({count,dimensions:{
- requestHost:RUM_HOST,requestPath:path,deviceType:device,bot:0},quantiles:q});
+ requestHost:RUM_HOST,requestPath:path,deviceType:device},quantiles:q});
 const all=()=>['/','/economic-indicators/'].flatMap(path=>
  ['mobile','desktop'].map(device=>row(path,device)));
 const parse=r=>parseRumGraphql(r,{startUtc,endUtc});
@@ -18,12 +18,16 @@ test('static query is host-scoped, account-scoped, bounded, and not executable i
  assert.match(GRAPHQL_QUERY,/requestHost: "zgmini.kr"/);
  assert.match(GRAPHQL_QUERY,/requestPath_in: \["\/", "\/economic-indicators\/"\]/);
  assert.match(GRAPHQL_QUERY,/bot: 0/);
- assert.match(GRAPHQL_QUERY,/dimensions \{requestHost requestPath deviceType bot\}/);
+ assert.match(GRAPHQL_QUERY,/dimensions \{requestHost requestPath deviceType\}/);
+ assert.doesNotMatch(GRAPHQL_QUERY,/dimensions\s*\{[^}]*\bbot\b/);
  // Cloudflare's Analytics schema uses the custom lowercase `string` scalar.
  assert.match(GRAPHQL_QUERY,/\$account: string!/);
  assert.doesNotMatch(GRAPHQL_QUERY,/\$account: String!/);
  assert.match(GRAPHQL_QUERY,/rumWebVitalsEventsAdaptiveGroups/);
  assert.match(GRAPHQL_QUERY,/largestContentfulPaintP75/);
+ assert.match(GRAPHQL_QUERY,/sum \{lcpTotal inpTotal clsTotal\}/);
+ assert.match(GRAPHQL_QUERY,/avg \{sampleInterval\}/);
+ assert.match(GRAPHQL_QUERY,/confidence\(level: 0\.95\) \{count \{estimate lower upper sampleSize\}\}/);
  assert.doesNotMatch(GRAPHQL_QUERY,/mutation|subscription/i);
 });
 test('invalid account, windows, dates and future horizon are rejected',()=>{
@@ -109,6 +113,16 @@ test('missing all field observations remains UNVERIFIED, never synthetic Good',(
  assert(x.observations.every(z=>z.metrics.inpMs.p75===null));
 });
 
+test('real Cloudflare grouped rows omit bot dimension and must retain P75 values',()=>{
+ const rows=all();
+ assert(rows.every(r=>!Object.hasOwn(r.dimensions,'bot')));
+ const x=parse(from(rows));
+ assert.equal(x.fieldP75ValuesPresent,true);
+ assert.equal(x.code,'CF_RUM_ALL_SCOPED_METRICS_WITHIN_REFERENCE');
+ assert.equal(x.observations.length,4);
+ assert(x.observations.every(o=>o.groupEventCount===1234));
+ assert(x.observations.every(o=>o.metrics.inpMs.p75===180));
+});
 test('bot-classified events never influence field P75 even if API returns them',()=>{
  const observed=parse(from([...all(),{...row('/other','mobile'),
   dimensions:{requestHost:RUM_HOST,requestPath:'/',deviceType:'tablet',bot:1}}]));
@@ -129,4 +143,141 @@ test('zero page views never turn quantiles into a verified Good reading',()=>{
  assert.equal(out.fieldP75ValuesPresent,false);
  assert(out.observations.every(o=>o.groupEventCount===0));
  assert(out.observations.every(o=>o.metrics.cls.p75===null));
+});
+
+test('non-target device groups are visible as bounded aggregate diagnostics only',()=>{
+ const tablet=row('/','tablet',undefined,17);
+ const unknown=row('/economic-indicators/','unknown',undefined,5);
+ const emptyTablet=row('/economic-indicators/','tablet',undefined,0);
+ const foreign={...row('/','tablet'),dimensions:{
+  requestHost:'other.example',requestPath:'/',deviceType:'tablet'}};
+ const bot={...row('/','tablet'),dimensions:{
+  requestHost:RUM_HOST,requestPath:'/',deviceType:'tablet',bot:1}};
+ const out=parse(from([row('/','desktop'),tablet,unknown,emptyTablet,foreign,bot]));
+ assert.deepEqual(out.nonTargetDeviceGroups,{tablet:1,unrecognized:1});
+ assert.equal(out.observations.length,4);
+ assert.equal(out.observations.find(o=>o.route==='/'&&o.device==='mobile')
+  .groupEventCount,0);
+ assert.equal(out.fieldP75ValuesPresent,false);
+ assert.equal(out.siteGoodCertified,false);
+ assert.equal(JSON.stringify(out).includes('other.example'),false);
+ assert.equal(JSON.stringify(out).includes('"unknown"'),false);
+});
+
+test('missing metric origin stays distinct from real zero without claiming a cause',()=>{
+ const rows=[
+  row('/','mobile',{largestContentfulPaintP75:0,
+   interactionToNextPaintP75:-1,cumulativeLayoutShiftP75:null},2),
+  row('/','desktop',{largestContentfulPaintP75:1200000,
+   cumulativeLayoutShiftP75:0.01},3),
+  row('/economic-indicators/','mobile',{
+   largestContentfulPaintP75:0,interactionToNextPaintP75:0,
+   cumulativeLayoutShiftP75:0},0)
+ ];
+ const x=parse(from(rows));
+ const at=(route,device)=>x.observations.find(o=>o.route===route&&o.device===device);
+ const mobile=at('/','mobile').metrics;
+ assert.equal(mobile.inpMs.p75,null);
+ assert.equal(mobile.inpMs.missingKind,'PROVIDER_NEGATIVE');
+ assert.equal(mobile.cls.p75,null);
+ assert.equal(mobile.cls.missingKind,'PROVIDER_NULL');
+ assert.equal(mobile.lcpMs.p75,0);
+ assert.equal(mobile.lcpMs.state,'AT_OR_BELOW_GOOD_REFERENCE');
+ assert.equal(Object.hasOwn(mobile.lcpMs,'missingKind'),false);
+ const desktop=at('/','desktop').metrics;
+ assert.equal(desktop.inpMs.p75,null);
+ assert.equal(desktop.inpMs.missingKind,'FIELD_OMITTED');
+ const zero=at('/economic-indicators/','mobile').metrics;
+ assert.equal(zero.inpMs.p75,null);
+ assert.equal(zero.inpMs.missingKind,'ZERO_GROUP_EVENTS');
+ const absent=at('/economic-indicators/','desktop').metrics;
+ assert.equal(absent.inpMs.p75,null);
+ assert.equal(absent.inpMs.missingKind,'NO_MATCHING_GROUP');
+ assert.equal(x.fieldP75ValuesPresent,false);
+ assert.equal(x.siteGoodCertified,false);
+ assert.equal(x.metricSampleSizesVerified,false);
+});
+
+test('Cloudflare metric totals distinguish no INP observations from page view count',()=>{
+ const data=all().map(r=>({...r,sum:{lcpTotal:2,inpTotal:1,clsTotal:2}}));
+ data[2]={...data[2],count:2,
+  quantiles:{largestContentfulPaintP75:712000,
+   interactionToNextPaintP75:-1,cumulativeLayoutShiftP75:0.002},
+  sum:{lcpTotal:2,inpTotal:0,clsTotal:2}};
+ const x=parse(from(data));
+ const mobile=x.observations.find(o=>
+  o.route==='/economic-indicators/'&&o.device==='mobile');
+ assert.equal(mobile.groupEventCount,2);
+ assert.deepEqual(mobile.metricReportedTotals,{lcpMs:2,inpMs:0,cls:2});
+ assert.equal(mobile.metrics.inpMs.p75,null);
+ assert.equal(mobile.metrics.inpMs.missingKind,'PROVIDER_NEGATIVE');
+ assert.equal(mobile.metricSpecificSampleCounts,'UNAVAILABLE');
+ assert.equal(x.metricSampleSizesVerified,false);
+ assert.equal(x.siteGoodCertified,false);
+ assert.equal(x.fieldP75ValuesPresent,false);
+ assert.equal(x.observations[0].metricReportedTotals.inpMs,1);
+});
+test('provider metric totals never turn negative P75 into Good or certified samples',()=>{
+ const withTotal={...row(),quantiles:{
+  largestContentfulPaintP75:1500000,interactionToNextPaintP75:-1,
+  cumulativeLayoutShiftP75:0.01},sum:{lcpTotal:30,inpTotal:5,clsTotal:30}};
+ const observed=parse(from([withTotal]));
+ assert.equal(observed.observations[0].metricReportedTotals.inpMs,5);
+ assert.equal(observed.observations[0].metrics.inpMs.p75,null);
+ assert.equal(observed.observations[0].metrics.inpMs.missingKind,
+  'PROVIDER_NEGATIVE');
+ assert.equal(observed.siteGoodCertified,false);
+ assert.equal(observed.metricSampleSizesVerified,false);
+ for(const sum of [{lcpTotal:1,inpTotal:-1,clsTotal:2},
+  {lcpTotal:1,inpTotal:'2',clsTotal:2},
+  {lcpTotal:1,clsTotal:2},{lcpTotal:NaN,inpTotal:2,clsTotal:2}]){
+  assert.throws(()=>parse(from([{...row(),sum}])),
+   /CF_RUM_METRIC_TOTALS_INVALID/);
+ }
+ const legacy=parse(from([row()]));
+ assert.equal(legacy.observations[0].metricReportedTotals,'UNAVAILABLE');
+ assert.equal(legacy.siteGoodCertified,false);
+});
+test('adaptive page-group sample size is recorded without certifying INP users',()=>{
+ const rows=all().map((r,i)=>({...r,
+  sum:{lcpTotal:12,inpTotal:i===2?0:7,clsTotal:12},
+  avg:{sampleInterval:1.5},
+  confidence:{count:{estimate:12,lower:10.1,upper:13.9,sampleSize:8}}}));
+ rows[2].quantiles={largestContentfulPaintP75:712000,
+  interactionToNextPaintP75:-1,cumulativeLayoutShiftP75:0.002};
+ const out=parse(from(rows));
+ const mobile=out.observations.find(x=>x.route==='/economic-indicators/'&&x.device==='mobile');
+ assert.deepEqual(mobile.groupSampling,{scope:'PAGE_VIEW_GROUP_ONLY',
+  averageSampleInterval:1.5,
+  countConfidence95:{estimate:12,lower:10.1,upper:13.9,sampleSize:8}});
+ assert.equal(mobile.metricReportedTotals.inpMs,0);
+ assert.equal(mobile.metrics.inpMs.p75,null);
+ assert.equal(out.metricSampleSizesVerified,false);
+ assert.equal(out.siteGoodCertified,false);
+ assert.equal(out.fieldP75ValuesPresent,false);
+});
+test('page-group confidence never invents precise metric sample certification',()=>{
+ const good={...row(),avg:{sampleInterval:1},
+  confidence:{count:{estimate:1234,lower:1234,upper:1234,sampleSize:1234}}};
+ const x=parse(from([good]));
+ assert.equal(x.observations[0].groupSampling.averageSampleInterval,1);
+ assert.equal(x.observations[0].groupSampling.countConfidence95.sampleSize,1234);
+ assert.equal(x.metricSampleSizesVerified,false);
+ assert.equal(x.siteGoodCertified,false);
+ const legacy=parse(from([row()]));
+ assert.equal(legacy.observations[0].groupSampling,'UNAVAILABLE');
+ for(const [avg,confidence] of [
+  [{sampleInterval:0},{count:{estimate:2,lower:1,upper:3,sampleSize:2}}],
+  [{sampleInterval:'1'},{count:{estimate:2,lower:1,upper:3,sampleSize:2}}],
+  [{sampleInterval:1},{count:{estimate:2,lower:3,upper:1,sampleSize:2}}],
+  [{sampleInterval:1},{count:{estimate:2,lower:1,upper:3,sampleSize:-1}}],
+  [{sampleInterval:1},{count:{estimate:2,lower:1,upper:3}}],
+  [{sampleInterval:1},{count:null}]
+ ])assert.throws(()=>parse(from([{...row(),avg,confidence}])),
+  /CF_RUM_SAMPLING_SHAPE_INVALID/);
+});
+test('normal four-group response has zero non-target device groups',()=>{
+ const out=parse(from(all()));
+ assert.deepEqual(out.nonTargetDeviceGroups,{tablet:0,unrecognized:0});
+ assert.equal(out.fieldP75ValuesPresent,true);
 });

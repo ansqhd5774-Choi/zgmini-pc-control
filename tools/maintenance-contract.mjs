@@ -938,6 +938,18 @@ export function verifiedRunningPostcheckFailure({ledger,manifest,issue,run,job}=
    runId:run?.id,jobId:job?.id,runnerName:job?.runner_name}},issue,run,job});
 }
 
+// A labeled PC Job Issue can create both an opened Run and a labeled Run.
+// Only a completed/skipped companion may be excluded, never two executable
+// Runs. This is evidence selection, not permission to execute or retry.
+export function selectMaintenancePostcheckRun(runs){
+ if(!Array.isArray(runs)||!runs.every(r=>Number.isSafeInteger(r?.id)&&r.id>0))return null;
+ if(runs.length===1)return runs[0];
+ if(runs.length!==2)return null;
+ const skipped=runs.filter(r=>r.status==='completed'&&r.conclusion==='skipped');
+ const candidate=runs.filter(r=>r.conclusion!=='skipped');
+ return skipped.length===1&&candidate.length===1?candidate[0]:null;
+}
+
 // Observational only: distinguish the postcheck handoff boundary without
 // replaying an Issue, modifying a Controller, or treating a missing run as FAIL.
 // This is a snapshot; the next bounded observation may advance its state.
@@ -976,8 +988,9 @@ export function classifyMaintenancePostcheckLink({requestId,issueNumber,operatio
   Number.isFinite(Date.parse(run.created_at??''))&&
   Date.parse(run.created_at)>=origin&&Date.parse(run.created_at)-origin<=900000);
  if(matches.length===0)return out('NO_RUN','POSTCHECK_RUN_NOT_OBSERVED');
- if(matches.length!==1)return out('STATE_UNKNOWN','POSTCHECK_RUN_IDENTITY_AMBIGUOUS');
- const run=matches[0],runId=run.id;
+ const run=selectMaintenancePostcheckRun(matches);
+ if(!run)return out('STATE_UNKNOWN','POSTCHECK_RUN_IDENTITY_AMBIGUOUS');
+ const runId=run.id;
  if(['queued','pending','requested','waiting'].includes(run.status))
   return out('RUNNER_QUEUE','POSTCHECK_RUN_WAITING',runId);
  if(!Array.isArray(jobs))return out('STATE_UNKNOWN','POSTCHECK_JOBS_LOOKUP_UNVERIFIED',runId);

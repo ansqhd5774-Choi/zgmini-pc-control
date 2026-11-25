@@ -18,7 +18,9 @@ const MAX_BODY_BYTES=32*1024*1024;
 const MAX_TOTAL_BYTES=512*1024*1024;
 const MAX_RUNS=20000;
 const MAX_MISSING_WEEK_BINS=700;
-const MAX_PUBLIC_MISSING_WEEKS=16;
+// The W04 57-week gap fits in the existing sanitized 32 KiB result contract.
+// Bound week-count output to 64 rows; never return raw keys or raw history.
+const MAX_PUBLIC_MISSING_WEEKS=64;
 const noWrite=()=>({operationalWrites:0,providerCalls:0,d1Writes:0});
 const safeJson=value=>{
  if(typeof value!=='string'||Buffer.byteLength(value)>40000)return null;

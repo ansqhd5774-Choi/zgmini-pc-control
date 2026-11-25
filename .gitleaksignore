@@ -1,0 +1,6 @@
+# Single reviewed Gitleaks v8.30.1 decoded-JSON false positive.
+# Manifest line 14 contains the public source-file SHA-256 beside the exact
+# `pit04-key-evidence.mjs` filename; no credential is present.
+# Fingerprint is limited to the immutable introducing commit, path, rule and line.
+# All other Gitleaks default rules and findings remain active.
+df2e1db5084ae04d714a77ad4a1f314f67c4f451:approvals/source-bundles/manifests/39b54c38e5a842ddd5e7fd546e32950f52767de6.json:generic-api-key:14

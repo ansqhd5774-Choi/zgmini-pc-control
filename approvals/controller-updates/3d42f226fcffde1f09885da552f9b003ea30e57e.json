@@ -1,0 +1,54 @@
+{
+  "schema": "ZGMINI_PC_UPDATE_V1",
+  "installedSha": "83679b013ac9a9820331d93311ec97e572b18e13",
+  "targetSha": "3d42f226fcffde1f09885da552f9b003ea30e57e",
+  "allowFiles": [
+    {
+      "path": "config/operations.json",
+      "sha256": "0faadb506c22e0219a9d6a4edcc24fbacd6af355ddfcd2fd80e5f602b4617f38"
+    },
+    {
+      "path": "controller/cloudflare-rum-field-parser.mjs",
+      "sha256": "5705f03b6ca5b33f5980e1af968ced6c70fa82d611bc8467e67390ba1dcfa0b5"
+    },
+    {
+      "path": "controller/operations.mjs",
+      "sha256": "2a204fe31c61b4c50ade16a20bd1d9a595d39212ace8a92b40eb1266b1abf5eb"
+    },
+    {
+      "path": "controller/w05-cloudflare-rum-readonly.mjs",
+      "sha256": "6271d351b628c23c2dd7ff4481389745c604400f044b163d25394c43fdfc4fae"
+    }
+  ],
+  "purpose": "pc-controller-maintenance",
+  "controllerOnlyInstall": true,
+  "selectiveSource": {
+    "schema": "ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1",
+    "branch": "codex/ci-cloudflare-rum-b-overlay-v2-20261125",
+    "mainSha": "730dfa37a8f676003dfe5840740e19134b99278d",
+    "customPaths": [
+      "config/operations.json",
+      "controller/operations.mjs"
+    ]
+  },
+  "approval": {
+    "grade": "B",
+    "scope": "PC_CONTROL_CONTROLLER_UPDATE",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3561"
+  },
+  "checks": {
+    "targetSha": "3d42f226fcffde1f09885da552f9b003ea30e57e",
+    "status": "PASS",
+    "manifestSha256": "78f42ba66bc1a474ab8e961159bdc9466feaed6e1c475c3b48a7f08549cef566"
+  },
+  "backup": {
+    "strategy": "VERSIONED_SNAPSHOT",
+    "rollback": {
+      "kind": "RESTORE_INSTALLED_SHA",
+      "sha": "83679b013ac9a9820331d93311ec97e572b18e13"
+    }
+  },
+  "postOperation": "core-status",
+  "postSourceBranch": "main",
+  "postSourceSha": "b6049aac81b3442a58b08050ee138921f87a09e6"
+}

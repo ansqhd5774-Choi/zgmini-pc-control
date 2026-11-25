@@ -10,6 +10,7 @@ import {inspectEmploymentR6D1Readback} from './employment-r6-d1-readback-readonl
 import {inspectR54PublicReadback} from './market-r54-d1-api-readback-readonly.mjs';
 import {inspectW05FiveKeyD1ApiReadback} from './w05-five-key-d1-api-readback-readonly.mjs';
 import {inspectW05CloudflareActive} from './w05-cloudflare-deployment-readonly.mjs';
+import {inspectW05CloudflareRum} from './w05-cloudflare-rum-readonly.mjs';
 import {inspectInflation7D1Readback} from './inflation7-d1-readback-readonly.mjs';
 import {inspectInflation19D1Readback} from './inflation19-d1-readback-readonly.mjs';
 import {inspectCoreRuntimeSource} from './core-runtime-source-readonly.mjs';
@@ -267,6 +268,7 @@ export async function runOperation(request,context){
  if(request.operation==='market-r54-d1-api-readback-readonly')return inspectR54PublicReadback(dataRoot);
  if(request.operation==='w05-five-key-d1-api-readback-readonly')return await inspectW05FiveKeyD1ApiReadback(dataRoot);
  if(request.operation==='w05-cloudflare-deployment-readonly')return await inspectW05CloudflareActive(dataRoot);
+ if(request.operation==='w05-cloudflare-rum-readonly')return await inspectW05CloudflareRum(dataRoot);
  if(request.operation==='inflation7-d1-readback-readonly')return inspectInflation7D1Readback(dataRoot);
  if(request.operation==='inflation19-d1-readback-readonly')return inspectInflation19D1Readback(dataRoot);
  if(request.operation==='r17-268-postcancel-readonly'){
@@ -312,9 +314,12 @@ export async function runOperation(request,context){
  if(request.operation==='earnings-bea-nipa-capture-readonly')return inspectBeaNipaCaptureReadonly(dataRoot);
  if(request.operation==='w05-wpsfd42-service-readonly')return await runW05ServiceStoredReadonly({request,host,dataRoot,workspace});
  if(request.operation==='employment-r6-candidate-stage-readonly'){
-  const minimum=policy.operations[request.operation].minimumFreeMiB??policy.minimumFreeMiBForHeavy;
-  if(os.freemem()/1048576<minimum)return {status:'BLOCKED',code:'RESOURCE_WAIT_MEMORY',
-    candidateExecuted:false,sqliteOpened:false,providerCalls:0,d1Writes:0};
+  // Admission already passed; a momentary RAM dip before the R6 worker
+  // must use the same bounded policy recheck, not an immediate one-shot denial.
+  const minimumFreeMiB=policy.operations[request.operation].minimumFreeMiB??policy.minimumFreeMiBForHeavy;
+  const memoryRecheck=await waitForMemoryAdmission({minimumFreeMiB,timeoutMs:9000,intervalMs:1500});
+  if(!memoryRecheck.admitted)return {status:'BLOCKED',code:'RESOURCE_WAIT_MEMORY',
+    candidateExecuted:false,sqliteOpened:false,providerCalls:0,d1Writes:0,memoryRecheck};
   return inspectEmploymentR6Candidate(request,{host,workspace});
  }
  if(request.operation==='core-conflict-proof'){

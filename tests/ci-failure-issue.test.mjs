@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {REPO,WORKFLOWS,triage,keyFor,markerFor} from '../scripts/ci-failure-issue.mjs';
+import {REPO,WORKFLOWS,triage,markerFor,caseKeyFor} from '../scripts/ci-failure-issue.mjs';
 
 const event=(overrides={})=>({
  action:'completed',repository:{full_name:REPO,private:true},
@@ -11,9 +11,10 @@ const event=(overrides={})=>({
 });
 const failureJob={id:87,name:'source-check',conclusion:'failure',steps:[
  {name:'checkout',conclusion:'success'},{name:'Regression tests',conclusion:'failure'}]};
-function fixture({existing=false,comments=[]}={}){
+function fixture({existing=false,comments=[],commentPage2=[]}={}){
  const calls=[];
- const hash=keyFor(WORKFLOWS[0],'source-check','Regression tests');
+ let lastPostedComment=null;
+ const hash=caseKeyFor(WORKFLOWS[0],'source-check','Regression tests',123456,1,87,2);
  const marker=markerFor(hash);
  const issue={number:6200,body:marker+'\nold failure',
   user:{login:'github-actions[bot]'}};
@@ -24,7 +25,11 @@ function fixture({existing=false,comments=[]}={}){
   if(resource==='issues?state=open&per_page=100&page=1')
    return existing?[issue]:[];
   if(resource==='issues/6200/comments?per_page=100')return comments;
-  if(resource==='issues/6200/comments'&&method==='POST')return {id:1};
+  if(resource==='issues/6200/comments?per_page=100&page=2')return commentPage2;
+  if(resource==='issues/6200/comments'&&method==='POST'){
+   lastPostedComment=body.body;return {id:1};
+  }
+  if(resource==='issues/comments/1')return {id:1,body:lastPostedComment};
   if(resource==='issues'&&method==='POST')return {...issue,body:body.body};
   if(resource==='issues/6200')return {...issue,body:marker+'\ncreated'};
   throw Error('unexpected route '+method+' '+resource);
@@ -51,7 +56,7 @@ test('same failure class links to existing Issue and repeated run is idempotent'
  assert.equal(f.calls.filter(x=>x.method==='POST'&&x.resource==='issues').length,0);
  assert.equal(f.calls.filter(x=>x.method==='POST'&&x.resource.endsWith('/comments')).length,1);
  const duplicate=fixture({existing:true,comments:[
-  {body:'<!-- zgmini-ci-run:123456:1 -->\nalready reported'}]});
+  {body:'<!-- zgmini-ci-run:123456:1:job:87:step:2 -->\nalready reported'}]});
  assert.deepEqual(await triage({event:event(),request:duplicate.request}),
   {state:'REUSED',issue:6200});
  assert.equal(duplicate.calls.filter(x=>x.method==='POST').length,0);
@@ -87,10 +92,10 @@ test('timed out second attempt records the exact attempt and timeout metadata',a
  const request=async(resource,{method='GET',body}={})=>{
   calls.push({resource,method,body});
   if(resource==='actions/runs/123456/attempts/2/jobs?per_page=100')
-   return {total_count:1,jobs:[{name:'CI timeout',conclusion:'timed_out',steps:[]}]};
+   return {total_count:1,jobs:[{id:88,name:'CI timeout',conclusion:'timed_out',steps:[]}]};
   if(resource==='issues?state=open&per_page=100&page=1')return [];
   if(resource==='issues'&&method==='POST')return {...issue,body:body.body};
-  if(resource==='issues/6201')return {...issue,body:markerFor(keyFor(WORKFLOWS[0],'CI timeout','JOB_TIMEOUT'))};
+  if(resource==='issues/6201')return {...issue,body:markerFor(caseKeyFor(WORKFLOWS[0],'CI timeout','JOB_TIMEOUT',123456,2,88,0))};
   throw Error('unexpected route '+resource);
  };
  assert.deepEqual(await triage({event:event({run_attempt:2,conclusion:'timed_out'}),request}),
@@ -116,10 +121,30 @@ test('GitHub job retrieval errors are propagated with zero issue writes',async()
  }}),/CI_INCIDENT_GITHUB_HTTP_403/);
  assert.deepEqual(calls.map(x=>x.method),['GET']);
 });
-test('full comment inventory blocks writes rather than duplicating an incident',async()=>{
- const f=fixture({existing:true,comments:Array.from({length:100},()=>({body:'other run'}))});
- await assert.rejects(triage({event:event(),request:f.request}),/CI_INCIDENT_COMMENTS_UNVERIFIED/);
- assert.equal(f.calls.some(x=>x.method==='POST'),false);
+test('the 100-comment boundary checks the next page and reuses an exact receipt',async()=>{
+ const receipt='<!-- zgmini-ci-run:123456:1:job:87:step:2 -->';
+ const f=fixture({existing:true,
+  comments:Array.from({length:100},()=>({body:'different observed run'})),
+  commentPage2:[{body:receipt+'\noriginal evidence'}]});
+ const result=await triage({event:event(),request:f.request});
+ assert.deepEqual(result,{state:'REUSED',issue:6200});
+ assert.ok(f.calls.some(c=>c.resource==='issues/6200/comments?per_page=100&page=2'));
+ assert.equal(f.calls.filter(c=>c.method==='POST').length,0);
+});
+test('incomplete 1000-comment evidence fails closed without writes',async()=>{
+ const calls=[];
+ const hash=caseKeyFor(WORKFLOWS[0],'source-check','Regression tests',123456,1,87,2);
+ const request=async(resource,{method='GET'}={})=>{
+  calls.push({resource,method});
+  if(resource.startsWith('actions/runs/'))return {total_count:1,jobs:[failureJob]};
+  if(resource==='issues?state=open&per_page=100&page=1')return [{
+   number:6200,body:markerFor(hash),user:{login:'github-actions[bot]'}}];
+  if(/^issues\/6200\/comments\?per_page=100/.test(resource))
+   return Array.from({length:100},()=>({body:'different incident'}));
+  throw Error('must not write');
+ };
+ await assert.rejects(triage({event:event(),request}),/CI_INCIDENT_COMMENTS_UNVERIFIED/);
+ assert.equal(calls.filter(c=>c.method==='POST').length,0);
 });
 test('an incorrect Issue creation readback is rejected',async()=>{
  let wrote=0;
@@ -152,10 +177,139 @@ test('nonempty GitHub job count with omitted jobs fails closed before Issue writ
  await assert.rejects(triage({event:event(),request}),/CI_INCIDENT_JOB_INVENTORY_INCOMPLETE/);
  assert.deepEqual(calls.map(c=>c.method),['GET']);
 });
-test('created Issue says grouping is by CI step, not by confirmed root cause',async()=>{
+test('created Issue isolates unverified causes by exact run and records its execution scope',async()=>{
  const f=fixture();
  assert.deepEqual(await triage({event:event(),request:f.request}),{state:'CREATED',issue:6200});
  const created=f.calls.find(x=>x.resource==='issues'&&x.method==='POST');
- assert.ok(created.body.body.includes('묶음 기준: 같은 Workflow/Job/Step'));
- assert.match(created.body.body,/근본 원인이 같다는 뜻은 아닙니다/);
+ assert.ok(created.body.body.includes('원인 미확정, 실행별 독립 사건'));
+ assert.ok(created.body.body.includes('분류: 실행·Job·Step 위치만 확인됨'));
+ assert.ok(created.body.body.includes('zgmini-ci-run:123456:1:job:87:step:2'));
+ assert.doesNotMatch(created.body.body,/묶음 기준: 같은 Workflow\/Job\/Step/);
+
+});
+
+test('unknown causes in identical CI steps are separated by run and attempt',()=>{
+ const a=caseKeyFor(WORKFLOWS[0],'source-check','Regression tests',123456,1,87,2);
+ const b=caseKeyFor(WORKFLOWS[0],'source-check','Regression tests',123457,1,87,2);
+ const c=caseKeyFor(WORKFLOWS[0],'source-check','Regression tests',123456,2,87,2);
+ assert.notEqual(a,b);
+ assert.notEqual(a,c);
+});
+
+test('all failing jobs and failed steps are reported without conflating causes',async()=>{
+ const calls=[],stored=new Map();
+ let issueNumber=6300;
+ const request=async(resource,{method='GET',body}={})=>{
+  calls.push({resource,method,body});
+  if(resource==='actions/runs/123456/attempts/1/jobs?per_page=100')
+   return {total_count:2,jobs:[
+    {id:87,name:'source-check',conclusion:'failure',steps:[
+     {number:1,name:'Unit',conclusion:'failure'},
+     {number:2,name:'Integration',conclusion:'failure'}]},
+    {id:88,name:'security-check',conclusion:'failure',steps:[
+     {number:1,name:'Secret scan',conclusion:'failure'}]}
+   ]};
+  if(resource==='issues?state=open&per_page=100&page=1')return [];
+  if(resource==='issues'&&method==='POST'){
+   const n=issueNumber++;
+   stored.set(n,{number:n,body:body.body});
+   return {number:n};
+  }
+  const match=resource.match(/^issues\/(\d+)$/);
+  if(match&&method==='GET')return stored.get(Number(match[1]));
+  throw Error('unexpected '+method+' '+resource);
+ };
+ const result=await triage({event:event(),request});
+ assert.equal(result.state,'MULTIPLE_INCIDENTS');
+ assert.deepEqual(result.incidents.map(i=>i.state),['CREATED','CREATED','CREATED']);
+ const posted=calls.filter(c=>c.resource==='issues'&&c.method==='POST');
+ assert.equal(posted.length,3);
+ assert.ok(posted.some(x=>x.body.body.includes('- Job ID: 88')));
+ assert.ok(posted.some(x=>x.body.body.includes('- Step: Integration')));
+ assert.ok(posted.every(x=>x.body.body.includes('원인 미확정')));
+ assert.equal(new Set(posted.map(x=>x.body.body.match(/zgmini-ci-failure:([a-f0-9]+)/)?.[1])).size,3);
+});
+
+test('missing failed-job identity is refused before incident writes',async()=>{
+ const calls=[];
+ await assert.rejects(triage({event:event(),request:async(resource,{method='GET'}={})=>{
+  calls.push({resource,method});
+  if(resource.startsWith('actions/runs/'))return {total_count:1,jobs:[
+   {name:'anonymous',conclusion:'failure',steps:[{name:'Unit',conclusion:'failure'}]}]};
+  throw Error('unexpected Issue access');
+ }}),/CI_INCIDENT_JOB_IDENTITY_INVALID/);
+ assert.equal(calls.length,1);
+});
+
+test('PC isolated C996 and Secret Scan retain independent checks after unrelated failed steps',()=>{
+ const c996=readFileSync(new URL('../.github/workflows/c996-r5-readonly-source-checks.yml',import.meta.url),'utf8').replace(/\r\n/g,'\n');
+ const secret=readFileSync(new URL('../.github/workflows/pc-secret-scan.yml',import.meta.url),'utf8').replace(/\r\n/g,'\n');
+ for(const [yml,names,guard] of [
+  [c996,['Validate pinned workflow security scanner',
+   'Audit changed GitHub Actions workflow security'],
+   "!cancelled() && steps.checkout.outcome == 'success' && steps.node_setup.outcome == 'success' && steps.queue_host.outcome == 'success'"],
+  [secret,['Verify Oxlint source selector and SHA256 guard',
+   'Lint changed JavaScript and TypeScript with pinned Oxlint'],
+   "!cancelled() && steps.queue_host.outcome == 'success' && steps.checkout.outcome == 'success' && steps.node_setup.outcome == 'success'"]
+ ]){
+  for(const name of names)
+   assert.ok(yml.includes("      - name: "+name+"\n        if: "+String.fromCharCode(36)+"{{ "+guard+" }}"),
+    'missing isolated execution: '+name);
+  assert.doesNotMatch(yml,/continue-on-error:\s*true/);
+ }
+});
+
+test('101 attempt jobs are fully paged, including a failure on page two',async()=>{
+ const calls=[],stored=new Map();
+ let issue=7500;
+ const jobs=Array.from({length:101},(_,i)=>({
+  id:10000+i,name:'job-'+i,conclusion:i===0||i===100?'failure':'success',
+  steps:i===0||i===100?[{name:'Unit',number:1,conclusion:'failure'}]:[]}));
+ const prefix='actions/runs/123456/attempts/1/jobs?per_page=100';
+ const request=async(resource,{method='GET',body}={})=>{
+  calls.push({resource,method});
+  if(resource===prefix)return {total_count:101,jobs:jobs.slice(0,100)};
+  if(resource===prefix+'&page=2')return {total_count:101,jobs:jobs.slice(100)};
+  if(resource==='issues?state=open&per_page=100&page=1')return [];
+  if(resource==='issues'&&method==='POST'){
+   const number=issue++;
+   stored.set(number,{number,body:body.body});return {number};
+  }
+  const m=resource.match(/^issues\/(\d+)$/);
+  if(m)return stored.get(Number(m[1]));
+  throw Error('unexpected '+resource);
+ };
+ const result=await triage({event:event(),request});
+ assert.equal(result.state,'MULTIPLE_INCIDENTS');
+ assert.equal(result.incidents.length,2);
+ assert.ok(calls.some(c=>c.resource===prefix+'&page=2'));
+ assert.equal(issue,7502);
+});
+test('short second job page fails closed without creating an Issue',async()=>{
+ const jobs=Array.from({length:100},(_,i)=>({
+  id:11000+i,name:'job-'+i,conclusion:'success',steps:[]}));
+ let wrote=false;
+ const request=async(resource,{method='GET'}={})=>{
+  if(resource.endsWith('/jobs?per_page=100'))return {total_count:101,jobs};
+  if(resource.endsWith('/jobs?per_page=100&page=2'))
+   return {total_count:101,jobs:[]};
+  wrote=wrote||method==='POST';throw Error('unexpected Issue access');
+ };
+ await assert.rejects(triage({event:event(),request}),/CI_INCIDENT_JOB_INVENTORY_INCOMPLETE/);
+ assert.equal(wrote,false);
+});
+test('comment acknowledgement requires an exact remote receipt readback',async()=>{
+ const hash=caseKeyFor(WORKFLOWS[0],'source-check','Regression tests',123456,1,87,2);
+ let posts=0;
+ const request=async(resource,{method='GET'}={})=>{
+  if(resource.startsWith('actions/runs/'))return {total_count:1,jobs:[failureJob]};
+  if(resource==='issues?state=open&per_page=100&page=1')
+   return [{number:6200,body:markerFor(hash),user:{login:'github-actions[bot]'}}];
+  if(resource==='issues/6200/comments?per_page=100')return [];
+  if(resource==='issues/6200/comments'&&method==='POST'){posts++;return {id:5};}
+  if(resource==='issues/comments/5')return {id:5,body:'missing receipt'};
+  throw Error('unexpected route '+resource);
+ };
+ await assert.rejects(triage({event:event(),request}),/CI_INCIDENT_ISSUE_COMMENT_READBACK/);
+ assert.equal(posts,1);
 });

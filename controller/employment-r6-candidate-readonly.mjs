@@ -135,6 +135,27 @@ export function projectPit04KeyReview(review,{offset,asOfDate}={}){
 }
 
 
+// Count-only opt-in; preserve existing A reply and private five-field key contract.
+export function projectPit04ConflictCauses(raw,{expectedTotal}={}){
+ if(raw==null)return null;
+ const labels=['invalidNumericValue','providerOrSeriesDifferent',
+  'valueAndHashDifferent','valueOnlyDifferent','hashOnlyDifferent'];
+ const flags=['numericValue','sourceHash','provider','providerSeries','sourceRevision'];
+ const causes=Object.fromEntries(labels.map(k=>[k,count(raw.causes?.[k])]));
+ const changedFields=Object.fromEntries(flags.map(k=>[k,count(raw.changedFields?.[k])]));
+ const total=count(raw.total);
+ if(raw.kind!=='W04_CANDIDATE_CURRENT_CAUSE_COUNTS_V1'
+  ||raw.sourceScope!=='READONLY_CORE_CANDIDATE_SAME_SNAPSHOT_NOT_PIT'
+  ||raw.rawPitAttested!==false||raw.repairAuthorized!==false
+  ||total===null||total>50000||total!==expectedTotal
+  ||[...Object.values(causes),...Object.values(changedFields)]
+    .some(x=>x===null||x>total)
+  ||Object.values(causes).reduce((a,b)=>a+b,0)!==total)
+  stop('R6_PIT0408_PRIVATE_REPORT_INVALID');
+ return {kind:raw.kind,total,causes,changedFields,
+  sourceScope:raw.sourceScope,rawPitAttested:false,repairAuthorized:false};
+}
+
 const PIT0605_CLASSES=['ORIGINAL_VERSION_AND_HISTORICAL_AVAILABILITY_PROVED',
  'RAW_OBSERVATION_MATCH_HISTORICAL_TIME_UNPROVEN',
  'RAW_OBSERVATION_OR_REVISION_CONFLICT','RAW_NOT_FOUND_IN_CHECKED_SCOPE'];
@@ -156,10 +177,32 @@ export function projectPit0605Aggregate(raw){
   ||Object.values(counts).reduce((a,b)=>a+b,0)!==missing
   ||counts.ORIGINAL_VERSION_AND_HISTORICAL_AVAILABILITY_PROVED!==0
   ||accepted>snapshots)stop('R6_PIT0605_REPORT_INVALID');
+ const receipt=raw.missingCandidateReceipts;
+ const projected=receipt===undefined?null:(()=>{
+  const keys=count(receipt?.keys),exact=count(receipt?.exactRawMatched),
+   in2025=count(receipt?.exactReceiptFirstObserved2025);
+  const validMonth=m=>m===null||typeof m==='string'
+   &&/^20[0-9]{2}-(0[1-9]|1[0-2])$/.test(m);
+  if(receipt?.scope!=='EXACT_STORED_RAW_RECEIPT_NOT_HISTORICAL_PIT'
+   ||[keys,exact,in2025].some(x=>x===null)
+   ||keys>missing||exact>keys||in2025>exact
+   ||!validMonth(receipt.firstExactReceiptMonth)||!validMonth(receipt.lastExactReceiptMonth)
+   ||(exact===0&&(receipt.firstExactReceiptMonth!==null
+     ||receipt.lastExactReceiptMonth!==null))
+   ||(exact>0&&(receipt.firstExactReceiptMonth===null
+     ||receipt.lastExactReceiptMonth===null
+     ||receipt.firstExactReceiptMonth>receipt.lastExactReceiptMonth)))
+   stop('R6_PIT0605_REPORT_INVALID');
+  return {keys,exactRawMatched:exact,exactReceiptFirstObserved2025:in2025,
+   firstExactReceiptMonth:receipt.firstExactReceiptMonth,
+   lastExactReceiptMonth:receipt.lastExactReceiptMonth,scope:receipt.scope};
+ })();
  return {kind:raw.kind,status:raw.status,checkedAt:raw.checkedAt,missingHistoryKeys:missing,
   counts,checkedRawSnapshots:snapshots,acceptedDOLSnapshots:accepted,
   malformedRawSnapshotGroups:malformed,rejectedRawSnapshots:rejected,
-  evidenceDigest:raw.evidenceDigest,historicalVersionAttested:false,repairAuthorized:false};
+  evidenceDigest:raw.evidenceDigest,
+  ...(projected===null?{}:{missingCandidateReceipts:projected}),
+  historicalVersionAttested:false,repairAuthorized:false};
 }
 export function retainPit0605PrivateEvidence({outputDir,host,request,aggregate}){
  const file=path.join(outputDir,'PIT0605_PRIVATE_KEY_EVIDENCE.json');
@@ -434,11 +477,20 @@ export async function inspectEmploymentR6Candidate(request,context){
         ||!['READY','PARTIAL_HISTORY','PARTIAL_MISSING'].includes(x.scoreStatus)))){
       stop('R6_RESULT_INVALID');
     }
+    // The approved reader already computed this missing-reference date;
+    // validate it before exposing only the bounded date (never raw rows).
+    if(Array.isArray(body.indicators)&&body.indicators.some(x=>
+      x?.firstMissingReferenceDate!==undefined&&(
+        x.scoreStatus!=='PARTIAL_HISTORY'||
+        dateOnly(x.firstMissingReferenceDate)===null||
+        dateOnly(body.asOfDate)===null||
+        x.firstMissingReferenceDate>body.asOfDate)))stop('R6_RESULT_INVALID');
     const indicators=Array.isArray(body.indicators)&&body.indicators.length<=29
       ?body.indicators.map(x=>({id:/^[A-Z0-9_]{1,64}$/.test(x.id??'')?x.id:null,
         rawStatus:['READY','STALE','UNAVAILABLE'].includes(x.rawStatus)?x.rawStatus:'UNAVAILABLE',
         chartStatus:['READY','PARTIAL','UNAVAILABLE'].includes(x.chartStatus)?x.chartStatus:'UNAVAILABLE',
-        scoreStatus:['READY','PARTIAL_HISTORY','PARTIAL_MISSING'].includes(x.scoreStatus)?x.scoreStatus:'PARTIAL_MISSING'})):[];
+        scoreStatus:['READY','PARTIAL_HISTORY','PARTIAL_MISSING'].includes(x.scoreStatus)?x.scoreStatus:'PARTIAL_MISSING',
+        ...(x.firstMissingReferenceDate===undefined?{}:{firstMissingReferenceDate:x.firstMissingReferenceDate})})):[];
     // Optional PIT-08 metadata. Older approved bundles remain compatible.
     const sourceMeta={};
     if(body.sourceStoredAt!==undefined){
@@ -490,6 +542,11 @@ export async function inspectEmploymentR6Candidate(request,context){
     const pit04KeyReview=wantsPit04&&body.status==='PASS'
       ?projectPit04KeyReview(body.pit04KeyReview,{
          offset:request.pit04Offset,asOfDate:body.asOfDate}):null;
+    if(body.candidateConflictBreakdown!=null&&request.pit0408Private!==true)
+      stop('R6_PIT0408_PRIVATE_REPORT_INVALID');
+    const causeSummary=request.pit0408Private===true&&body.status==='PASS'
+      ?projectPit04ConflictCauses(body.candidateConflictBreakdown,{
+         expectedTotal:pit.candidateOverlapConflictingKeys}):null;
     let privateReceipt={};
     if(request.pit0408Private===true&&body.status==='PASS'){
       if(request.pit04Offset!==0||!HASH.test(body.pit04PrivateEvidenceDigest??'')
@@ -570,6 +627,7 @@ export async function inspectEmploymentR6Candidate(request,context){
       sourceBundleSha:request.sourceSha,asOfDate:dateOnly(body.asOfDate),
       sqliteOpened:body.sqliteOpened===true,
       summary,...sourceMeta,pit,...(pit04KeyReview===null?{}:{pit04KeyReview}),...privateReceipt,
+      ...(causeSummary===null?{}:{candidateConflictBreakdown:causeSummary}),
       indicators,bodyDigest:HASH.test(body.bodyDigest??'')?body.bodyDigest:null,
       walPreflight,promotionApproved:false,
       memoryTelemetry:{...child.memoryTelemetry,

@@ -537,3 +537,34 @@ test('independent recovery protection CAS stays strict at pre-pause and pre-swit
  // A successful snapshot comparison cannot mutate the frozen original.
  assert.deepEqual(exact,pinned);
 });
+
+test('#3409 maintainer handoff V2 pins only existing-approved three-file delta',async()=>{
+ const {requireHandoffApproval,approvedRuntimeChanges,handoffFilePlan,nextRuntimeFiles}=
+  await import('../tools/handoff-maintenance.mjs');
+ const target='9a0378ffb96aa9f1403f74c189d3c39b30e4604e';
+ const before='e34a20062e3ef3b77c78af0b4881c15609b36eb1';
+ const root='../approvals/maintenance-handoffs/';
+ const read=name=>JSON.parse(fs.readFileSync(new URL(root+name+'.json',import.meta.url),'utf8'));
+ const old=read(before),next=read(target);
+ assert.equal(old.targetSha,before);
+ assert.equal(next.schema,'ZGMINI_MAINTENANCE_HANDOFF_V2');
+ assert.equal(next.transition,'SEVEN_TO_SEVEN');
+ assert.equal(next.installedSha,before);
+ assert.equal(next.targetSha,target);
+ assert.equal(next.approved,true);
+ assert.equal(next.scope,'COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE');
+ assert.equal(next.checks.windowsHandoffExecuted,false);
+ assert.equal(requireHandoffApproval(next,target,before),'SEVEN_TO_SEVEN');
+ assert.deepEqual(Object.keys(next.files),Object.keys(old.files));
+ for(const hash of Object.values(next.files))assert.match(hash,/^[a-f0-9]{64}$/);
+ const changed=['tools/maintenance-contract.mjs','tools/maintenance-agent.mjs','tools/update.mjs'];
+ const installedRuntime=Object.fromEntries(nextRuntimeFiles.map(path=>[path,old.files[path]]));
+ assert.equal(Object.keys(installedRuntime).length,7);
+ assert.deepEqual(approvedRuntimeChanges('SEVEN_TO_SEVEN',installedRuntime,next.files),changed);
+ assert.deepEqual(handoffFilePlan('SEVEN_TO_SEVEN',installedRuntime,next.files).writes,changed);
+ assert.deepEqual(next.runtimeChangedFiles,changed);
+ assert.throws(()=>requireHandoffApproval(next,target,'a'.repeat(40)),/HANDOFF_APPROVAL_REQUIRED/);
+ assert.throws(()=>requireHandoffApproval({...next,approved:false},target,before),
+  /HANDOFF_APPROVAL_REQUIRED/);
+ assert.throws(()=>requireHandoffApproval(next,before,before),/HANDOFF_APPROVAL_REQUIRED/);
+});
