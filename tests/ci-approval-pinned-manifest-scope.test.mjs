@@ -41,3 +41,31 @@ const cases=[
  ['cross-effect path',undefined,v=>{v.effect='B_CONTROLLER_INSTALL'},'OUT_OF_SCOPE']
 ];
 for(const [name,e,change,state] of cases)test(name,()=>{const v=make(e);change(v);const r=inspect(v);assert.equal(r.state,state);assert.equal(r.canPublish,false);assert.equal(r.canExecute,false);});
+
+function selectiveFixture({config=false}={}){
+ const v=make('B_CONTROLLER_INSTALL'),m=JSON.parse(v.observation.bytes);
+ m.controllerOnlyInstall=true;
+ m.selectiveSource={schema:'ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1',branch:'codex/selective-test',mainSha:'f'.repeat(40),customPaths:[]};
+ if(config){m.allowFiles=[{path:'config/operations.json',sha256:'c'.repeat(64)}];m.checks.manifestSha256=manifestFingerprint(m.allowFiles).sha256;}
+ function source(path,obj){
+  const bytes=Buffer.from(JSON.stringify(obj)),p={repository:repo,revision:v.pin.revision,path,blobSha:hash('sha1',Buffer.concat([Buffer.from('blob '+bytes.length+'\0'),bytes])),sha256:hash('sha256',bytes)};
+  return [p,{repository:repo,revision:p.revision,path,blobSha:p.blobSha,bytes}];
+ }
+ [v.pin,v.observation]=source('approvals/controller-updates/'+m.targetSha+'.json',m);
+ v.request.approvalManifestSha256=v.pin.sha256;
+ const s={schema:'ZGMINI_CONTROLLER_SELECTIVE_PIN_V1',installedSha:m.installedSha,targetSha:m.targetSha,sourceMainSha:m.selectiveSource.mainSha,targetBranch:m.selectiveSource.branch,customPaths:[],allowFiles:m.allowFiles,approvalRef:m.approval.ref};
+ [v.selectivePin,v.selectiveObservation]=source('approvals/controller-selective-targets/'+m.targetSha+'.json',s);
+ return {v,s,source};
+}
+for(const [name,change,expected] of [
+ ['selective two pins',()=>{},'SELECTIVE_MANIFEST_PIN_MATCH_ONLY'],
+ ['missing selective pin',({v})=>{delete v.selectivePin},'EVIDENCE_MISSING'],
+ ['tampered selective bytes',({v})=>{v.selectiveObservation.bytes=Buffer.from('{}')},'REJECTED'],
+ ['wrong selective revision',({v})=>{v.selectivePin.revision='e'.repeat(40)},'REJECTED'],
+ ['wrong selective target path',({v})=>{v.selectivePin.path='approvals/controller-selective-targets/other.json'},'REJECTED'],
+ ['valid bytes but mismatched installed SHA',({v,s,source})=>{s.installedSha='e'.repeat(40);[v.selectivePin,v.selectiveObservation]=source(v.selectivePin.path,s)},'REJECTED'],
+ ['consumed selective request',({v})=>{v.requestState='CONSUMED'},'WAIT_RESOURCE'],
+ ['unknown selective request',({v})=>{v.requestState='UNKNOWN'},'WAIT_RESOURCE']
+])test(name,()=>{const fixture=selectiveFixture();change(fixture);const r=inspect(fixture.v);assert.equal(r.state,expected);assert.equal(r.mode,'SHADOW_ONLY');assert.equal(r.canPublish,false);assert.equal(r.canExecute,false);});
+test('selective config remains outside delegation pilot',()=>{const r=inspect(selectiveFixture({config:true}).v);assert.equal(r.state,'OUT_OF_SCOPE');assert.equal(r.canPublish,false);assert.equal(r.canExecute,false);});
+test('nonselective request rejects unexpected selective pin',()=>{const v=make('B_CONTROLLER_INSTALL');v.selectivePin=selectiveFixture().v.selectivePin;assert.equal(inspect(v).state,'REJECTED');});
