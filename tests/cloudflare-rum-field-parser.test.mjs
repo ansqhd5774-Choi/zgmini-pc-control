@@ -16,6 +16,9 @@ test('static query is host-scoped, account-scoped, bounded, and not executable i
  assert.equal(x.endpoint,GRAPHQL_ENDPOINT);assert.equal(x.method,'POST');
  assert.equal(x.networkExecuted,false);assert.equal(x.registeredOperation,false);
  assert.match(GRAPHQL_QUERY,/requestHost: "zgmini.kr"/);
+ // Cloudflare's Analytics schema uses the custom lowercase `string` scalar.
+ assert.match(GRAPHQL_QUERY,/\$account: string!/);
+ assert.doesNotMatch(GRAPHQL_QUERY,/\$account: String!/);
  assert.match(GRAPHQL_QUERY,/rumWebVitalsEventsAdaptiveGroups/);
  assert.match(GRAPHQL_QUERY,/largestContentfulPaintP75/);
  assert.doesNotMatch(GRAPHQL_QUERY,/mutation|subscription/i);

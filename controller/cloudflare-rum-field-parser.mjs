@@ -7,7 +7,7 @@ export const RUM_DEVICES=Object.freeze(['mobile','desktop']);
 export const GOOD=Object.freeze({lcpMs:2500,inpMs:200,cls:0.1});
 export const GRAPHQL_ENDPOINT='https://api.cloudflare.com/client/v4/graphql';
 export const GRAPHQL_QUERY=[
- 'query ZgminiRumP75($account: String!, $start: Time!, $end: Time!) {',
+ 'query ZgminiRumP75($account: string!, $start: Time!, $end: Time!) {',
  'viewer { accounts(filter: {accountTag: $account}) {',
  'rumWebVitalsEventsAdaptiveGroups(limit: 30,',
  'filter: {datetime_geq: $start, datetime_leq: $end, requestHost: "zgmini.kr"}) {',
