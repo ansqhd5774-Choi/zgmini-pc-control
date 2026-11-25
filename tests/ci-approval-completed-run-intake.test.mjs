@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {observeCompletedRun} from '../ci-approval/completed-run-intake.mjs';
+import {createHash} from 'node:crypto';
+import {observeCompletedRun,observePublishedControllerApprovals} from '../ci-approval/completed-run-intake.mjs';
 
 const repository={id:1442936296,full_name:'ansqhd5774-Choi/zgmini-pc-control',private:true};
 const event=()=>({action:'completed',repository:{...repository},workflow_run:{
@@ -39,5 +40,55 @@ for(const [name,change] of [
 });
 test('unavailable authenticated read is not success',async()=>{
  const r=await observeCompletedRun(event(),{getRun:async()=>{throw Error('unavailable')}});
+ assert.equal(r.state,'EVIDENCE_MISSING');assert.equal(r.canPublish,false);
+});
+
+function publicationFixture(){
+ const before='a'.repeat(40),after='b'.repeat(40),target='c'.repeat(40);
+ const path='approvals/controller-updates/'+target+'.json';
+ const bytes=Buffer.from(JSON.stringify({schema:'ZGMINI_PC_UPDATE_V1',targetSha:target}));
+ const blob=createHash('sha1').update(Buffer.concat([Buffer.from('blob '+bytes.length+'\0'),bytes])).digest('hex');
+ const event={repository:{...repository},ref:'refs/heads/main',deleted:false,forced:false,before,after};
+ const diff={status:'ahead',behind_by:0,base_commit:{sha:before},merge_base_commit:{sha:before},files:[{filename:path,status:'added',sha:blob}]};
+ const record={type:'file',path,sha:blob,encoding:'base64',content:bytes.toString('base64')};
+ return {event,diff,record,bytes,path,target,getJson:async route=>{
+  if(route==='compare/'+before+'...'+after)return diff;
+  if(route==='contents/'+path+'?ref='+after)return record;
+  throw Error('unexpected route');
+ }};
+}
+test('approval publication after source CI is observed at exact immutable revision',async()=>{
+ const v=publicationFixture(),r=await observePublishedControllerApprovals(v.event,v);
+ assert.equal(r.state,'APPROVAL_PUBLICATION_OBSERVED_ONLY');
+ assert.equal(r.entries[0].state,'EXISTING_MANIFEST_OBSERVED_ONLY');
+ assert.equal(r.entries[0].revision,v.event.after);
+ assert.equal(r.entries[0].manifestSha256,createHash('sha256').update(v.bytes).digest('hex'));
+ assert.equal(r.canPublish,false);assert.equal(r.canExecute,false);
+});
+test('non-main publication does not read API',async()=>{
+ const v=publicationFixture();v.event.ref='refs/heads/codex/test';
+ const r=await observePublishedControllerApprovals(v.event,{getJson:async()=>assert.fail('unexpected read')});
+ assert.equal(r.state,'IGNORED');
+});
+test('changed existing approval is not accepted as new publication',async()=>{
+ const v=publicationFixture();v.diff.files[0].status='modified';
+ const r=await observePublishedControllerApprovals(v.event,v);
+ assert.equal(r.entries[0].state,'EXISTING_APPROVAL_CHANGE_REQUIRES_REVIEW');
+ assert.equal(r.canExecute,false);
+});
+test('manifest bytes mismatch is isolated to that approval',async()=>{
+ const v=publicationFixture();v.record.content=Buffer.from('{}').toString('base64');
+ const r=await observePublishedControllerApprovals(v.event,v);
+ assert.equal(r.entries[0].state,'APPROVAL_READ_UNVERIFIED');
+ assert.equal(r.canExecute,false);
+});
+test('unrelated main changes need no approval lookup',async()=>{
+ const v=publicationFixture();v.diff.files=[{filename:'docs/example.md',status:'added'}];
+ const r=await observePublishedControllerApprovals(v.event,v);
+ assert.equal(r.state,'IGNORED');assert.deepEqual(r.entries,[]);
+});
+test('incomplete publication diff is not approved',async()=>{
+ const v=publicationFixture();v.diff.files=Array(300).fill(v.diff.files[0]);
+ const r=await observePublishedControllerApprovals(v.event,v);
  assert.equal(r.state,'EVIDENCE_MISSING');assert.equal(r.canPublish,false);
 });
