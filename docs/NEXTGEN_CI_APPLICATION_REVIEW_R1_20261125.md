@@ -413,3 +413,6 @@
   - 4/4 전부 **로컬 Chromium first-party-only 단회 관측 Good 측정 항목 충족**. 이 수치로 브라우저 throttling/제3자 자산 포함 일반 사용자 속도, 방문자 p75, Lighthouse 90+ 달성, 실제 운영 전체 Good 인증을 확정하지 않는다.
 - main SHA **99694466e43105fc036067a8cc1ceb428818e066** 재조회 및 신규 source/test/browser Workflow readback 성공. `LAB_SCHEMA=2` CLS 정밀도, 기존 #8 PSI 공개 필드 매뉴얼 opt-in, Chrome good/local/browser/wcag 판정 모두 유지.
 - **범위 판정:** R2 12개 도입 대상의 #8 Good threshold/local/production 독립 관측기는 코드·CI·main 실제 적용 완료. 외부 **실사용자 CrUX P75 모바일·PC 확인은 미완료**(API 429, 유료 플러그인 무승인); 전체 웹사이트 Good 등급 인증 및 강제 performance gate를 DONE으로 선언하지 않으며 엄격 진행률 **11/12종 = 91.7% + #8 부분 완료**. 후속은 기존 공식 무료 CrUX Vis 화면에서 해당 origin 데이터의 실제 존재 여부를 확인하거나, 이미 승인된 신뢰 가능한 Google API 키 경로가 생긴 경우 최소 재조회만 시행; 유료 구독/추가 예약/임의 쿼터 우회 금지.
+
+
+- **PR #1606 main 병합 후 재검증:** 정확 병합 SHA `99694466e43105fc036067a8cc1ceb428818e066`에서 [Node CI #45577806918](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45577806918) **SUCCESS**, [CodeQL #45577806843](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45577806843) **SUCCESS**, [Secret #45577806836](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45577806836) **SUCCESS**, [Production SEO #45577806816](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45577806816) **SUCCESS**. PR 정확 HEAD 4/4 외에 main 재검증도 완료. 작업 외 운영 성능·Cloudflare 배포 SHA 인증으로 확대하지 않는다.
