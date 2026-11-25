@@ -1,0 +1,32 @@
+# The existing ER1 Windows issue-only workflow must not acquire a PR trigger
+# or issues:write token for untrusted PR source validation.
+name: ZGMINI ER1 December Pair Contract PR Tests
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'er1-dec31-symbol-batch-a-entry.mjs'
+      - 'er1-dec31-symbol-pair-resume-entry.test.mjs'
+      - 'ER1_DEC31_SYMBOL_PAIR_RESUME_B_APPROVAL.json'
+      - '.github/workflows/pc-er1-dec31-symbol-batch-a.yml'
+      - '.github/workflows/pc-er1-dec31-symbol-pair-contract-tests.yml'
+      - 'tests/ci-er1-workflow-pr-boundary.test.mjs'
+permissions:
+  contents: read
+jobs:
+  pair-contract-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout source without credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288ca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify bounded pair contract and original one-shot preservation
+        run: |
+          node --check er1-dec31-symbol-batch-a-entry.mjs
+          node --test er1-dec31-symbol-pair-resume-entry.test.mjs tests/ci-er1-workflow-pr-boundary.test.mjs
