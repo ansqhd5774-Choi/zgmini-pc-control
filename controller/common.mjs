@@ -13,11 +13,20 @@ export function openSqliteReadonly(filename,{timeout=4000}={}){
 }
 export const digest=x=>createHash('sha256').update(x).digest('hex');
 export const need=(condition,code)=>{if(!condition)throw Object.assign(new Error(code),{code});};
-export function exclusive(root,id){
- const p=path.join(root,id);fs.mkdirSync(root,{recursive:true});
- try{fs.mkdirSync(p);}catch(e){if(e.code==='EEXIST')throw Object.assign(new Error('LEASE_BUSY'),{code:'LEASE_BUSY'});throw e;}
- const nonce=crypto.randomUUID();fs.writeFileSync(path.join(p,'owner.json'),JSON.stringify({pid:process.pid,nonce,at:new Date().toISOString(),bootAt:Date.now()-os.uptime()*1000}),{flag:'wx'});
- return ()=>{const f=path.join(p,'owner.json');need(JSON.parse(fs.readFileSync(f)).nonce===nonce,'LEASE_OWNER_CHANGED');fs.unlinkSync(f);fs.rmdirSync(p);};
+export function exclusive(root,id,io=fs){
+ const p=path.join(root,id);io.mkdirSync(root,{recursive:true});
+ try{io.mkdirSync(p);}catch(e){if(e.code==='EEXIST')throw Object.assign(new Error('LEASE_BUSY'),{code:'LEASE_BUSY'});throw e;}
+ let nonce;
+ try{
+  nonce=crypto.randomUUID();
+  io.writeFileSync(path.join(p,'owner.json'),JSON.stringify({pid:process.pid,nonce,at:new Date().toISOString(),bootAt:Date.now()-os.uptime()*1000}),{flag:'wx'});
+ }catch(error){
+  // Only an empty directory created by this call may be rolled back.
+  // Never unlink a possibly written owner or touch a pre-existing lease.
+  try{io.rmdirSync(p);}catch{}
+  throw error;
+ }
+ return ()=>{const f=path.join(p,'owner.json');need(JSON.parse(io.readFileSync(f)).nonce===nonce,'LEASE_OWNER_CHANGED');io.unlinkSync(f);io.rmdirSync(p);};
 }
 export function validateRequest(request,policy){
  need(request&&typeof request==='object'&&!Array.isArray(request),'REQUEST_OBJECT');

@@ -4,6 +4,8 @@ import fs from 'node:fs';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {renderBoundedReport,projectSourcePreflightReport,uploadVerifiedReportPair,resolveUploadPolicy,hasVerifiedReportComment,confirmVerifiedReportComment} from '../controller/report-upload-verified.mjs';
+// The upload lease regression suite is run by the existing report CI step.
+import './controller-exclusive-acquire.test.mjs';
 
 const params={repository:'ansqhd5774-Choi/zgmini-pc-control',runId:'12345',attempt:'1',seat:'2',
  json:'{"ok":true}\n',txt:'status=PASS\r\n',wait:async()=>{}};
