@@ -43,19 +43,24 @@ export function validateRequest(request,policy){
   Object.hasOwn(request,'pit0605Raw');
  const pit0408Private=request.operation==='employment-r6-candidate-stage-readonly'&&
   Object.hasOwn(request,'pit0408Private');
+ const rawAggregate=request.operation==='employment-r6-candidate-stage-readonly'&&
+  Object.hasOwn(request,'rawAggregateSourceOnly');
  need(!(pit04&&pit0605)&&!(pit0605&&pit0408Private)
+  &&!(rawAggregate&&(pit04||pit0605||pit0408Private))
   &&(!pit0408Private||(pit04&&request.pit04Offset===0))
   &&Object.keys(request).length===keys.length+(scoped?extra.length:0)
-    +(pit04?1:0)+(pit0605?1:0)+(pit0408Private?1:0)
+    +(pit04?1:0)+(pit0605?1:0)+(pit0408Private?1:0)+(rawAggregate?1:0)
   &&keys.every(k=>Object.hasOwn(request,k))
   &&Object.keys(request).every(k=>keys.includes(k)||(scoped&&extra.includes(k))
     ||(pit04&&k==='pit04Offset')||(pit0605&&k==='pit0605Raw')
-    ||(pit0408Private&&k==='pit0408Private')),
+    ||(pit0408Private&&k==='pit0408Private')
+    ||(rawAggregate&&k==='rawAggregateSourceOnly')),
   'REQUEST_FIELDS');
  if(pit04)need(Number.isSafeInteger(request.pit04Offset)&&request.pit04Offset>=0
    &&request.pit04Offset<=50000,'PIT04_OFFSET_INVALID');
  if(pit0605)need(request.pit0605Raw===true,'PIT0605_FLAG_INVALID');
  if(pit0408Private)need(request.pit0408Private===true,'PIT0408_PRIVATE_FLAG_INVALID');
+ if(rawAggregate)need(request.rawAggregateSourceOnly===true,'R6_RAW_AGGREGATE_FLAG_INVALID');
  if(scoped){
   need(typeof request.preimageManifestPath==='string'&&
    /^approvals\/writer-preimage\/[a-z0-9][a-z0-9-]{3,79}\.json$/.test(request.preimageManifestPath),
