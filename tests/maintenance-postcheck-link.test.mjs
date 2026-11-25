@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {fileURLToPath} from 'node:url';
 import {classifyMaintenancePostcheckLink as classify} from '../tools/maintenance-contract.mjs';
 
 const id='pc-update-11111111-1111-4111-8111-111111111111';
@@ -69,4 +71,25 @@ test('missing or wrong job evidence is unknown, not fabricated success',()=>{
  assert.equal(result({jobs:null}).state,'STATE_UNKNOWN');
  assert.equal(result({jobs:[job({name:'other-job'})]}).state,'STATE_UNKNOWN');
  assert.equal(result({jobs:[job({run_id:999})]}).state,'STATE_UNKNOWN');
+});
+
+test('real updater persists exact Issue link through coordinator failure phase',()=>{
+ const src=fs.readFileSync(fileURLToPath(new URL('../tools/update.mjs',import.meta.url)),'utf8');
+ assert.match(src,/labels:\['pc-job'\]/);
+ assert.match(src,/postcheckCreationAttempted:true/);
+ assert.match(src,/postIssueNumber,postcheckLink:/);
+ assert.match(src,/postcheckLink=prior\?\.postcheckLink\?\.requestId===request\.requestId/);
+ assert.match(src,/classifyMaintenancePostcheckLink\(\{/);
+ assert.match(src,/\{maxPages:3\}/);
+ assert.match(src,/verifiedRunningPostcheckFailure\(\{/);
+});
+
+test('workflow late-label branch stays opt-in and matches source entry contract',()=>{
+ const workflow=fs.readFileSync(fileURLToPath(new URL('../.github/workflows/pc-job.yml',import.meta.url)),'utf8');
+ const entry=fs.readFileSync(fileURLToPath(new URL('../controller/entry.mjs',import.meta.url)),'utf8');
+ assert.match(workflow,/types: \[opened, labeled\]/);
+ assert.match(workflow,/vars\.ZGMINI_PC_JOB_LATE_LABEL_ENABLED == 'true'/);
+ assert.match(entry,/event\.action==='opened'/);
+ assert.match(entry,/event\.action==='labeled'/);
+ assert.match(entry,/event\.label\?\.name==='pc-job'/);
 });
