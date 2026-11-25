@@ -15,7 +15,7 @@ const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 
 const readApproval=()=>{
  const dir=path.join(root,'approvals/source-bundles');
- const files=fs.readdirSync(dir).filter(name=>/^[a-f0-9]{64}\\.json$/.test(name));
+ const files=fs.readdirSync(dir).filter(name=>/^[a-f0-9]{64}\.json$/.test(name));
  for(const name of files){
   const body=fs.readFileSync(path.join(dir,name));
   if(digest(body)!==name.slice(0,-5))continue;
@@ -60,6 +60,6 @@ test('W04 R1 conditional B approval preserves source closure and exact host CAS 
 test('W04 Source B immutable LF manifest rejects CRLF bytes as approved raw digest',()=>{
  const {body,name}=readApproval();
  assert.equal(body.includes(13),false);
- const crlf=Buffer.from(body.toString('utf8').replace(/\\n/g,'\\r\\n'),'utf8');
+ const crlf=Buffer.from(body.toString('utf8').replace(/\n/g,'\r\n'),'utf8');
  assert.notEqual(digest(crlf),name.slice(0,-5));
 });
