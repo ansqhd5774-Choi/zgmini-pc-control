@@ -11,8 +11,8 @@ import {inspectR54PublicReadback} from './market-r54-d1-api-readback-readonly.mj
 import {inspectW05FiveKeyD1ApiReadback} from './w05-five-key-d1-api-readback-readonly.mjs';
 import {inspectW05CloudflareActive} from './w05-cloudflare-deployment-readonly.mjs';
 import {inspectW05CloudflareRum} from './w05-cloudflare-rum-readonly.mjs';
-import {inspectInflationCensusM3ArchivedHeaders} from './inflation-census-m3-archived-headers-readonly.mjs';
 import {inspectInflation7D1Readback} from './inflation7-d1-readback-readonly.mjs';
+import {inspectInflation19D1Readback} from './inflation19-d1-readback-readonly.mjs';
 import {inspectCoreRuntimeSource} from './core-runtime-source-readonly.mjs';
 import {observeInflationCoreLock} from './inflation-core-lock-observation-readonly.mjs';
 import {inspectInflationEvent129Once} from './inflation-event129-evidence-readonly.mjs';
@@ -46,6 +46,7 @@ import {inspectA407IntegrityReadonly} from './inflation-a407-integrity-readonly.
 import {inspectInflation19RuntimeReadonly} from './inflation19-runtime-readonly.mjs';
 import {inspectInflationR2LocalReadonly} from './inflation-r2-local-readonly.mjs';
 import {inspectInflationR2D1Readback} from './inflation-r2-d1-readback-readonly.mjs';
+import {inspectInflationCensusM3ArchivedHeaders} from './inflation-census-m3-archived-headers-readonly.mjs';
 import {inspectInflationCandidatesRuntimeReadonly} from './inflation-candidates-runtime-readonly.mjs';
 import {inspectEmploymentR6Candidate} from './employment-r6-candidate-readonly.mjs';
 import {inspectEmploymentR6HostCas} from './employment-r6-host-cas-readonly.mjs';
@@ -56,8 +57,14 @@ import {inspectBeaMfgArchiveReadonly} from './earnings-bea-mfg-archive-readonly.
 import {inspectBeaUnitArchiveReadonly} from './earnings-bea-unit-archive-readonly.mjs';
 import {inspectBeaNipaCaptureReadonly} from './earnings-bea-nipa-capture-readonly.mjs';
 import {runW05ServiceStoredReadonly} from './w05-wpsfd42-service-readonly.mjs';
-import {inspectInflation19D1Readback} from './inflation19-d1-readback-readonly.mjs';
 const activeTasks=['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea'];
+// Fixed, non-sensitive stage values for diagnosing a confirmed core-status Worker timeout.
+// No raw checkpoint contents, machine paths, PIDs, or task XML leave the job workspace.
+export const CORE_STATUS_STAGES=Object.freeze([
+ 'CORE_STATUS_ENTERED','CORE_LOCK_READ','CORE_CHECKPOINT_CYCLE',
+ 'CORE_CHECKPOINT_COLLECTION','CORE_CHECKPOINT_WRITER','CORE_CONFIG',
+ 'CORE_TASK_HASHES','CORE_STATUS_DONE'
+]);
 const retiredIranTask='ZGMINI-PC-Iran-Progress-R13';
 const taskNotFound=text=>/cannot find the file|cannot find the specified|does not exist|지정.*(?:파일|작업|경로).*찾을 수 없|찾을 수 없.*(?:파일|작업|경로)/i.test(text);
 const decodeTaskOutput=bytes=>new TextDecoder('euc-kr').decode(bytes);
@@ -105,6 +112,11 @@ const r6GroupNames=new Set([
 ]);
 const r6Code=value=>typeof value==='string'&&/^[A-Z][A-Z0-9_]{0,99}$/.test(value)?value:null;
 const r6Count=value=>Number.isSafeInteger(value)&&value>=0&&value<=100000?value:null;
+const r6RowCount=value=>Number.isSafeInteger(value)&&value>=0&&value<=1_000_000?value:null;
+const R6_ROW_CHANGE_KEYS=Object.freeze([
+ 'collectedRows','inserted','revised','noop','rejected','historyRowsAdded',
+ 'rawSnapshots','rawSnapshotNoops'
+]);
 const r6Time=value=>typeof value==='string'
  &&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)
  &&Number.isFinite(Date.parse(value))
@@ -118,14 +130,24 @@ function r6CollectionProjection(raw){
   return [{groupName:item.groupName,status,
    ...(r6Code(item.failureCode)?{failureCode:r6Code(item.failureCode)}:{}),
    ...(!planned&&r6Count(item.providerRequests)!==null?{providerRequests:item.providerRequests}:{}),
+   ...(!planned?Object.fromEntries(R6_ROW_CHANGE_KEYS
+    .filter(key=>r6RowCount(item[key])!==null).map(key=>[key,item[key]])):{}),
    ...(planned?{due:item.due===true,
     ...Object.fromEntries(['retryAt','releaseAt','collectAt']
      .map(key=>[key,r6Time(item[key])]).filter(([,value])=>value!==null))
    }: {})}];
  }).slice(0,6):[];
+ const stored=raw.lastStoredDolRelease;
+ const storedRelease=stored&&typeof stored==='object'&&!Array.isArray(stored)
+  &&['SUCCESS','PARTIAL','FAIL'].includes(stored.status)
+  &&r6Time(stored.completedAt)!==null
+  ?{status:stored.status,completedAt:stored.completedAt,
+    ...Object.fromEntries(R6_ROW_CHANGE_KEYS.filter(key=>r6RowCount(stored[key])!==null)
+      .map(key=>[key,stored[key]]))}:null;
  return {status:r6Code(raw.status),code:r6Code(raw.code),
   providerRequests:r6Count(raw.providerRequests),
-  groups:rows(raw.groups,false),plannedGroups:rows(raw.plannedGroups,true)};
+  groups:rows(raw.groups,false),plannedGroups:rows(raw.plannedGroups,true),
+  ...(storedRelease?{lastStoredDolRelease:storedRelease}:{})};
 }
 function r6LocalResultReadback(root,checksum,asOfDate,sourceStoredAt){
  if(!/^[a-f0-9]{64}$/.test(checksum??''))return 'NO_HASH';
@@ -173,9 +195,12 @@ function r6PublicationProjection(report,root){
  }
  return projected;
 }
-export function readCore(dataRoot,{queryTask,retiredTaskEvidence=nativeRetiredIranEvidence}={}){
+export function readCore(dataRoot,{queryTask,retiredTaskEvidence=nativeRetiredIranEvidence,taskXmlHashes,onStage}={}){
+ const stage=value=>{if(typeof onStage==='function')onStage(value);};
+ stage('CORE_LOCK_READ');
  const root=path.join(dataRoot,'pc-writer'),out={lockPresent:fs.existsSync(path.join(root,'local-cycle.lock')),checkpoints:{},taskXmlHashes:{}};
- for(const file of ['local-cycle-last-run.json','local-collection-last-run.json','local-writer-last-run.json']){
+ for(const [index,file] of ['local-cycle-last-run.json','local-collection-last-run.json','local-writer-last-run.json'].entries()){
+  stage(['CORE_CHECKPOINT_CYCLE','CORE_CHECKPOINT_COLLECTION','CORE_CHECKPOINT_WRITER'][index]);
   const p=path.join(root,file);if(!fs.existsSync(p)){out.checkpoints[file]={exists:false};continue;}
   const s=fs.statSync(p);let data;try{data=JSON.parse(fs.readFileSync(p));}catch{data={};}
   out.checkpoints[file]={exists:true,modifiedAt:s.mtime.toISOString(),bytes:s.size,status:typeof data.status==='string'&&/^[A-Z0-9_:-]{1,80}$/.test(data.status)?data.status:null};
@@ -188,11 +213,17 @@ export function readCore(dataRoot,{queryTask,retiredTaskEvidence=nativeRetiredIr
    if(employmentR6)out.checkpoints[file].employmentR6=employmentR6;
   }
  }
+ stage('CORE_CONFIG');
  const config=path.join(root,'config.json');if(fs.existsSync(config)){const c=JSON.parse(fs.readFileSync(config));const x=c.source;out.approvedSourceSha=[x?.sha,x?.commit,x?.commitSha,x,c.sourceSha].find(v=>typeof v==='string'&&/^[a-f0-9]{40}$/.test(v))??null;}
- if(queryTask){
+ stage('CORE_TASK_HASHES');
+ if(taskXmlHashes){
+  // Reuse the fixed engine's precheck observation; the postcheck still verifies drift.
+  out.taskXmlHashes={...taskXmlHashes};
+ }else if(queryTask){
   for(const task of activeTasks)out.taskXmlHashes[task]=digest(queryTask(task));
   out.taskXmlHashes[retiredIranTask]=retiredTaskEvidence();
  }
+ stage('CORE_STATUS_DONE');
  return out;
 }
 export function nativeTaskXml(task){return execFileSync(path.join(process.env.SystemRoot||'C:/Windows','System32','schtasks.exe'),['/Query','/TN',task,'/XML'],{windowsHide:true,timeout:12000,maxBuffer:262144});}
@@ -203,11 +234,21 @@ export async function runOperation(request,context){
   // Only the fixed engine's missing pre-snapshot activates this scope. The
   // outer result must remain STATE_UNKNOWN; local Core evidence is still useful.
   const partial=context.skipProtectedTaskObservation===true&&policy.mutationsEnabled===false;
-  return {status:'PASS',code:'CORE_READONLY_DIAGNOSIS',core:readCore(dataRoot,partial?{}:{queryTask,retiredTaskEvidence}),
+  // This marker is scoped to the existing private, per-request Worker workspace.
+  // Best-effort diagnostic writes must never turn a successful read into a failure.
+  const onStage=stage=>{
+   if(typeof workspace!=='string'||!CORE_STATUS_STAGES.includes(stage))return;
+   try{writeJson(path.join(workspace,'core-status-readonly-stage.json'),{stage});}catch{}
+  };
+  onStage('CORE_STATUS_ENTERED');
+  const options=partial?{onStage}:context.protectedTaskHashes?
+   {taskXmlHashes:context.protectedTaskHashes,onStage}:{queryTask,retiredTaskEvidence,onStage};
+  return {status:'PASS',code:'CORE_READONLY_DIAGNOSIS',core:readCore(dataRoot,options),
    ...(partial?{taskObservation:'UNVERIFIED'}:{}),providerCalls:0,d1Writes:0,sqliteOpened:false};
  }
  if(request.operation==='d05-lineage-readonly')return summarizeD05LineageOperation(
-  inspectD05LineageReadonly(dataRoot,{approvedSourceSha:readCore(dataRoot).approvedSourceSha}));
+  inspectD05LineageReadonly(dataRoot,{approvedSourceSha:
+   Object.hasOwn(context,'d05ApprovedSourceSha')?context.d05ApprovedSourceSha:readCore(dataRoot).approvedSourceSha}));
  if(request.operation==='sector-r3-dated-ledger-readonly')return inspectSectorR3DatedLedger(dataRoot);
  if(request.operation==='sector-r3-d1-api-readback-readonly')return inspectSectorR3D1ApiReadback(dataRoot);
  if(request.operation==='core-runtime-source-readonly')return inspectCoreRuntimeSource();
@@ -228,8 +269,8 @@ export async function runOperation(request,context){
  if(request.operation==='w05-five-key-d1-api-readback-readonly')return await inspectW05FiveKeyD1ApiReadback(dataRoot);
  if(request.operation==='w05-cloudflare-deployment-readonly')return await inspectW05CloudflareActive(dataRoot);
  if(request.operation==='w05-cloudflare-rum-readonly')return await inspectW05CloudflareRum(dataRoot);
- if(request.operation==='inflation-census-m3-archive-headers-readonly')return inspectInflationCensusM3ArchivedHeaders(dataRoot);
  if(request.operation==='inflation7-d1-readback-readonly')return inspectInflation7D1Readback(dataRoot);
+ if(request.operation==='inflation19-d1-readback-readonly')return inspectInflation19D1Readback(dataRoot);
  if(request.operation==='r17-268-postcancel-readonly'){
   if(request.requestId!==ONE_SHOT_DIAGNOSTIC_ID)return {status:'BLOCKED',code:'R17_268_ONE_SHOT_REQUEST_ID_STOP',providerCalls:0,d1Writes:0,operationalWrites:0};
   let coreTaskXml=null,sourceTrace=null,protectedStateSha256=null;
@@ -272,7 +313,6 @@ export async function runOperation(request,context){
  if(request.operation==='earnings-bea-unit-archive-readonly')return inspectBeaUnitArchiveReadonly(dataRoot);
  if(request.operation==='earnings-bea-nipa-capture-readonly')return inspectBeaNipaCaptureReadonly(dataRoot);
  if(request.operation==='w05-wpsfd42-service-readonly')return await runW05ServiceStoredReadonly({request,host,dataRoot,workspace});
- if(request.operation==='inflation19-d1-readback-readonly')return inspectInflation19D1Readback(dataRoot);
  if(request.operation==='employment-r6-candidate-stage-readonly'){
   // Admission already passed; a momentary RAM dip before the R6 worker
   // must use the same bounded policy recheck, not an immediate one-shot denial.
@@ -317,6 +357,7 @@ export async function runOperation(request,context){
  if(request.operation==='inflation19-runtime-readonly')return inspectInflation19RuntimeReadonly(dataRoot);
  if(request.operation==='inflation-r2-local-readonly')return inspectInflationR2LocalReadonly(dataRoot);
  if(request.operation==='inflation-r2-d1-readback-readonly')return inspectInflationR2D1Readback(dataRoot);
+ if(request.operation==='inflation-census-m3-archive-headers-readonly')return inspectInflationCensusM3ArchivedHeaders(dataRoot);
  if(request.operation==='inflation-candidates-runtime-readonly')return inspectInflationCandidatesRuntimeReadonly(dataRoot);
  if(request.operation==='theme-platform-shadow-readonly'){
   try{return await runApprovedShadowReadOnly({request,host,dataRoot});}

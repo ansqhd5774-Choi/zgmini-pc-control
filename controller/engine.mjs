@@ -1,24 +1,35 @@
 import fs from 'node:fs';import path from 'node:path';import {spawn,execFileSync} from 'node:child_process';import {fileURLToPath} from 'node:url';
-import {digest,need,validateRequest,writeJson,exclusive,errorCode} from './common.mjs';import {protectedState,readCore,nativeTaskXml,nativeRetiredIranEvidence} from './operations.mjs';
+import {digest,need,validateRequest,writeJson,exclusive,errorCode,assertSupervisorOwner} from './common.mjs';import {protectedState,readCore,nativeTaskXml,nativeRetiredIranEvidence,
+ CORE_STATUS_STAGES} from './operations.mjs';
 import {memoryAdmissionMinimum,waitForMemoryAdmission} from './memory-admission.mjs';
 import {R6_READONLY_STAGES} from './employment-r6-collection-evidence-readonly.mjs';
 const worker=fileURLToPath(new URL('./worker.mjs',import.meta.url));
 // Only reviewed fixed operations with no provider/DB/operational write effect
 // may return useful reads when an unrelated Scheduler observation is missing.
 // The caller cannot select or expand this class in the Issue payload.
-const ISOLATED_READS=new Set(['runner-smoke','core-status','core-runtime-source-readonly','writer-install-preimage-readonly']);
+const ISOLATED_READS=new Set(['runner-smoke','core-status','d05-lineage-readonly','core-runtime-source-readonly','writer-install-preimage-readonly',
+ // Read-only Core/Writer lock snapshot must remain observable when an unrelated
+ // retired Scheduler inventory command fails. An incomplete protection
+ // pre/postcheck still downgrades the final report to STATE_UNKNOWN.
+ 'shared-resource-release-readonly']);
 const unavailableProtection=e=>['RETIRED_IRAN_INVENTORY_UNAVAILABLE',
  'PROTECTED_TASK_XML_QUERY_FAILED'].includes(errorCode(e));
-export function readFixedR6Stage(workspace){
+// Read a tiny private Workspace marker only after a known Worker timeout.
+ // Never elevate the result to PASS or accept arbitrary paths/stage names.
+function readFixedStage(workspace,filename,allowedStages){
  try{
-  const marker=path.join(workspace,'employment-r6-readonly-stage.json');
+  const marker=path.join(workspace,filename);
   const stat=fs.lstatSync(marker);
   if(!stat.isFile()||stat.isSymbolicLink()||stat.size<2||stat.size>128)return null;
   const body=JSON.parse(fs.readFileSync(marker,'utf8'));
-  return body&&typeof body==='object'&&Object.keys(body).length===1&&
-   R6_READONLY_STAGES.includes(body.stage)?body.stage:null;
+  return body&&typeof body==='object'&&!Array.isArray(body)&&
+   Object.keys(body).length===1&&allowedStages.includes(body.stage)?body.stage:null;
  }catch{return null;}
 }
+export const readFixedR6Stage=workspace=>
+ readFixedStage(workspace,'employment-r6-readonly-stage.json',R6_READONLY_STAGES);
+export const readFixedCoreStatusStage=workspace=>
+ readFixedStage(workspace,'core-status-readonly-stage.json',CORE_STATUS_STAGES);
 function noteUnavailableProtection(report,error,phase){
  report[phase==='PRECHECK'?'protectionPrecheckCode':'protectionPostcheckCode']=errorCode(error);
  if(phase==='POSTCHECK')report.postcheckFailureCode=errorCode(error);
@@ -69,13 +80,23 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
     affectedScope:'OWN_REQUEST_ONLY',nextAction:retiredIranFailure?'VERIFY_APPROVED_RETIRED_IRAN_STATE_NO_RETRY':'INSPECT_REQUIRED_TASK_REGISTRATION_NO_AUTOMATIC_RETRY',
     ...(protectedProbeReason?{protectedProbeReason}:{}),
     ...(retiredIranFailure?{failedProtectedTask:'ZGMINI-PC-Iran-Progress-R13'}:typeof error.safeTaskName==='string'?{failedProtectedTask:error.safeTaskName}:{})});throw error;}}
-  preflightOperation='CORE_STATE_READ';report.pcOperationalApprovedSha=readCore(host.dataRoot).approvedSourceSha??null;report.lastPass=before?'PROTECTED_STATE_SNAPSHOT':'CORE_STATE_READ';
+  preflightOperation='CORE_STATE_READ';
+  if(request.operation==='d05-lineage-readonly'){
+   // Core source observation is independent from the fixed, local D05 ledger read.
+   try{report.pcOperationalApprovedSha=readCore(host.dataRoot).approvedSourceSha??null;}
+   catch{report.pcOperationalApprovedSha=null;report.coreSourceObservation='UNVERIFIED';}
+  }else report.pcOperationalApprovedSha=readCore(host.dataRoot).approvedSourceSha??null;
+  report.lastPass=before?'PROTECTED_STATE_SNAPSHOT':'CORE_STATE_READ';
   preflightOperation='WORKER_INPUT_WRITE';
   const input=path.join(workspace,'input.json'),output=path.join(workspace,'worker-result.json');
   writeJson(input,{request,context:{workspace,workspaceId,dataRoot:host.dataRoot,policy,host,seat,approvedPreimageScope,
-   skipProtectedTaskObservation:isolatedRead&&!before&&request.operation==='core-status'}});
+   skipProtectedTaskObservation:isolatedRead&&!before&&request.operation==='core-status',
+   ...(request.operation==='core-status'&&before?{protectedTaskHashes:before.tasks}:{}),
+   ...(request.operation==='d05-lineage-readonly'?{d05ApprovedSourceSha:report.pcOperationalApprovedSha}:{})}});
   const ms=policy.operations[request.operation].timeoutSeconds*1000;
-  preflightOperation='WORKER_EXECUTION';const childResult=await new Promise(resolve=>{
+  // Revalidate owner after memory admission, immediately before Worker spawn.
+   preflightOperation='SUPERVISOR_OWNERSHIP';assertSupervisorOwner(root,host);
+   preflightOperation='WORKER_EXECUTION';const childResult=await new Promise(resolve=>{
    const env={SystemRoot:process.env.SystemRoot,ComSpec:process.env.ComSpec,PATH:path.dirname(process.execPath),TEMP:workspace,TMP:workspace};
    const child=spawn(process.execPath,[worker,input,output],{env,cwd:workspace,windowsHide:true,stdio:'ignore'});let timedOut=false,settled=false,grace;
    const timer=setTimeout(()=>{timedOut=true;grace=setTimeout(()=>{if(!settled){settled=true;child.unref();resolve({code:null,timedOut:true,terminationUnknown:true,pid:child.pid});}},terminationGraceMs);if(child.pid){if(terminateTree)try{terminateTree(child.pid);}catch{}else if(process.platform==='win32')try{execFileSync('taskkill.exe',['/PID',String(child.pid),'/T','/F'],{windowsHide:true,stdio:'ignore',timeout:10000});}catch{}else child.kill('SIGKILL');}},ms);
@@ -87,6 +108,10 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
    report.status='FAIL';report.code='JOB_EXECUTION_TIMEOUT';report.firstFail='OWN_WORKER_TIMEOUT';
    if(request.operation==='employment-r6-collection-evidence-readonly'){
     const lastStage=readFixedR6Stage(workspace);
+    if(lastStage)report.workerLastEnteredStage=lastStage;
+   }else if(request.operation==='core-status'){
+    // Preserve FAIL/60s limit; report only an allowlisted stage on verified timeout.
+    const lastStage=readFixedCoreStatusStage(workspace);
     if(lastStage)report.workerLastEnteredStage=lastStage;
    }
   }
@@ -111,6 +136,12 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
   }else{
    report.protectedStateUnchanged=JSON.stringify(before)===JSON.stringify(after);
    need(report.protectedStateUnchanged,'PROTECTED_STATE_DRIFT_OBSERVED');
+  }
+  if(request.operation==='d05-lineage-readonly'&&report.coreSourceObservation==='UNVERIFIED'&&report.status==='PASS'){
+   report.workerOutcome={status:report.status,code:report.code,
+    firstFail:report.firstFail,resultPresent:report.result!==undefined};
+   report.status='STATE_UNKNOWN';report.code='D05_CORE_SOURCE_OBSERVATION_UNVERIFIED';
+   report.firstFail='CORE_SOURCE_OBSERVATION';report.next='USE_LEDGER_READ_RESULT_WITHOUT_CURRENT_SOURCE_ATTESTATION';
   }
   report.actualExecutionSha=request.operation==='employment-r6-candidate-stage-readonly'
     ?(report.result?.actualExecutionSha??null)
