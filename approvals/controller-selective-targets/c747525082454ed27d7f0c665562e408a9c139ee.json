@@ -1,0 +1,30 @@
+{
+  "schema": "ZGMINI_CONTROLLER_SELECTIVE_PIN_V1",
+  "installedSha": "83679b013ac9a9820331d93311ec97e572b18e13",
+  "targetSha": "c747525082454ed27d7f0c665562e408a9c139ee",
+  "sourceMainSha": "4bd6653382c28060bbf12ca8341acb8c30e5f8e3",
+  "targetBranch": "codex/ci-cloudflare-rum-b-overlay-20261125",
+  "customPaths": [
+    "config/operations.json",
+    "controller/operations.mjs"
+  ],
+  "allowFiles": [
+    {
+      "path": "config/operations.json",
+      "sha256": "0faadb506c22e0219a9d6a4edcc24fbacd6af355ddfcd2fd80e5f602b4617f38"
+    },
+    {
+      "path": "controller/cloudflare-rum-field-parser.mjs",
+      "sha256": "de3e35b8bc3b6ff925a69da51abfa4f0fcbf08034abfd746589a34908b56ed75"
+    },
+    {
+      "path": "controller/operations.mjs",
+      "sha256": "2a204fe31c61b4c50ade16a20bd1d9a595d39212ace8a92b40eb1266b1abf5eb"
+    },
+    {
+      "path": "controller/w05-cloudflare-rum-readonly.mjs",
+      "sha256": "6271d351b628c23c2dd7ff4481389745c604400f044b163d25394c43fdfc4fae"
+    }
+  ],
+  "approvalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3546"
+}
