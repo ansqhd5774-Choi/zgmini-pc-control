@@ -131,7 +131,13 @@ test('Standby never promotes from missing, partial or ambiguous Runner heartbeat
  const exited=()=>false;
  assert.equal(provenOldRunnerExit({owner,heartbeat:hb,pidAlive:exited}),true);
  assert.equal(provenOldRunnerExit({owner,heartbeat:null,pidAlive:exited}),false);
- assert.equal(provenOldRunnerExit({owner:null,heartbeat:hb,pidAlive:exited}),false);
+ // Clean startup without a prior lease is safe only with a complete
+ // historical six-seat heartbeat and a proven-dead prior Supervisor PID.
+ assert.equal(provenOldRunnerExit({owner:null,heartbeat:hb,pidAlive:exited}),true);
+ assert.equal(provenOldRunnerExit({owner:null,heartbeat:hb,pidAlive:pid=>
+  pid===8810?true:false}),false);
+ assert.equal(provenOldRunnerExit({owner:null,heartbeat:hb,pidAlive:pid=>
+  pid===8810?null:false}),false);
  assert.equal(provenOldRunnerExit({owner,heartbeat:{pid:8810,children:[]},pidAlive:exited}),false);
  assert.equal(provenOldRunnerExit({owner,heartbeat:{pid:8810,children:children.slice(0,5)},pidAlive:exited}),false);
  assert.equal(provenOldRunnerExit({owner,heartbeat:{pid:8811,children},pidAlive:exited}),false);
@@ -200,4 +206,18 @@ test('WMI source missing, inaccessible or untrusted process identity never certi
   {...options,canonicalize:()=>{throw Error('ACCESS_DENIED');}}),'UNVERIFIED');
  const source=fs.readFileSync(new URL('../tools/runner-watchdog.mjs',import.meta.url),'utf8');
  assert.match(source,/if\(standbyMode&&scanControllerRunnersReadOnly\(\)!=='NO_CONTROLLER_RUNNER_PROCESS'\)/);
+});
+
+test('lease-absent clean startup still requires old heartbeat and WMI absence',()=>{
+ const heartbeat={pid:4050,children:Array.from({length:6},(_,i)=>({
+  seat:i+1,pid:5000+i
+ }))};
+ const oldExited=()=>false;
+ assert.equal(provenOldRunnerExit({owner:null,heartbeat,pidAlive:oldExited}),true);
+ assert.equal(provenOldRunnerExit({owner:null,heartbeat:null,pidAlive:oldExited}),false);
+ const controllerRoot='E:\\ZGmini\\automation\\pc-control';
+ const others=[{pid:5001,name:'Runner.Worker.exe',
+  executablePath:'E:\\ZGmini\\automation\\pc-control\\runners\\03\\bin\\Runner.Worker.exe'}];
+ assert.equal(classifyRunnerExecutableProof(others,{
+  controllerRoot,canonicalize:p=>p}),'ACTIVE_RUNNER_PROCESS');
 });
