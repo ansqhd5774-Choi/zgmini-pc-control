@@ -194,3 +194,11 @@
 - **원본 11건: 실제 종결 9/11(81.8%), 미종결 2/11(18.2%)**. 새로운 [#3740](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3740)은 PR #3739 새 보안 CI 실패 Run #45713308074에 대한 **별도 고유 실행 사고**이며 이 원본 11건의 완료로 계산하지 않음.
 - 다른 독립 PR/업무: 자동 승인 [#3545](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3545) 운영 활성화 미완료, Draft [#3719](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3719) 검토 중. 사용자 승인 없이 무관 PR 병합·PC·Runner·예약·D1·Cloudflare 변경 없음.
 - **검증 증거의 범위:** 9건은 각 CI 관측 이력으로 종결; 이는 CI 19종 도입/후속 개선 6/6 및 승인 정책을 훼손하지 않고 현재 source/정확 관련 테스트의 합격 확인으로 판정한 것. 운영 PR 병합·실제 PC 적용·보안 원시 경고 전체 종료의 증거가 아니다.
+
+### 2026-11-26 후속 실조회 — 작업 범위 및 신규 접수 분리
+
+- 기존 고정 cohort **CI 실패 11건 중 9건 종결(81.8%)**, **#3724/#3630 2건 OPEN**. 최초 CI 11건 성과와 이후 신규 접수는 혼합하지 않는다.
+- 동일 소스 수정 [PR #3739](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3739)는 운영용 ER1 issue-only Workflow와 read-only PR 전용 검증을 분리, 추가로 Zizmor high 실패 진단 시 안전한 **규칙 ID만** 기록하도록 수정했다. 정확 HEAD `da94e53403859790e96faf5d2db1163009995b0d`: [오프라인 PR 경계 CI #45714237805](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45714237805) **SUCCESS (11/11)**, [PC Secret #45714237738](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45714237738) **SUCCESS**, [C996 #45714237730](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45714237730) **QUEUED/결과 없음**. 직전 C996 [#45713308074](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45713308074)는 Zizmor `exit 14` FAIL; `14`는 탐지 14건이 아니라 종료 코드. 보안 검사 PASS가 없어 **PR 미병합, #3724 및 #3740 OPEN**. 중복 강제 실행/우회 없음.
+- 새 [#3740](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3740)은 #3739의 원본과 다른 **신규 고유 실패 Run**. 계속 OPEN. 새 [#3741](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3741), [#3742](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3742)는 별도 W06 업무가 낸 정규 PC A 조회 `pc-job`으로, 이 CI 장애 정리 범위에 해당하지 않음.
+- 최근 순간 실조회 PC 저장소 OPEN **Issue 9**(미해결 CI 3, 월별/중앙 원장 4, 신규 별도 pc-job 2) + **PR 4**(#3545, #3719, #3738 별도 Controller 작업, 이 작업 #3739). 웹 저장소는 전 작업에서 OPEN Issue 0/PR 0 확인. 동시 실행·접수에 따라 전체 OPEN 수는 변하므로 고정 원본 cohort 해결률과 별도 집계.
+- **다음 직접 필수 행동:** 큐에 있는 #45714237730의 Zizmor 규칙 ID·정확 Job을 실제 회수해 해당 YAML 보안 위반만 최소 수정, 동일 HEAD C996/Secret/PR source 회귀 성공 후에만 #3739 병합 및 #3724/#3740 재판정. #3630은 원본 탐지 fingerprint 미확정이므로 별도 보존; 다른 브랜치의 whitelist로 일괄 결론 금지.
