@@ -10,8 +10,9 @@ export const GRAPHQL_QUERY=[
  'query ZgminiRumP75($account: string!, $start: Time!, $end: Time!) {',
  'viewer { accounts(filter: {accountTag: $account}) {',
  'rumWebVitalsEventsAdaptiveGroups(limit: 30,',
- 'filter: {datetime_geq: $start, datetime_leq: $end, requestHost: "zgmini.kr"}) {',
- 'count dimensions {requestHost requestPath deviceType}',
+ 'filter: {datetime_geq: $start, datetime_leq: $end, requestHost: "zgmini.kr",',
+ 'requestPath_in: ["/", "/economic-indicators/"], bot: 0}) {',
+ 'count dimensions {requestHost requestPath deviceType bot}',
  'quantiles {largestContentfulPaintP75 interactionToNextPaintP75 cumulativeLayoutShiftP75}',
  '} } } }'
 ].join(' ');
@@ -65,12 +66,14 @@ export function parseRumGraphql(response,{startUtc,endUtc}={}){
   const {requestHost,requestPath,deviceType}=row.dimensions;
   // Never expose another host/path or an untrusted URL in a public result.
   if(requestHost!==RUM_HOST||!RUM_PATHS.includes(requestPath))continue;
+  // API query also excludes bots; enforce the dimension in response independently.
+  if(row.dimensions.bot!==0)continue;
   const device=typeof deviceType==='string'?deviceType.toLowerCase():null;
   if(!RUM_DEVICES.includes(device))continue;
   const key=requestPath+'|'+device;
   if(seen.has(key))fail('CF_RUM_DUPLICATE_GROUPS_UNVERIFIED');
   const q=row.quantiles;
-  const metrics={
+  const metrics=row.count===0?empty(requestPath,device).metrics:{
    lcpMs:metric(q.largestContentfulPaintP75,GOOD.lcpMs,1000),
    inpMs:metric(q.interactionToNextPaintP75,GOOD.inpMs,1000),
    cls:metric(q.cumulativeLayoutShiftP75,GOOD.cls,1)};
