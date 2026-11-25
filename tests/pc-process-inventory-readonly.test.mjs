@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {inspectTask, TASK} from '../tools/marketparquet-task-source-readonly.mjs';
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
+import {inspectCiControllerBReceiverReadOnly} from '../tools/pc-process-inventory-readonly.mjs';
 import assert from 'node:assert/strict';
 import {classifyInstalledReconciliationProof,main as maintenanceRecoveryMain} from '../tools/maintenance-recovery.mjs';
 import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,project2960MaintenanceStatus,project3409MaintenanceStatus,compact3409ProcessResult,projectEr1PostcheckLinkReadonly,assess3409OriginalLeaseLineage,project3516MaintenanceStatus,compact3516ProcessResult,assess3516OriginalLeaseLineage,project3409PauseWindows,compare2960ProtectedBaseline,classify2960ProtectionDifference,assess2960OriginalLeaseLineage,compact2960ProcessResult,projectD05WriterCheckpoint,compactD05WriterResult,inspectD05PrivateFinalReceiptReadonly,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
@@ -401,6 +402,43 @@ test('no implicit cross-host worker execution',()=>{
  const out=collect('operating',{requestId:'id',issueNumber:2,runId:'2',attempt:'1'},
   {RUNNER_NAME:'zgmini-handoff-ci-spare-01'});
  assert.equal(out.status,'BLOCKED');
+});
+
+test('CI installed policy readback never exposes the CI installed policy or local path',()=>{
+ const fixed='E:/ZGmini/automation/pc-maintenance/MAINTENANCE_INSTALL.json';
+ const base={schema:'ZGMINI_PC_MAINTENANCE_INSTALL_V1',
+  sourceSha:'a'.repeat(40),startupSha256:'b'.repeat(64),
+  files:Object.fromEntries(Array.from({length:7},(_,i)=>['tools/file'+i+'.mjs','c'.repeat(64)])),
+  token:'NEVER_PRINT_PRIVATE_TOKEN',root:'E:/PRIVATE_CREDENTIAL_ROOT'};
+ const policy={schema:'ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V1',enabled:true,
+  workflowId:430972394,workflowBlobSha:'d'.repeat(40),
+  workflowPath:'.github/workflows/ci-approval-controller-b.yml'};
+ const fake=(content,{link=false,size=160}={})=>({
+  lstatSync:p=>{assert.equal(p,fixed);return{
+   isFile:()=>true,isSymbolicLink:()=>link,size};},
+  readFileSync:(p,encoding)=>{assert.equal(p,fixed);assert.equal(encoding,'utf8');return content;}
+ });
+ const absent=inspectCiControllerBReceiverReadOnly(fake(JSON.stringify(base)));
+ assert.equal(absent.policyState,'ABSENT_IN_INSTALLED_MANIFEST');
+ assert.equal(absent.manifestReadable,true);
+ const present=inspectCiControllerBReceiverReadOnly(fake(JSON.stringify({...base,ciControllerBPolicy:policy})));
+ assert.equal(present.policyState,'PRESENT_FORMAT_ONLY');
+ assert.equal(present.installedSourceIntegrityAsserted,false);
+ assert.equal(present.executionAuthorized,false);
+ assert.equal(present.operationalWrites,0);
+ const invalid=inspectCiControllerBReceiverReadOnly(fake(JSON.stringify({...base,
+  ciControllerBPolicy:{...policy,workflowBlobSha:'BAD'}})));
+ assert.equal(invalid.policyState,'INVALID');
+ for(const value of [invalid,absent,present])
+  assert.doesNotMatch(JSON.stringify(value),/PRIVATE|TOKEN|credential|430972394|dddddddd/i);
+ for(const value of [invalid,absent,present])assert.equal(JSON.stringify(value).includes('E:/'),false);
+ for(const unverified of [
+  inspectCiControllerBReceiverReadOnly(fake('invalid JSON')),
+  inspectCiControllerBReceiverReadOnly(fake(JSON.stringify(base),{link:true})),
+  inspectCiControllerBReceiverReadOnly(fake(JSON.stringify(base),{size:131073})),
+  inspectCiControllerBReceiverReadOnly({lstatSync:()=>{throw Error('PRIVATE PATH')}}),
+  inspectCiControllerBReceiverReadOnly(fake('{}'))
+ ])assert.equal(unverified.policyState,'UNVERIFIED');
 });
 
 test('operating maintainer status exposes only bounded hashes and safe lease booleans',()=>{
