@@ -1,0 +1,124 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {createHash,randomUUID} from 'node:crypto';
+import {decideStandbyPromotion as decide,watchdogIdentityMatches,
+ verifyStandbySource} from '../controller/standby.mjs';
+import {assertSupervisorOwner} from '../controller/common.mjs';
+
+const eligible=()=>({
+ sourceVerified:true,watchdogBound:true,supervisorLeasePresent:false,
+ relatedLeasesPresent:false,maintenanceBusy:false,activeChildrenStopped:true
+});
+const ok='ELIGIBLE_FOR_SUPERVISOR_ATOMIC_ACQUIRE';
+test('standby is eligible only when Watchdog proved every protection boundary',()=>{
+ assert.equal(decide(eligible()),ok);
+ for(const [key,expected] of [
+  ['sourceVerified','HOLD_SOURCE_UNVERIFIED'],
+  ['watchdogBound','HOLD_WATCHDOG_IDENTITY'],
+  ['supervisorLeasePresent','HOLD_EXISTING_OWNER'],
+  ['relatedLeasesPresent','HOLD_RELATED_JOB'],
+  ['maintenanceBusy','HOLD_MAINTENANCE'],
+  ['activeChildrenStopped','HOLD_EXISTING_CHILD']
+ ]){
+  const x=eligible();x[key]=key==='supervisorLeasePresent'||
+   key==='relatedLeasesPresent'||key==='maintenanceBusy'?true:false;
+  assert.equal(decide(x),expected,key);
+ }
+});
+test('unknown source, Watchdog, owner or children never promotes',()=>{
+ for(const key of Object.keys(eligible())){
+  const x=eligible();x[key]=null;
+  assert.notEqual(decide(x),ok,key);
+ }
+});
+test('no second independent standby leader election or Runner launch',()=>{
+ const src=fs.readFileSync(new URL('../controller/standby.mjs',import.meta.url),'utf8');
+ assert.match(src,/typeof process\.send!=='function'/);
+ assert.match(src,/message\?\.type!=='PROMOTE'/);
+ assert.match(src,/await import\('\.\/supervisor\.mjs'\)/);
+ assert.doesNotMatch(src,/taskkill\.exe|core\.lock|workflow_dispatch|run\.cmd/);
+});
+test('only exact owned Watchdog IPC identity can instruct candidate',()=>{
+ const nonce=randomUUID(),owner={pid:1234,nonce};
+ assert.equal(watchdogIdentityMatches(owner,{parentPid:1234,nonce}),true);
+ assert.equal(watchdogIdentityMatches(owner,{parentPid:1235,nonce}),false);
+ assert.equal(watchdogIdentityMatches(owner,{parentPid:1234,nonce:randomUUID()}),false);
+ assert.equal(watchdogIdentityMatches(null,{parentPid:1234,nonce}),false);
+});
+test('source verification is tied to exact installed host manifest',()=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-standby-src-'));
+ const sha=b=>createHash('sha256').update(b).digest('hex');
+ try{
+  fs.mkdirSync(path.join(dir,'controller'));
+  fs.writeFileSync(path.join(dir,'controller/standby.mjs'),'standby');
+  fs.writeFileSync(path.join(dir,'controller/supervisor.mjs'),'supervisor');
+  const host={controllerSourceSha:'a'.repeat(40),
+   controllerFiles:{'controller/standby.mjs':sha('standby'),
+    'controller/supervisor.mjs':sha('supervisor')}};
+  fs.writeFileSync(path.join(dir,'host.json'),JSON.stringify(host));
+  assert.equal(verifyStandbySource(dir),host.controllerSourceSha);
+  fs.writeFileSync(path.join(dir,'controller/standby.mjs'),'tampered');
+  assert.throws(()=>verifyStandbySource(dir),/STANDBY_SOURCE_DRIFT/);
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+test('legacy Supervisor job entry stays unchanged until attested R3 install',()=>{
+ assert.equal(assertSupervisorOwner('/tmp/unused',{controllerFiles:{}}),
+  'LEGACY_CONTROLLER_UNCHANGED');
+});
+test('current owner nonce must match on every new job entry',()=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-standby-owner-'));
+ const nonce=randomUUID();
+ const host={controllerFiles:{'controller/standby.mjs':'a'.repeat(64)}};
+ try{
+  fs.mkdirSync(path.join(dir,'leases','supervisor'),{recursive:true});
+  const f=path.join(dir,'leases/supervisor/owner.json');
+  fs.writeFileSync(f,JSON.stringify({pid:process.pid,nonce,
+   bootAt:Date.now()-os.uptime()*1000}));
+  assert.equal(assertSupervisorOwner(dir,host,{ZGMINI_SUPERVISOR_NONCE:nonce}),
+   'SUPERVISOR_OWNERSHIP_VERIFIED');
+  assert.throws(()=>assertSupervisorOwner(dir,host,{ZGMINI_SUPERVISOR_NONCE:randomUUID()}),
+   /SUPERVISOR_OWNERSHIP_LOST/);
+  assert.throws(()=>assertSupervisorOwner(dir,host,{}),
+   /SUPERVISOR_OWNERSHIP_UNVERIFIED/);
+  fs.writeFileSync(f,JSON.stringify({pid:process.pid,nonce,bootAt:Date.now()-86400000}));
+  assert.throws(()=>assertSupervisorOwner(dir,host,{ZGMINI_SUPERVISOR_NONCE:nonce}),
+   /SUPERVISOR_OWNERSHIP_LOST/);
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+test('run entry and Worker path both check supervisor ownership',()=>{
+ const entry=fs.readFileSync(new URL('../controller/entry.mjs',import.meta.url),'utf8');
+ const engine=fs.readFileSync(new URL('../controller/engine.mjs',import.meta.url),'utf8');
+ const supervisor=fs.readFileSync(new URL('../controller/supervisor.mjs',import.meta.url),'utf8');
+ assert.match(entry,/assertSupervisorOwner\(root,host\)/);
+ assert.match(engine,/preflightOperation='SUPERVISOR_OWNERSHIP';assertSupervisorOwner\(root,host\)/);
+ assert.ok(engine.indexOf("preflightOperation='SUPERVISOR_OWNERSHIP'")<
+  engine.indexOf("preflightOperation='WORKER_EXECUTION'"));
+ assert.match(supervisor,/ZGMINI_SUPERVISOR_NONCE:leaseNonce/);
+});
+test('Watchdog stays sole recovery authority; standby is opt-in after B install',()=>{
+ const src=fs.readFileSync(new URL('../tools/runner-watchdog.mjs',import.meta.url),'utf8');
+ assert.match(src,/installed\.standby\?\.mode==='ACTIVE_1_STANDBY_1'/);
+ assert.match(src,/installed\.standby\?\.approved===true/);
+ assert.match(src,/archiveDeadLease\(path\.join\(control,'leases\/supervisor'\)/);
+ assert.match(src,/candidate\.child\.send\(\{type:'PROMOTE',oldChildrenStopped:true\}/);
+ assert.match(src,/BLOCKED_OLD_RUNNER_CHILD_UNVERIFIED/);
+ assert.match(src,/if\(standbyMode\)\{/);
+});
+test('active maintenance and existing related work prevent standby promotion',()=>{
+ for(const overrides of [
+  {maintenanceBusy:true},
+  {relatedLeasesPresent:true},
+  {supervisorLeasePresent:true},
+  {activeChildrenStopped:false}
+ ]){
+  assert.notEqual(decide({...eligible(),...overrides}),ok);
+ }
+});
+test('Watchdog still leaves old registration path intact without standby activation',()=>{
+ const src=fs.readFileSync(new URL('../tools/runner-watchdog.mjs',import.meta.url),'utf8');
+ assert.match(src,/if\(standbyMode\)\{[\s\S]*?return;[\s\S]*?const out=fs\.openSync\(path\.join\(home,'SUPERVISOR_OUTPUT\.log'\)/);
+ assert.match(src,/const child=spawn\(node,\[path\.join\(control,'controller\/supervisor\.mjs'\)\]/);
+});
