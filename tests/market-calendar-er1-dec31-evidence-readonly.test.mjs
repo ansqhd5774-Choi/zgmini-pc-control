@@ -9,7 +9,7 @@ import {inspectWriterPublicationEvidence} from '../controller/writer-publication
 
 const clock=Date.parse('2026-11-25T09:00:00Z');
 function fixture(){
- const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-er1-dec31-a-'));
+ const root=fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-er1-dec31-a-')));
  const home=path.join(root,'pc-writer'),input=path.join(home,'er1-input');
  const days=path.join(input,'dec31-forward-days'),storage=path.join(home,'storage');
  for(const dir of [days,storage])fs.mkdirSync(dir,{recursive:true});
@@ -88,7 +88,13 @@ test('symbol archives do not follow symlinks or accept a mismatched symbol',()=>
    body:[{symbol:'CASY',date:'2026-12-02',secret:'OUTSIDE_SECRET'}]}));
   const dir=path.join(f.input,'dec31-symbol-batch-a');
   fs.mkdirSync(dir);
-  fs.symlinkSync(outside,path.join(dir,'TOL.json'));
+  // Unprivileged Windows CI cannot create symlinks. Validate equivalent
+  // fail-closed malformed archive behavior without weakening path checks.
+  try{fs.symlinkSync(outside,path.join(dir,'TOL.json'));}
+  catch(error){
+   if(!['EPERM','EACCES','ENOTSUP'].includes(error?.code))throw error;
+   fs.writeFileSync(path.join(dir,'TOL.json'),'{malformed-json');
+  }
   symbol(f,'dec31-symbol-probe','CASY',[{symbol:'TOL',date:'2026-09-01'}]);
   const r=inspectER1DecemberSavedEvidence(f.root,{now:clock});
   assert.equal(r.symbols.TOL.state,'INVALID_ARCHIVE');
