@@ -161,6 +161,40 @@ test('non-target device groups are visible as bounded aggregate diagnostics only
  assert.equal(JSON.stringify(out).includes('"unknown"'),false);
 });
 
+test('missing metric origin stays distinct from real zero without claiming a cause',()=>{
+ const rows=[
+  row('/','mobile',{largestContentfulPaintP75:0,
+   interactionToNextPaintP75:-1,cumulativeLayoutShiftP75:null},2),
+  row('/','desktop',{largestContentfulPaintP75:1200000,
+   cumulativeLayoutShiftP75:0.01},3),
+  row('/economic-indicators/','mobile',{
+   largestContentfulPaintP75:0,interactionToNextPaintP75:0,
+   cumulativeLayoutShiftP75:0},0)
+ ];
+ const x=parse(from(rows));
+ const at=(route,device)=>x.observations.find(o=>o.route===route&&o.device===device);
+ const mobile=at('/','mobile').metrics;
+ assert.equal(mobile.inpMs.p75,null);
+ assert.equal(mobile.inpMs.missingKind,'PROVIDER_NEGATIVE');
+ assert.equal(mobile.cls.p75,null);
+ assert.equal(mobile.cls.missingKind,'PROVIDER_NULL');
+ assert.equal(mobile.lcpMs.p75,0);
+ assert.equal(mobile.lcpMs.state,'AT_OR_BELOW_GOOD_REFERENCE');
+ assert.equal(Object.hasOwn(mobile.lcpMs,'missingKind'),false);
+ const desktop=at('/','desktop').metrics;
+ assert.equal(desktop.inpMs.p75,null);
+ assert.equal(desktop.inpMs.missingKind,'FIELD_OMITTED');
+ const zero=at('/economic-indicators/','mobile').metrics;
+ assert.equal(zero.inpMs.p75,null);
+ assert.equal(zero.inpMs.missingKind,'ZERO_GROUP_EVENTS');
+ const absent=at('/economic-indicators/','desktop').metrics;
+ assert.equal(absent.inpMs.p75,null);
+ assert.equal(absent.inpMs.missingKind,'NO_MATCHING_GROUP');
+ assert.equal(x.fieldP75ValuesPresent,false);
+ assert.equal(x.siteGoodCertified,false);
+ assert.equal(x.metricSampleSizesVerified,false);
+});
+
 test('normal four-group response has zero non-target device groups',()=>{
  const out=parse(from(all()));
  assert.deepEqual(out.nonTargetDeviceGroups,{tablet:0,unrecognized:0});
