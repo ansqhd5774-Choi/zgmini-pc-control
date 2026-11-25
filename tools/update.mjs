@@ -22,7 +22,7 @@ validateControllerConfigTransition,controllerAdmissionForPurpose,
  decideR6RecoveryReentry,sameR6RecoveryClaim,verifyR6HistoricCompletion,
  R6_HOST_SOURCE_SHA,R6_HOST_SOURCE_MANIFEST_SHA256,
  selectPreservedRecoveryProtection,recoveryProtectedSnapshotStillPinned,
- verifiedRunningPostcheckFailure,
+ verifiedRunningPostcheckFailure,classifyMaintenancePostcheckLink,
  R6_HOST_CANDIDATE_SHA256,validateR54BIssueEnvelope,
  validateR54BManifestRequest,R54_B_ISSUE_TITLE,R54_B_OPERATION,
  R54_B_SOURCE_FILES,SOURCE_BUNDLE_OPERATION,SOURCE_BUNDLE_ISSUE_TITLE,
@@ -1579,7 +1579,10 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
       }catch{}
       if(!postIssueNumber)throw Object.assign(Error('POSTCHECK_OUTCOME_UNKNOWN'),{code:'POSTCHECK_OUTCOME_UNKNOWN'});
     }
-    writeJson(ledgerFile,{...ledger,postIssueNumber});
+    writeJson(ledgerFile,{...ledger,postIssueNumber,postcheckLink:{
+     schema:'ZGMINI_MAINTENANCE_POSTCHECK_LINK_V1',requestId:issue.requestId,
+     issueNumber:postIssueNumber,state:'ISSUE_CREATED',code:'POSTCHECK_ISSUE_CREATED',
+     runId:null,jobId:null,observedAtUtc:new Date().toISOString()}});
    }
    for(let n=0;n<100;n++){
     let comments;
@@ -1604,26 +1607,42 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
          result.sourceBranch===manifest.postSourceBranch&&
          result.controlSourceSha===manifest.targetSha};
     }
-    // Missing upload is not an unknown execution when the exact original
-    // Actions job proves its execution step failed. Observe, never resubmit.
+    // Existing request only: bounded Run/Job observation explains the first
+    // missing link. No repost, label re-drive, workflow toggle or lease write.
     if(n%5===0){
      let confirmed=null;
      try{
       const liveIssue=github('issues/'+postIssueNumber);
       const runs=readAllMaintenancePages(page=>github(
-       `actions/workflows/pc-job.yml/runs?event=issues&status=completed&created=${encodeURIComponent('>='+liveIssue.created_at)}&per_page=100&page=${page}`).workflow_runs)
-       .filter(r=>r.display_title===`PC Update ${issue.requestId} postcheck`&&r.conclusion==='failure');
+       `actions/workflows/pc-job.yml/runs?event=issues&created=${encodeURIComponent('>='+liveIssue.created_at)}&per_page=100&page=${page}`).workflow_runs,
+       {maxPages:3});
+      const expectedTitle=`PC Update ${issue.requestId} postcheck`;
+      const linkedRuns=runs.filter(r=>r.event==='issues'&&r.display_title===expectedTitle&&
+       Number.isFinite(Date.parse(r.created_at))&&
+       Date.parse(r.created_at)>=Date.parse(liveIssue.created_at));
+      const selected=linkedRuns.length===1?linkedRuns[0]:null;
+      const jobs=selected?readAllMaintenancePages(page=>github(
+       `actions/runs/${selected.id}/jobs?per_page=100&page=${page}`).jobs,
+       {maxPages:3}):null;
+      const link=classifyMaintenancePostcheckLink({
+       requestId:issue.requestId,issueNumber:postIssueNumber,
+       operation:manifest.postOperation,sourceSha:manifest.postSourceSha,
+       issue:liveIssue,runs,jobs});
       const liveLedger=json(ledgerFile);
-      for(const run of runs){
-       const jobs=readAllMaintenancePages(page=>github(
-        `actions/runs/${run.id}/jobs?per_page=100&page=${page}`).jobs);
-       for(const job of jobs)if(verifiedRunningPostcheckFailure({
-        ledger:liveLedger,manifest,issue:liveIssue,run,job})){
-        confirmed={issueNumber:postIssueNumber,runId:run.id,jobId:job.id,runnerName:job.runner_name};break;
-       }
-       if(confirmed)break;
+      // Store a bounded, nonsecret observation only when the evidence moves.
+      // A temporarily failed GitHub lookup must not erase earlier evidence.
+      const prior=liveLedger.postcheckLink;
+      if(link.state!=='STATE_UNKNOWN' &&
+       (!prior||Object.entries(link).some(([key,value])=>prior[key]!==value))){
+       writeJson(ledgerFile,{...liveLedger,postcheckLink:{
+        ...link,observedAtUtc:new Date().toISOString()}});
       }
-     }catch{/* A failed observation is still UNKNOWN, never a rollback signal. */}
+      for(const job of jobs??[])if(selected&&verifiedRunningPostcheckFailure({
+       ledger:liveLedger,manifest,issue:liveIssue,run:selected,job})){
+       confirmed={issueNumber:postIssueNumber,runId:selected.id,jobId:job.id,
+        runnerName:job.runner_name};break;
+      }
+     }catch{/* Failed observation remains UNKNOWN, not installation failure. */}
      if(confirmed)throw Object.assign(Error('POSTCHECK_EXECUTION_FAILED_VERIFIED'),{
       code:'POSTCHECK_EXECUTION_FAILED_VERIFIED',postcheckFailureEvidence:confirmed});
     }
