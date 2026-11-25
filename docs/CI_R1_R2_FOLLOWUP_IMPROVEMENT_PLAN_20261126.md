@@ -174,3 +174,23 @@
 - 최종 실조회 OPEN: 웹 Issue/PR **0/0**, PC Issue/PR **15/2**, 전체 **17**.
 - 실제 이번 정리 6건은 기존 실패 시점/원본 Run·브랜치와 이후 완료·대체 증거를 댓글로 남겼다. PC 11 CI 사고는 해결 근거 미충족, 4 원장·2 PR은 계속 필요한 별도 목적이다.
 - 후속 순서: (1) 해당 PC 브랜치 Zizmor·비밀 탐지 개별 실제 실패 조건 해결 및 재시험 (2) 자동 승인 #3545 정규 병합/운영 증거 구분 후 역사 CI Issue 재판정 (3) Windows/manifest 원본-수정 연결 (4) 기존 월별 원장은 유지하되 실제 사용 계약 변화가 있을 때만 정리. 무관 CI 신규 기능이나 예약/PC 변경을 새 완료 조건으로 추가하지 않는다.
+
+## 11. PC CI 원본 실패 11건 정리 — 2026-11-26
+
+**범위:** 위 10절의 과거 OPEN 원본 집합에서 최초 PC CI 실패 Issue 11개만 고정해 추적. 현재 새로 생긴 Issue/PR을 원본 해결 건수에 섞지 않는다. GitHub 원본 Run/정확 HEAD/동일 시험 성공/정확 실패 조건에 근거한 종료만 기록하며, 원본 실패 로그·보안 원시값은 유지·비공개.
+
+| 원본 Issue | 이번 처리 | 원인·실증 |
+|---|---|---|
+| [#3728](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3728) | CLOSED / not_planned | 위험한 issue-only A에 PR 트리거를 혼합한 변경을 같은 브랜치 후속 `7932ea0b...`에서 폐기. 원래 issue-only 계약 복원, C996 [#45696806233](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45696806233) SUCCESS. 위험 변경의 Zizmor PASS를 위장하지 않음 |
+| [#3633](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3633) | CLOSED / completed | 공개 JSON manifest의 SHA-256 필드 단일 오탐을 도입 커밋·파일·규칙·행 exact Gitleaks fingerprint로 한정. 후속 같은 브랜치 Secret [#45636349831](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45636349831) 및 C996 SUCCESS |
+| [#3648](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3648) | CLOSED / completed | 별도 SHA-256 false positive의 정확 fingerprint만 추가. 후속 같은 브랜치 Secret [#45650734871](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45650734871) 및 C996 SUCCESS, 기본 Gitleaks 규칙 유지 |
+| [#3718](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3718) | CLOSED / completed | PR 생성 전 번호 의존성 회귀 실제 과거 FAIL → 같은 개발 브랜치 [C996 #45712678076](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45712678076)의 정확 시험 `ok 49`. [#3545](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3545)는 여전히 미병합·운영 별도 |
+| [#3701](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3701), [#3702](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3702) | CLOSED / completed 각각 | 영수증 회귀 `REQUEST_READBACK_VERIFIED` 기대·`STATE_UNKNOWN` 실제의 오래된 source 오류 → 후속 Controller Maintenance [#45711594012](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45711594012) `ok 329`, 후속 C996 [#45712678076](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45712678076) `ok 406` 확인. 운영 설치 인증 아님 |
+| [#3685](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3685), [#3688](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3688) | CLOSED / completed 각각 | Windows symlink fixture `EPERM`에 missing-original fail-closed 조건을 먼저 검증하고, symlink 지원 환경에서는 원래 `RECOVERY_FILE_UNSAFE_FILE` 거부 assertion 유지. [C996 #45665130176](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45665130176) 동일 테스트 `ok 12`, `ok 30`; [Controller Maintenance #45665130452](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45665130452) `ok 15` |
+| [#3635](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3635) | CLOSED / completed | 첫 실패 HEAD의 Controller manifest 정확 2파일 누락 후 같은 브랜치에서 두 파일 원본 추가. 후속 [C996 #45636886031](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45636886031) 같은 CAS·scope 시험 `ok 1`. 실제 설치 완료 아님 |
+| [#3724](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3724) | OPEN / 수정 PR 검증 중 | 위험한 기존 `issues:write` PC Workflow와 PR 소스 테스트 혼합. 별도 [PR #3739](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3739)에서 issue-only 운영 실행과 read-only hosted PR 테스트 분리. 독립 PR source 시험 `11/11 PASS`, 하지만 C996 [#45713308074](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45713308074)는 Zizmor 14로 여전히 FAIL. 정확 위반 규칙 식별을 위해 *규칙 ID만* 출력하는 안전 진단 추가, 감사 강도·차단·원본 출력을 완화하지 않음. 최신 HEAD C996/Secret 재검증 미완료이므로 병합·Issue 종료 HOLD |
+| [#3630](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3630) | OPEN / 원본 탐지 미확정 | 원본 브랜치의 단일 `generic-api-key` 탐지는 유사 규칙의 다른 브랜치가 수정됐다는 이유만으로 동일 오탐이라고 단정하지 않는다. 원본 승인 JSON의 공개 SHA 필드를 확인했지만 **Gitleaks 실제 발견 대상/원본 인가·노출 위험 미확인**, 비밀값 출력·무근거 ignore 금지 |
+
+- **원본 11건: 실제 종결 9/11(81.8%), 미종결 2/11(18.2%)**. 새로운 [#3740](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3740)은 PR #3739 새 보안 CI 실패 Run #45713308074에 대한 **별도 고유 실행 사고**이며 이 원본 11건의 완료로 계산하지 않음.
+- 다른 독립 PR/업무: 자동 승인 [#3545](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3545) 운영 활성화 미완료, Draft [#3719](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3719) 검토 중. 사용자 승인 없이 무관 PR 병합·PC·Runner·예약·D1·Cloudflare 변경 없음.
+- **검증 증거의 범위:** 9건은 각 CI 관측 이력으로 종결; 이는 CI 19종 도입/후속 개선 6/6 및 승인 정책을 훼손하지 않고 현재 source/정확 관련 테스트의 합격 확인으로 판정한 것. 운영 PR 병합·실제 PC 적용·보안 원시 경고 전체 종료의 증거가 아니다.
