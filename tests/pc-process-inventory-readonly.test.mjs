@@ -9,7 +9,7 @@ import {inspectTask, TASK} from '../tools/marketparquet-task-source-readonly.mjs
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
 import assert from 'node:assert/strict';
 import {classifyInstalledReconciliationProof,main as maintenanceRecoveryMain} from '../tools/maintenance-recovery.mjs';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,project2960MaintenanceStatus,project3409MaintenanceStatus,compact3409ProcessResult,assess3409OriginalLeaseLineage,project3516MaintenanceStatus,compact3516ProcessResult,assess3516OriginalLeaseLineage,project3409PauseWindows,compare2960ProtectedBaseline,classify2960ProtectionDifference,assess2960OriginalLeaseLineage,compact2960ProcessResult,projectD05WriterCheckpoint,compactD05WriterResult,inspectD05PrivateFinalReceiptReadonly,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,project2960MaintenanceStatus,project3409MaintenanceStatus,compact3409ProcessResult,projectEr1PostcheckLinkReadonly,assess3409OriginalLeaseLineage,project3516MaintenanceStatus,compact3516ProcessResult,assess3516OriginalLeaseLineage,project3409PauseWindows,compare2960ProtectedBaseline,classify2960ProtectionDifference,assess2960OriginalLeaseLineage,compact2960ProcessResult,projectD05WriterCheckpoint,compactD05WriterResult,inspectD05PrivateFinalReceiptReadonly,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 import {inspect3160RecoveryCasReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 import {inspect3160RollbackPreflightReadonly} from '../tools/pc-process-inventory-readonly.mjs';
@@ -77,6 +77,57 @@ test('#3409 original maintenance ledger projection strips secrets and fails clos
  assert.equal(project3409MaintenanceStatus(null).status,'STATE_UNKNOWN');
  assert.equal(compact3409ProcessResult({requestId:'fixed'},
   project3409MaintenanceStatus(null)).status,'PARTIAL');
+});
+test('#3587 fixed ER1 postcheck link probe only accepts operating role and exact input',()=>{
+ const e=event(),p=JSON.parse(e.issue.body),probe='w04-3587-postcheck-link-readonly';
+ const scoped={...e,issue:{...e.issue,body:JSON.stringify({...p,probe})}};
+ assert.equal(authenticateProcess(scoped,env,'operating').w043587PostcheckLink,true);
+ assert.throws(()=>authenticateProcess(scoped,env,'handoff'));
+ for(const bad of ['w04-3588-postcheck-link-readonly',probe+';cmd']){
+  assert.throws(()=>authenticateProcess({...e,issue:{...e.issue,
+   body:JSON.stringify({...p,probe:bad})}},env,'operating'));
+ }
+ assert.throws(()=>authenticateProcess({...e,issue:{...e.issue,
+  body:JSON.stringify({...p,probe,path:'E:/private'})}},env,'operating'));
+});
+test('#3587 local ledger projection distinguishes actual linked pair from external PASS',()=>{
+ const id='pc-update-f4ad863b-608b-4c04-b23c-921a8b4823fe';
+ const fixture={requestId:id,issueNumber:3587,
+  targetSha:'502aac841475fa94b7cc9d56c028fd38b0554831',
+  postIssueNumber:3590,secret:'NEVER_EXPOSE_LEDGER_SECRET',
+  postcheckLink:{schema:'ZGMINI_MAINTENANCE_POSTCHECK_LINK_V1',
+   requestId:id,issueNumber:3590,state:'RESULT_REPORTED',
+   reportedRunJobLinked:true,runId:45617472368,jobId:139216506442,
+   reportedStatus:'PASS',postSourceVerified:true,
+   observedAtUtc:'2026-11-25T12:50:00.000Z',nonce:'NEVER_EXPOSE_NONCE'}};
+ const good=projectEr1PostcheckLinkReadonly(fixture);
+ assert.equal(good.status,'PASS');
+ assert.equal(good.exactRunJobMatched,true);
+ assert.equal(good.reportedRunJobLinked,true);
+ assert.equal(good.sourceCommitExistenceVerified,null);
+ assert.equal(good.postSourceMetadataMatched,true);
+ assert.equal(good.operationalWrites,0);
+ assert.doesNotMatch(JSON.stringify(good),/NEVER_EXPOSE|nonce|secret/);
+ for(const alteration of [
+  {postIssueNumber:3591},{targetSha:'a'.repeat(40)},
+  {requestId:'other'},{issueNumber:3590}
+ ]){
+  assert.equal(projectEr1PostcheckLinkReadonly({...fixture,...alteration}).status,'STATE_UNKNOWN');
+ }
+ for(const linkChange of [
+  {reportedRunJobLinked:false},{reportedRunJobLinked:undefined},
+  {runId:45617472369},{jobId:139216506443},
+  {reportedStatus:'FAIL'},{issueNumber:3591}
+ ]){
+  const r=projectEr1PostcheckLinkReadonly({...fixture,
+   postcheckLink:{...fixture.postcheckLink,...linkChange}});
+  assert.notEqual(r.status,'PASS');
+  assert.equal(r.exactRunJobMatched,false);
+ }
+ assert.equal(projectEr1PostcheckLinkReadonly(null).status,'STATE_UNKNOWN');
+ assert.equal(projectEr1PostcheckLinkReadonly({...fixture,
+  postcheckLink:{...fixture.postcheckLink,requestId:'other'}}).status,'STATE_UNKNOWN');
+ assert.ok(Buffer.byteLength(JSON.stringify(good))<2048);
 });
 test('W04 #3409 pause-window projection is exact, bounded and redacts raw data',()=>{
  const id='pc-update-71ea39dc-7048-4e10-9d11-d4be7f6c3ec0';
