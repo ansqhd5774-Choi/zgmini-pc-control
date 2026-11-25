@@ -99,3 +99,50 @@ test('re-pinned RUM browser evidence B preserves prior installed 0353 and exactl
  assert.throws(()=>validateUpdateRequest(req,raw,{actor:'ansqhd5774-Choi',
   installedSha:installed}),/UPDATE_INSTALLED_SOURCE_DRIFT/);
 });
+
+
+test('RUM e4bf one-parent replacement preserves report recovery and only two RUM files',()=>{
+ const current='e4bfd955ec06b6eecd4d67213309ec8f4e028af5';
+ const targetE4='53fe24e22446d21a9fd4ee308d12b7cba7f37e25';
+ const sourceE4='codex/rum-browser-evidence-selective-e4bf-20261126';
+ const raw=fs.readFileSync(path.join(root,'approvals/controller-updates',targetE4+'.json'));
+ const m=JSON.parse(raw);
+ const pin=JSON.parse(fs.readFileSync(path.join(root,
+  'approvals/controller-selective-targets',targetE4+'.json')));
+ assert.equal(m.schema,'ZGMINI_PC_UPDATE_V1');
+ assert.equal(m.installedSha,current);
+ assert.equal(m.targetSha,targetE4);
+ assert.equal(m.purpose,'pc-controller-maintenance');
+ assert.equal(m.controllerOnlyInstall,true);
+ assert.deepEqual(m.allowFiles.map(f=>f.path),paths);
+ for(const f of m.allowFiles)assert.equal(f.sha256,
+  hash(fs.readFileSync(path.join(root,f.path))));
+ assert.equal(m.checks.status,'PASS');
+ assert.equal(m.checks.manifestSha256,manifestFingerprint(m.allowFiles).sha256);
+ assert.equal(m.selectiveSource.branch,sourceE4);
+ assert.equal(m.selectiveSource.mainSha,sourceMain);
+ assert.deepEqual(m.selectiveSource.customPaths,[]);
+ assert.equal(m.backup.strategy,'VERSIONED_SNAPSHOT');
+ assert.deepEqual(m.backup.rollback,{kind:'RESTORE_INSTALLED_SHA',sha:current});
+ assert.equal(m.approval.grade,'B');
+ assert.equal(m.approval.scope,'PC_CONTROL_CONTROLLER_UPDATE');
+ assert.equal(m.approval.ref,pin.approvalRef);
+ assert.equal(m.postOperation,'core-status');
+ assert.equal(m.postSourceBranch,'main');
+ assert.equal(m.postSourceSha,'b6049aac81b3442a58b08050ee138921f87a09e6');
+ assert.equal(validateControllerSelectivePin(m,pin),true);
+ assert.equal(validateControllerOnlyInstallDelta(paths,m.allowFiles),true);
+ const req={schema:MAINTENANCE_ISSUE_SCHEMA,
+  requestId:'pc-update-57c4f1b6-3e76-4cf0-a861-3cfe6296bd84',
+  chatId:'chat-rum-browser-e4bf-20261126',
+  operation:'controller-update',controlRepository:CONTROL_REPOSITORY,
+  targetControllerSha:targetE4,approvalManifestSha256:hash(raw)};
+ assert.equal(validateUpdateRequest(req,raw,{actor:'ansqhd5774-Choi',
+  installedSha:current}).manifest.targetSha,targetE4);
+ assert.throws(()=>validateUpdateRequest(req,raw,{actor:'ansqhd5774-Choi',
+  installedSha:'0353e09059d6c8d483afbffb20d7f795e138f581'}),
+  /UPDATE_INSTALLED_SOURCE_DRIFT/);
+ assert.throws(()=>validateControllerOnlyInstallDelta([
+  ...paths,'controller/report-recovery-3650-once.mjs'],m.allowFiles),
+  /ALLOWFILE_DIFF_MISMATCH/);
+});
