@@ -24,6 +24,22 @@ export function verifyZizmorArchive(content,expected=ZIZMOR_ZIP_SHA256){
  if(hash!==expected)throw Error('ZIZMOR_ARCHIVE_SHA256_MISMATCH');
  return true;
 }
+// Print only validated rule identifiers when a strict offline audit fails.
+// Never expose the original findings, source excerpts, files or matched literals.
+export function summarizeZizmorRuleIds(stdout,stderr){
+ const texts=[stdout,stderr];
+ if(texts.some(t=>typeof t!=='string'||t.length>8*1024*1024))
+   return [];
+ const ids=new Set();
+ for(const source of texts){
+  for(const match of source.matchAll(/(?:^|\n)\s*(?:error|warning|note|info)\[([a-z][a-z0-9-]{0,79})\]/g)){
+   if(ids.size>=64)break;
+   ids.add(match[1]);
+  }
+ }
+ return [...ids].sort();
+}
+
 function run(cmd,args){
  const p=spawnSync(cmd,args,{windowsHide:true,stdio:'pipe',encoding:'utf8',
    timeout:120000,maxBuffer:8*1024*1024});
@@ -51,8 +67,12 @@ export async function auditChangedActions(){
      cwd:process.cwd(),windowsHide:true,stdio:'pipe',encoding:'utf8',
      timeout:120000,maxBuffer:8*1024*1024});
    // Avoid echoing potentially sensitive action YAML excerpts or literals.
-   if(audit.error||audit.status!==0)
+   if(audit.error||audit.status!==0){
+     const ids=summarizeZizmorRuleIds(audit.stdout??'',audit.stderr??'');
+     console.log(ids.length?'ZIZMOR_FINDING_RULE_IDS='+ids.join(','):
+       'ZIZMOR_FINDING_RULE_IDS_UNAVAILABLE');
      throw Error('ZIZMOR_ACTION_SECURITY_FAILED_'+String(audit.status??'EXEC'));
+   }
    console.log('PASS: zizmor audited '+files.length+' modified workflow/action file(s).');
  }finally{
    fs.rmSync(folder,{recursive:true,force:true});
