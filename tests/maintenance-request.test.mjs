@@ -297,6 +297,26 @@ test('existing manual request with matching manifest is reused without issuing a
  const result=await submitExistingControllerApprovalFromCi(f.input,f.ports);
  assert.equal(result.status,'EXISTING_REQUEST_REUSED');assert.deepEqual(result.issueNumbers,[123]);assert.equal(f.posts,0);
 });
+test('CI reuse accepts legacy pc-UUID using the established envelope schema',async()=>{
+ const f=workloadPublisherFixture();
+ const previous=JSON.parse(prepareMaintenanceIssue(f.bytes,{installedSha:OLD,chatId:'chat-ci-123-1'}).body);
+ previous.requestId=previous.requestId.replace(/^pc-update-/,'pc-');
+ f.prior=[{number:123,state:'closed',user:f.owner,title:'pc-controller-update',
+  body:JSON.stringify(previous),labels:[{name:'pc-maintenance'}]}];
+ const result=await submitExistingControllerApprovalFromCi(f.input,f.ports);
+ assert.equal(result.status,'EXISTING_REQUEST_REUSED');assert.deepEqual(result.issueNumbers,[123]);assert.equal(f.posts,0);
+});
+test('CI reuse rejects malformed historical request identity without a new POST',async()=>{
+ const f=workloadPublisherFixture();
+ const previous=JSON.parse(prepareMaintenanceIssue(f.bytes,{installedSha:OLD,chatId:'chat-ci-123-1'}).body);
+ previous.requestId='pc-update-unsafe';
+ f.prior=[{number:123,state:'closed',user:f.owner,title:'pc-controller-update',
+  body:JSON.stringify(previous),labels:[{name:'pc-maintenance'}]}];
+ const result=await submitExistingControllerApprovalFromCi(f.input,f.ports);
+ assert.equal(result.status,'STATE_UNKNOWN');
+ assert.equal(result.code,'MAINTENANCE_CI_PRIOR_EFFECT_UNVERIFIED_NO_REPOST');
+ assert.equal(f.posts,0);assert.equal(f.saved,null);
+});
 test('CI reuse never reports success for a different manifest with the same target SHA',async()=>{
  const f=workloadPublisherFixture();
  const original=JSON.parse(prepareMaintenanceIssue(f.bytes,{installedSha:OLD,chatId:'chat-ci-123-1'}).body);

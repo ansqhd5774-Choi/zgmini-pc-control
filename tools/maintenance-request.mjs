@@ -303,13 +303,12 @@ export async function submitExistingControllerApprovalFromCi({targetSha,approval
   // reuse a historical owner/bot request as a successful CI outcome.
   const exact=matches.every(x=>{
    try{
-    const previous=JSON.parse(x.body);
+    // Reuse the established envelope validator: it accepts both historical
+    // pc-UUID and current pc-update-UUID without weakening the request schema.
+    const previous=validateMaintenanceRequest(JSON.parse(x.body),{actor:CONTROL_ACTOR});
     return Number.isSafeInteger(x.number)&&x.number>0&&
      ['open','closed'].includes(x.state)&&
      x.labels?.some(label=>label.name===LABEL)&&
-     Object.keys(previous).length===Object.keys(q).length&&
-     typeof previous.requestId==='string'&&previous.requestId.startsWith('pc-update-')&&
-     typeof previous.chatId==='string'&&previous.chatId.startsWith('chat-')&&
      ['schema','operation','controlRepository','targetControllerSha','approvalManifestSha256']
       .every(key=>previous[key]===q[key]);
    }catch{return false;}
