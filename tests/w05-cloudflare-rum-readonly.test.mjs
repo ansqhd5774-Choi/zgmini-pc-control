@@ -136,3 +136,59 @@ test('A/light operation is a single fixed allowlist entry, not Controller mutati
  assert.match(controller,/inspectW05CloudflareRum\(dataRoot\)/);
  assert.doesNotMatch(controller,/request\.cloudflare|request\.graphql|request\.url/);
 });
+
+
+// B-only source approval checks: staging must never be confused with runtime install.
+// The independently recovered #3516 lease remains a separate, current CAS condition.
+import {manifestFingerprint,validateControllerSelectivePin,
+ validateControllerOnlyInstallDelta} from '../tools/maintenance-contract.mjs';
+const RUM_B_TARGET='c747525082454ed27d7f0c665562e408a9c139ee';
+const RUM_B_INSTALLED='83679b013ac9a9820331d93311ec97e572b18e13';
+const RUM_B_MAN=JSON.parse(readFileSync(new URL(
+ '../approvals/controller-updates/'+RUM_B_TARGET+'.json',import.meta.url),'utf8'));
+const RUM_B_PIN=JSON.parse(readFileSync(new URL(
+ '../approvals/controller-selective-targets/'+RUM_B_TARGET+'.json',import.meta.url),'utf8'));
+test('RUM B proposal pins only four Controller/config files with last confirmed preimage',()=>{
+ assert.equal(RUM_B_MAN.schema,'ZGMINI_PC_UPDATE_V1');
+ assert.equal(RUM_B_MAN.installedSha,RUM_B_INSTALLED);
+ assert.equal(RUM_B_MAN.targetSha,RUM_B_TARGET);
+ assert.equal(RUM_B_MAN.controllerOnlyInstall,true);
+ assert.equal(RUM_B_MAN.purpose,'pc-controller-maintenance');
+ assert.equal(RUM_B_MAN.approval.grade,'B');
+ assert.equal(RUM_B_MAN.approval.scope,'PC_CONTROL_CONTROLLER_UPDATE');
+ assert.match(RUM_B_MAN.approval.ref,
+  /^https:\/\/github\.com\/ansqhd5774-Choi\/zgmini-pc-control\/pull\/\d+$/);
+ assert.deepEqual(RUM_B_MAN.allowFiles.map(x=>x.path),[
+  'config/operations.json','controller/cloudflare-rum-field-parser.mjs',
+  'controller/operations.mjs','controller/w05-cloudflare-rum-readonly.mjs']);
+ assert.equal(RUM_B_MAN.checks.status,'PASS');
+ assert.equal(RUM_B_MAN.checks.targetSha,RUM_B_TARGET);
+ assert.equal(manifestFingerprint(RUM_B_MAN.allowFiles).sha256,
+  '917255f22a8f52579c6428ccb3cd1a9c7960d9248b00f247e1e19b30b929c83a');
+ assert.equal(RUM_B_MAN.checks.manifestSha256,
+  '917255f22a8f52579c6428ccb3cd1a9c7960d9248b00f247e1e19b30b929c83a');
+ assert.equal(validateControllerSelectivePin(RUM_B_MAN,RUM_B_PIN),true);
+ assert.equal(validateControllerOnlyInstallDelta(
+  RUM_B_MAN.allowFiles.map(x=>x.path),RUM_B_MAN.allowFiles),true);
+});
+test('RUM B exact source overlay takes no unrelated main Controller operations',()=>{
+ assert.equal(RUM_B_MAN.selectiveSource.schema,'ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1');
+ assert.equal(RUM_B_MAN.selectiveSource.branch,'codex/ci-cloudflare-rum-b-overlay-20261125');
+ assert.equal(RUM_B_MAN.selectiveSource.mainSha,
+  '4bd6653382c28060bbf12ca8341acb8c30e5f8e3');
+ assert.deepEqual([...RUM_B_MAN.selectiveSource.customPaths].sort(),[
+  'config/operations.json','controller/operations.mjs']);
+ assert.equal(RUM_B_MAN.backup.strategy,'VERSIONED_SNAPSHOT');
+ assert.deepEqual(RUM_B_MAN.backup.rollback,
+  {kind:'RESTORE_INSTALLED_SHA',sha:RUM_B_INSTALLED});
+ assert.equal(RUM_B_MAN.postOperation,'core-status');
+ assert.equal(RUM_B_MAN.postSourceBranch,'main');
+ assert.equal(RUM_B_MAN.postSourceSha,'b6049aac81b3442a58b08050ee138921f87a09e6');
+ assert.equal(RUM_B_PIN.sourceMainSha,RUM_B_MAN.selectiveSource.mainSha);
+ assert.deepEqual(RUM_B_PIN.allowFiles,RUM_B_MAN.allowFiles);
+ assert.throws(()=>validateControllerSelectivePin(RUM_B_MAN,{
+  ...RUM_B_PIN,targetSha:'0'.repeat(40)}),/SELECTIVE_PIN_MISMATCH/);
+ assert.throws(()=>validateControllerOnlyInstallDelta([
+  ...RUM_B_MAN.allowFiles.map(x=>x.path),'controller/engine.mjs'],
+  RUM_B_MAN.allowFiles),/ALLOWFILE_DIFF_MISMATCH/);
+});
