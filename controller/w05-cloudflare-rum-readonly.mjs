@@ -8,7 +8,8 @@ import {execFileSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 import {readFixedReadonlyBytes} from './fixed-readonly-bytes.mjs';
 import {selectR6GitBinary} from './employment-r6-d1-readback-readonly.mjs';
-import {buildRumQuery,parseRumGraphql,RUM_HOST} from './cloudflare-rum-field-parser.mjs';
+import {buildRumQuery,parseRumGraphql,buildRumBrowserQuery,
+ parseRumBrowserGraphql,RUM_HOST} from './cloudflare-rum-field-parser.mjs';
 
 export const RUM_OPERATION='w05-cloudflare-rum-readonly';
 const ACCOUNT=/^[a-f0-9]{32}$/;
@@ -64,9 +65,44 @@ export async function queryCloudflareRum({account,token,fetchImpl=fetch,nowMs=Da
  let parsed;
  try{parsed=parseRumGraphql(JSON.parse(raw),window);}
  catch(e){return {...base,code:cleanCode(e),phase:'VALIDATION'};}
+ // A browser breakdown is requested only for the observed missing mobile
+ // INP with a positive Web Vitals event group and reported INP total zero.
+ // It cannot override the four original P75 values or certify field Good.
+ const target=parsed.observations?.find(x=>
+  x.route==='/economic-indicators/'&&x.device==='mobile');
+ const inspect=target?.groupEventCount>0&&target.metrics?.inpMs?.p75===null&&
+  target.metricReportedTotals?.inpMs===0;
+ let browserEvidence='NOT_REQUESTED',cloudflareApiCalls=1;
+ if(inspect){
+  cloudflareApiCalls=2;
+  browserEvidence={status:'UNVERIFIED',code:'CF_RUM_BROWSER_QUERY_UNVERIFIED'};
+  try{
+   const browser=buildRumBrowserQuery({accountTag:account,...window});
+   const bresp=await fetchImpl(browser.endpoint,{
+    method:'POST',redirect:'error',cache:'no-store',
+    headers:{Authorization:'Bearer '+token,
+     'Content-Type':'application/json',Accept:'application/json'},
+    body:JSON.stringify({query:browser.query,variables:browser.variables}),
+    signal:AbortSignal.timeout(12000)
+   });
+   if(bresp?.status===200&&
+      Number(bresp.headers?.get?.('content-length')??0)<=65536){
+    const braw=await bresp.text();
+    if(braw.length<=65536){
+     const evidence=parseRumBrowserGraphql(JSON.parse(braw),window);
+     const browserCount=evidence.groups.reduce((s,r)=>s+r.groupEventCount,0);
+     browserEvidence={...evidence,
+      countsMatchPrimaryGroup:browserCount===target.groupEventCount};
+    }
+   }
+  }catch{
+   // This optional diagnostic is independent of the authenticated P75 read.
+   // Never expose a provider response, raw UA, credentials, or error details.
+  }
+ }
  const valuesPresent=parsed.fieldP75ValuesPresent===true;
  return {...base,...parsed,status:valuesPresent?'PASS':'STATE_UNKNOWN',
-  phase:'DONE',cloudflareApiCalls:1,providerCalls:0,d1Writes:0,
+  phase:'DONE',cloudflareApiCalls,browserEvidence,providerCalls:0,d1Writes:0,
   operationalWrites:0,sqliteOpened:false,siteGoodCertified:false,
   metricSampleSizesVerified:false,cruxEquivalent:false,mergeBlocking:false};
 }
