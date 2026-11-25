@@ -96,7 +96,12 @@ export async function main(){
    });
   }catch{state='HOLD_PROMOTION_OBSERVATION_UNVERIFIED';}
   if(state!=='ELIGIBLE_FOR_SUPERVISOR_ATOMIC_ACQUIRE'){
-   process.send?.({type:'PROMOTION_BLOCKED',code:state,pid:process.pid});
+   // A rejected one-shot candidate must not remain READY=false forever:
+   // release the IPC child so the sole Watchdog may rearm a fresh candidate.
+   process.send?.({type:'PROMOTION_BLOCKED',code:state,pid:process.pid},()=>{
+    process.exitCode=1;
+    process.disconnect?.();
+   });
    return;
   }
   // A one-shot, authenticated promotion request never steals or removes
@@ -105,8 +110,10 @@ export async function main(){
   process.send?.({type:'PROMOTION_ATTEMPTED',pid:process.pid});
   try{await import('./supervisor.mjs');}
   catch(e){
-   process.send?.({type:'PROMOTION_FAILED',code:'STANDBY_SUPERVISOR_IMPORT_FAILED'});
-   process.exitCode=1;
+   process.send?.({type:'PROMOTION_FAILED',code:'STANDBY_SUPERVISOR_IMPORT_FAILED'},()=>{
+    process.exitCode=1;
+    process.disconnect?.();
+   });
   }
  });
  process.send({type:'READY',pid:process.pid,sourceSha});
