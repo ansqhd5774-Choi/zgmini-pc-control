@@ -56,10 +56,10 @@
 | #25 | 완료 | 기존 fixture 및 실제 Browser 아티팩트의 color-contrast 미확정 결과 확인 | **DONE_NO_CHANGE (CI 계약)** — 미확정 결과를 통과로 위장하지 않음 | 기존 Browser CI 성공 재사용, 코드 수정 없음; 실제 UI 색 대비 여부는 별도 미확인 |
 | #1 | 완료 | 실제 홈·레이아웃 공유 파일 7개 트리거 누락 확인 | **DONE_FIXED** — 누락 경로 7개 보완 | [웹 PR #1635](https://github.com/ansqhd5774-Choi/zgmini/pull/1635), Node·Browser·CodeQL·Secret 4/4 PASS, main 병합 `04b4e4c45c66e8ca126fcb897337523ee2d2257c` |
 | #19 | 완료 | 전체 최근 100건 혼잡 조건 및 회귀시험 작성 | **DONE_FIXED** — Workflow별 범위 조회로 교정 | [PC PR #3721](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3721) CI 2/2·Node 회귀 11/11 PASS, main 병합 `9d8dcf906c938c41f6acde6f1ad4288652bcd890` |
-| #29 | 완료 | 기존 main 아티팩트 2개 동일 스키마·파일·hash 비교 | **수정 PR 진행** — 선택적 이전 baseline 자동 readback | [웹 PR #1636](https://github.com/ansqhd5774-Choi/zgmini/pull/1636) 코드·회귀시험 작성, 정확 HEAD CI 미확정 |
-| #12 | 완료 | 변경 YAML 1파일 actionlint 실행·기존 경로 회귀 사용 확인 | **DONE_NO_CHANGE** — 현재 계약 검사 정합 | 웹 PR #1635 Node CI PASS, Browser CI 별도 확인 중; 신규 Governance 기능 없음 |
+| #29 | 완료 | 기존 main 아티팩트 2개 + 신규 정확 HEAD 자동 compare JSON 원본 재조회 | **DONE_FIXED** — 선택적 이전 baseline 자동 readback | [웹 PR #1636](https://github.com/ansqhd5774-Choi/zgmini/pull/1636) Node·CodeQL·Secret 3/3 PASS, main 병합 `2112c2e83870e705fda078d266f79857cb9d1267` |
+| #12 | 완료 | 변경 YAML 1파일 actionlint 실행·기존 경로 회귀 사용 확인 | **DONE_NO_CHANGE** — 현재 계약 검사 정합 | 웹 PR #1635 Node·Browser·CodeQL·Secret 4/4 PASS 및 main 병합 완료, 신규 Governance 기능 없음 |
 
-**계획 수립: 6/6**, **후속 판정·필수 검증 완료: 5/6 (#23·#25·#12 DONE_NO_CHANGE, #19·#1 DONE_FIXED)**, **수정 PR·CI 진행: 1/6 (#29)**. 기존 CI 도입 완료 19/19를 감소시키지 않는다. 사용자가 요청하지 않은 새 예약 검증을 후속 개선 완료조건으로 추가하지 않는다.
+**계획 수립: 6/6**, **후속 판정·필수 검증 완료: 6/6 (100%): #23·#25·#12 DONE_NO_CHANGE, #19·#1·#29 DONE_FIXED**. 변경된 3건은 지정 범위 PR/실제 관련 CI/정확 병합 SHA/main 파일 readback 완료.  기존 CI 도입 완료 19/19를 감소시키지 않는다. 사용자가 요청하지 않은 새 예약 검증을 후속 개선 완료조건으로 추가하지 않는다.
 
 **첫 실행 대상:** #23의 `finalizeCrossBrowser`에 `javascriptErrors=1`을 주입한 기존 계약 테스트와 현재 요구된 합격 조건을 비교한다. 결과가 관측-only 정책과 일치하면 차단 추가 없이 `DONE_NO_CHANGE` 또는 별도 결정 필요로 처리하고 다음 독립 후보를 진행한다.
 
@@ -78,13 +78,13 @@
 - [브라우저 Run #45688120760](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45688120760) 로그는 두 뷰포트에서 각각 **`violatedRules=0`, `unverifiedRules=1`**로 기록한다. 이는 전체 접근성 통과가 아니라 **현재 미확정 결과가 남아 있음**을 의미한다. 기존 보고 경로 자체의 결함은 재현되지 않아 새 Gate를 추가하지 않았다.
 - **원본 아티팩트 재조회:** [Browser Run #45688120760](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45688120760)의 `community-chat-browser-r1` ZIP 내 `ci-accessibility/summary.json`에서 각 뷰포트의 `incomplete`를 식별. 규칙 `color-contrast`, 영향도 `serious`, 모바일 390px **3개 노드**, 데스크톱 1440px **1개 노드**, 양쪽 확정 `violatedRules=0`. 이는 자동화로 판정할 수 없는 규칙이며, UI의 실제 대비 결함 확정은 아니다. 기존 요약·시험은 이를 미확정으로 정상 표기하므로 **CI 로직 수정 불필요**. 실제 UI 색 대비 합격·불합격은 이 증거만으로 확정하지 않는다.
 
-### #19 CI Observability — 수정 PR 진행
+### #19 CI Observability — 수정·병합 완료
 
 - [PC `scripts/ci-job-metrics.mjs`](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/scripts/ci-job-metrics.mjs)는 저장소 전체 최근 `actions/runs?per_page=100`을 읽은 후 Workflow 이름을 선별했다. 격리 PC 제어 저장소에서 인계/관제 실행이 다량 섞인 실제 첫 페이지를 확인했고, **실제 대상 실행이 101번째 이후일 때 빈 결과가 되는 조건**을 가설로 분리했다. 현재 관측에서 모든 대상이 누락됐다는 주장은 아니다.
 - [별도 최신 main 기반 PR #3721](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3721): 기존 공식 GET으로 Workflow 이름→고유 ID를 검증한 뒤 해당 Workflow 실행 100건을 조회하도록 최소 수정. 인벤토리 누락·동명·잘못된 ID·대상 외 실행은 fail-closed. 관련 시험 11건으로 회귀 확장. **정확 HEAD `c7bd264fb3fe0d5725e7fed1dc2c37590628a0bd` C996·Secret Scan 2/2 SUCCESS, C996 직접 선택 테스트 11/11 PASS(0 FAIL); main `9d8dcf906c938c41f6acde6f1ad4288652bcd890` 병합 및 기록 확인.**
 - 새로운 Runner·예약·소스 설치·운영 데이터/권한·요금제 변경 없음.
 
-### #1 Dynamic CI — 누락 경로 실제 확인, 웹 PR 검증 중
+### #1 Dynamic CI — 누락 경로 확인·수정·병합 완료
 
 - 최신 웹 `main` `app/page.tsx`, `app/dashboard-ui.tsx`, `app/layout.tsx`, `app/about/page.tsx`의 **실존하는 직접 import**와 [`community-chat-browser.yml`](https://github.com/ansqhd5774-Choi/zgmini/blob/main/.github/workflows/community-chat-browser.yml)의 `pull_request.paths`를 비교. `components/site-header.tsx`, `components/site-footer.tsx`, `components/dashboard-side-rails.tsx`, `components/live-score-value.tsx`, `components/score-arrow-provider.tsx`, `app/responsive.css`, `app/about/about.module.css`는 실제 파일이면서 브라우저 트리거 목록에서 빠져 있었음.
 - [웹 PR #1635](https://github.com/ansqhd5774-Choi/zgmini/pull/1635): 기존 Workflow 경로 7개 추가와 `tests/browser-ci-trigger-scope.test.mjs`의 직접 의존 경로 회귀만 변경. **새 Workflow·전역 Gate·#8 성능예산 재도입 없음**.
@@ -94,10 +94,25 @@
 
 - [웹 PR #1635](https://github.com/ansqhd5774-Choi/zgmini/pull/1635)에서는 기존 Workflow YAML 1파일의 경로만 변경. 정확 HEAD `6b2df32e8e68f14ae8c7329040f0e450b643b97a` [Node CI #45694551850](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45694551850)의 `Validate changed GitHub Actions YAML (actionlint)` 단계가 성공했고 로그 `ACTIONLINT_CHANGED_WORKFLOWS=1`을 확인.
 - 기존 `tests/browser-ci-trigger-scope.test.mjs`에 직접 의존 경로 7건을 추가해 YAML 형식 검사와 실제 트리거 누락 검사를 **서로 다른 조건**으로 분리했다. #12의 누락을 입증한 추가 오류는 없으므로 신규 Governance Workflow나 전역 검사를 추가하지 않고 **DONE_NO_CHANGE**.
-- 브라우저 CI 성공은 #1 PR 최종 검증으로 별도 확인한다.
+- 관련 브라우저 CI [#45694551870](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45694551870)도 **SUCCESS**; #1과 중복 시험을 새로 만들지 않았다.
 
 ### #29 Bundle Size — 기존 기준선 원본 비교 결과
 
 - [Node CI Run #45691667146](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45691667146)와 [#45691870499](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45691870499)의 기존 `client-bundle-size-report` ZIP 아티팩트(각 `report.json`)를 GitHub 공식 읽기로 회수, **스키마 1·`dist/client/assets/*.js,*.css` 범위 일치** 확인.
 - JS **102파일, 1,715,802 raw bytes, 563,383 gzip 추정 bytes**, CSS **27파일, 719,954 raw bytes, 129,355 gzip 추정 bytes**로 두 결과 일치. **총 129개 파일 개별 SHA-256 일치**, JS/CSS raw·gzip 증감 **모두 0 bytes**.
-- 따라서 비교 가능한 baseline 아티팩트가 존재하지 않는다는 가설은 반증. [신규 웹 PR #1636](https://github.com/ansqhd5774-Choi/zgmini/pull/1636)은 기존 Node CI에 공식 GitHub Actions 읽기/이전 main 성공 결과 다운로드/기존 비교 함수 활용을 연결하고, 없어도 가짜 0%·PASS를 만들지 않는 선택적 관측만 추가했다. **현재 CI·main 병합 미확정이므로 #29는 RUNNING**. 새 예산 임계값·강제 Gate 없음.
+- 따라서 비교 가능한 baseline 아티팩트가 존재하지 않는다는 가설은 반증. [웹 PR #1636](https://github.com/ansqhd5774-Choi/zgmini/pull/1636)은 기존 Node CI에 공식 GitHub Actions 읽기·이전 main 성공 결과 아티팩트 조회·기존 비교 함수 활용을 연결하고, 결측을 가짜 0%/PASS로 만들지 않는 선택적 관측만 추가했다. **최종 CI·main 병합 검증이 완료되어 #29는 DONE_FIXED**. 새 예산 임계값·강제 Gate 없음.
+
+### #29 최종 실패 원인·수정·실제 검증
+
+- 최초 [PR #1636 Run #45696385288](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45696385288)은 **Node CI 실패**(다른 CodeQL/Secret 성공). 실제 원인은 `Regression tests` 중 7건: 기존 여러 테스트가 `continue-on-error: true`를 전역 거부했으며, 신규 아티팩트 목록 시험의 `total_count` 검사가 불충분했다. 비교·다운로드가 성공한 사실과 PR 전체 PASS는 구분했다.
+- 최소 수정: **`continue-on-error` 제거**, 기존 GitHub-hosted Runner의 공식 `gh run download`를 읽기 전용·고정 인자·bounded timeout으로 호출하는 선택형 Node 경로에 통합. 다운로드/권한/아티팩트 결측 시 `UNVERIFIED/UNAVAILABLE` 보고로 구분하고 필수 기존 단계는 그대로 fail-closed. 아티팩트 목록 불완전은 정확히 거부. 관련 fixture·회귀시험 재검증.
+- 최종 PR 정확 HEAD `2bada35e0520b88a0656a29b7594d42ab3dac1ba`: [Node CI #45697071567](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45697071567), [CodeQL #45697071625](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45697071625), [Secret #45697071579](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45697071579) **3/3 SUCCESS**.
+- 정확 HEAD CI 아티팩트 `client-bundle-size-report` (ID `15061122822`) 실제 ZIP readback: `comparison.json` + `report.json`; `status=COMPARABLE`, `baselineRunId=45696149190`, JS·CSS raw/gzip **0 bytes delta** (해당 두 샘플에만 해당). 누락 baseline을 0으로 위조한 결과가 아니다.
+- [웹 PR #1636](https://github.com/ansqhd5774-Choi/zgmini/pull/1636) 병합 `2112c2e83870e705fda078d266f79857cb9d1267`; 기존 Node Workflow·두 스크립트·두 시험 **총 5개 파일**의 `main` 원격 blob readback 완료. CI PASS/소스 병합과 웹 운영 배포·공급자 수집·DB/D1 게시 완료는 분리한다.
+
+## 7. 후속 개선 종료 판정 (2026-11-26)
+
+- **완료 6/6**: `DONE_FIXED` 3개 (#1 트리거, #19 관측 조회, #29 번들 과거 비교) + `DONE_NO_CHANGE` 3개 (#12 Workflow Governance, #23 관측형 Cross-browser, #25 접근성 미확정 결과의 안전한 구분).
+- #25 실제 페이지 색 대비의 자동 판정 불가 (`color-contrast` 모바일 노드 3·데스크톱 노드 1)는 **UI 실제 적합성 미입증**이며 새로운 CI 미완료나 강제 Gate로 승격하지 않는다.
+- 기존 채택 R1 8/8·R2 11/11=19/19의 실행 계약 보존. 사용자 제외한 R2 #8 Good/P75/Performance Budget 재도입 없음.
+- 이 원장은 기존 자동화 담당 전용 브랜치의 해당 문서에만 반영한다. 전체 오래된 브랜치의 무단 `main` 병합, 예약·Runner·PC·Cloudflare·원자료/DB/D1 운영 변경·유료 서비스 추가는 수행하지 않았다.
