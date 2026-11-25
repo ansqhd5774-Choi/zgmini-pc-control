@@ -1,0 +1,43 @@
+{
+  "schema": "ZGMINI_PC_UPDATE_V1",
+  "installedSha": "0353e09059d6c8d483afbffb20d7f795e138f581",
+  "targetSha": "f04f7c58b878432ea4b037ac8da8ae803e6dcb0e",
+  "allowFiles": [
+    {
+      "path": "controller/cloudflare-rum-field-parser.mjs",
+      "sha256": "eddf9155d90a427b63aca0cc8a107bcaca05275cf4393982f222e10017bfc9ea"
+    },
+    {
+      "path": "controller/w05-cloudflare-rum-readonly.mjs",
+      "sha256": "5263d90325e9f815c13dd7b75d545118bfd7a3eba8c23131b7141228d9fe6f82"
+    }
+  ],
+  "purpose": "pc-controller-maintenance",
+  "controllerOnlyInstall": true,
+  "selectiveSource": {
+    "schema": "ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1",
+    "branch": "codex/rum-browser-evidence-selective-0353-20261126",
+    "mainSha": "56cccf6dd73003d82fdda9e5e559a863d48df594",
+    "customPaths": []
+  },
+  "approval": {
+    "grade": "B",
+    "scope": "PC_CONTROL_CONTROLLER_UPDATE",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3699"
+  },
+  "checks": {
+    "targetSha": "f04f7c58b878432ea4b037ac8da8ae803e6dcb0e",
+    "status": "PASS",
+    "manifestSha256": "3cf6fa634d628dc0ab5e5460bb6787b946bb99f30ccc3c75e403d960d8de65a5"
+  },
+  "backup": {
+    "strategy": "VERSIONED_SNAPSHOT",
+    "rollback": {
+      "kind": "RESTORE_INSTALLED_SHA",
+      "sha": "0353e09059d6c8d483afbffb20d7f795e138f581"
+    }
+  },
+  "postOperation": "core-status",
+  "postSourceBranch": "main",
+  "postSourceSha": "b6049aac81b3442a58b08050ee138921f87a09e6"
+}
