@@ -82,3 +82,8 @@ A는 기존 정규 접수/판정에 필요한 확인만 재사용한다. B는 �
 - pinned-manifest-scope.mjs: 기존 승인 원본 무결성 검사와 Controller/Writer 계약 검사를 하나의 읽기 전용 경로로 연결. 효과, 승인 원본 경로, raw SHA256, target SHA, 요청 계약, 현재 설치/base-config 대조 및 기존 요청 상태를 비교한다. 역사 fixture는 과거 범위 대조용이며 신규 승인이나 실제 현재값이 아니다. selective Controller 별도 pin 및 다른 B 효과는 이번 기본 범위 대조에서 제외한다.
 - EXACT_MANIFEST_SCOPE_MATCH_ONLY는 원본과 요청의 일치 관측이며 자동 승인 발행의 근거 자체가 아니다. 독립 trust pin 출처, 신규 업무의 기존 사용자 승인과 필수 유지보수 매핑, 실제 CI tree/현재 상태 및 one-shot claim의 독립 확인은 미완료. A의 기존 경로 및 기존 B 승인 실행기는 변경하지 않는다.
 - 17건 회귀시험을 기존 격리 CI에 연결(승인 관련 총 97건, 기존 wiring 회귀 1건 별도). 신규 테스트 실행 결과 미확인. 운영 변경/권한 확대 없음. 기존 PR CI 중에는 준비 브랜치에서 유지하고 종료 후 원래 PR에 fast-forward한다.
+
+### 2026-11-25 후속 — 기존 실행 요청 형식 연결
+- 754ecd4f97c991960c0eb48995bb7da9dcf8b273의 CI 3종 SUCCESS(45597113597/45597113616/45597113786); 승인 관련 80건 통과. 기존 준비 커밋 bec6be792de14b3eec17c0e578b3eed14cc566d2을 원래 Draft PR #3545에 fast-forward, 97건 CI 등록.
+- request-preview.mjs는 정확한 기존 B manifest 범위 검사에 성공한 경우 기존 Controller/Writer 제목·라벨·본문을 구성하고 기존 requestId/본문 SHA256을 보존한다. Writer 유지보수 모드별 라벨을 기존 계약에 따라 결정한다. Controller 기존 readback 검증기와 형식 호환 회귀시험 포함. REQUEST_PREVIEW_ONLY, 외부 제출/승인 발행/권한 부여 없음.
+- 신규 12건 시험(승인 관련 총 109건), 기존 격리 CI에 연결 준비. 원래 PR의 진행 중 CI를 취소하지 않도록 준비 브랜치에서 보존한다. 실제 CI 결과 미확인. 신뢰 pin 발급 출처 및 현재 유효성, 독립적인 one-shot claim, 기존 승인 범위 내 신규 manifest 발행은 미완료. 기존 Controller/Writer 제출/복구 계약을 변경하지 않는다.
