@@ -21,6 +21,29 @@ test('gate is operation-specific and preserves the R6 1536 MiB threshold',()=>{
  assert.equal(memoryAdmissionMinimum(policy,'theme-common-tests'),384);
  assert.equal(memoryAdmissionMinimum(policy,'employment-r6-candidate-stage-readonly'),1536);
 });
+test('R6 post-admission check tolerates transient RAM dips but keeps the 1536 MiB guard',async()=>{
+ const source=fs.readFileSync(new URL('../controller/operations.mjs',import.meta.url),'utf8');
+ const branch=source.split("if(request.operation==='employment-r6-candidate-stage-readonly')")[1]
+  ?.split("if(request.operation==='core-conflict-proof')")[0];
+ assert.ok(branch,'R6 operation branch present');
+ assert.match(branch,/await waitForMemoryAdmission\\(\\{minimumFreeMiB,timeoutMs:9000,intervalMs:1500\\}\\)/);
+ assert.match(branch,/minimumFreeMiB=policy\\.operations\\[request\\.operation\\]\\.minimumFreeMiB\\?\\?policy\\.minimumFreeMiBForHeavy/);
+ assert.match(branch,/if\\(!memoryRecheck\\.admitted\\)return \\{status:'BLOCKED',code:'RESOURCE_WAIT_MEMORY'/);
+ assert.doesNotMatch(branch,/if\\(os\\.freemem\\(\\)\\/1048576<minimum\\)/);
+ const threshold=memoryAdmissionMinimum(policy,'employment-r6-candidate-stage-readonly');
+ assert.equal(threshold,1536);
+ const admitted=await waitForMemoryAdmission({minimumFreeMiB:threshold,
+  readFreeMiB:()=>1634,timeoutMs:0});
+ assert.equal(admitted.admitted,true);
+ const seen=[1200,1540];let n=0;
+ const recovered=await waitForMemoryAdmission({minimumFreeMiB:threshold,
+  readFreeMiB:()=>seen[Math.min(n++,seen.length-1)],timeoutMs:50,intervalMs:1});
+ assert.equal(recovered.admitted,true);assert.equal(recovered.samples,2);
+ const blocked=await waitForMemoryAdmission({minimumFreeMiB:threshold,
+  readFreeMiB:()=>1200,timeoutMs:5,intervalMs:1});
+ assert.equal(blocked.admitted,false);assert.equal(blocked.freeMiB,1200);
+});
+
 test('free memory at threshold is admitted without waiting',async()=>{
  const r=await waitForMemoryAdmission({minimumFreeMiB:1536,readFreeMiB:()=>1536,timeoutMs:0});
  assert.equal(r.admitted,true);assert.equal(r.samples,1);assert.ok(r.waitedMs<10);
