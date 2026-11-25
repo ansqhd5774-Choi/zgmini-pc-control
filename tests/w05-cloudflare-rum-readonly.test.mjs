@@ -193,3 +193,64 @@ test('RUM B exact source overlay takes no unrelated main Controller operations',
   ...RUM_B_MAN.allowFiles.map(x=>x.path),'controller/engine.mjs'],
   RUM_B_MAN.allowFiles),/ALLOWFILE_DIFF_MISMATCH/);
 });
+
+
+// Corrected B candidate supersedes the old source target for RUM deployment.
+// Both are immutable, but only the V2 source has real GraphQL bot-filter semantics.
+const CORRECTED_TARGET='3d42f226fcffde1f09885da552f9b003ea30e57e';
+const CORRECTED_MAN=JSON.parse(readFileSync(new URL(
+ '../approvals/controller-updates/'+CORRECTED_TARGET+'.json',import.meta.url),'utf8'));
+const CORRECTED_PIN=JSON.parse(readFileSync(new URL(
+ '../approvals/controller-selective-targets/'+CORRECTED_TARGET+'.json',import.meta.url),'utf8'));
+test('RUM B V2 pins four corrected bytes and the same installed CAS, not old target',()=>{
+ assert.equal(CORRECTED_MAN.installedSha,RUM_B_INSTALLED);
+ assert.equal(CORRECTED_MAN.targetSha,CORRECTED_TARGET);
+ assert.notEqual(CORRECTED_MAN.targetSha,RUM_B_TARGET);
+ assert.equal(CORRECTED_MAN.schema,'ZGMINI_PC_UPDATE_V1');
+ assert.equal(CORRECTED_MAN.controllerOnlyInstall,true);
+ assert.equal(CORRECTED_MAN.purpose,'pc-controller-maintenance');
+ assert.equal(CORRECTED_MAN.approval.grade,'B');
+ assert.equal(CORRECTED_MAN.approval.scope,'PC_CONTROL_CONTROLLER_UPDATE');
+ assert.match(CORRECTED_MAN.approval.ref,
+  /^https:\/\/github\.com\/ansqhd5774-Choi\/zgmini-pc-control\/pull\/\d+$/);
+ assert.deepEqual(CORRECTED_MAN.allowFiles.map(f=>f.path),RUM_B_MAN.allowFiles.map(f=>f.path));
+ assert.deepEqual(CORRECTED_MAN.allowFiles.map(f=>f.sha256),[
+  '0faadb506c22e0219a9d6a4edcc24fbacd6af355ddfcd2fd80e5f602b4617f38',
+  '5705f03b6ca5b33f5980e1af968ced6c70fa82d611bc8467e67390ba1dcfa0b5',
+  '2a204fe31c61b4c50ade16a20bd1d9a595d39212ace8a92b40eb1266b1abf5eb',
+  '6271d351b628c23c2dd7ff4481389745c604400f044b163d25394c43fdfc4fae'
+ ]);
+ assert.equal(CORRECTED_MAN.checks.status,'PASS');
+ assert.equal(CORRECTED_MAN.checks.targetSha,CORRECTED_TARGET);
+ assert.equal(CORRECTED_MAN.checks.manifestSha256,
+  '78f42ba66bc1a474ab8e961159bdc9466feaed6e1c475c3b48a7f08549cef566');
+ assert.equal(manifestFingerprint(CORRECTED_MAN.allowFiles).sha256,
+  CORRECTED_MAN.checks.manifestSha256);
+ assert.equal(validateControllerSelectivePin(CORRECTED_MAN,CORRECTED_PIN),true);
+ assert.equal(validateControllerOnlyInstallDelta(
+  CORRECTED_MAN.allowFiles.map(x=>x.path),CORRECTED_MAN.allowFiles),true);
+});
+test('RUM B V2 uses corrected source merge and cannot silently overwrite ER1',()=>{
+ assert.equal(CORRECTED_MAN.selectiveSource.schema,
+  'ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1');
+ assert.equal(CORRECTED_MAN.selectiveSource.mainSha,
+  '730dfa37a8f676003dfe5840740e19134b99278d');
+ assert.equal(CORRECTED_MAN.selectiveSource.branch,
+  'codex/ci-cloudflare-rum-b-overlay-v2-20261125');
+ assert.deepEqual([...CORRECTED_MAN.selectiveSource.customPaths].sort(),[
+  'config/operations.json','controller/operations.mjs']);
+ assert.equal(CORRECTED_MAN.postOperation,'core-status');
+ assert.equal(CORRECTED_MAN.postSourceBranch,'main');
+ assert.equal(CORRECTED_MAN.postSourceSha,'b6049aac81b3442a58b08050ee138921f87a09e6');
+ assert.deepEqual(CORRECTED_MAN.backup.rollback,
+  {kind:'RESTORE_INSTALLED_SHA',sha:RUM_B_INSTALLED});
+ assert.equal(CORRECTED_MAN.backup.strategy,'VERSIONED_SNAPSHOT');
+ assert.equal(CORRECTED_PIN.sourceMainSha,CORRECTED_MAN.selectiveSource.mainSha);
+ assert.deepEqual(CORRECTED_PIN.allowFiles,CORRECTED_MAN.allowFiles);
+ assert.throws(()=>validateControllerSelectivePin(CORRECTED_MAN,{
+  ...CORRECTED_PIN,targetSha:RUM_B_TARGET}),/SELECTIVE_PIN_MISMATCH/);
+ assert.throws(()=>validateControllerOnlyInstallDelta([
+  ...CORRECTED_MAN.allowFiles.map(x=>x.path),
+  'controller/market-calendar-er1-dec31-evidence-readonly.mjs'
+ ],CORRECTED_MAN.allowFiles),/ALLOWFILE_DIFF_MISMATCH/);
+});
