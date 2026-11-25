@@ -47,8 +47,8 @@ function calendarRows(body,day){
   return rows;
 }
 
-function storedHistory(input,symbol){
-  for(const name of HISTORY_DIRS){
+function storedHistory(input,symbol,folders=HISTORY_DIRS){
+  for(const name of folders){
     const file=path.join(input,name,symbol+'.json');
     if(!fs.existsSync(file))continue;
     if(!safeFile(file,2_500_000))return {kind:'INVALID',rows:[]};
@@ -95,6 +95,77 @@ export function summarizeOriginalPriorActualContent(history){
   return {epsRows,revenueRows,bothRows};
 }
 
+
+// An additional local candidate is NOT an approved data source. Inspect only
+// immediate siblings of the five fixed ER1 archives, never arbitrary PC paths.
+// Return aggregate provenance signals, never directory names, tickers or raw.
+export function inspectExtraEr1ArchiveCandidates(input,symbols){
+  const out={schema:'ZGMINI_ER1_474_NEARBY_ARCHIVE_A_V1',
+    status:'NOT_VERIFIED',code:'NEARBY_ARCHIVE_NOT_STARTED',
+    scope:'ER1_INPUT_SIBLING_DIRECTORIES_ONLY',
+    siblingDirectories:0,otherNamedDirectories:0,inspectedFolders:0,
+    candidateFiles:0,shapeValidFiles:0,invalidFiles:0,
+    extraOriginalSymbols:0,extraOriginalWithPriorBothActual:0,
+    extraOriginalPreRunWithPriorBothActual:0,
+    providerCalls:0,coreWrites:0,d1Writes:0,schedulerWrites:0};
+  if(typeof input!=='string'||!path.isAbsolute(input)||
+    !Array.isArray(symbols)||symbols.length>5000||
+    symbols.some(x=>!SYMBOL.test(x))||new Set(symbols).size!==symbols.length){
+    out.code='NEARBY_ARCHIVE_INPUT_INVALID';return out;
+  }
+  let entries;
+  try{
+    const root=fs.lstatSync(input);
+    if(!root.isDirectory()||root.isSymbolicLink())throw Error('ROOT');
+    entries=fs.readdirSync(input,{withFileTypes:true});
+  }catch{out.code='NEARBY_ARCHIVE_ROOT_UNREADABLE';return out}
+  if(entries.length>128){out.status='PARTIAL';out.code='NEARBY_ARCHIVE_ROOT_LIMIT';return out}
+  const pattern=/^(?:nov30|dec31)-[a-z0-9-]{1,64}$/;
+  const other=entries.filter(x=>x.isDirectory()&&!x.isSymbolicLink()&&!HISTORY_DIRS.includes(x.name));
+  out.siblingDirectories=other.length;
+  out.otherNamedDirectories=other.filter(x=>!pattern.test(x.name)).length;
+  const matching=other.filter(x=>pattern.test(x.name));
+  if(matching.length>32){out.status='PARTIAL';out.code='NEARBY_ARCHIVE_FOLDER_LIMIT';return out}
+  const original=new Set(symbols),novel=new Set(),both=new Set(),earlyBoth=new Set();
+  let partial=false;
+  for(const ent of matching){
+    const dir=path.join(input,ent.name);
+    let names;
+    try{
+      const st=fs.lstatSync(dir);
+      if(!st.isDirectory()||st.isSymbolicLink())throw Error('UNSAFE');
+      names=fs.readdirSync(dir,{withFileTypes:true});
+      if(names.length>4096)throw Error('TOO_MANY');
+    }catch{partial=true;continue}
+    out.inspectedFolders++;
+    for(const entry of names){
+      if(!entry.isFile()||entry.isSymbolicLink()||
+        !entry.name.endsWith('.json'))continue;
+      const symbol=entry.name.slice(0,-5);
+      if(!original.has(symbol))continue;
+      out.candidateFiles++;
+      const h=storedHistory(input,symbol,[ent.name]);
+      if(h.kind!=='READ'){out.invalidFiles++;continue}
+      out.shapeValidFiles++;
+      // Avoid promoting a duplicate of an already-inspected archive.
+      if(storedHistory(input,symbol).kind!=='MISSING')continue;
+      novel.add(symbol);
+      const actual=summarizeOriginalPriorActualContent(h);
+      if(actual.bothRows){
+        both.add(symbol);
+        if(Date.parse(h.storedAt)<=ORIGINAL_474_CUTOFF_MS)
+          earlyBoth.add(symbol);
+      }
+    }
+  }
+  out.extraOriginalSymbols=novel.size;
+  out.extraOriginalWithPriorBothActual=both.size;
+  out.extraOriginalPreRunWithPriorBothActual=earlyBoth.size;
+  out.status=partial?'PARTIAL':'PASS';
+  out.code=partial?'NEARBY_ARCHIVE_SCAN_PARTIAL':'NEARBY_ARCHIVE_SCAN_COMPLETE';
+  return out;
+}
+
 // A-grade: reconstruct the original date-pinned November candidate set only
 // from stored historical SQLite rows and existing private files, never GET.
 // If any historical input is unavailable, the original hash is NOT VERIFIED.
@@ -118,6 +189,7 @@ export async function inspectOriginalNov6InputVintage({
     originalCohortCachedWithPriorBothActual:null,
     originalCohortStoredBeforeRunWithPriorBothActual:null,
     originalCohortPriorBothActualRows:null,
+    nearbyArchiveCandidateInventory:null,
     providerCalls:0,coreWrites:0,d1Writes:0,schedulerWrites:0
   };
   if(typeof pcHome!=='string'||!path.isAbsolute(pcHome)){
@@ -250,6 +322,7 @@ export async function inspectOriginalNov6InputVintage({
     r.originalCohortCachedWithPriorBothActual=withBoth;
     r.originalCohortStoredBeforeRunWithPriorBothActual=beforeWithBoth;
     r.originalCohortPriorBothActualRows=bothRows;
+    r.nearbyArchiveCandidateInventory=inspectExtraEr1ArchiveCandidates(input,symbols);
     r.originalCohortCachedSymbols=present;
     r.originalCohortMissingSymbols=missing;
     r.originalCohortInvalidFiles=invalid;
