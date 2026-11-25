@@ -610,3 +610,51 @@ test('#3650 after RUM: one-file uploader selective B re-pins the verified RUM Co
  assert.equal(validateUpdateRequest(request,raw,{actor:'ansqhd5774-Choi',installedSha:installed}).manifest.targetSha,target);
  assert.throws(()=>validateUpdateRequest(request,raw,{actor:'ansqhd5774-Choi',installedSha:'2e0506fd63ea40b47171af8ea3ef8d017fe2ce5a'}),/UPDATE_INSTALLED_SOURCE_DRIFT/);
 });
+
+
+test('#3650 after uploader: exact original report recovery B is single-file and preserves original only',async()=>{
+ const {manifestFingerprint,validateControllerSelectivePin,validateControllerOnlyInstallDelta,
+  validateUpdateRequest,MAINTENANCE_ISSUE_SCHEMA,CONTROL_REPOSITORY}=await import('../tools/maintenance-contract.mjs');
+ const installed='f50de351af0ef1502aeca99a913a6a9153fd3f10';
+ const target='0353e09059d6c8d483afbffb20d7f795e138f581';
+ const selected='codex/report-recovery-3650-overlay-post-uploader-r1';
+ const sourceMain='557063ff2e4a69f9280a71cbdd3d804c76b0611c';
+ const file='controller/report-recovery-3650-once.mjs';
+ const digest=b=>createHash('sha256').update(b).digest('hex');
+ const raw=fs.readFileSync(new URL('../approvals/controller-updates/'+target+'.json',import.meta.url));
+ const manifest=JSON.parse(raw);
+ const pin=JSON.parse(fs.readFileSync(new URL('../approvals/controller-selective-targets/'+target+'.json',import.meta.url)));
+ assert.equal(manifest.installedSha,installed);
+ assert.equal(manifest.targetSha,target);
+ assert.equal(manifest.purpose,'pc-controller-maintenance');
+ assert.equal(manifest.controllerOnlyInstall,true);
+ assert.equal(manifest.approval.grade,'B');
+ assert.equal(manifest.approval.scope,'PC_CONTROL_CONTROLLER_UPDATE');
+ assert.match(manifest.approval.ref,/^https:\/\/github\.com\/ansqhd5774-Choi\/zgmini-pc-control\/pull\/[1-9]\d*$/);
+ assert.equal(pin.approvalRef,manifest.approval.ref);
+ assert.equal(manifest.selectiveSource.schema,'ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1');
+ assert.equal(manifest.selectiveSource.branch,selected);
+ assert.equal(manifest.selectiveSource.mainSha,sourceMain);
+ assert.deepEqual(manifest.selectiveSource.customPaths,[]);
+ assert.deepEqual(manifest.allowFiles.map(x=>x.path),[file]);
+ assert.equal(manifest.allowFiles[0].sha256,digest(fs.readFileSync(new URL('../'+file,import.meta.url))));
+ assert.equal(manifest.allowFiles[0].sha256,'e3fa9bed3230cafb43c98942e2708c83d2796d4b264ef38345354217cfd04eed');
+ assert.equal(manifest.checks.targetSha,target);
+ assert.equal(manifest.checks.status,'PASS');
+ assert.equal(manifest.checks.manifestSha256,manifestFingerprint(manifest.allowFiles).sha256);
+ assert.equal(manifest.checks.manifestSha256,'4e1c95aa5ce3052df4142460f16bc36e8b5423448c55558474305e9ecaffb916');
+ assert.equal(manifest.backup.strategy,'VERSIONED_SNAPSHOT');
+ assert.equal(manifest.backup.rollback.kind,'RESTORE_INSTALLED_SHA');
+ assert.equal(manifest.backup.rollback.sha,installed);
+ assert.equal(manifest.postOperation,'core-status');
+ assert.equal(manifest.postSourceBranch,'main');
+ assert.equal(manifest.postSourceSha,'b6049aac81b3442a58b08050ee138921f87a09e6');
+ assert.equal(validateControllerSelectivePin(manifest,pin),true);
+ assert.equal(validateControllerOnlyInstallDelta([file],manifest.allowFiles),true);
+ assert.throws(()=>validateControllerOnlyInstallDelta([file,'controller/w05-cloudflare-rum-readonly.mjs'],manifest.allowFiles),/ALLOWFILE_DIFF_MISMATCH/);
+ const request={schema:MAINTENANCE_ISSUE_SCHEMA,requestId:'pc-update-0218e39b-f31d-4111-9f14-b2e332113cc9',
+  chatId:'chat-report-recovery-3650-original-only',operation:'controller-update',
+  controlRepository:CONTROL_REPOSITORY,targetControllerSha:target,approvalManifestSha256:digest(raw)};
+ assert.equal(validateUpdateRequest(request,raw,{actor:'ansqhd5774-Choi',installedSha:installed}).manifest.targetSha,target);
+ assert.throws(()=>validateUpdateRequest(request,raw,{actor:'ansqhd5774-Choi',installedSha:'717e242d769c9de3ed122b7fb636d38daaef48eb'}),/UPDATE_INSTALLED_SOURCE_DRIFT/);
+});
