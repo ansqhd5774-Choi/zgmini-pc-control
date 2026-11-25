@@ -171,8 +171,8 @@ export async function execute(){
  const protectionBefore=protection();
  requireCurrentProtection({historical:historicalProtection,current:protectionBefore});
  const controllerHost=readJSON(path.join(controller,'host.json'));
- verifyApprovedControllerHost(controllerHost,r4?R4_TARGET:APPROVED_CONTROLLER_SHA);
- if(r4)verifyR4ControllerHost(controllerHost);
+ verifyApprovedControllerHost(controllerHost,r4?request.expectedControllerSha:APPROVED_CONTROLLER_SHA);
+ if(r4)verifyR4ControllerHost(controllerHost,request.expectedControllerSha);
  const owner=readJSON(path.join(home,'receiver/owner.json'));
  const status=readJSON(path.join(home,'STATUS.json'));
  const requests=path.join(home,'upgrades');
