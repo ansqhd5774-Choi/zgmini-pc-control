@@ -5,6 +5,7 @@ on:
     paths:
       - 'ci-approval/**'
       - 'tests/ci-approval-completed-run-intake.test.mjs'
+      - 'tests/ci-approval-execution-identity.test.mjs'
       - '.github/workflows/ci-approval-event-intake.yml'
       - 'tests/ci-approval-shadow-decision.test.mjs'
       - 'tests/ci-approval-contract-adapter.test.mjs'
@@ -270,7 +271,7 @@ jobs:
         if: hashFiles('tests/ci-approval-shadow-decision.test.mjs', 'tests/ci-approval-contract-adapter.test.mjs') != ''
         run: node --test --test-concurrency=1 tests/ci-approval-shadow-decision.test.mjs tests/ci-approval-contract-adapter.test.mjs
       - name: Verify completed CI run intake without issuance
-        run: node --test --test-concurrency=1 tests/ci-approval-completed-run-intake.test.mjs
+        run: node --test --test-concurrency=1 tests/ci-approval-completed-run-intake.test.mjs tests/ci-approval-execution-identity.test.mjs
       - name: Verify CI approval evidence observations without execution
         if: hashFiles('ci-approval/github-ci-evidence.mjs', 'tests/ci-approval-github-ci-evidence.test.mjs') != ''
         run: node --test --test-concurrency=1 tests/ci-approval-github-ci-evidence.test.mjs
