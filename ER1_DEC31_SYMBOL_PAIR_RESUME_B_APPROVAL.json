@@ -1,0 +1,31 @@
+{
+  "schema": "ZGMINI_ER1_DEC31_SYMBOL_PAIR_RESUME_APPROVAL_V1",
+  "approvalState": "USER_APPROVED_IN_CHAT_2026-11-26",
+  "scope": "PC_PRIVATE_EARNINGSAPI_DEC2026_TOL_CASY_PAIR_RESUME_ONLY",
+  "originalIssueNumber": 173,
+  "originalRequestId": "pc-dec31-a237c95a-dedb-4d19-854c-eb1234878eab",
+  "originalSourceSha": "55014d3c76ac1071dbe369c0a7fe72bd94ed0c5a",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceSha": "e9895abee60bc74e30380372143daf10cb3333ee",
+  "sourceFile": "scripts/pc-writer/market-calendar-dec31-symbol-batch-a.mjs",
+  "sourceGitBlobSha1": "a2ce20772f0415c461e2b8a027b16f8e28bef1fc",
+  "fixedExistingSymbols": 38,
+  "symbols": [
+    "TOL",
+    "CASY"
+  ],
+  "periodStart": "2026-12-01",
+  "periodEnd": "2026-12-31",
+  "maxProviderRequests": 2,
+  "maxAutomaticRetries": 0,
+  "privateRawStorageOnly": true,
+  "requireOriginalOneShotMarker": true,
+  "requireUnmodifiedExistingRaw": true,
+  "allowPaidPlanChange": false,
+  "allowNewProvider": false,
+  "allowCoreWrites": false,
+  "allowD1Writes": false,
+  "allowSchedulerChanges": false,
+  "allowPublicRawData": false,
+  "allowDeploymentChanges": false
+}
