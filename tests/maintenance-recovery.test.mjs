@@ -205,3 +205,36 @@ test('independent #3516 A result remains original postcheck UNKNOWN; no syntheti
  assert.equal(claim.protectedStateUnchanged,true);
  assert.equal(Object.keys(claim.recoveryCas.casDigests).length,7);
 });
+
+test('#3516 unapproved recovery proposal pins exact source and independent A without enabling effect',()=>{
+ const rel='../drafts/maintenance-recoveries/pc-update-c087fa10-88e2-42e3-bc60-c758ab93f0c1.unapproved.json';
+ const draft=JSON.parse(fs.readFileSync(new URL(rel,import.meta.url),'utf8'));
+ assert.equal(draft.schema,'ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V1');
+ assert.equal(draft.approved,false);
+ assert.equal(draft.operation,'RECONCILE_INSTALLED');
+ assert.equal(draft.requestId,'pc-update-c087fa10-88e2-42e3-bc60-c758ab93f0c1');
+ assert.equal(draft.sourceSha,'a730a06305810b15a197925c07746757da60ad52');
+ assert.equal(draft.issueNumber,3516);
+ assert.equal(draft.targetControllerSha,'83679b013ac9a9820331d93311ec97e572b18e13');
+ assert.equal(draft.files.length,4);
+ for(const file of draft.files){
+  assert.match(file.path,/^(tools\/(?:maintenance-recovery|update|maintenance-contract)\.mjs|controller\/fixed-readonly-bytes\.mjs)$/);
+  const bytes=fs.readFileSync(new URL('../'+file.path,import.meta.url));
+  assert.equal(createHash('sha256').update(bytes).digest('hex'),file.sha256,file.path);
+ }
+ const receiptBytes=fs.readFileSync(new URL('../'+draft.proof.resultPath,import.meta.url));
+ assert.equal(createHash('sha256').update(receiptBytes).digest('hex'),
+  draft.proof.resultSha256);
+ const receipt=JSON.parse(receiptBytes),proof=receipt.w043516MaintenanceStatus;
+ assert.equal(receipt.issueNumber,draft.proof.issueNumber);
+ assert.equal(receipt.runId,String(draft.proof.runId));
+ assert.equal(receipt.status,'PASS');
+ assert.equal(proof.requestId,draft.requestId);
+ assert.equal(proof.actualControllerSha,draft.targetControllerSha);
+ assert.equal(proof.historicalRequest.postIssueNumber,3519);
+ assert.equal(proof.historicalRequest.code,'POSTCHECK_OUTCOME_UNKNOWN');
+ assert.equal(proof.recoveryCas.recoveryEligible,false);
+ assert.equal(proof.protectedDifferenceClass,'UNCHANGED');
+ assert.deepEqual(draft.casDigests,proof.recoveryCas.casDigests);
+ assert.equal(draft.approvedCurrentWriterConfigSha256,draft.casDigests.writerSha256);
+});
