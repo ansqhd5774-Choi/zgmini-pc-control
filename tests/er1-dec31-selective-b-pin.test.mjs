@@ -19,3 +19,70 @@ test('ER1 December selective overlay two paths match merged read-only source byt
   assert.equal(digest(fs.readFileSync(path.join(root,file.path))),file.sha256);
  }
 });
+
+import {manifestFingerprint,validateControllerSelectivePin,validateUpdateRequest}
+ from '../tools/maintenance-contract.mjs';
+
+const target='90f2bdca223ebb6b031d60b28bcd879f72bae2ff';
+const installed='83679b013ac9a9820331d93311ec97e572b18e13';
+const sourceMain='e1651b7f764415f4fffa29ba2eeb72a8ced743be';
+const approvedRef='https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3542';
+
+function evidence(){
+ const f=fs.readFileSync(path.join(root,'approvals/controller-updates',target+'.json'));
+ const manifest=JSON.parse(f);
+ const pin=JSON.parse(fs.readFileSync(path.join(root,
+   'approvals/controller-selective-targets',target+'.json'),'utf8'));
+ const issue={
+  schema:'ZGMINI_PC_MAINTENANCE_REQUEST_V1',
+  requestId:'pc-update-eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+  chatId:'chat-er1-dec31-selective-fixture',
+  operation:'controller-update',
+  controlRepository:'ansqhd5774-Choi/zgmini-pc-control',
+  targetControllerSha:target,
+  approvalManifestSha256:digest(f),
+ };
+ return {manifest,pin,issue,raw:f};
+}
+
+test('exact selective B manifest and reviewed pin agree on source and rollback',()=>{
+ const {manifest,pin,issue,raw}=evidence();
+ assert.equal(manifest.installedSha,installed);
+ assert.equal(manifest.targetSha,target);
+ assert.equal(manifest.purpose,'pc-controller-maintenance');
+ assert.equal(manifest.controllerOnlyInstall,true);
+ assert.equal(manifest.approval.grade,'B');
+ assert.equal(manifest.approval.scope,'PC_CONTROL_CONTROLLER_UPDATE');
+ assert.equal(manifest.approval.ref,approvedRef);
+ assert.equal(manifest.selectiveSource.mainSha,sourceMain);
+ assert.equal(manifest.selectiveSource.branch,
+  'codex/er1-dec31-selective-installed83679-20261125');
+ assert.deepEqual(manifest.selectiveSource.customPaths,[]);
+ assert.deepEqual(manifest.allowFiles,exactFiles);
+ assert.equal(manifest.checks.manifestSha256,
+  manifestFingerprint(exactFiles).sha256);
+ assert.deepEqual(manifest.backup,{strategy:'VERSIONED_SNAPSHOT',
+  rollback:{kind:'RESTORE_INSTALLED_SHA',sha:installed}});
+ assert.equal(manifest.postOperation,'core-status');
+ assert.equal(manifest.postSourceBranch,'main');
+ assert.equal(manifest.postSourceSha,sourceMain);
+ const {manifest:normalized}=validateUpdateRequest(issue,raw,
+  {actor:'ansqhd5774-Choi',installedSha:installed});
+ assert.equal(validateControllerSelectivePin(normalized,pin),true);
+});
+
+test('source or approval hash tampering cannot authorize B',()=>{
+ const {manifest,pin,issue,raw}=evidence();
+ const v=validateUpdateRequest(issue,raw,
+  {actor:'ansqhd5774-Choi',installedSha:installed});
+ assert.throws(()=>validateControllerSelectivePin(v.manifest,
+  {...pin,allowFiles:pin.allowFiles.slice(1)}),/SELECTIVE_PIN_MISMATCH/);
+ assert.throws(()=>validateControllerSelectivePin(v.manifest,
+  {...pin,sourceMainSha:'0'.repeat(40)}),/SELECTIVE_PIN_MISMATCH/);
+ assert.throws(()=>validateUpdateRequest({...issue,
+  approvalManifestSha256:'0'.repeat(64)},raw,
+  {actor:'ansqhd5774-Choi',installedSha:installed}),/UPDATE_MANIFEST_PIN_MISMATCH/);
+ assert.throws(()=>validateUpdateRequest(issue,raw,
+  {actor:'ansqhd5774-Choi',installedSha:'0'.repeat(40)}),/UPDATE_INSTALLED_SOURCE_DRIFT/);
+ assert.notEqual(manifest.installedSha,manifest.targetSha);
+});
