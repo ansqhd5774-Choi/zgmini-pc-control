@@ -159,6 +159,44 @@ export function projectPit04ConflictCauses(raw,{expectedTotal}={}){
 const PIT0605_CLASSES=['ORIGINAL_VERSION_AND_HISTORICAL_AVAILABILITY_PROVED',
  'RAW_OBSERVATION_MATCH_HISTORICAL_TIME_UNPROVEN',
  'RAW_OBSERVATION_OR_REVISION_CONFLICT','RAW_NOT_FOUND_IN_CHECKED_SCOPE'];
+
+// Source-only count projection. No new approval, publication or repair.
+export function projectR6RawCountAggregate(raw){
+ const keys=['metadataKeys','bodyVerifiedKeys','runCertifiedKeys'];
+ const countSafe=n=>Number.isSafeInteger(n)&&n>=0&&n<=4000?n:null;
+ const approved=new Set(['DOL_UI_WEEKLY_CLAIMS','BLS_EMPLOYMENT_SITUATION','BLS_JOLTS','BLS_ECI','BLS_STATE_MSA','BLS_BED']);
+ const month=s=>typeof s==='string'&&(s==='OLDER'||s==='UNKNOWN'||/^20\d{2}-(?:0[1-9]|1[0-2])$/.test(s));
+ const buckets=(data,label,allowed,max)=>{
+  if(!Array.isArray(data)||data.length>max)stop('R6_RAW_AGGREGATE_RESULT_INVALID');
+  const seen=new Set();
+  return data.map(item=>{
+   const name=item?.[label];
+   if(typeof name!=='string'||!allowed(name)||seen.has(name))stop('R6_RAW_AGGREGATE_RESULT_INVALID');
+   seen.add(name);
+   const counts=Object.fromEntries(keys.map(k=>[k,countSafe(item[k])]));
+   if(Object.values(counts).some(x=>x===null)||counts.runCertifiedKeys>counts.bodyVerifiedKeys
+     ||counts.bodyVerifiedKeys>counts.metadataKeys)stop('R6_RAW_AGGREGATE_RESULT_INVALID');
+   return {[label]:name,...counts};
+  });
+ };
+ if(raw?.kind!=='W04_R6_RAW_AGGREGATE_COUNT_ONLY_V1'
+  ||raw.status!=='SOURCE_ONLY_NOT_RUNTIME_ATTESTATION'
+  ||raw.historicalPitAttested!==false||raw.repairAuthorized!==false
+  ||raw.runtimeAuthorizationVerified!==false||raw.promotionApproved!==false
+  ||raw.providerCalls!==0||raw.d1Writes!==0
+  ||keys.some(k=>countSafe(raw[k])===null)
+  ||raw.runCertifiedKeys>raw.bodyVerifiedKeys||raw.bodyVerifiedKeys>raw.metadataKeys)
+  stop('R6_RAW_AGGREGATE_RESULT_INVALID');
+ const groups=buckets(raw.rawSnapshotByGroup,'releaseGroup',s=>approved.has(s),6);
+ const months=buckets(raw.rawSnapshotByMonth,'retrievalMonth',month,14);
+ if([groups,months].some(rows=>keys.some(k=>rows.reduce((n,r)=>n+r[k],0)!==raw[k])))
+  stop('R6_RAW_AGGREGATE_RESULT_INVALID');
+ return {kind:raw.kind,status:raw.status,...Object.fromEntries(keys.map(k=>[k,raw[k]])),
+  rawSnapshotByGroup:groups,rawSnapshotByMonth:months,
+  historicalPitAttested:false,repairAuthorized:false,
+  runtimeAuthorizationVerified:false,promotionApproved:false};
+}
+
 export function projectPit0605Aggregate(raw){
  if(raw?.kind!=='ZGMINI_W04_PIT0605_AGGREGATE_ONLY_V1'
  ||raw.status!=='HOLD_HISTORICAL_PIT_UNATTESTED'
@@ -364,6 +402,13 @@ export function retainPit0408PrivateEvidence({outputDir,host,request,keyReview,a
 }
 
 export function validateBundle(request,{host,workspace}){
+  if(Object.hasOwn(request,'rawAggregateSourceOnly')&&(
+     request.rawAggregateSourceOnly!==true
+     ||Object.hasOwn(request,'pit04Offset')
+     ||Object.hasOwn(request,'pit0408Private')
+     ||Object.hasOwn(request,'pit0605Raw')
+     ||request.sourceSha!=='76c5de87a29be9646fcbf2b6ec071914443ce762'))
+    stop('R6_RAW_AGGREGATE_SCOPE_NOT_APPROVED');
   if(Object.hasOwn(request,'pit04Offset')&&(!Number.isSafeInteger(request.pit04Offset)
      ||request.pit04Offset<0||request.pit04Offset>50000))stop('R6_PIT04_OFFSET_INVALID');
   const approved=host?.approvedSources?.[request.sourceSha];
@@ -397,6 +442,13 @@ export function validateBundle(request,{host,workspace}){
     !['lib/market-score/employment-r6-pit04-key-evidence.mjs',
       'scripts/pc-writer/employment-r6-pit-coverage.mjs'].every(p=>Object.hasOwn(files,p)))
     stop('R6_PIT04_SOURCE_NOT_APPROVED');
+  if(request.rawAggregateSourceOnly===true
+     &&!['lib/market-score/employment-r6-raw-aggregate-source-only.mjs',
+       'lib/market-score/employment-r6-approved-snapshot-aggregate-source-only.mjs',
+       'scripts/pc-writer/employment-r6-pit-coverage.mjs',
+       'scripts/pc-writer/employment-r6-runner-stage.mjs'
+     ].every(p=>Object.hasOwn(files,p)))
+    stop('R6_RAW_AGGREGATE_SOURCE_NOT_APPROVED');
   if(request.pit0605Raw===true&&
      !['lib/market-score/employment-r6-pit04-key-evidence.mjs',
        'lib/market-score/employment-r4-shadow-provider.mjs',
@@ -467,6 +519,7 @@ export async function inspectEmploymentR6Candidate(request,context){
   if(Object.hasOwn(request,'pit04Offset'))argv.push('--pit04-offset',String(request.pit04Offset));
   if(request.pit0408Private===true)argv.push('--pit0408-private','1');
   if(request.pit0605Raw===true)argv.push('--pit0605-raw','1');
+  if(request.rawAggregateSourceOnly===true)argv.push('--raw-aggregate-source-only','1');
   const repairPreview=wantsHistoryRepairPreview(request,files);
   if(repairPreview){
     try{stageHistoryRepairReceipt(context.host,outputDir);}
@@ -482,7 +535,9 @@ export async function inspectEmploymentR6Candidate(request,context){
     const resultFile=path.join(outputDir,reports[0]);
     if(fs.statSync(resultFile).size>12000)stop('R6_RESULT_TOO_LARGE');
     const body=JSON.parse(fs.readFileSync(resultFile,'utf8'));
-    const resultKind=body.status==='PASS'&&request.pit0605Raw===true
+    const resultKind=body.status==='PASS'&&request.rawAggregateSourceOnly===true
+      ?'EMPLOYMENT_R6_RUNNER_RAW_AGGREGATE_SOURCE_ONLY_V1'
+      :body.status==='PASS'&&request.pit0605Raw===true
       ?(repairPreview?'EMPLOYMENT_R6_RUNNER_HISTORY_REPAIR_PREVIEW_V1':'EMPLOYMENT_R6_RUNNER_PIT0605_AGGREGATE_V1')
       :'EMPLOYMENT_R6_RUNNER_READONLY_REPORT_V1';
     if(!STATUS.has(body.status)||!/^[A-Z0-9_]{1,100}$/.test(body.code??'')
@@ -496,6 +551,18 @@ export async function inspectEmploymentR6Candidate(request,context){
       return {status:body.status,code:safe(body.code),
        candidateExecuted:true,sqliteOpened:body.sqliteOpened===true,
        repairAuthorized:false,operationalWrites:0,providerCalls:0,d1Writes:0};
+    }
+    if(request.rawAggregateSourceOnly===true){
+      if(body.status!=='PASS')return {status:body.status,code:safe(body.code),
+        candidateExecuted:true,repairAuthorized:false,operationalWrites:0,
+        providerCalls:0,d1Writes:0};
+      if(body.code!=='R6_RAW_AGGREGATE_SOURCE_ONLY_NOT_PIT')
+        stop('R6_RAW_AGGREGATE_RESULT_INVALID');
+      const rawAggregate=projectR6RawCountAggregate(body.rawAggregate);
+      return {status:'PASS',code:'R6_RAW_AGGREGATE_SOURCE_ONLY_NOT_PIT',
+        actualExecutionSha:request.sourceSha,rawAggregate,
+        promotionApproved:false,repairAuthorized:false,
+        operationalWrites:0,providerCalls:0,d1Writes:0};
     }
     if(repairPreview){
       if(body.code!=='W04_HISTORY_REPAIR_SELECTION_PREVIEW'||body.sqliteOpened!==true)
