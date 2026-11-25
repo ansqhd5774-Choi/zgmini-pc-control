@@ -11,6 +11,7 @@ import {TextDecoder} from 'node:util';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {applyApprovedUpdate,maintenanceCliFailureReport} from './maintenance-apply.mjs';
 import {validateUpdateRequest,validateMaintenanceRequest,
+ authenticateControllerBIssue,CI_CONTROLLER_ACTOR,installedControllerBPolicy,
 validateControllerConfigTransition,controllerAdmissionForPurpose,
   readAllMaintenancePages,validateInfrastructureDelta,
   validateControllerOnlyInstallDelta,validateControllerSelectivePin,
@@ -1298,6 +1299,14 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
   inspect:async()=>({installedSha:installedManifest().installedSha,
    insideRunnerTree:false,githubActions:Boolean(process.env.GITHUB_ACTIONS||process.env.RUNNER_NAME)}),
   validate:async()=>{
+   // Reauthenticate the exact original CI Issue and manifest under the
+   // existing install lease before the first operational mutation.
+   if(packageData.actor===CI_CONTROLLER_ACTOR){
+    const fresh=await loadAuthenticatedApprovedPackage(request.requestId,
+     path.join(maintenanceRoot,'approved',request.requestId+'.json'));
+    need(JSON.stringify(fresh.issue)===JSON.stringify(issue)&&JSON.stringify(fresh.manifest)===JSON.stringify(manifest),
+     'MAINTENANCE_ISSUE_IDENTITY');
+   }
    const {host}=installedManifest();
    const owner=readOwner();verifyIndependent(owner.owner.pid);oldOwner=owner;
    need(github('actions/workflows/pc-job.yml').state==='active','WORKFLOW_NOT_ACTIVE_PREEXISTING');
@@ -1899,24 +1908,65 @@ export function admittedMaintenanceIssueState(issue,{recovery=false}={}){
   (recovery===true&&issue.state==='closed'&&issue.state_reason==='completed'));
 }
 
-export function loadApprovedPackage(requestId,file,{recovery=false}={}) {
+function readApprovedControllerEnvelope(requestId,file) {
  const expected=path.join(maintenanceRoot,'approved',requestId+'.json');
  need(path.resolve(file)===path.resolve(expected),'APPROVAL_FILE_PATH');
  const data=json(expected),{issue,manifest,manifestRawBase64}=data;
  need(issue?.requestId===requestId&&issue?.operation==='controller-update'&&issue?.controlRepository===controlRepository,'MAINTENANCE_REQUEST_MISMATCH');
- need(data.actor==='ansqhd5774-Choi'&&Number.isSafeInteger(data.issueNumber),'MAINTENANCE_ACTOR_NOT_APPROVED');
+ need(['ansqhd5774-Choi',CI_CONTROLLER_ACTOR].includes(data.actor)&&Number.isSafeInteger(data.issueNumber)&&data.issueNumber>0,'MAINTENANCE_ACTOR_NOT_APPROVED');
  need(validSha(issue.targetControllerSha)&&manifest.targetSha===issue.targetControllerSha,'TARGET_SHA_MISMATCH');
  const raw=Buffer.from(manifestRawBase64??'','base64');
  need(raw.length>0&&raw.length<=32768&&sha256(raw)===issue.approvalManifestSha256,'APPROVAL_MANIFEST_HASH_MISMATCH');
  const actual=github('issues/'+data.issueNumber);
  let liveRequest;try{liveRequest=JSON.parse(actual.body);}catch{throw Object.assign(Error('MAINTENANCE_ISSUE_INVALID'),{code:'MAINTENANCE_ISSUE_INVALID'});}
- const authenticated=validateMaintenanceRequest(liveRequest,{actor:actual.user?.login,controlRepository});
- need(actual.user?.login===data.actor&&JSON.stringify(authenticated)===JSON.stringify(issue),'MAINTENANCE_ISSUE_IDENTITY');
+ return {data,raw,actual,liveRequest};
+}
+function finishApprovedControllerEnvelope({data,raw,actual,liveRequest},{recovery=false,ciAuthorization=null}={}){
+ const {issue,manifest}=data;
+ const authenticated=validateMaintenanceRequest(liveRequest,{actor:actual.user?.login,controlRepository,ciAuthorization});
+ need(actual.number===data.issueNumber&&actual.user?.login===data.actor&&JSON.stringify(authenticated)===JSON.stringify(issue),'MAINTENANCE_ISSUE_IDENTITY');
  need(admittedMaintenanceIssueState(actual,{recovery}),'MAINTENANCE_REQUEST_CANCELED');
  need(actual.labels?.some(x=>x.name==='pc-maintenance')&&!actual.pull_request,'MAINTENANCE_LABEL');
- const validated=validateUpdateRequest(issue,raw,{actor:data.actor,
+ const validated=validateUpdateRequest(issue,raw,{actor:data.actor,ciAuthorization,
   controlRepository,installedSha:recovery?manifest.installedSha:installedManifest().installedSha});
  return {...data,issue:validated.request,manifest:validated.manifest};
+}
+// Preserve the synchronous owner-only compatibility contract for historical
+// fixed recovery cases. Generic independent rollback uses the authenticated
+// async reader below and must still pass its exact recovery approval.
+export function loadApprovedPackage(requestId,file,{recovery=false}={}){
+ const envelope=readApprovedControllerEnvelope(requestId,file);
+ need(envelope.data.actor==='ansqhd5774-Choi','MAINTENANCE_ACTOR_NOT_APPROVED');
+ return finishApprovedControllerEnvelope(envelope,{recovery});
+}
+export async function loadAuthenticatedApprovedPackage(requestId,file,{recovery=false}={}){
+ const envelope=readApprovedControllerEnvelope(requestId,file);
+ if(envelope.data.actor==='ansqhd5774-Choi')return finishApprovedControllerEnvelope(envelope,{recovery});
+ // The flag is only supplied by the independent exact-approval rollback
+ // entry, never by an Issue or ordinary apply/preflight command.
+ // Independently re-read the same installed policy as the receiver.
+ // Do not inherit a serializable proof, Issue field, GitHub event or caller
+ // environment variable. The prior self-manifest and seven-file CAS stay in
+ // the existing independent maintenance path.
+ const policyFile=path.join(maintenanceRoot,'MAINTENANCE_INSTALL.json');
+ const stat=fs.lstatSync(policyFile);
+ need(stat.isFile()&&!stat.isSymbolicLink()&&stat.size>0&&stat.size<=131072,
+  'CI_INSTALLED_POLICY_UNVERIFIED');
+ let policy;
+ try{policy=installedControllerBPolicy(json(policyFile));}
+ catch{throw Object.assign(Error('CI_INSTALLED_POLICY_UNVERIFIED'),
+  {code:'CI_INSTALLED_POLICY_UNVERIFIED'});}
+ need(policy!==null,'CI_IDENTITY_POLICY_NOT_CONFIGURED');
+ const proof=await authenticateControllerBIssue(envelope.actual,{policy,recovery,getJson:github,
+  readJobLogs:jobId=>execFileSync(gh,['api',`repos/${controlRepository}/actions/jobs/${jobId}/logs`],
+   {encoding:'utf8',windowsHide:true,timeout:60000,maxBuffer:16000000})});
+ need(proof.state==='CI_WORKLOAD_IDENTITY_VERIFIED_ONLY',proof.code);
+ // Re-read the approved main bytes independently for CI, never trust the local
+ // package as an approval source or accept a serializable proof from it.
+ const found=github('contents/approvals/controller-updates/'+envelope.data.issue.targetControllerSha+'.json?ref=main');
+ need(found?.type==='file'&&found.encoding==='base64'&&typeof found.content==='string'&&
+  Buffer.from(found.content,'base64').equals(envelope.raw),'APPROVAL_MANIFEST_HASH_MISMATCH');
+ return finishApprovedControllerEnvelope(envelope,{recovery,ciAuthorization:proof.authorization});
 }
 
 // A read-only, fixed-root view of exactly one update's preserved artifacts.
@@ -3141,7 +3191,7 @@ export async function command(args=process.argv.slice(2)) {
  need(['apply','preflight'].includes(cmd)&&args.length===5&&args[1]==='--request-id'&&args[3]==='--manifest-file','MAINTENANCE_ARGS');
  let data,request,ports,preInstallOperation='loadApprovedPackage';
  try{
- data=loadApprovedPackage(requestId,args[4]);
+ data=await loadAuthenticatedApprovedPackage(requestId,args[4]);
  preInstallOperation='makePorts';({request,ports}=makePorts(data,data.issueNumber));
  // Read-only prerequisite checks before taking the shared installation lease.
  // They are repeated by validate under the lease to prevent a stale preflight

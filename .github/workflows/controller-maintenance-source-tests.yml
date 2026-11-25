@@ -3,6 +3,26 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
+      - 'ci-approval/**'
+      - 'tests/ci-approval-completed-run-intake.test.mjs'
+      - 'tests/ci-approval-execution-identity.test.mjs'
+      - '.github/workflows/ci-approval-event-intake.yml'
+      - '.github/workflows/ci-approval-controller-b.yml'
+      - 'tests/ci-approval-shadow-decision.test.mjs'
+      - 'tests/ci-approval-contract-adapter.test.mjs'
+      - 'tests/ci-approval-github-ci-evidence.test.mjs'
+      - 'tests/ci-approval-approval-source-integrity.test.mjs'
+      - 'tests/ci-approval-pinned-manifest-scope.test.mjs'
+      - 'tests/ci-approval-request-preview.test.mjs'
+      - 'tests/ci-approval-integration-tree-evidence.test.mjs'
+      - 'tests/ci-approval-owner-delegation.test.mjs'
+      - 'tests/ci-approval-delegation-evidence-reader.test.mjs'
+      - 'tests/ci-approval-controller-candidate-review.test.mjs'
+      - 'tests/ci-approval-writer-candidate-review.test.mjs'
+      - 'tools/writer-request.mjs'
+      - 'tests/writer-request.test.mjs'
+      - 'writer-b/contract.mjs'
+      - 'writer-b/contract.test.mjs'
       - 'controller/common.mjs'
       - 'controller/entry.mjs'
       - 'controller/upload.mjs'
@@ -250,6 +270,41 @@ jobs:
         run: |
           echo CI_TESTED_INTEGRATION_SHA=%GITHUB_SHA%
           node --test tests/controller-ci-scope.test.mjs
+      - name: Verify CI approval shadow decisions and non-executable candidates
+        if: hashFiles('tests/ci-approval-shadow-decision.test.mjs', 'tests/ci-approval-contract-adapter.test.mjs') != ''
+        run: node --test --test-concurrency=1 tests/ci-approval-shadow-decision.test.mjs tests/ci-approval-contract-adapter.test.mjs
+      - name: Verify completed CI run intake without issuance
+        run: node --test --test-concurrency=1 tests/ci-approval-completed-run-intake.test.mjs tests/ci-approval-execution-identity.test.mjs
+      - name: Verify CI approval evidence observations without execution
+        if: hashFiles('ci-approval/github-ci-evidence.mjs', 'tests/ci-approval-github-ci-evidence.test.mjs') != ''
+        run: node --test --test-concurrency=1 tests/ci-approval-github-ci-evidence.test.mjs
+      - name: Verify approval source integrity without authority issuance
+        if: hashFiles('ci-approval/approval-source-integrity.mjs', 'tests/ci-approval-approval-source-integrity.test.mjs') != ''
+        run: node --test --test-concurrency=1 tests/ci-approval-approval-source-integrity.test.mjs
+      - name: Verify exact pinned manifest effect scope without issuance
+        if: hashFiles('ci-approval/pinned-manifest-scope.mjs', 'tests/ci-approval-pinned-manifest-scope.test.mjs') != ''
+        run: node --test --test-concurrency=1 tests/ci-approval-pinned-manifest-scope.test.mjs
+      - name: Verify deterministic scoped request previews without submission
+        if: hashFiles('ci-approval/request-preview.mjs', 'tests/ci-approval-request-preview.test.mjs') != ''
+        run: node --test --test-concurrency=1 tests/ci-approval-request-preview.test.mjs
+      - name: Verify tested integration tree observation without issuance
+        if: hashFiles('ci-approval/integration-tree-evidence.mjs', 'tests/ci-approval-integration-tree-evidence.test.mjs') != ''
+        run: node --test --test-concurrency=1 tests/ci-approval-integration-tree-evidence.test.mjs
+      - name: Verify bounded standing delegation observation without issuance
+        if: hashFiles('ci-approval/owner-delegation.mjs', 'tests/ci-approval-owner-delegation.test.mjs') != ''
+        run: node --test --test-concurrency=1 tests/ci-approval-owner-delegation.test.mjs
+      - name: Verify read-only delegation and changed-file collection
+        if: hashFiles('ci-approval/delegation-evidence-reader.mjs', 'tests/ci-approval-delegation-evidence-reader.test.mjs') != ''
+        run: node --test --test-concurrency=1 tests/ci-approval-delegation-evidence-reader.test.mjs
+      - name: Verify end-to-end Controller candidate shadow review
+        if: hashFiles('ci-approval/controller-candidate-review.mjs', 'tests/ci-approval-controller-candidate-review.test.mjs') != ''
+        run: node --test --test-concurrency=1 tests/ci-approval-controller-candidate-review.test.mjs
+      - name: Verify Writer candidate review and independent source CI evidence
+        if: hashFiles('ci-approval/writer-candidate-review.mjs', 'tests/ci-approval-writer-candidate-review.test.mjs') != ''
+        run: node --test --test-concurrency=1 tests/ci-approval-writer-candidate-review.test.mjs
+      - name: Verify Writer owner submission contract without operational requests
+        if: hashFiles('tools/writer-request.mjs', 'tests/writer-request.test.mjs') != ''
+        run: node --test --test-concurrency=1 tests/writer-request.test.mjs writer-b/contract.test.mjs
       - name: Verify W05 independent operator receipt without operational access
         # Historical PR integration trees can predate this W05 fixture.
         # Test it whenever it is present; do not fail unrelated older heads.

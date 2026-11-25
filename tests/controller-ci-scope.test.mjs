@@ -68,3 +68,12 @@ test('Controller integration workflow triggers for owning source edits',()=>{
  assert.match(y,/runs-on: \[self-hosted, Windows, X64, zgmini-handoff-ci-isolated\]/);
  assert.doesNotMatch(trigger,/schedule:|workflow_dispatch:/);
 });
+
+
+test('CI evidence observation is included in isolated source CI',()=>{
+ const workflow=fs.readFileSync(new URL('../.github/workflows/controller-maintenance-source-tests.yml',import.meta.url),'utf8');
+ const trigger=workflow.slice(0,workflow.indexOf('\npermissions:'));
+ assert.ok(trigger.includes("      - 'tests/ci-approval-github-ci-evidence.test.mjs'"));
+ assert.ok(workflow.includes("if: hashFiles('ci-approval/github-ci-evidence.mjs', 'tests/ci-approval-github-ci-evidence.test.mjs') != ''"));
+ assert.ok(workflow.includes('run: node --test --test-concurrency=1 tests/ci-approval-github-ci-evidence.test.mjs'));
+});

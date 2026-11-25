@@ -147,18 +147,11 @@ export function validateWriterBManifest(manifest){
  return manifest;
 }
 
-export function authorizeWriterBIssue({event,env,manifestBytes}){
- need(env?.GITHUB_REPOSITORY===CONTROL_REPO&&env?.GITHUB_EVENT_NAME==='issues'&&
-   env.GITHUB_EVENT_ACTION==='opened'&&env.GITHUB_ACTOR===ACTOR&&
-   env.GITHUB_RUN_ATTEMPT==='1'&&SHA40.test(env.GITHUB_SHA??'')&&
-   event?.repository?.full_name===CONTROL_REPO&&event.repository.private===true&&
-   event?.sender?.login===ACTOR&&event?.issue?.user?.login===ACTOR&&
-   !event.issue.pull_request&&event.issue.title===ISSUE_TITLE&&
-   event.issue.labels?.some(x=>x.name===ISSUE_LABEL)&&
-   Number.isSafeInteger(event.issue.number)&&event.issue.number>0,
-   'WRITER_B_ISSUE_AUTH_STOP');
+// Shared syntax/hash/label validation; does not authenticate an Issue or seal it.
+export function validateWriterBRequestManifest({body,labels,manifestBytes}){
+ need(Array.isArray(labels)&&labels.some(x=>x?.name===ISSUE_LABEL),'WRITER_B_ISSUE_AUTH_STOP');
  let request;
- try{request=JSON.parse(event.issue.body);}catch{fail('WRITER_B_ISSUE_JSON_STOP');}
+ try{request=JSON.parse(body);}catch{fail('WRITER_B_ISSUE_JSON_STOP');}
  need(exact(request,REQUEST_KEYS)&&request.schema===REQUEST_SCHEMA&&
    UUID.test(request.requestId)&&UUID.test(request.chatId)&&
    request.operation===OPERATION&&request.controlRepository===CONTROL_REPO&&
@@ -173,14 +166,28 @@ export function authorizeWriterBIssue({event,env,manifestBytes}){
  try{manifest=JSON.parse(manifestBytes.toString('utf8'));}
  catch{fail('WRITER_B_MANIFEST_JSON_STOP');}
  validateWriterBManifest(manifest);
- const issueExtended=event.issue.labels.some(x=>x?.name===EXTENDED_DRAIN_LABEL);
+ const issueExtended=labels.some(x=>x?.name===EXTENDED_DRAIN_LABEL);
  need(issueExtended===
    (manifest.coreMaintenance==='PAUSE_NEW_STARTS_DRAIN_2400S_V1'),
   'WRITER_B_EXTENDED_DRAIN_LABEL_STOP');
- const issue1200=event.issue.labels.some(x=>x?.name===DRAIN_1200_LABEL);
+ const issue1200=labels.some(x=>x?.name===DRAIN_1200_LABEL);
  need(issue1200===
    (manifest.coreMaintenance==='PAUSE_NEW_STARTS_DRAIN_1200S_V1'),
   'WRITER_B_1200_DRAIN_LABEL_STOP');
+ return {request,manifest};
+}
+
+export function authorizeWriterBIssue({event,env,manifestBytes}){
+ need(env?.GITHUB_REPOSITORY===CONTROL_REPO&&env?.GITHUB_EVENT_NAME==='issues'&&
+   env.GITHUB_EVENT_ACTION==='opened'&&env.GITHUB_ACTOR===ACTOR&&
+   env.GITHUB_RUN_ATTEMPT==='1'&&SHA40.test(env.GITHUB_SHA??'')&&
+   event?.repository?.full_name===CONTROL_REPO&&event.repository.private===true&&
+   event?.sender?.login===ACTOR&&event?.issue?.user?.login===ACTOR&&
+   !event.issue.pull_request&&event.issue.title===ISSUE_TITLE&&
+   event.issue.labels?.some(x=>x.name===ISSUE_LABEL)&&
+   Number.isSafeInteger(event.issue.number)&&event.issue.number>0,
+   'WRITER_B_ISSUE_AUTH_STOP');
+ const {request,manifest}=validateWriterBRequestManifest({body:event.issue.body,labels:event.issue.labels,manifestBytes});
  for(const entry of manifest.files){
   if(Object.hasOwn(entry,'insertions')){
    for(const insertion of entry.insertions)Object.freeze(insertion);

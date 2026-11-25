@@ -37,7 +37,7 @@ export async function main(args=process.argv.slice(2)){
  const required=['tools/controller-rollback-recovery.mjs','tools/update.mjs','tools/maintenance-apply.mjs','tools/maintenance-contract.mjs','tools/maintenance-lock.mjs'];
  need(Array.isArray(approval.files)&&approval.files.length===required.length&&required.every(p=>approval.files.filter(x=>x.path===p).length===1),'ROLLBACK_FILES_REQUIRED');
  for(const f of approval.files)need(required.includes(f.path)&&/^[a-f0-9]{64}$/.test(f.sha256)&&digest(g(['show',source+':'+f.path]))===f.sha256&&digest(fs.readFileSync(path.join(repo,f.path)))===f.sha256,'ROLLBACK_SOURCE_DRIFT');
- const {loadApprovedPackage,makePorts}=await import('./update.mjs');
+ const {loadAuthenticatedApprovedPackage,makePorts}=await import('./update.mjs');
  const {reconcileInterruptedRollback}=await import('./maintenance-apply.mjs');
  const dir=path.join(root,'leases/controller-install'),ownerBytes=fs.readFileSync(path.join(dir,'owner.json')),markerBytes=fs.readFileSync(path.join(dir,'RECOVERY_REQUIRED.json'));
  const owner=JSON.parse(ownerBytes),marker=JSON.parse(markerBytes);
@@ -48,7 +48,7 @@ export async function main(args=process.argv.slice(2)){
   approval.ledgerSha256===digest(ledgerBytes)&&approval.ownerSha256===digest(ownerBytes)&&approval.markerSha256===digest(markerBytes)&&
   approval.snapshotHostSha256===digest(fs.readFileSync(snapshot))&&approval.protectionSha256===digest(fs.readFileSync(baseline)),'ROLLBACK_APPROVAL_MISMATCH');
  need(ledger.requestId===id&&Number.isSafeInteger(owner.pid)&&owner.pid>0&&marker.requestOwnerPid===owner.pid&&marker.nonce===owner.nonce&&alive(owner.pid)===false,'ROLLBACK_OWNER_NOT_PROVEN_DEAD');
- const data=loadApprovedPackage(id,path.join(root,'approved',id+'.json'),{recovery:true});
+ const data=await loadAuthenticatedApprovedPackage(id,path.join(root,'approved',id+'.json'),{recovery:true});
  need(data.manifest.installedSha===ledger.installedShaBefore&&data.manifest.targetSha===ledger.targetSha,'ROLLBACK_ORIGINAL_TARGET_MISMATCH');
  // A confirmed postcheck is required only for the historically uncertain
  // POSTCHECK_PENDING phase. Verify live GitHub issue/run/job evidence and the
