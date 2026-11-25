@@ -22,7 +22,7 @@ const job=(overrides={})=>({id:888,run_id:777,name:'approved-pc-job',
   {name:'Upload sanitized TXT JSON and issue result',conclusion:'success'}],
  ...overrides});
 const obs=(overrides={})=>({requestId:id,issueNumber:42,operation:'core-status',
- sourceSha:source,issue:issue(),runs:[run()],jobs:[job()],...overrides});
+ sourceBranch:'main',sourceSha:source,issue:issue(),runs:[run()],jobs:[job()],...overrides});
 const result=(arg)=>classify(obs(arg));
 
 test('no Run is observed as NO_RUN, not failed installation or synthetic PASS',()=>{
@@ -44,6 +44,7 @@ test('unverified Issue identity never produces NO_RUN',()=>{
  assert.equal(result({issue:changed,runs:[]}).state,'STATE_UNKNOWN');
  assert.equal(result({issue:{...issue(),labels:[]},runs:[]}).state,'STATE_UNKNOWN');
  assert.equal(result({runs:null}).state,'STATE_UNKNOWN');
+ assert.equal(result({sourceBranch:'wrong-branch',runs:[]}).state,'STATE_UNKNOWN');
 });
 
 test('Run gate skipped, Runner queue, and active job stay separate',()=>{
