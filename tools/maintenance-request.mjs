@@ -251,9 +251,10 @@ export async function submitExistingControllerApprovalFromCi({targetSha,approval
  const approvedBytes=await ports.readMergedManifest(targetSha,pr.merge_commit_sha);
  if(!Buffer.isBuffer(approvedBytes)||!approvedBytes.equals(bytes))
   fail('MAINTENANCE_CI_EXISTING_APPROVAL_BYTES_MISMATCH');
- await resolveControllerApprovalCI(manifest.approval.ref,{readApprovalPr:ports.readApprovalPr,
-  listRuns:ports.listRuns,readRun:ports.readRun});
- if(!ownerMerged){
+ if(ownerMerged){
+  await resolveControllerApprovalCI(manifest.approval.ref,{readApprovalPr:ports.readApprovalPr,
+   listRuns:ports.listRuns,readRun:ports.readRun});
+ }else{
   // This port is supplied by the independently reviewed fixed publisher,
   // not by the approval PR, manifest or Issue. No production context is
   // configured yet; the automatic branch therefore fails closed by default.
@@ -273,6 +274,10 @@ export async function submitExistingControllerApprovalFromCi({targetSha,approval
   if(prepared.state!=='SELECTIVE_APPROVAL_FILES_PREPARED'||prepared.files.length!==2||
      !prepared.files[0].bytes.equals(bytes))
    fail('MAINTENANCE_CI_AUTO_APPROVAL_RECONSTRUCTION_DENIED');
+  // The original source CI is independently verified during reconstruction.
+  // Only the two new generated JSON files may be present in the automated
+  // approval PR. Do not require a second PR workflow for those files.
+  await requireExactApprovalPair(ports,prNumber,prepared.files);
   const pin=prepared.files[1];
   for(const revision of [pr.merge_commit_sha,'main']){
    const actual=await ctx.readFileBytes(CONTROL_REPOSITORY,revision,pin.path);
@@ -303,12 +308,18 @@ export async function submitExistingControllerApprovalFromCi({targetSha,approval
  // and uncertain POSTs are never given fresh execution identity.
  return {...result,effectKey,receiptMarker:controllerBReceiptMarker(result.issueNumber,Buffer.from(expected.body))};
 }
-// A prepared approval PR already exists and has been tested. Use the
-// existing PR-based installation contract; never replace it with direct
-// main writes. A single trusted CI job can merge that exact head and submit
-// without depending on a subsequent push event. The real privileged caller,
-// initial business-approval source and PR creation/test path are separate.
-// No default production merge port or permission is enabled by this code.
+async function requireExactApprovalPair(ports,number,expected){
+ if(typeof ports.readApprovalPrFiles!=='function')fail('MAINTENANCE_CI_MERGE_DIFF_DENIED');
+ const files=await ports.readApprovalPrFiles(number),wanted=expected.map(f=>f.path).sort();
+ if(!Array.isArray(files)||files.length!==2||files.some(f=>f.status!=='added')||
+    JSON.stringify(files.map(f=>f.filename).sort())!==JSON.stringify(wanted))
+  fail('MAINTENANCE_CI_MERGE_DIFF_DENIED');
+}
+// A prepared approval PR contains only the reconstructed metadata pair.
+// Original source CI remains mandatory in prepareSelectiveApprovalPublication.
+// A redundant PR workflow for these generated JSON files could require human
+// approval when the PR was made with GITHUB_TOKEN. Preserve the merged PR,
+// Pin, GitHub branch rules, head CAS, main readback and runtime safeguards.
 export async function mergeAndSubmitPreparedControllerApproval({targetSha,approvalPrNumber,runId,attempt},ports){
  if(!sha40(targetSha)||!Number.isSafeInteger(approvalPrNumber)||approvalPrNumber<=0||
     !Number.isSafeInteger(runId)||runId<=0||!Number.isSafeInteger(attempt)||attempt<=0)
@@ -349,18 +360,13 @@ export async function mergeAndSubmitPreparedControllerApproval({targetSha,approv
   fail('MAINTENANCE_CI_AUTO_APPROVAL_RECONSTRUCTION_DENIED');
  // Restrict publication to the exact two new files. Never merge unrelated
  // code, workflow, permission or existing approval changes on this path.
- const files=await ports.readApprovalPrFiles(approvalPrNumber);
- const wanted=prepared.files.map(f=>f.path).sort();
- if(!Array.isArray(files)||files.length!==2||files.some(f=>f.status!=='added')||
-    JSON.stringify(files.map(f=>f.filename).sort())!==JSON.stringify(wanted))
-  fail('MAINTENANCE_CI_MERGE_DIFF_DENIED');
+ await requireExactApprovalPair(ports,approvalPrNumber,prepared.files);
  for(const f of prepared.files){
   const actual=await ctx.readFileBytes(CONTROL_REPOSITORY,pr.head.sha,f.path);
   if(!Buffer.isBuffer(actual)||!actual.equals(f.bytes))fail('MAINTENANCE_CI_MERGE_FILE_MISMATCH');
  }
- const ci=await resolveControllerApprovalCI(manifest.approval.ref,{
-  approvalState:pr.merged?'MERGED':'OPEN',readApprovalPr:ports.readApprovalPr,listRuns:ports.listRuns,readRun:ports.readRun});
- if(ci.headSha!==pr.head.sha)fail('MAINTENANCE_CI_MERGE_HEAD_DRIFT');
+ // The candidate contains no source changes. The original source CI and
+ // both immutable publication file bytes were checked in this same job.
  const current=await ports.readApprovalPr(approvalPrNumber);
  if(current?.head?.sha!==pr.head.sha||current?.base?.ref!=='main')
   fail('MAINTENANCE_CI_MERGE_HEAD_DRIFT');

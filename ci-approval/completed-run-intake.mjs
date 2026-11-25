@@ -172,6 +172,12 @@ export function createControllerPublicationPorts({getJson,postIssue,store,autoAp
   listRuns:head=>{if(!sha(head))throw Error('CI_PUBLICATION_SOURCE_INVALID');return getJson('actions/workflows/'+workflowId+'/runs?head_sha='+head+'&event=pull_request&status=success&per_page=100');},
   readRun:n=>{if(!id(n))throw Error('CI_PUBLICATION_RUN_INVALID');return getJson('actions/runs/'+n);},
   readIssue:n=>{if(!id(n))throw Error('CI_PUBLICATION_ISSUE_INVALID');return getJson('issues/'+n);},
+  async readApprovalPrFiles(n){
+   if(!id(n))throw Error('CI_PUBLICATION_PR_INVALID');
+   const rows=await getJson('pulls/'+n+'/files?per_page=100');
+   if(!Array.isArray(rows)||rows.length>=100)throw Error('CI_PUBLICATION_PR_FILES_UNVERIFIED');
+   return rows;
+  },
   async findPriorRequests(target){
    if(!sha(target))throw Error('CI_PUBLICATION_SOURCE_INVALID');
    const matches=[];

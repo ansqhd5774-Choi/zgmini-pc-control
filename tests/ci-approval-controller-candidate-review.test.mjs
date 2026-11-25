@@ -136,7 +136,9 @@ async function automaticSubmissionFixture(){
  const ports={readRepository:async()=>({id:1442936296,private:true,full_name:repo,owner}),
   readManifest:async()=>m.bytes,readMergedManifest:async()=>m.bytes,readApprovalPr:async()=>pr,
   listRuns:async()=>({workflow_runs:[run]}),readRun:async()=>run,
-  readAutoApprovalContext:async()=>ctx,loadReceipt:async()=>store.receipt,
+  readAutoApprovalContext:async()=>ctx,
+  readApprovalPrFiles:async()=>[m,pin].map(x=>({filename:x.path,status:'added'})),
+  loadReceipt:async()=>store.receipt,
   saveReceipt:async(key,value)=>{store.receipt=structuredClone(value)},findPriorRequests:async()=>[],
   createIssue:async e=>{store.posts++;store.actual={number:42,state:'open',user:bot,title:e.title,body:e.body,labels:e.labels.map(name=>({name}))};return {number:42}},
   readIssue:async()=>store.actual};
@@ -206,4 +208,19 @@ test('missing approval context denies both merge and issue',async()=>{
  const f=await mergeSubmissionFixture();delete f.ports.readAutoApprovalContext;
  await assert.rejects(()=>mergeAndSubmitPreparedControllerApproval(f.mergeInput,f.ports),/AUTO_APPROVAL_CONTEXT_REQUIRED/);
  assert.equal(f.merges,0);assert.equal(f.store.posts,0);
+});
+
+test('metadata-only automatic approval does not require a second PR CI',async()=>{
+ const f=await mergeSubmissionFixture();
+ f.ports.listRuns=async()=>assert.fail('redundant approval PR CI queried');
+ f.ports.readRun=async()=>assert.fail('redundant approval PR CI queried');
+ const result=await mergeAndSubmitPreparedControllerApproval(f.mergeInput,f.ports);
+ assert.equal(result.status,'REQUEST_READBACK_VERIFIED');
+ assert.equal(f.merges,1);assert.equal(f.store.posts,1);
+});
+test('already merged bot approval with extra files is denied',async()=>{
+ const f=await automaticSubmissionFixture();
+ f.ports.readApprovalPrFiles=async()=>[{filename:f.m.path,status:'added'},{filename:f.pin.path,status:'added'},{filename:'tools/update.mjs',status:'modified'}];
+ await assert.rejects(()=>submitExistingControllerApprovalFromCi(f.input,f.ports),/MERGE_DIFF_DENIED/);
+ assert.equal(f.store.posts,0);
 });
