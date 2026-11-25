@@ -937,3 +937,66 @@ export function verifiedRunningPostcheckFailure({ledger,manifest,issue,run,job}=
   manifest,approval:{confirmedPostcheckFailure:{issueNumber:issue.number,
    runId:run?.id,jobId:job?.id,runnerName:job?.runner_name}},issue,run,job});
 }
+
+// Observational only: distinguish the postcheck handoff boundary without
+// replaying an Issue, modifying a Controller, or treating a missing run as FAIL.
+// This is a snapshot; the next bounded observation may advance its state.
+export function classifyMaintenancePostcheckLink({requestId,issueNumber,operation,
+ sourceSha,issue,runs,jobs}={}){
+ const out=(state,code,runId=null,jobId=null)=>({
+  schema:'ZGMINI_MAINTENANCE_POSTCHECK_LINK_V1',
+  requestId,issueNumber,state,code,runId,jobId,
+  next:state==='NO_RUN'?'CHECK_EVENT_AND_WORKFLOW_CONTRACT_NO_REPOST':
+   state==='SKIPPED_GATE'?'INSPECT_EXACT_WORKFLOW_GATE':
+   state==='RUNNER_QUEUE'||state==='RUNNING'?'KEEP_EXISTING_EXECUTION_NO_RETRY':
+   state==='UPLOAD_MISSING'?'RECOVER_EXISTING_LOCAL_RECEIPT_NO_REEXECUTION':
+   state==='ENTRY_REJECT'?'INSPECT_EXACT_ENTRY_AND_LOCAL_REPORT':
+   'VERIFY_ORIGINAL_ISSUE_RUN_AND_RECEIPT_NO_RETRY'
+ });
+ if(!/^pc-update-[a-f0-9-]{36}$/.test(requestId??'')||
+  !Number.isSafeInteger(issueNumber)||issueNumber<1||
+  !['core-status','source-audit','fear-greed-archive-status'].includes(operation)||
+  !/^[a-f0-9]{40}$/.test(sourceSha??''))
+  return out('STATE_UNKNOWN','POSTCHECK_IDENTITY_UNVERIFIED');
+ let body;
+ try{body=JSON.parse(issue?.body);}catch{return out('STATE_UNKNOWN','POSTCHECK_ISSUE_BODY_UNVERIFIED');}
+ const title=`PC Update ${requestId} postcheck`;
+ const origin=Date.parse(issue?.created_at??'');
+ if(issue?.number!==issueNumber||issue.title!==title||
+  issue.user?.login!=='ansqhd5774-Choi'||
+  !issue.labels?.some(x=>x.name==='pc-job')||
+  !Number.isFinite(origin)||
+  body?.schema!=='ZGMINI_PC_JOB_V1'||body.requestId!==requestId+'-postcheck'||
+  body.operation!==operation||body.sourceRepository!=='ansqhd5774-Choi/zgmini'||
+  body.sourceSha!==sourceSha)
+  return out('STATE_UNKNOWN','POSTCHECK_ISSUE_CONTRACT_UNVERIFIED');
+ if(!Array.isArray(runs))return out('STATE_UNKNOWN','POSTCHECK_RUN_LOOKUP_UNVERIFIED');
+ const matches=runs.filter(run=>Number.isSafeInteger(run?.id)&&run.id>0&&
+  run.event==='issues'&&run.display_title===title&&
+  Number.isFinite(Date.parse(run.created_at??''))&&
+  Date.parse(run.created_at)>=origin);
+ if(matches.length===0)return out('NO_RUN','POSTCHECK_RUN_NOT_OBSERVED');
+ if(matches.length!==1)return out('STATE_UNKNOWN','POSTCHECK_RUN_IDENTITY_AMBIGUOUS');
+ const run=matches[0],runId=run.id;
+ if(['queued','pending','requested','waiting'].includes(run.status))
+  return out('RUNNER_QUEUE','POSTCHECK_RUN_WAITING',runId);
+ if(!Array.isArray(jobs))return out('STATE_UNKNOWN','POSTCHECK_JOBS_LOOKUP_UNVERIFIED',runId);
+ const matched=jobs.filter(job=>job?.run_id===runId&&job.name==='approved-pc-job');
+ if(matched.length!==1)return out('STATE_UNKNOWN','POSTCHECK_JOB_IDENTITY_UNVERIFIED',runId);
+ const job=matched[0],jobId=Number.isSafeInteger(job.id)?job.id:null;
+ if(run.conclusion==='skipped'||job.conclusion==='skipped')
+  return out('SKIPPED_GATE','POSTCHECK_WORKFLOW_GATE_SKIPPED',runId,jobId);
+ if(['queued','waiting','pending'].includes(job.status))
+  return out('RUNNER_QUEUE','POSTCHECK_JOB_WAITING',runId,jobId);
+ if(job.status==='in_progress')return out('RUNNING','POSTCHECK_JOB_RUNNING',runId,jobId);
+ if(job.status!=='completed')
+  return out('STATE_UNKNOWN','POSTCHECK_JOB_STATUS_UNVERIFIED',runId,jobId);
+ const entry=job.steps?.filter(s=>s.name==='Execute fixed host allowlist entry');
+ if(!Array.isArray(entry)||entry.length!==1)
+  return out('STATE_UNKNOWN','POSTCHECK_ENTRY_STEP_UNVERIFIED',runId,jobId);
+ if(entry[0].conclusion==='failure')
+  return out('ENTRY_REJECT','POSTCHECK_ENTRY_STEP_FAILED_CAUSE_UNVERIFIED',runId,jobId);
+ if(entry[0].conclusion!=='success')
+  return out('SKIPPED_GATE','POSTCHECK_ENTRY_NOT_EXECUTED',runId,jobId);
+ return out('UPLOAD_MISSING','POSTCHECK_RESULT_RECEIPT_NOT_OBSERVED',runId,jobId);
+}
