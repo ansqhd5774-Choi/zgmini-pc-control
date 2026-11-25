@@ -54,12 +54,12 @@
 |---|---|---|---|---|
 | #23 | 완료 | 기존 정상·오류 fixture 확인 | **DONE_NO_CHANGE** — 관측형 계약 의도 확인 | 기존 Run 성공 재사용, 코드 수정 없음 |
 | #25 | 완료 | 기존 fixture 및 실제 Browser 아티팩트의 color-contrast 미확정 결과 확인 | **DONE_NO_CHANGE (CI 계약)** — 미확정 결과를 통과로 위장하지 않음 | 기존 Browser CI 성공 재사용, 코드 수정 없음; 실제 UI 색 대비 여부는 별도 미확인 |
-| #1 | 완료 | 실제 홈·레이아웃 공유 파일 7개 트리거 누락 확인 | **수정 필요** — 직접 UI 의존 경로 누락 | [웹 PR #1635](https://github.com/ansqhd5774-Choi/zgmini/pull/1635), 정확 HEAD CI 진행 |
+| #1 | 완료 | 실제 홈·레이아웃 공유 파일 7개 트리거 누락 확인 | **DONE_FIXED** — 누락 경로 7개 보완 | [웹 PR #1635](https://github.com/ansqhd5774-Choi/zgmini/pull/1635), Node·Browser·CodeQL·Secret 4/4 PASS, main 병합 `04b4e4c45c66e8ca126fcb897337523ee2d2257c` |
 | #19 | 완료 | 전체 최근 100건 혼잡 조건 및 회귀시험 작성 | **DONE_FIXED** — Workflow별 범위 조회로 교정 | [PC PR #3721](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3721) CI 2/2·Node 회귀 11/11 PASS, main 병합 `9d8dcf906c938c41f6acde6f1ad4288652bcd890` |
-| #29 | 완료 | 과거 Node CI 아티팩트 2개 원본 비교 완료 | **연결 방식 검토** — 비교 가능한 baseline 존재 | 두 보고 동일 129개 파일·bytes·hash, 자동 기준선 연결은 미구현 |
+| #29 | 완료 | 기존 main 아티팩트 2개 동일 스키마·파일·hash 비교 | **수정 PR 진행** — 선택적 이전 baseline 자동 readback | [웹 PR #1636](https://github.com/ansqhd5774-Choi/zgmini/pull/1636) 코드·회귀시험 작성, 정확 HEAD CI 미확정 |
 | #12 | 완료 | 변경 YAML 1파일 actionlint 실행·기존 경로 회귀 사용 확인 | **DONE_NO_CHANGE** — 현재 계약 검사 정합 | 웹 PR #1635 Node CI PASS, Browser CI 별도 확인 중; 신규 Governance 기능 없음 |
 
-**계획 수립: 6/6**, **후속 판정·필수 검증 완료: 4/6 (#23·#25·#12 DONE_NO_CHANGE, #19 DONE_FIXED)**, **수정 PR 진행: 1/6 (#1)**, **비교 자동 연결 미완료: 1/6 (#29)**. 기존 CI 도입 완료 19/19를 감소시키지 않는다. 사용자가 요청하지 않은 새 예약 검증을 후속 개선 완료조건으로 추가하지 않는다.
+**계획 수립: 6/6**, **후속 판정·필수 검증 완료: 5/6 (#23·#25·#12 DONE_NO_CHANGE, #19·#1 DONE_FIXED)**, **수정 PR·CI 진행: 1/6 (#29)**. 기존 CI 도입 완료 19/19를 감소시키지 않는다. 사용자가 요청하지 않은 새 예약 검증을 후속 개선 완료조건으로 추가하지 않는다.
 
 **첫 실행 대상:** #23의 `finalizeCrossBrowser`에 `javascriptErrors=1`을 주입한 기존 계약 테스트와 현재 요구된 합격 조건을 비교한다. 결과가 관측-only 정책과 일치하면 차단 추가 없이 `DONE_NO_CHANGE` 또는 별도 결정 필요로 처리하고 다음 독립 후보를 진행한다.
 
@@ -88,7 +88,7 @@
 
 - 최신 웹 `main` `app/page.tsx`, `app/dashboard-ui.tsx`, `app/layout.tsx`, `app/about/page.tsx`의 **실존하는 직접 import**와 [`community-chat-browser.yml`](https://github.com/ansqhd5774-Choi/zgmini/blob/main/.github/workflows/community-chat-browser.yml)의 `pull_request.paths`를 비교. `components/site-header.tsx`, `components/site-footer.tsx`, `components/dashboard-side-rails.tsx`, `components/live-score-value.tsx`, `components/score-arrow-provider.tsx`, `app/responsive.css`, `app/about/about.module.css`는 실제 파일이면서 브라우저 트리거 목록에서 빠져 있었음.
 - [웹 PR #1635](https://github.com/ansqhd5774-Choi/zgmini/pull/1635): 기존 Workflow 경로 7개 추가와 `tests/browser-ci-trigger-scope.test.mjs`의 직접 의존 경로 회귀만 변경. **새 Workflow·전역 Gate·#8 성능예산 재도입 없음**.
-- 검증: 정확 HEAD `6b2df32e8e68f14ae8c7329040f0e450b643b97a`의 Node/Browser/CodeQL/Secret 실제 CI 완료 후 합격 판정·병합 여부를 갱신. 지금 단계는 **RUNNING**, 완료로 계산하지 않음.
+- 검증: 정확 HEAD `6b2df32e8e68f14ae8c7329040f0e450b643b97a`의 Node/Browser/CodeQL/Secret **4/4 SUCCESS** 확인, [main 병합 SHA `04b4e4c45c66e8ca126fcb897337523ee2d2257c`](https://github.com/ansqhd5774-Choi/zgmini/commit/04b4e4c45c66e8ca126fcb897337523ee2d2257c) 및 YAML·회귀시험 원격 blob readback 완료. **DONE_FIXED**.
 
 ### #12 Workflow Governance — 기존 검사 재사용으로 DONE_NO_CHANGE
 
@@ -100,4 +100,4 @@
 
 - [Node CI Run #45691667146](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45691667146)와 [#45691870499](https://github.com/ansqhd5774-Choi/zgmini/actions/runs/45691870499)의 기존 `client-bundle-size-report` ZIP 아티팩트(각 `report.json`)를 GitHub 공식 읽기로 회수, **스키마 1·`dist/client/assets/*.js,*.css` 범위 일치** 확인.
 - JS **102파일, 1,715,802 raw bytes, 563,383 gzip 추정 bytes**, CSS **27파일, 719,954 raw bytes, 129,355 gzip 추정 bytes**로 두 결과 일치. **총 129개 파일 개별 SHA-256 일치**, JS/CSS raw·gzip 증감 **모두 0 bytes**.
-- 따라서 비교 가능한 baseline 아티팩트가 존재하지 않는다는 가설은 반증. 그러나 현행 `ci-bundle-size.mjs` 실행 경로는 `CI_BUNDLE_SIZE_BASELINE=UNAVAILABLE`로 자동 이전 빌드 연결을 수행하지 않음. **수동 원본 비교 검증과 CI 자동 기준선 연결 완료를 구분**한다. P3의 필요한 기존 API/아티팩트 읽기 자동 연결은 별도 최소 수정 범위로 남김; 새 예산 임계값·강제 Gate 추가 없음.
+- 따라서 비교 가능한 baseline 아티팩트가 존재하지 않는다는 가설은 반증. [신규 웹 PR #1636](https://github.com/ansqhd5774-Choi/zgmini/pull/1636)은 기존 Node CI에 공식 GitHub Actions 읽기/이전 main 성공 결과 다운로드/기존 비교 함수 활용을 연결하고, 없어도 가짜 0%·PASS를 만들지 않는 선택적 관측만 추가했다. **현재 CI·main 병합 미확정이므로 #29는 RUNNING**. 새 예산 임계값·강제 Gate 없음.
