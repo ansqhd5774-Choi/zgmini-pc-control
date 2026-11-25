@@ -212,3 +212,21 @@ test('missing failed-job identity is refused before incident writes',async()=>{
  }}),/CI_INCIDENT_JOB_IDENTITY_INVALID/);
  assert.equal(calls.length,1);
 });
+
+test('PC isolated C996 and Secret Scan retain independent checks after unrelated failed steps',()=>{
+ const c996=readFileSync(new URL('../.github/workflows/c996-r5-readonly-source-checks.yml',import.meta.url),'utf8');
+ const secret=readFileSync(new URL('../.github/workflows/pc-secret-scan.yml',import.meta.url),'utf8');
+ for(const [yml,names,guard] of [
+  [c996,['Validate pinned workflow security scanner',
+   'Audit changed GitHub Actions workflow security'],
+   "!cancelled() && steps.checkout.outcome == 'success' && steps.node_setup.outcome == 'success' && steps.queue_host.outcome == 'success'"],
+  [secret,['Verify Oxlint source selector and SHA256 guard',
+   'Lint changed JavaScript and TypeScript with pinned Oxlint'],
+   "!cancelled() && steps.queue_host.outcome == 'success' && steps.checkout.outcome == 'success' && steps.node_setup.outcome == 'success'"]
+ ]){
+  for(const name of names)
+   assert.ok(yml.includes("      - name: "+name+"\n        if: "+String.fromCharCode(36)+"{{ "+guard+" }}"),
+    'missing isolated execution: '+name);
+  assert.doesNotMatch(yml,/continue-on-error:\s*true/);
+ }
+});
