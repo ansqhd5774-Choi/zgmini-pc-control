@@ -26,6 +26,8 @@ test('static query is host-scoped, account-scoped, bounded, and not executable i
  assert.match(GRAPHQL_QUERY,/rumWebVitalsEventsAdaptiveGroups/);
  assert.match(GRAPHQL_QUERY,/largestContentfulPaintP75/);
  assert.match(GRAPHQL_QUERY,/sum \{lcpTotal inpTotal clsTotal\}/);
+ assert.match(GRAPHQL_QUERY,/avg \{sampleInterval\}/);
+ assert.match(GRAPHQL_QUERY,/confidence\(level: 0\.95\) \{count \{estimate lower upper sampleSize\}\}/);
  assert.doesNotMatch(GRAPHQL_QUERY,/mutation|subscription/i);
 });
 test('invalid account, windows, dates and future horizon are rejected',()=>{
@@ -235,6 +237,44 @@ test('provider metric totals never turn negative P75 into Good or certified samp
  const legacy=parse(from([row()]));
  assert.equal(legacy.observations[0].metricReportedTotals,'UNAVAILABLE');
  assert.equal(legacy.siteGoodCertified,false);
+});
+test('adaptive page-group sample size is recorded without certifying INP users',()=>{
+ const rows=all().map((r,i)=>({...r,
+  sum:{lcpTotal:12,inpTotal:i===2?0:7,clsTotal:12},
+  avg:{sampleInterval:1.5},
+  confidence:{count:{estimate:12,lower:10.1,upper:13.9,sampleSize:8}}}));
+ rows[2].quantiles={largestContentfulPaintP75:712000,
+  interactionToNextPaintP75:-1,cumulativeLayoutShiftP75:0.002};
+ const out=parse(from(rows));
+ const mobile=out.observations.find(x=>x.route==='/economic-indicators/'&&x.device==='mobile');
+ assert.deepEqual(mobile.groupSampling,{scope:'PAGE_VIEW_GROUP_ONLY',
+  averageSampleInterval:1.5,
+  countConfidence95:{estimate:12,lower:10.1,upper:13.9,sampleSize:8}});
+ assert.equal(mobile.metricReportedTotals.inpMs,0);
+ assert.equal(mobile.metrics.inpMs.p75,null);
+ assert.equal(out.metricSampleSizesVerified,false);
+ assert.equal(out.siteGoodCertified,false);
+ assert.equal(out.fieldP75ValuesPresent,false);
+});
+test('page-group confidence never invents precise metric sample certification',()=>{
+ const good={...row(),avg:{sampleInterval:1},
+  confidence:{count:{estimate:1234,lower:1234,upper:1234,sampleSize:1234}}};
+ const x=parse(from([good]));
+ assert.equal(x.observations[0].groupSampling.averageSampleInterval,1);
+ assert.equal(x.observations[0].groupSampling.countConfidence95.sampleSize,1234);
+ assert.equal(x.metricSampleSizesVerified,false);
+ assert.equal(x.siteGoodCertified,false);
+ const legacy=parse(from([row()]));
+ assert.equal(legacy.observations[0].groupSampling,'UNAVAILABLE');
+ for(const [avg,confidence] of [
+  [{sampleInterval:0},{count:{estimate:2,lower:1,upper:3,sampleSize:2}}],
+  [{sampleInterval:'1'},{count:{estimate:2,lower:1,upper:3,sampleSize:2}}],
+  [{sampleInterval:1},{count:{estimate:2,lower:3,upper:1,sampleSize:2}}],
+  [{sampleInterval:1},{count:{estimate:2,lower:1,upper:3,sampleSize:-1}}],
+  [{sampleInterval:1},{count:{estimate:2,lower:1,upper:3}}],
+  [{sampleInterval:1},{count:null}]
+ ])assert.throws(()=>parse(from([{...row(),avg,confidence}])),
+  /CF_RUM_SAMPLING_SHAPE_INVALID/);
 });
 test('normal four-group response has zero non-target device groups',()=>{
  const out=parse(from(all()));
