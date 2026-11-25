@@ -84,6 +84,7 @@ function treeFixture(){
   [root+'/branches/'+encodeURIComponent(m.selectiveSource.branch)]:{name:m.selectiveSource.branch,commit:{sha:m.targetSha}},
   [root+'/git/commits/'+m.targetSha]:{sha:m.targetSha,parents:[{sha:m.installedSha}]},
   [root+'/compare/'+m.installedSha+'...'+m.targetSha]:overlay,
+  ['repos/ansqhd5774-Choi/zgmini/commits/'+m.postSourceSha]:{sha:m.postSourceSha},
   [root+'/pulls/1']:{number:1,merged:true,base:{ref:'main',repo:{full_name:repo}},merge_commit_sha:merge},
   [root+'/compare/'+m.selectiveSource.mainSha+'...'+rev]:lineage(m.selectiveSource.mainSha,rev),
   [root+'/compare/'+merge+'...'+rev]:lineage(merge,rev)
@@ -93,6 +94,8 @@ function treeFixture(){
 }
 for(const [name,edit,state] of [
  ['exact selective tree',()=>{},'SELECTIVE_TREE_MATCH_ONLY'],
+ ['postcheck source missing in app repo',f=>{delete f.data['repos/ansqhd5774-Choi/zgmini/commits/'+f.m.postSourceSha]},'EVIDENCE_MISSING'],
+ ['postcheck source wrong app SHA',f=>{f.data['repos/ansqhd5774-Choi/zgmini/commits/'+f.m.postSourceSha].sha='e'.repeat(40)},'REJECTED'],
  ['wrong parent',f=>{f.data[f.root+'/git/commits/'+f.m.targetSha].parents.push({sha:f.rev})},'REJECTED'],
  ['extra diff path',f=>{f.overlay.files.push({filename:'docs/extra.md',status:'added'})},'REJECTED'],
  ['incomplete compare',f=>{f.overlay.total_commits=2},'EVIDENCE_MISSING'],
