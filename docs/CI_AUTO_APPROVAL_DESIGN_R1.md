@@ -59,3 +59,10 @@ A는 기존 정규 접수/판정에 필요한 확인만 재사용한다. B는 �
 - Controller 후보는 승인 기록 및 CI PASS를 만들지 않는다. Writer 후보는 기존 validator 내부 구조검사만 수행하고 승인 상태 없는 계획을 반환한다. 두 후보 모두 PROPOSED_NOT_APPROVED, 기존 approvals/에 저장하거나 실행하는 명세가 아니다.
 - 테스트 17건 추가(기존 30건과 총 47건). 원격 파일 확인. 기존 Controller Maintenance Source Tests의 격리 Windows CI에서 두 테스트를 실행하도록 후보 브랜치에만 경로/단계를 연결했다. 운영 Workflow·토큰 권한·Runner 변경은 없다. Node CI 결과는 아직 미확인.
 - 단계 2/3 부분 완료, 실제 보호된 승인 근거/CI 증거 수집 미완료. 전체 약 40%(6단계 진행 추정), 운영 적용 0%. 다음: Draft PR의 격리 CI 실제 결과 회수, 보호된 승인 출처 및 CI evidence adapter, 위임 검토. 실제 승인 발행/실행 연결은 아직 비활성.
+
+### 2026-11-25 후속 — 실제 CI 증거 읽기 어댑터
+- PR #3545 HEAD `52e347c15e7933445951ee8173a544adb9793200`: Secret Scan [45591949415](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45591949415) SUCCESS, attempt 1, job 139128128814, 격리 호스트 확인·Gitleaks·Oxlint 단계 SUCCESS. 기존 Controller/C996 CI 관측: ZGMINI PC Secret Scan: completed/success; ZGMINI Controller Maintenance Source Tests: completed/success; C996 R5 Readonly Source Checks: in_progress/NONE. 아직 운영 승인이나 전체 Node 회귀 PASS 아님.
+- github-ci-evidence.mjs와 17개 fixture 추가. V8 17/17 통과, 실제 GitHub 읽기 호출로 위 Secret Scan의 Run/attempt/job/step 일치 관측을 반환. checkout 실제 바이트, workflow 신뢰성, 업무 승인 출처는 아직 검증하지 않음. 모든 결과 canPublish/canExecute=false. 전체 준비된 회귀 64건(기존 47 + 신규 17), Node CI 전체 미확인.
+- 기존 PR의 대기 중 CI를 취소하지 않기 위해 동일 HEAD를 기반으로 한 준비 브랜치 `codex/ci-auto-approval-evidence-prep-20261125`에만 보존. 별도 PR 없음. 기존 CI 결과 확인 후 원래 작업 브랜치로 통합하고 기존 격리 CI 테스트 목록에 신규 파일 연결 예정.
+- 권한 출처 조사: GitHub branches/main API의 protected=false, protection.enabled=false, rulesets 목록 빈 배열. 상세 branch-protection API는 403. 이 관측은 기존 업무 승인 폐기를 뜻하지 않으나 보호된 CI 자동 권한 발행 근거는 확립되지 않음. 정책/권한 변경 없이 신뢰된 위임 출처와 변조 방지 검증을 별도로 설계한다. CI 성공만으로 승인 명세서 발행 금지.
+- 단계 2/3/4 진행 중, 전체 약 45%(추정), 운영 0%. 다음: 기존 PR 실제 CI 회수, 준비 변경 통합 및 64건 Node 시험, 보호된 승인 출처 검증 설계. 운영 PC/정책/권한/요청 실행 변경 없음.
