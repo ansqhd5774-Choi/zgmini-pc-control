@@ -5,7 +5,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {test} from 'node:test';
 import {manifestFingerprint,validateControllerImportClosure,controllerImportScanRoots} from '../tools/maintenance-contract.mjs';
-import {prepareMaintenanceIssue,verifyMaintenanceIssue,submitMaintenanceIssue,reconcileMaintenanceIssue,main} from '../tools/maintenance-request.mjs';
+import {prepareMaintenanceIssue,verifyMaintenanceIssue,submitMaintenanceIssue,reconcileMaintenanceIssue,main,verifyMaintenancePostcheckSourceCommit,POSTCHECK_SOURCE_REPOSITORY} from '../tools/maintenance-request.mjs';
 const OLD='a'.repeat(40),NEXT='b'.repeat(40),OWNER='ansqhd5774-Choi';
 function manifest(){
  const allowFiles=[{path:'controller/operations.mjs',sha256:'c'.repeat(64)}];
@@ -92,4 +92,36 @@ test('actual TEMP package missing dependency fails before simulated switch; comp
  assert.notEqual(missing.status,0);assert.match(missing.stderr,/ERR_MODULE_NOT_FOUND/);
  fs.writeFileSync(path.join(root,'required.mjs'),'export const ready=true;\n');
  assert.equal(spawnSync(process.execPath,[path.join(root,'entry.mjs')],{encoding:'utf8',windowsHide:true,timeout:5000}).status,0);
+});
+
+test('Controller B pre-submit checks postcheck commit in the application repository',()=>{
+ const valid='b6049aac81b3442a58b08050ee138921f87a09e6';
+ const wrong='3a3aa9bc511048c122ddf72a388c04531a54108f';
+ const seen=[];
+ const readGitCommit=endpoint=>{seen.push(endpoint);return {sha:valid};};
+ const approved=verifyMaintenancePostcheckSourceCommit({postSourceSha:valid},{readGitCommit});
+ assert.equal(approved.status,'POSTCHECK_SOURCE_REPOSITORY_COMMIT_VERIFIED');
+ assert.equal(approved.sourceRepository,'ansqhd5774-Choi/zgmini');
+ assert.equal(approved.sourceSha,valid);
+ assert.equal(POSTCHECK_SOURCE_REPOSITORY,'ansqhd5774-Choi/zgmini');
+ assert.deepEqual(seen,['repos/ansqhd5774-Choi/zgmini/git/commits/'+valid]);
+ assert.throws(()=>verifyMaintenancePostcheckSourceCommit({postSourceSha:wrong},{readGitCommit}),
+  /MAINTENANCE_POSTCHECK_SOURCE_REPOSITORY_MISMATCH/);
+ assert.deepEqual(seen.at(-1),'repos/ansqhd5774-Choi/zgmini/git/commits/'+wrong);
+});
+
+test('wrong Controller-repo postcheck SHA and API errors stop before authorization',()=>{
+ const sha='3a3aa9bc511048c122ddf72a388c04531a54108f';
+ const repoCommit=endpoint=>{assert.equal(endpoint,'repos/ansqhd5774-Choi/zgmini/git/commits/'+sha);
+  throw Error('No commit found for SHA (422)');};
+ assert.throws(()=>verifyMaintenancePostcheckSourceCommit({postSourceSha:sha},{readGitCommit:repoCommit}),
+  /MAINTENANCE_POSTCHECK_SOURCE_LOOKUP_UNVERIFIED/);
+ assert.throws(()=>verifyMaintenancePostcheckSourceCommit({postSourceSha:sha},{readGitCommit:()=>{throw Error('network unavailable');}}),
+  /MAINTENANCE_POSTCHECK_SOURCE_LOOKUP_UNVERIFIED/);
+ assert.throws(()=>verifyMaintenancePostcheckSourceCommit({postSourceSha:sha},{readGitCommit:()=>({sha:'a'.repeat(40)})}),
+  /MAINTENANCE_POSTCHECK_SOURCE_REPOSITORY_MISMATCH/);
+ assert.throws(()=>verifyMaintenancePostcheckSourceCommit({postSourceSha:'../bad'},{readGitCommit:()=>{throw Error('must never run');}}),
+  /MAINTENANCE_POSTCHECK_SOURCE_SHA_INVALID/);
+ assert.throws(()=>verifyMaintenancePostcheckSourceCommit({postSourceSha:sha}),
+  /MAINTENANCE_POSTCHECK_LOOKUP_REQUIRED/);
 });

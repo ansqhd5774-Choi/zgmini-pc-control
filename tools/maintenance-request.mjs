@@ -8,6 +8,23 @@ import {prepareControllerUpdateRequest,validateMaintenanceRequest,
 
 const TITLE='pc-controller-update',LABEL='pc-maintenance';
 const fail=code=>{throw Error(code)};
+// The installed maintenance updater creates its postcheck PC Job against
+// the application repository, regardless of the Controller-source repository.
+// A Controller SHA in postSourceSha cannot execute there. This pre-POST
+// verification checks only the exact pinned commit; it changes no PC state.
+export const POSTCHECK_SOURCE_REPOSITORY='ansqhd5774-Choi/zgmini';
+export function verifyMaintenancePostcheckSourceCommit(manifest,{readGitCommit}={}){
+ const sha=manifest?.postSourceSha;
+ if(typeof sha!=='string'||!/^[a-f0-9]{40}$/.test(sha))
+  fail('MAINTENANCE_POSTCHECK_SOURCE_SHA_INVALID');
+ if(typeof readGitCommit!=='function')fail('MAINTENANCE_POSTCHECK_LOOKUP_REQUIRED');
+ let commit;
+ try{commit=readGitCommit(`repos/${POSTCHECK_SOURCE_REPOSITORY}/git/commits/${sha}`);}
+ catch{fail('MAINTENANCE_POSTCHECK_SOURCE_LOOKUP_UNVERIFIED');}
+ if(commit?.sha!==sha)fail('MAINTENANCE_POSTCHECK_SOURCE_REPOSITORY_MISMATCH');
+ return {status:'POSTCHECK_SOURCE_REPOSITORY_COMMIT_VERIFIED',
+  sourceRepository:POSTCHECK_SOURCE_REPOSITORY,sourceSha:sha};
+}
 export function prepareMaintenanceIssue(bytes,options){
  const request=prepareControllerUpdateRequest(bytes,options);
  return {repository_full_name:CONTROL_REPOSITORY,title:TITLE,
@@ -134,6 +151,9 @@ export async function main(argv=process.argv.slice(2)){
  const request=JSON.parse(expected.body);
  if(!readRemote(request.targetControllerSha).equals(bytes))
   fail('MAINTENANCE_REMOTE_MANIFEST_BYTES_MISMATCH');
+ // Read only, before receipt creation and the one authorized Issue POST.
+ // A 404/422, outage or mismatched response cannot become false approval.
+ verifyMaintenancePostcheckSourceCommit(JSON.parse(bytes),{readGitCommit:endpoint=>github(endpoint)});
  return submitMaintenanceIssue(expected,{saveReceipt,readIssue,
   createIssue:e=>github(`repos/${CONTROL_REPOSITORY}/issues`,{body:{title:e.title,labels:e.labels,body:e.body}})});
 }
