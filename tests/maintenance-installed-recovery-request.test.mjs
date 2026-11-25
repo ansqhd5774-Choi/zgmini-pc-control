@@ -291,20 +291,24 @@ test('#3516 is admitted only with exact approved manifest and independent A scop
  assert.equal(f.stats.recoveries,1);
 });
 
-test('#3516 cannot substitute unrelated A evidence, missing bytes or stale source',async t=>{
+test('#3516 cannot substitute unrelated A proof, CAS or stale source',async t=>{
  for(const mutation of [
   x=>({...x,proof:{...x.proof,runId:45457196689}}),
   x=>({...x,proof:{...x.proof,issueNumber:3438}}),
+  x=>({...x,casDigests:{...x.casDigests,writerSha256:'d'.repeat(64)}}),
+ ])await t.test('manifest fails before one-shot claim',async t2=>{
+  const f=setup(t2,{which:'w043516',approvalMutation:mutation});
+  const out=await f.agent.pollOnce();
+  assert.equal(out[0].status,'BLOCKED');
+  assert.equal(out[0].code,'INSTALLED_RECOVERY_APPROVAL_SCOPE_INVALID');
+  assert.equal(f.stats.recoveries,0);
+  assert.equal(f.agent.loadLedger(f.request.requestId),null);
+ });
+ for(const mutation of [
   x=>({...x,sourceSha:W04_INSTALLED_RECOVERY_SOURCE_SHA}),
   x=>({...x,requestId:W04_INSTALLED_RECOVERY_ORIGINAL_ID}),
-  x=>({...x,casDigests:{...x.casDigests,writerSha256:'d'.repeat(64)}}),
- ])await t.test('changed precise recovery contract',async t2=>{
-  const bytes=approved(mutation,'w043516');
-  assert.throws(()=>prepareInstalledRecoveryRequest(bytes));
-  // Even if the envelope was not created, no recovery child was invoked.
-  const original=setup(t2,{which:'w043516'});
-  assert.equal(original.stats.recoveries,0);
- });
+  x=>({...x,targetControllerSha:W04_INSTALLED_RECOVERY_CONTROLLER_SHA}),
+ ])assert.throws(()=>prepareInstalledRecoveryRequest(approved(mutation,'w043516')));
  const absent=setup(t,{which:'w043516',sourceReady:false});
  const result=await absent.agent.pollOnce();
  assert.equal(result[0].status,'BLOCKED');
