@@ -11,7 +11,8 @@
     "lib/market-score/employment-r6-formula.mjs": "dc23545f9f3512c260468d1c3afd6cc5185c5a0a1a60785050428f945d1c0dbb",
     "lib/market-score/employment-r6-observation-reader.mjs": "81d9341a625d75bb96816657dbb26cc906a6afaaa49482d1c8cef8eb72291b88",
     "lib/market-score/employment-r6-one-year-read-model.mjs": "aa6a9f429f64802251b88a839f56154f43d73864f8d11df569ef56210fee69a4",
-    "lib/market-score/employment-r6-pit04-key-evidence.mjs": "3c2b396ac8dfa926be1717efab37e31683e7ef5c945c164cea6b5e7c43ffb92e",
+    "lib/market-score/employment-r6-pit04-key-evidence.mjs":
+        "3c2b396ac8dfa926be1717efab37e31683e7ef5c945c164cea6b5e7c43ffb92e",
     "lib/market-score/employment-r6-scheduler.mjs": "10f18be45d2848945b6b2e1f1e56321885719faa0e19f28f9b4ab20e94fbc834",
     "lib/market-score/employment-r6-window.mjs": "dc41a6780f05d28c31ee52b77b2f688df27216d109ae4c7dc1aa17a9da07decd",
     "scripts/pc-writer/d1-diagnostics.mjs": "2e9ea54661c51d86798800e532edb10c6796694d3049844ef8b283b7ad6dfe5f",
