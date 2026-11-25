@@ -10,12 +10,16 @@ import {protection} from '../tools/install-runner-watchdog.mjs';
 import {TARGET,ORIGINAL,REPLACEMENT,INITIAL_SCOPE,FINAL_SCOPE,
   APPROVED_CONTROLLER_SHA,NEXT_TARGET,NEXT_SOURCE_SHA,
   parseCanonicalBody,validateRequest,validateR3Request,decideUpgradeState,error} from './contract.mjs';
+import {R4_TARGET,R4_PREIMAGE_SHA256,R4_SOURCE_SHA256,
+ validateR4Request,verifyR4ControllerHost,projectR4InstalledManifest}
+ from './standby-r4-contract.mjs';
 
 const repoRoot=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const home='E:/ZGmini/automation/pc-watchdog';
 const maintenance='E:/ZGmini/automation/pc-maintenance';
 const controller='E:/ZGmini/automation/pc-control';
 const manifestFor=body=>path.join(repoRoot,'approvals/watchdog-upgrades',
+ body.targetSha===R4_TARGET?R4_TARGET+'.json':
  body.targetSha===NEXT_TARGET?NEXT_TARGET+'.json':TARGET+'-r2.json');
 const sourceFile=path.join(repoRoot,'tools/runner-watchdog.mjs');
 const installedFile=path.join(home,'runner-watchdog.mjs');
@@ -140,13 +144,17 @@ export async function execute(){
  const oldBytes=fs.readFileSync(installedFile);
  const oldManifestBytes=fs.readFileSync(installedManifest);
  const installed=JSON.parse(oldManifestBytes);
+ const r4=body.targetSha===R4_TARGET;
  const r3=body.targetSha===NEXT_TARGET;
- const oldSha=r3?REPLACEMENT:ORIGINAL;
- const nextSha=r3?NEXT_SOURCE_SHA:REPLACEMENT;
- const targetSha=r3?NEXT_TARGET:TARGET;
- const oldScope=r3?FINAL_SCOPE:INITIAL_SCOPE;
- const request=r3
-  ?validateR3Request(event,body,approval,installed,digest(newBytes),digest(approvalBytes))
+ const oldSha=r4?R4_PREIMAGE_SHA256:r3?REPLACEMENT:ORIGINAL;
+ const nextSha=r4?R4_SOURCE_SHA256:r3?NEXT_SOURCE_SHA:REPLACEMENT;
+ const targetSha=r4?R4_TARGET:r3?NEXT_TARGET:TARGET;
+ const oldScope=r3||r4?FINAL_SCOPE:INITIAL_SCOPE;
+ const request=r4
+  ?validateR4Request(event,body,approval,installed,digest(newBytes),
+    digest(approvalBytes),oldManifestBytes)
+  :r3?validateR3Request(event,body,approval,installed,
+    digest(newBytes),digest(approvalBytes))
   :validateRequest(event,body,approval,installed,digest(newBytes),digest(approvalBytes));
  if(!Number.isSafeInteger(request.issueNumber)||request.issueNumber<1)
   throw error('WATCHDOG_B_ISSUE_NUMBER_INVALID');
@@ -162,7 +170,9 @@ export async function execute(){
  const historicalProtection=readJSON(path.join(home,'PROTECTION_BEFORE.json'));
  const protectionBefore=protection();
  requireCurrentProtection({historical:historicalProtection,current:protectionBefore});
- verifyApprovedControllerHost(readJSON(path.join(controller,'host.json')));
+ const controllerHost=readJSON(path.join(controller,'host.json'));
+ verifyApprovedControllerHost(controllerHost,r4?R4_TARGET:APPROVED_CONTROLLER_SHA);
+ if(r4)verifyR4ControllerHost(controllerHost);
  const owner=readJSON(path.join(home,'receiver/owner.json'));
  const status=readJSON(path.join(home,'STATUS.json'));
  const requests=path.join(home,'upgrades');
@@ -209,8 +219,10 @@ export async function execute(){
     ||localAcl(stagedManifest)!==originalManifestAcl)
     throw error('WATCHDOG_B_STAGED_ACL_MISMATCH');
   fs.writeFileSync(stagedScript,newBytes);
-  const updated={...installed,sha256:nextSha,scope:FINAL_SCOPE,
-    approvedTargetSourceSha:targetSha,upgradedAt:new Date().toISOString()};
+  const updated=r4
+   ?projectR4InstalledManifest(installed,request,new Date().toISOString())
+   :{...installed,sha256:nextSha,scope:FINAL_SCOPE,
+     approvedTargetSourceSha:targetSha,upgradedAt:new Date().toISOString()};
   fs.writeFileSync(stagedManifest,JSON.stringify(updated,null,2)+'\n');
   if(digest(fs.readFileSync(stagedScript))!==nextSha
     ||localAcl(stagedScript)!==originalSourceAcl
@@ -231,6 +243,9 @@ export async function execute(){
   const result=readJSON(installedManifest);
   if(digest(fs.readFileSync(installedFile))!==nextSha
     ||result.sha256!==nextSha||result.scope!==FINAL_SCOPE
+    ||(r4&&(result.standby?.mode!=='ACTIVE_1_STANDBY_1'||
+       result.standby?.approved!==true||
+       result.approvedTargetSourceSha!==R4_TARGET))
     ||localAcl(installedFile)!==originalSourceAcl
     ||localAcl(installedManifest)!==originalManifestAcl
     ||digest(fs.readFileSync(startup))!==installed.startupSha256
