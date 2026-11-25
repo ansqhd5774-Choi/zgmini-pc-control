@@ -1,0 +1,355 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-45714445280-1-seat-6",
+  "requestId": "pc-74388bf6-ec34-4ae7-8a3d-e8c922341149",
+  "startedAt": "2026-11-25T22:35:02.614Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "53fe24e22446d21a9fd4ee308d12b7cba7f37e25",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "7c243d87b8c04b408d30e3fe2e3e8dad9d3571aa",
+  "sourceBranch": "main",
+  "operation": "fear-greed-archive-status",
+  "seat": 6,
+  "status": "PASS",
+  "code": "FEAR_GREED_ARCHIVE_READONLY_DIAGNOSIS",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": true,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-w06-cnn-intraday-20261126",
+  "effectClass": "REGISTERED_OPERATION",
+  "pcOperationalApprovedSha": "d8ac245003e7b8e006c2345382d5c639c6d5f18b",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "FEAR_GREED_ARCHIVE_READONLY_DIAGNOSIS",
+    "task": {
+      "hasExecAction": true,
+      "commandBase": "wscript.exe",
+      "actionSha256": "c80e02f58b1e118189cd7d2c63df56a3d0b1fb94a793f6dfe62041714fab0f3a",
+      "referencedScripts": [
+        {
+          "relativePath": "ZGmini/data/pc-writer/archive-sidecar-r7/run-original-then-archive.vbs",
+          "exists": true,
+          "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+          "references": {
+            "archiveRun": true,
+            "archiveCore": false,
+            "verifiedChecksR9": false,
+            "quotaRunner": false,
+            "localCycle": false
+          }
+        },
+        {
+          "relativePath": "ZGmini/data/pc-writer/cutover-evidence/inflation-r37-2026-10-20T19-39-19-549Z/run-local-core.vbs",
+          "exists": true,
+          "sha256": "bb3e11c0b5c8da07162b1c824e7b52e7a7c2f987c079f29713211a2413932b01",
+          "references": {
+            "archiveRun": false,
+            "archiveCore": false,
+            "verifiedChecksR9": false,
+            "quotaRunner": false,
+            "localCycle": false
+          }
+        },
+        {
+          "relativePath": "ZGmini/data/pc-writer/archive-sidecar-r7/archive-run.mjs",
+          "exists": true,
+          "sha256": "583297b451f168a32a2a5de4b0b04c9b14449aab9a041c954a420203cf04f188",
+          "references": {
+            "archiveRun": false,
+            "archiveCore": false,
+            "verifiedChecksR9": false,
+            "quotaRunner": false,
+            "localCycle": false
+          }
+        },
+        {
+          "relativePath": "ZGmini/data/pc-writer/earnings-risk-provisional-r23/ZGMINI_EARNINGS_R38_AUTO_DISPATCH.mjs",
+          "exists": true,
+          "sha256": "4346e5e4406f893ede75e994e3a1e7253bde2bb8eacd7656b365e3a82e3704f1",
+          "references": {
+            "archiveRun": false,
+            "archiveCore": false,
+            "verifiedChecksR9": false,
+            "quotaRunner": false,
+            "localCycle": false
+          }
+        }
+      ]
+    },
+    "local": {
+      "sqliteOpened": true,
+      "status": "READ",
+      "currentPublic": {
+        "status": "verified",
+        "score": 15.2253164556962,
+        "observedAt": "2026-11-25T22:09:41.000Z",
+        "storedAt": 1795645535269
+      },
+      "original": {
+        "status": "READ",
+        "days": 6,
+        "pointCount": 119,
+        "latest": {
+          "date": "2026-11-24",
+          "count": 11,
+          "lastAt": "2026-11-24T13:17:31.000Z",
+          "storedAt": 1795527781442
+        },
+        "recentDates": [
+          {
+            "date": "2026-11-24",
+            "count": 11,
+            "lastAt": "2026-11-24T13:17:31.000Z",
+            "storedAt": 1795527781442
+          },
+          {
+            "date": "2026-11-06",
+            "count": 14,
+            "lastAt": "2026-11-06T23:59:54.000Z",
+            "storedAt": 1794011426473
+          },
+          {
+            "date": "2026-11-05",
+            "count": 3,
+            "lastAt": "2026-11-05T08:25:46.000Z",
+            "storedAt": 1793868467624
+          },
+          {
+            "date": "2026-11-04",
+            "count": 46,
+            "lastAt": "2026-11-04T23:59:55.000Z",
+            "storedAt": 1793839057428
+          },
+          {
+            "date": "2026-11-03",
+            "count": 44,
+            "lastAt": "2026-11-03T23:59:48.000Z",
+            "storedAt": 1793752370492
+          },
+          {
+            "date": "2026-10-30",
+            "count": 1,
+            "lastAt": "2026-10-30T23:59:48.000Z",
+            "storedAt": 1793443731294
+          }
+        ]
+      },
+      "checks": {
+        "status": "READ",
+        "days": 7,
+        "pointCount": 119,
+        "latest": {
+          "date": "2026-11-24",
+          "count": 11,
+          "lastAt": "2026-11-24T13:35:44.576Z",
+          "storedAt": 1795527344576
+        },
+        "recentDates": [
+          {
+            "date": "2026-11-24",
+            "count": 11,
+            "lastAt": "2026-11-24T13:35:44.576Z",
+            "storedAt": 1795527344576
+          },
+          {
+            "date": "2026-11-07",
+            "count": 2,
+            "lastAt": "2026-11-07T00:30:02.951Z",
+            "storedAt": 1794011402951
+          },
+          {
+            "date": "2026-11-06",
+            "count": 12,
+            "lastAt": "2026-11-06T23:50:04.862Z",
+            "storedAt": 1794009004862
+          },
+          {
+            "date": "2026-11-05",
+            "count": 5,
+            "lastAt": "2026-11-05T08:45:04.235Z",
+            "storedAt": 1793868304235
+          },
+          {
+            "date": "2026-11-04",
+            "count": 46,
+            "lastAt": "2026-11-04T23:55:05.106Z",
+            "storedAt": 1793836505106
+          },
+          {
+            "date": "2026-11-03",
+            "count": 42,
+            "lastAt": "2026-11-03T23:50:04.711Z",
+            "storedAt": 1793749804711
+          },
+          {
+            "date": "2026-11-01",
+            "count": 1,
+            "lastAt": "2026-11-01T11:30:08.551Z",
+            "storedAt": 1793532608551
+          }
+        ]
+      },
+      "composite": {
+        "status": "READ",
+        "days": 24,
+        "pointCount": 126,
+        "latest": {
+          "date": "2026-11-25",
+          "count": 8,
+          "lastAt": "2026-11-25T21:35:39.128Z",
+          "storedAt": 1795642539128
+        },
+        "recentDates": [
+          {
+            "date": "2026-11-25",
+            "count": 8,
+            "lastAt": "2026-11-25T21:35:39.128Z",
+            "storedAt": 1795642539128
+          },
+          {
+            "date": "2026-11-24",
+            "count": 7,
+            "lastAt": "2026-11-24T23:45:51.438Z",
+            "storedAt": 1795563951438
+          },
+          {
+            "date": "2026-11-23",
+            "count": 7,
+            "lastAt": "2026-11-23T22:25:37.982Z",
+            "storedAt": 1795472737982
+          },
+          {
+            "date": "2026-11-22",
+            "count": 1,
+            "lastAt": "2026-11-22T00:00:50.969Z",
+            "storedAt": 1795305650969
+          },
+          {
+            "date": "2026-11-21",
+            "count": 2,
+            "lastAt": "2026-11-21T05:01:38.086Z",
+            "storedAt": 1795237298086
+          },
+          {
+            "date": "2026-11-20",
+            "count": 8,
+            "lastAt": "2026-11-20T22:00:29.506Z",
+            "storedAt": 1795212029506
+          },
+          {
+            "date": "2026-11-19",
+            "count": 9,
+            "lastAt": "2026-11-19T22:35:48.517Z",
+            "storedAt": 1795127748517
+          }
+        ]
+      }
+    },
+    "archiveTrace": {
+      "alignment": {
+        "status": "HISTORY_DIVERGENCE",
+        "currentObservedNewerThanOriginal": true,
+        "currentStoredNewerThanCheck": true,
+        "cause": "UNKNOWN"
+      },
+      "sidecar": {
+        "evidence": "OBSERVED_UNATTESTED",
+        "candidates": [
+          {
+            "name": "last-run.json",
+            "evidence": "UNATTESTED_LEDGER",
+            "sha256": "ef3f3b871eb923ff075fd866acc1a3d8dddd58a7750b4607f9191ec3fc7414a2",
+            "modifiedAt": "2026-11-25T22:32:19.810Z",
+            "reportedStatus": "BLOCKED",
+            "code": null,
+            "lastPass": null,
+            "firstFail": null,
+            "reason": null,
+            "at": "2026-11-25T22:32:19.344Z",
+            "failureHints": {
+              "evidence": "UNATTESTED_CATEGORICAL_HINTS",
+              "hasStage": false,
+              "hasError": false,
+              "hasReason": true,
+              "categories": [
+                "SOURCE_OR_APPROVAL"
+              ],
+              "reportedBlockSubtype": "UNKNOWN"
+            },
+            "reportedShaRelation": {
+              "evidence": "UNATTESTED_LEDGER_FIELDS",
+              "actualPresent": false,
+              "approvedPresent": false,
+              "relation": "UNKNOWN"
+            }
+          }
+        ]
+      },
+      "sidecarSourceGate": {
+        "evidence": "UNATTESTED_STATIC_SOURCE_AND_LEDGER",
+        "scriptStatus": [
+          {
+            "file": "archive-run.mjs",
+            "status": "CHANGED",
+            "modifiedAfterLedger": false
+          },
+          {
+            "file": "run-original-then-archive.vbs",
+            "status": "MATCH",
+            "modifiedAfterLedger": false
+          },
+          {
+            "file": "archive-core-r10.mjs",
+            "status": "MATCH",
+            "modifiedAfterLedger": false
+          },
+          {
+            "file": "verified-checks-r10.mjs",
+            "status": "MATCH",
+            "modifiedAfterLedger": false
+          }
+        ],
+        "ledgerStatus": "READ",
+        "sameLedgerSnapshot": true,
+        "reasonShape": "STRING",
+        "reasonConcepts": [
+          "SOURCE",
+          "SHA"
+        ],
+        "matchingErrorSite": "NOT_CHECKED",
+        "matchedScript": null,
+        "siteLine": null,
+        "gatePatternCategories": [],
+        "matchedGateCategories": [],
+        "operationalWrites": 0,
+        "providerCalls": 0,
+        "d1Writes": 0
+      },
+      "publicationLedger": {
+        "evidence": "UNATTESTED_LEDGER",
+        "reportedStatus": "VERIFIED",
+        "at": "2026-11-25T22:27:43.019Z",
+        "modifiedAt": "2026-11-25T22:27:43.019Z",
+        "sha256": "a269627fe76a107a42b4c900ed9de4c0a33f2cb146bb55eeb0e2c5cffc4fd009",
+        "scope": "GLOBAL_PUBLICATION_ONLY"
+      }
+    },
+    "sqliteOpened": true,
+    "operationalWrites": 0,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "scope": "READ_ONLY_NO_PROVIDER_NO_PUBLICATION"
+  },
+  "protectedBeforeSha256": "c3f37ad6b759146c1159c7637c428b704eac1383658071f7b1927697ade3c4b8",
+  "protectedAfterSha256": "c3f37ad6b759146c1159c7637c428b704eac1383658071f7b1927697ade3c4b8",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "53fe24e22446d21a9fd4ee308d12b7cba7f37e25",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-25T22:35:08.598Z",
+  "durationMs": 5984
+}
