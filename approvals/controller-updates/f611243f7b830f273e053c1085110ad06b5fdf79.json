@@ -1,0 +1,41 @@
+{
+  "schema": "ZGMINI_PC_UPDATE_V1",
+  "installedSha": "57d5056d00943b25b88d6c13b1418d94bd14fc21",
+  "targetSha": "f611243f7b830f273e053c1085110ad06b5fdf79",
+  "allowFiles": [
+    {
+      "path": "controller/operations.mjs",
+      "sha256": "b887dac033e5eddb03d40a81c83bdda41b92439f3f636d85a5b8ede0f606967d"
+    }
+  ],
+  "purpose": "pc-controller-maintenance",
+  "controllerOnlyInstall": true,
+  "selectiveSource": {
+    "schema": "ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1",
+    "branch": "codex/w04-memory-recheck-installed57d-20261125",
+    "mainSha": "ff620ab1b0bcfd78273297aa1b764dfd2ee05503",
+    "customPaths": [
+      "controller/operations.mjs"
+    ]
+  },
+  "approval": {
+    "grade": "B",
+    "scope": "PC_CONTROL_CONTROLLER_UPDATE",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3606"
+  },
+  "checks": {
+    "targetSha": "f611243f7b830f273e053c1085110ad06b5fdf79",
+    "status": "PASS",
+    "manifestSha256": "6b33bf5f707046f3408430b415b9f254fa296d888b6022d0940ad05262edb06b"
+  },
+  "backup": {
+    "strategy": "VERSIONED_SNAPSHOT",
+    "rollback": {
+      "kind": "RESTORE_INSTALLED_SHA",
+      "sha": "57d5056d00943b25b88d6c13b1418d94bd14fc21"
+    }
+  },
+  "postOperation": "core-status",
+  "postSourceBranch": "main",
+  "postSourceSha": "b6049aac81b3442a58b08050ee138921f87a09e6"
+}
