@@ -12,7 +12,7 @@ export const GRAPHQL_QUERY=[
  'rumWebVitalsEventsAdaptiveGroups(limit: 30,',
  'filter: {datetime_geq: $start, datetime_leq: $end, requestHost: "zgmini.kr",',
  'requestPath_in: ["/", "/economic-indicators/"], bot: 0}) {',
- 'count dimensions {requestHost requestPath deviceType bot}',
+ 'count dimensions {requestHost requestPath deviceType}',
  'quantiles {largestContentfulPaintP75 interactionToNextPaintP75 cumulativeLayoutShiftP75}',
  '} } } }'
 ].join(' ');
@@ -66,8 +66,9 @@ export function parseRumGraphql(response,{startUtc,endUtc}={}){
   const {requestHost,requestPath,deviceType}=row.dimensions;
   // Never expose another host/path or an untrusted URL in a public result.
   if(requestHost!==RUM_HOST||!RUM_PATHS.includes(requestPath))continue;
-  // API query also excludes bots; enforce the dimension in response independently.
-  if(row.dimensions.bot!==0)continue;
+  // `bot: 0` is a filter, NOT a selected RUM dimension. Standard GraphQL
+  // responses omit dimensions.bot; reject unexpected explicitly nonzero bots.
+  if(row.dimensions.bot!==undefined&&row.dimensions.bot!==0)continue;
   const device=typeof deviceType==='string'?deviceType.toLowerCase():null;
   if(!RUM_DEVICES.includes(device))continue;
   const key=requestPath+'|'+device;
