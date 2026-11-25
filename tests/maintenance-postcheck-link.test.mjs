@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {classifyMaintenancePostcheckLink as classify,
+ selectMaintenancePostcheckRun as select,
  summarizeMaintenancePostcheckLocalPointer as localPointer,
  classifyMaintenancePostcheckWorkflowRegistration as registration} from '../tools/maintenance-contract.mjs';
 
@@ -40,6 +41,35 @@ test('a nonmatching Run or a Run predating the Issue is never attached',()=>{
  }
  assert.equal(result({runs:[run(),run({id:999})],jobs:null}).code,
   'POSTCHECK_RUN_IDENTITY_AMBIGUOUS');
+});
+
+test('paired opened/labeled Runs select only the unique non-skipped Run',()=>{
+ const active=run({status:'completed',conclusion:'success'});
+ const skipped=run({id:778,created_at:'2026-11-25T01:00:03Z',
+  status:'completed',conclusion:'skipped'});
+ assert.equal(select([active,skipped])?.id,777);
+ assert.equal(select([skipped,active])?.id,777);
+ assert.equal(result({runs:[active,skipped],jobs:[job()]}).state,'UPLOAD_MISSING');
+ assert.equal(result({runs:[skipped,active],jobs:[job()]}).runId,777);
+ // When the actionable Run is the second event, its own Job must be selected.
+ const later=run({id:779,created_at:'2026-11-25T01:00:04Z'});
+ assert.equal(result({runs:[skipped,later],jobs:[job({id:889,run_id:779})]}).runId,779);
+ assert.equal(result({runs:[skipped,run({id:779,status:'queued',conclusion:null})],jobs:null}).state,
+  'RUNNER_QUEUE');
+});
+
+test('paired executable or unverifiable Runs remain ambiguous and never authorize replay',()=>{
+ assert.equal(select([run(),run({id:999})]),null);
+ assert.equal(select([run({status:'completed',conclusion:'skipped'}),
+  run({id:999,status:'completed',conclusion:'skipped'})]),null);
+ assert.equal(result({runs:[run(),run({id:999})],jobs:[job()]}).code,
+  'POSTCHECK_RUN_IDENTITY_AMBIGUOUS');
+ assert.equal(result({runs:[run(),run({id:999}),run({id:1000})],jobs:[job()]}).state,
+  'STATE_UNKNOWN');
+ assert.equal(select([run({id:0})]),null);
+ assert.equal(result({runs:[],jobs:null}).state,'NO_RUN');
+ const src=fs.readFileSync(fileURLToPath(new URL('../tools/update.mjs',import.meta.url)),'utf8');
+ assert.match(src,/const selected=selectMaintenancePostcheckRun\\(linkedRuns\\)/);
 });
 
 test('run at exactly existing 15-minute provenance boundary remains eligible',()=>{
