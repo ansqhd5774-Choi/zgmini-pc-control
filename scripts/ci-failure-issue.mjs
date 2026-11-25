@@ -58,6 +58,34 @@ async function verifiedIssueComments(request,issueNumber){
  fail('COMMENTS_UNVERIFIED');
 }
 
+// Historical matches are review candidates, never evidence of a shared root cause.
+// Bounded to three latest closed-Issue pages; absence is not proof of no recurrence.
+export function recurrenceCandidates(issues,{workflow,job,step},limit=3){
+ const field=(body,name)=>{
+  const prefix='- '+name+': ';
+  return String(body??'').split(/\r?\n/).find(line=>line.startsWith(prefix))?.slice(prefix.length);
+ };
+ return issues.filter(i=>!i.pull_request&&Number.isSafeInteger(i.number)&&i.number>0&&
+   typeof i.body==='string'&&i.body.includes('**CI 실패 관측')&&
+   field(i.body,'Workflow')===workflow&&field(i.body,'Job')===job&&
+   field(i.body,'Step')===step).slice(0,limit).map(i=>i.number);
+}
+async function closedCiCandidates(request){
+ const issues=[];
+ try{
+  for(let page=1;page<=3;page++){
+   const batch=await request('issues?state=closed&per_page=100&page='+page);
+   if(!Array.isArray(batch)||batch.length>100)throw Error('INVALID_CLOSED_ISSUE_PAGE');
+   issues.push(...batch);
+   if(batch.length<100)return {issues,scope:'BOUNDED_CLOSED_ISSUES'};
+  }
+  return {issues,scope:'BOUNDED_CLOSED_ISSUES'};
+ }catch{
+  // Never block the original failure intake because historical matching is unavailable.
+  return {issues:[],scope:'HISTORY_UNAVAILABLE'};
+ }
+}
+
 export async function triage({event,repository=REPO,request}){
  if(typeof request!=='function')fail('IO_MISSING');
  const run=event?.workflow_run;
@@ -104,6 +132,7 @@ export async function triage({event,repository=REPO,request}){
   if(list.length<100)break;
   if(page===10)fail('ISSUE_INVENTORY_INCOMPLETE');
  }
+ let closedHistory;
  const results=[];
  for(const incident of cases){
   const marker=markerFor(incident.key);
@@ -140,8 +169,15 @@ export async function triage({event,repository=REPO,request}){
    ' / Run '+run.id+' Attempt '+run.run_attempt;
   const crossLink=legacy?'\n이전 Step 묶음 이력: #'+legacy.number+
     ' (동일 원인이라는 뜻이 아님).':'';
+  if(!closedHistory)closedHistory=await closedCiCandidates(request);
+  const related=recurrenceCandidates(closedHistory.issues,{
+   workflow:clean(run.name),job:incident.jobName,step:incident.stepName});
+  const recurrenceNote='\n- 이전 종결 CI 관측 후보 ('+
+   closedHistory.scope+'): '+(related.length?related.map(n=>'#'+n).join(', '):'확인되지 않음')+
+   '\n- 재발 판정: 미확인 — Workflow/Job/Step 동일성은 근본 원인 일치 증거가 아님.';
+
   const created=await request('issues',{method:'POST',
-   body:{title,body:[marker,evidence,crossLink,
+   body:{title,body:[marker,evidence,crossLink,recurrenceNote,
     '\n근본 원인이 확인되기 전에는 다른 Run과 합치지 않으며 자동 재실행·자동 종료하지 않습니다.'].join('\n')}});
   if(!goodId(created?.number))fail('ISSUE_CREATE_RESULT_UNKNOWN');
   const check=await request('issues/'+created.number);
