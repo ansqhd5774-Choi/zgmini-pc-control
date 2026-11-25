@@ -1,0 +1,15 @@
+{
+  "schema": "ZGMINI_CONTROLLER_SELECTIVE_PIN_V1",
+  "installedSha": "0353e09059d6c8d483afbffb20d7f795e138f581",
+  "targetSha": "e4bfd955ec06b6eecd4d67213309ec8f4e028af5",
+  "sourceMainSha": "603c4434a905f485fcce2061042a579ceb97a887",
+  "targetBranch": "codex/report-recovery-3650-correct-0353-overlay-r1",
+  "customPaths": [],
+  "allowFiles": [
+    {
+      "path": "controller/report-recovery-3650-once.mjs",
+      "sha256": "19520e4bce58f756193cfacc5a3744997261fb52d5f21cf2aad61846a6092eab"
+    }
+  ],
+  "approvalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3700"
+}
