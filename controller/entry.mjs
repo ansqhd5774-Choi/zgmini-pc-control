@@ -1,4 +1,4 @@
-import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';import {need,writeJson,errorCode,digest,validateRequest} from './common.mjs';
+import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';import {need,writeJson,errorCode,digest,validateRequest,assertSupervisorOwner} from './common.mjs';
 const controller=path.dirname(fileURLToPath(import.meta.url)),root=path.dirname(controller);
 let policy,event,importFailureStage='EVENT_OR_REQUEST_VALIDATION';
 const seat=Number(process.env.RUNNER_NAME?.match(/^zgmini-pc-0([1-6])$/)?.[1]);const runId=process.env.GITHUB_RUN_ID,attempt=Number(process.env.GITHUB_RUN_ATTEMPT||1);
@@ -39,6 +39,8 @@ try{
   files.every(([rel,sha])=>/^(controller\/[a-z0-9-]+\.mjs|config\/operations\.json)$/.test(rel)
    &&/^[a-f0-9]{64}$/.test(sha)),'CONTROLLER_HOST_MANIFEST_UNAVAILABLE');
  for(const [rel,sha] of Object.entries(host.controllerFiles))need(digest(fs.readFileSync(path.join(root,rel)))===sha,'CONTROLLER_SOURCE_DRIFT');
+ // Guard new work at installed, standby-attested Controller entry only.
+ assertSupervisorOwner(root,host);
  need(process.env.GITHUB_REPOSITORY===policy.controlRepository&&event.repository?.private===true,'CONTROL_REPOSITORY_OR_VISIBILITY');
  need(policy.allowedActors.includes(process.env.GITHUB_ACTOR),'ACTOR_NOT_ALLOWED');const validEvent=event.action==='opened' ||
   (event.action==='labeled'&&event.label?.name==='pc-job');
