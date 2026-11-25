@@ -163,7 +163,9 @@ test('submission workflow is activation-gated, source-event driven and pinned to
  assert.match(y,/vars\.ZGMINI_CI_CONTROLLER_B_ENABLED == 'true'/);
  assert.match(y,/name: submit-controller-b/);
  assert.match(y,/name: Record Controller B request receipt/);
- assert.match(y,/ref: [a-f0-9]{40}\s+persist-credentials: false/);
+ // Keep the privileged workflow on the last reviewed 4/4-green publisher source.
+ // A publisher implementation change requires an explicit new fixed pin.
+ assert.match(y,/ref: ee707147c70794b2d3900615c2f015f2f480289e\s+persist-credentials: false/);
  assert.match(y,/run: node ci-approval\/completed-run-intake\.mjs --publish-existing/);
  assert.match(y,/cancel-in-progress: false/);
  assert.match(y,/github\.event\.workflow_run\.conclusion == 'success'/);
