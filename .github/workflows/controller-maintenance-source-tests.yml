@@ -10,6 +10,7 @@ on:
       - 'tests/ci-approval-approval-source-integrity.test.mjs'
       - 'tests/ci-approval-pinned-manifest-scope.test.mjs'
       - 'tests/ci-approval-request-preview.test.mjs'
+      - 'tests/ci-approval-integration-tree-evidence.test.mjs'
       - 'controller/common.mjs'
       - 'controller/entry.mjs'
       - 'controller/upload.mjs'
@@ -268,6 +269,9 @@ jobs:
       - name: Verify deterministic scoped request previews without submission
         if: hashFiles('ci-approval/request-preview.mjs', 'tests/ci-approval-request-preview.test.mjs') != ''
         run: node --test --test-concurrency=1 tests/ci-approval-request-preview.test.mjs
+      - name: Verify tested integration tree observation without issuance
+        if: hashFiles('ci-approval/integration-tree-evidence.mjs', 'tests/ci-approval-integration-tree-evidence.test.mjs') != ''
+        run: node --test --test-concurrency=1 tests/ci-approval-integration-tree-evidence.test.mjs
       - name: Verify W05 independent operator receipt without operational access
         # Historical PR integration trees can predate this W05 fixture.
         # Test it whenever it is present; do not fail unrelated older heads.
