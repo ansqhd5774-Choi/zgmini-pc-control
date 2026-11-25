@@ -140,7 +140,12 @@ export async function inspectOriginalNov6InputVintage({
       const file=path.join(input,'nov30-forward-days',day+'.json');
       let body=null,fromPrivate=false;
       // An unsafe or post-cutoff archive is NOT replaced by today's Core row.
-      if(fs.existsSync(file)){
+      let filePresent=false;
+      try{fs.lstatSync(file);filePresent=true}
+      catch(error){
+        if(error?.code!=='ENOENT'){r.invalidDays++;continue}
+      }
+      if(filePresent){
         if(!safeFile(file,2_501_024)){
           r.invalidDays++;continue;
         }
