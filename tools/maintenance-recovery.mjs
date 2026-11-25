@@ -318,6 +318,70 @@ function verifyInstalledRecoverySupervisor(targetSha){
  return status.children.every(child=>child?.alive===true&&
   Number.isSafeInteger(child.pid)&&child.pid>0&&alive(child.pid)===true);
 }
+// Exact #3516 exception requires independent host source/lease evidence from
+// the operating PC. It is NOT the missing original #3519 core-status receipt.
+// This classifier alone grants no recovery right or permission to archive.
+export function verify3516IndependentOperatingA({receipt,issue,run,job,cas,ledger,
+ targetSha,postIssueNumber,proofSourceSha,proofCase}={}){
+ if(!receipt||!issue||!run||!job||!cas||!ledger||!proofCase)return false;
+ let body;try{body=JSON.parse(issue.body);}catch{return false;}
+ const observed=receipt.w043516MaintenanceStatus;
+ const lineage=observed?.recoveryCas;
+ const expectedCas=['ledgerSha256','ownerSha256','markerSha256','backlogSha256',
+  'snapshotSha256','protectionSha256','writerSha256'];
+ const steps=job.steps?.filter(s=>
+  s.name==='Collect read-only runtime process snapshot on existing operating PC');
+ return issue.number===3528&&issue.user?.login==='ansqhd5774-Choi'&&
+  issue.title==='pc-process-inventory-readonly'&&
+  body?.schema==='ZGMINI_PC_PROCESS_INVENTORY_REQUEST_V1'&&
+  body.operation==='process-inventory-readonly'&&body.role==='operating'&&
+  body.probe==='w04-3516-maintenance-status-readonly'&&
+  body.requestId==='f4c7a6a2-5c62-4f1e-973b-4aba72ca8589'&&
+  receipt.requestId===body.requestId&&
+  run.id===proofCase.runId&&run.event==='issues'&&
+  run.head_sha===proofSourceSha&&run.status==='completed'&&
+  run.conclusion==='success'&&job.id===proofCase.jobId&&
+  job.run_id===run.id&&job.name==='operating-process-snapshot'&&
+  job.runner_name===proofCase.runnerName&&
+  job.status==='completed'&&job.conclusion==='success'&&
+  Array.isArray(steps)&&steps.length===1&&steps[0].conclusion==='success'&&
+  receipt.schema==='ZGMINI_PC_PROCESS_INVENTORY_RESULT_V1'&&
+  receipt.issueNumber===proofCase.issueNumber&&
+  receipt.runId===String(proofCase.runId)&&receipt.attempt==='1'&&
+  receipt.host==='PC'&&receipt.role==='operating'&&
+  receipt.runnerName===proofCase.runnerName&&
+  receipt.runnerLabel==='zgmini-pc-control'&&
+  receipt.status==='PASS'&&receipt.code==='W04_3516_STATUS_OBSERVED'&&
+  receipt.operationalWrites===0&&receipt.providerCalls===0&&
+  receipt.d1Writes===0&&receipt.automaticRetries===0&&
+  observed?.schema==='ZGMINI_W04_3516_MAINTENANCE_READONLY_V1'&&
+  observed.requestId==='pc-update-c087fa10-88e2-42e3-bc60-c758ab93f0c1'&&
+  observed.status==='READ_ONLY_OBSERVED'&&
+  observed.actualControllerSha===targetSha&&
+  observed.workflowState==='active'&&
+  observed.historicalRequest?.status==='RECOVERY_REQUIRED'&&
+  observed.historicalRequest?.code==='POSTCHECK_OUTCOME_UNKNOWN'&&
+  observed.historicalRequest?.firstFail==='POSTCHECK_PENDING'&&
+  observed.historicalRequest?.postIssueNumber===postIssueNumber&&
+  observed.recoveryEvidence?.leaseHeld===true&&
+  observed.recoveryEvidence?.recoveryRequired===true&&
+  observed.recoveryEvidence?.postIssueNumber===postIssueNumber&&
+  observed.protectedStateUnchanged===true&&
+  observed.protectedDifferenceClass==='UNCHANGED'&&
+  lineage?.status==='LINEAGE_CORRELATED'&&
+  lineage.leaseLineageCorrelated===true&&
+  lineage.ownerAlive===false&&lineage.originalLedgerMatches===true&&
+  lineage.ownerMarkerMatches===true&&lineage.recoveryTimelineMatches===true&&
+  lineage.recoveryEligible===false&&
+  Object.keys(cas).length===expectedCas.length&&
+  Object.keys(lineage.casDigests??{}).length===expectedCas.length&&
+  expectedCas.every(key=>/^[a-f0-9]{64}$/.test(cas[key]??'')&&
+   lineage.casDigests[key]===cas[key])&&
+  Number.isFinite(Date.parse(receipt.observedAtUtc))&&
+  Number.isFinite(Date.parse(ledger.updatedAt))&&
+  Date.parse(receipt.observedAtUtc)>Date.parse(ledger.updatedAt);
+}
+
 async function reconcileInstalledRecoveryFixed({id,source,g,before}){
  const fixed=fixedInstalledRecoveryCase(id);
  need(fixed!==null,'INSTALLED_RECOVERY_SCOPE_NOT_ALLOWED');
@@ -459,7 +523,11 @@ async function reconcileInstalledRecoveryFixed({id,source,g,before}){
  // are different requests. Pin and verify both; never equate their source SHAs.
  const evidenceIssue=github('issues/'+proofCase.issueNumber);
  let evidenceBody;try{evidenceBody=JSON.parse(evidenceIssue.body);}catch{}
- const proofIssueExact=evidenceIssue.number===proofCase.issueNumber&&
+ const inventory3516=fixed.proofMode==='EXACT_W04_3516_OPERATING_INVENTORY';
+ const run=github('actions/runs/'+proofCase.runId);
+ const job=github('actions/jobs/'+proofCase.jobId);
+ const oldStep=job.steps?.filter(s=>s.name==='Execute fixed host allowlist entry');
+ const coreIssueExact=evidenceIssue.number===proofCase.issueNumber&&
   evidenceIssue.title==='pc-job'&&
   evidenceIssue.user?.login==='ansqhd5774-Choi'&&
   evidenceIssue.labels?.some(l=>l.name==='pc-job')&&
@@ -469,15 +537,14 @@ async function reconcileInstalledRecoveryFixed({id,source,g,before}){
   evidenceBody.sourceBranch===fixed.proofSourceBranch&&
   evidenceBody.sourceSha===fixed.proofSourceSha&&
   evidenceBody.requestId===receipt.requestId;
- const run=github('actions/runs/'+proofCase.runId);
- const job=github('actions/jobs/'+proofCase.jobId);
- const step=job.steps?.filter(s=>s.name==='Execute fixed host allowlist entry');
- const success=postExact&&proofIssueExact&&run?.id===proofCase.runId&&
-  run.event==='issues'&&run.status==='completed'&&run.conclusion==='success'&&
+ const oldCoreSuccess=!inventory3516&&coreIssueExact&&
+  run?.id===proofCase.runId&&run.event==='issues'&&
+  run.status==='completed'&&run.conclusion==='success'&&
   job?.id===proofCase.jobId&&job.run_id===run.id&&
   job.runner_name===proofCase.runnerName&&job.name==='approved-pc-job'&&
   job.status==='completed'&&job.conclusion==='success'&&
-  Array.isArray(step)&&step.length===1&&step[0].conclusion==='success'&&
+  Array.isArray(oldStep)&&oldStep.length===1&&
+  oldStep[0].conclusion==='success'&&
   receipt.schema==='ZGMINI_PC_RESULT_V1'&&receipt.status==='PASS'&&
   receipt.code==='CORE_READONLY_DIAGNOSIS'&&receipt.operation==='core-status'&&
   receipt.sourceRepository==='ansqhd5774-Choi/zgmini'&&
@@ -488,6 +555,12 @@ async function reconcileInstalledRecoveryFixed({id,source,g,before}){
   receipt.d1Writes===0&&receipt.sqliteOpened===false&&
   Number.isFinite(Date.parse(receipt.finishedAt))&&
   Date.parse(receipt.finishedAt)>Date.parse(ledger.updatedAt);
+ const newInventorySuccess=inventory3516&&
+  verify3516IndependentOperatingA({
+   receipt,issue:evidenceIssue,run,job,cas,ledger,targetSha,
+   postIssueNumber:fixed.postIssueNumber,
+   proofSourceSha:fixed.proofSourceSha,proofCase});
+ const success=postExact&&(inventory3516?newInventorySuccess:oldCoreSuccess);
  // Existing maintainer source/issue/Controller path already validated by
  // the original independent inspection; never infer six Runner API states
  // from a 403 or substitute new A success for the missing #2965 result.
