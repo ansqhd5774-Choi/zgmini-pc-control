@@ -246,7 +246,12 @@ export async function main(){
  write(path.join(lease,'owner.json'),{pid:process.pid,nonce,at:new Date().toISOString()});
  let history=fs.existsSync(path.join(home,'RESTART_HISTORY.json'))?read(path.join(home,'RESTART_HISTORY.json')):[];
  let healthySince=null;
- const status=(state,extra={})=>write(path.join(home,'STATUS.json'),{at:new Date().toISOString(),pid:process.pid,state,...extra});
+ const status=(state,extra={})=>write(path.join(home,'STATUS.json'),{
+  at:new Date().toISOString(),pid:process.pid,state,
+  ...(installed.standby?.mode==='ACTIVE_1_STANDBY_1'&&installed.standby?.approved===true?
+   {standbyRole:standby?.ready?'READY':standby?.promoting?'PROMOTING':
+    standby?'STARTING':'UNVERIFIED',standbyPid:standby?.child?.pid??null}:{}),
+  ...extra});
  // Standby is opt-in only after an exact approved watchdog B install
  // has written this capability to INSTALL.json. Legacy recovery stays intact.
  const standbyMode=installed.standby?.mode==='ACTIVE_1_STANDBY_1'&&installed.standby?.approved===true;
