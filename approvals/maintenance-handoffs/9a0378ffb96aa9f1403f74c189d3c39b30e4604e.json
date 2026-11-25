@@ -1,0 +1,41 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "e34a20062e3ef3b77c78af0b4881c15609b36eb1",
+  "targetSha": "9a0378ffb96aa9f1403f74c189d3c39b30e4604e",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "Reuses the same previously approved independent Windows nine-file 7-to-7 maintainer handoff effect as #3376, with the user's continued execution instruction. Existing #3409 and #3516 independent installed-state C recoveries have separate exact source/approval/proof gates and are already completed; extending maintenance-agent's exact historical case matching does not create a free-form recovery, new privilege or automatic replay. #3515/#3521/#3526/#3548 and #3574 add bounded read-only postcheck Issue/Run/Job evidence correlation. No new operation, Controller/Runner/Core/Writer/DB/D1/DNS change, schedule, data publication, permission or arbitrary shell effect. An authorized independent Windows receiver still verifies live source CAS, immutable raw approval bytes, file hashes, receiver ownership, install lease, backups and safe rollback before any change.",
+  "files": {
+    "tools/maintenance-contract.mjs": "9330f8f7f34edb8442584a02a29e38d7c06ca06224296c53e201f426190b169e",
+    "tools/maintenance-apply.mjs": "a99c6a51a024deaf4e3c6aa806182e73aeb4049604636db7dbd65614a40eb51e",
+    "tools/maintenance-agent.mjs": "807f206a92a01d1ccbec10f7eaeebac98dfac37baa51c876f0e38146accb46d7",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "dbf5d297a15fc868954673f0053590cafb42ac8587e35431b3f1da502be26fbb",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "af31ab1f6a159aa1d8467d2585eb16750e8a1a293f9ecfb90b85c388d8640d70",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "445bdf1b321d8e7db0b9b3f62a4b0172e5bc5ea364fd9790f4bd9626d9037563"
+  },
+  "checks": {
+    "sourceCi": "PR #3574 exact head 9871df7d3185088bf104d595fc1f98f9de02b214: Controller Maintenance Run 45611343219 SUCCESS (new postcheck 306/307 PASS), C996 Run 45611343353 SUCCESS, Secret Scan Run 45611343206 SUCCESS, Automation Status Run 45611343359 SUCCESS (49 PASS/0 FAIL). Previously approved #3409/#3516 exact recovery gates remain in source and have independently completed runtime recovery receipts.",
+    "installedWindowsEvidence": "#3579 read-only operating PC Run 45613802493 (2026-11-25T12:27:29.186Z), JSON/TXT pair PASS/PROCESS_INVENTORY_COLLECTED: maintainer source e34a20062e3ef3b77c78af0b4881c15609b36eb1, maintenanceFilesVerified=true, receiver LISTENING/HEALTHY, installLockReadbackVerified=true/held=false, workflow active, Controller 3d42f226fcffde1f09885da552f9b003ea30e57e, no operational/provider/D1 writes. Runner API roster separately UNVERIFIED. Fresh independent on-machine CAS/lease and receiver checks still mandatory.",
+    "exactBytePlan": "Nine target files independently hashed from Git source commit 9a0378ffb96aa9f1403f74c189d3c39b30e4604e as UTF-8 raw SHA-256, 6/9 exactly matched prior approved e34a2006... manifest. Precisely 3 runtime file changes: tools/maintenance-contract.mjs, tools/maintenance-agent.mjs, tools/update.mjs; no other runtime, Startup or watchdog bytes change. Local installed file bytes remain subject to existing exact 7-file runtime preflight and on-machine CAS.",
+    "targetMainCommit": "9a0378ffb96aa9f1403f74c189d3c39b30e4604e (merged #3574), observed ancestor of main 7fe6b073fdc50139bf549ccdfb73fb6c94797f92; verify ancestor and 9 target Git source bytes again on actual installed checkout.",
+    "windowsHandoffExecuted": false
+  },
+  "runtimeChangedFiles": [
+    "tools/maintenance-contract.mjs",
+    "tools/maintenance-agent.mjs",
+    "tools/update.mjs"
+  ],
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "preserve": [
+    "Existing installed Controller and six dedicated Runner seats",
+    "Current Workflow, Core/Writer task schedules, original SQLite/Writer/data, D1 and DNS",
+    "All original #3409/#3516 and other maintenance ledgers, owner markers, lease archives and rollback backups",
+    "No automatic replay of original failed requests; exact per-case existing C recovery approvals remain independently enforced"
+  ],
+  "scopeNote": "Authorized same-effect maintainer-only 7-to-7 source handoff. Bounded three-file runtime change; strong live CAS/lease, receiver origin, file/Startup hash, isolated checkout/approval pin, backup and recovery contract. Approval publication is not execution; on-machine operator may BLOCK/STATE_UNKNOWN. No claim of a permanent GitHub Actions events-registration fix."
+}
