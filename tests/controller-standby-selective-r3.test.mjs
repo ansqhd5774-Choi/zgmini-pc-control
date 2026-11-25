@@ -61,7 +61,7 @@ test('R3 selective manifest refuses extra operations, SHA, and unapproved files'
   m=>{m.controllerOnlyInstall=false;},
   m=>{m.allowFiles.push({path:'config/operations.json',sha256:'0'.repeat(64)});},
   m=>{m.allowFiles[0].sha256='0'.repeat(64);},
-  m=>{m.selectiveSource.customPaths=['controller/entry.mjs'];},
+  m=>{m.selectiveSource.customPaths=['controller/entry.mjs','controller/entry.mjs'];},
   m=>{m.postOperation='run-shell';},
   m=>{m.approval.scope='WRITER_UPDATE';},
  ];
