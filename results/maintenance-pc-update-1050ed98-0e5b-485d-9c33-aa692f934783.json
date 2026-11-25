@@ -1,0 +1,13 @@
+{
+  "schema": "ZGMINI_PC_MAINTENANCE_RESULT_V1",
+  "requestId": "pc-update-1050ed98-0e5b-485d-9c33-aa692f934783",
+  "targetControllerSha": "f04f7c58b878432ea4b037ac8da8ae803e6dcb0e",
+  "status": "BLOCKED",
+  "code": "UPDATE_INSTALLED_SOURCE_DRIFT",
+  "lastPass": "NONE",
+  "firstFail": "UPDATE_INSTALLED_SOURCE_DRIFT",
+  "actualControllerSha": null,
+  "recoverySha": null,
+  "protectedStateUnchanged": null,
+  "workflowEnabled": null
+}
