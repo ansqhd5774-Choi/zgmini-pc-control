@@ -449,6 +449,21 @@ test('fixed GitHub approval PR ports cannot write other branches or arbitrary fi
  assert.equal(calls.length,0);
 });
 
+test('GitHub ref reader GET and branch writer PATCH use their distinct REST endpoints',async()=>{
+ const target='a'.repeat(40),branch='codex/ci-controller-b-'+target;
+ const suffix=encodeURIComponent(branch),gets=[],writes=[];
+ const io=createControllerPrPublicationIo({targetSha:target,
+  getJson:async route=>{gets.push(route);return {ref:'refs/heads/'+branch,
+   object:{type:'commit',sha:'b'.repeat(40)}};},
+  github:async(route,body,method)=>{writes.push({route,body,method});return {object:{sha:body.sha}};}});
+ const read=await io.readBranch(branch);
+ assert.equal(read.object.sha,'b'.repeat(40));
+ await io.updateBranch(branch,{sha:'c'.repeat(40),force:false});
+ assert.deepEqual(gets,['git/ref/heads/'+suffix]);
+ assert.deepEqual(writes,[{route:'git/refs/heads/'+suffix,
+  body:{sha:'c'.repeat(40),force:false},method:'PATCH'}]);
+});
+
 test('publisher rejects a preparer result bound to wrong approval PR without committing final pair',async()=>{
  const f=exactPrPublisherFixture(),normal=f.prepare;
  const prepared=async n=>n===2147483647?normal(n):{...(await normal(n)),approvalPrNumber:n+1};

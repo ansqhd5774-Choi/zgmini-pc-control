@@ -308,7 +308,9 @@ export function createControllerPrPublicationIo({getJson,github,targetSha}={}){
  const branch='codex/ci-controller-b-'+targetSha,paths=[
   'approvals/controller-updates/'+targetSha+'.json',
   'approvals/controller-selective-targets/'+targetSha+'.json'];
+ // GitHub REST uses singular git/ref for GET and plural git/refs for PATCH.
  const branchRoute='git/ref/heads/'+encodeURIComponent(branch);
+ const branchUpdateRoute='git/refs/heads/'+encodeURIComponent(branch);
  const checkTree=v=>{
   if(!Array.isArray(v?.tree)||v.tree.length<1||v.tree.length>2||v.tree.some(f=>
      !paths.includes(f.path)||f.mode!=='100644'||f.type!=='blob'||typeof f.content!=='string'))
@@ -364,7 +366,7 @@ export function createControllerPrPublicationIo({getJson,github,targetSha}={}){
   updateBranch:(name,v)=>{
    if(name!==branch||!sha(v?.sha)||v.force!==false)
     throw Error('CI_APPROVAL_PR_BRANCH_DENIED');
-   return github(branchRoute,v,'PATCH');
+   return github(branchUpdateRoute,v,'PATCH');
   }
  };
 }
