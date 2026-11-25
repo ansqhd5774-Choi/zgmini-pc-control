@@ -321,11 +321,36 @@ export async function submitExistingControllerApprovalFromCi({targetSha,approval
  }
  const current=await ports.readManifest(targetSha);
  if(!Buffer.isBuffer(current)||!current.equals(bytes))fail('MAINTENANCE_CI_MANIFEST_PIN_MISMATCH');
- const result=await submitExactEnvelope(expected,{createIssue:ports.createIssue,readIssue:ports.readIssue,
+ let result=await submitExactEnvelope(expected,{createIssue:ports.createIssue,readIssue:ports.readIssue,
   saveReceipt:(receipt,options)=>ports.saveReceipt(effectKey,receipt,options)},verifyCiIssue);
+ // A lost create response or transient readback failure may be recovered only
+ // while this ORIGINAL CI run is executing. The Issue trace binds its run and
+ // a later attempt must never claim the original Issue with a fresh marker.
+ // Reconcile the exact Issue using GitHub reads; never send another POST.
+ if((result.status==='STATE_UNKNOWN'&&result.code==='MAINTENANCE_CREATE_OUTCOME_UNKNOWN')||
+    (result.status==='AUTOMATION_BLOCKED'&&result.code==='MAINTENANCE_CREATED_ISSUE_NOT_VERIFIED')){
+  let number=Number.isSafeInteger(result.issueNumber)&&result.issueNumber>0?result.issueNumber:null;
+  if(!number){
+   try{
+    const found=await ports.findPriorRequests(targetSha);
+    if(Array.isArray(found)){
+     const exact=found.filter(x=>botIdentity(x?.user)&&!x.pull_request&&x.title===TITLE&&
+      x.body===expected.body&&Number.isSafeInteger(x.number)&&x.number>0);
+     if(exact.length===1)number=exact[0].number;
+    }
+   }catch{} // Unavailable or ambiguous evidence is not a new POST permission.
+  }
+  if(number){
+   try{
+    const verified=verifyCiIssue(expected,await ports.readIssue(number));
+    await ports.saveReceipt(effectKey,{schema:'ZGMINI_MAINTENANCE_SUBMISSION_V1',
+     phase:'READBACK_VERIFIED',expected,issueNumber:number});
+    result=verified;
+   }catch{} // A failed read or receipt write retains the original uncertain state.
+  }
+ }
  if(result.status!=='REQUEST_READBACK_VERIFIED')return {...result,effectKey};
- // Only the exact new successful run emits this receipt; historical requests
- // and uncertain POSTs are never given fresh execution identity.
+ // Emit a receipt only for this CI run's independently verified original Issue.
  return {...result,effectKey,receiptMarker:controllerBReceiptMarker(result.issueNumber,Buffer.from(expected.body))};
 }
 async function requireExactApprovalPair(ports,number,expected){
