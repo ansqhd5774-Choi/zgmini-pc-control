@@ -136,7 +136,7 @@ test('bot-classified events never influence field P75 even if API returns them',
  assert.equal(denied.code,'CF_RUM_FIELD_INCOMPLETE');
 });
 
-test('zero page views never turn quantiles into a verified Good reading',()=>{
+test('zero Web Vitals event groups never turn quantiles into a verified Good reading',()=>{
  const zero=all().map(x=>({...x,count:0}));
  const out=parse(from(zero));
  assert.equal(out.status,'FIELD_VALUES_INCOMPLETE');
@@ -198,7 +198,7 @@ test('missing metric origin stays distinct from real zero without claiming a cau
  assert.equal(x.metricSampleSizesVerified,false);
 });
 
-test('Cloudflare metric totals distinguish no INP observations from page view count',()=>{
+test('Cloudflare metric totals distinguish no INP observations from Web Vitals group count',()=>{
  const data=all().map(r=>({...r,sum:{lcpTotal:2,inpTotal:1,clsTotal:2}}));
  data[2]={...data[2],count:2,
   quantiles:{largestContentfulPaintP75:712000,
@@ -247,7 +247,7 @@ test('adaptive page-group sample size is recorded without certifying INP users',
   interactionToNextPaintP75:-1,cumulativeLayoutShiftP75:0.002};
  const out=parse(from(rows));
  const mobile=out.observations.find(x=>x.route==='/economic-indicators/'&&x.device==='mobile');
- assert.deepEqual(mobile.groupSampling,{scope:'PAGE_VIEW_GROUP_ONLY',
+ assert.deepEqual(mobile.groupSampling,{scope:'WEB_VITALS_EVENT_GROUP_ONLY',
   averageSampleInterval:1.5,
   countConfidence95:{estimate:12,lower:10.1,upper:13.9,sampleSize:8}});
  assert.equal(mobile.metricReportedTotals.inpMs,0);
@@ -256,7 +256,7 @@ test('adaptive page-group sample size is recorded without certifying INP users',
  assert.equal(out.siteGoodCertified,false);
  assert.equal(out.fieldP75ValuesPresent,false);
 });
-test('page-group confidence never invents precise metric sample certification',()=>{
+test('Web Vitals event-group confidence never invents metric sample certification',()=>{
  const good={...row(),avg:{sampleInterval:1},
   confidence:{count:{estimate:1234,lower:1234,upper:1234,sampleSize:1234}}};
  const x=parse(from([good]));
