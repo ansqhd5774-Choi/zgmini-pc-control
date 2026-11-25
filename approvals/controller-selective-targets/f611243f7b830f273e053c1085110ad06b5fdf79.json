@@ -1,0 +1,17 @@
+{
+  "schema": "ZGMINI_CONTROLLER_SELECTIVE_PIN_V1",
+  "installedSha": "57d5056d00943b25b88d6c13b1418d94bd14fc21",
+  "targetSha": "f611243f7b830f273e053c1085110ad06b5fdf79",
+  "sourceMainSha": "ff620ab1b0bcfd78273297aa1b764dfd2ee05503",
+  "targetBranch": "codex/w04-memory-recheck-installed57d-20261125",
+  "customPaths": [
+    "controller/operations.mjs"
+  ],
+  "allowFiles": [
+    {
+      "path": "controller/operations.mjs",
+      "sha256": "b887dac033e5eddb03d40a81c83bdda41b92439f3f636d85a5b8ede0f606967d"
+    }
+  ],
+  "approvalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3606"
+}
