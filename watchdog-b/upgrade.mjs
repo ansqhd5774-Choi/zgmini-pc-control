@@ -152,7 +152,7 @@ export async function execute(){
  const oldScope=r3||r4?FINAL_SCOPE:INITIAL_SCOPE;
  const request=r4
   ?validateR4Request(event,body,approval,installed,digest(newBytes),
-    digest(approvalBytes),oldManifestBytes)
+    digest(approvalBytes),digest(oldManifestBytes))
   :r3?validateR3Request(event,body,approval,installed,
     digest(newBytes),digest(approvalBytes))
   :validateRequest(event,body,approval,installed,digest(newBytes),digest(approvalBytes));
