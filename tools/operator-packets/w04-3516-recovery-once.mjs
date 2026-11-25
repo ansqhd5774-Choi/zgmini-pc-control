@@ -18,7 +18,6 @@ export const FIXED=Object.freeze({
  approvedSource:'ec9009be720f3da33c3300a81aaf54be1e18c683',
  original:'pc-update-c087fa10-88e2-42e3-bc60-c758ab93f0c1',
  controller:'83679b013ac9a9820331d93311ec97e572b18e13',
- bootstrap:'E:/ZGmini/automation/pc-maintenance/recovery-source/w04-3516-bootstrap',
  staged:'E:/ZGmini/automation/pc-maintenance/recovery-source/w04-3516',
  approval:'approvals/maintenance-recoveries/pc-update-c087fa10-88e2-42e3-bc60-c758ab93f0c1.installed.json',
  approvalSha256:'fd15a911666efe560fcba984b9bff60fdffe83bd27682ddbeb2bfc3142197d4b'
@@ -271,7 +270,7 @@ export async function runOnce({platform=process.platform,env=process.env}={}){
  assertOperatorScope({platform,env});
  need(fs.existsSync(FIXED.node)&&fs.existsSync(FIXED.root)&&fs.existsSync(lease),
   'OPERATOR_REQUIRED_HOST_OR_LEASE_ABSENT');
- need(!fs.existsSync(FIXED.bootstrap)&&!fs.existsSync(FIXED.staged),
+ need(!fs.existsSync(FIXED.staged),
   'OPERATOR_PREVIOUS_SOURCE_STAGE_RECONCILE_FIRST');
  verifyInstalledOperator();
  isolatedHooksPath=fs.mkdtempSync(path.join(env.TEMP,'ZGMINI_W04_3516_EMPTY_HOOKS_'));
@@ -300,17 +299,14 @@ export async function runOnce({platform=process.platform,env=process.env}={}){
     'OPERATOR_ORIGINAL_HEAD_MOVED');
   git(['merge-base','--is-ancestor',FIXED.release,'refs/remotes/origin/main']);
   git(['merge-base','--is-ancestor',FIXED.approvedSource,FIXED.release]);
-  const bootstrapParent=path.dirname(FIXED.bootstrap);
+  const stagedParent=path.dirname(FIXED.staged);
   const maintStat=fs.lstatSync(FIXED.maintenance);
   need(maintStat.isDirectory()&&!maintStat.isSymbolicLink(),
     'OPERATOR_MAINTENANCE_ROOT_UNSAFE');
-  if(!fs.existsSync(bootstrapParent))fs.mkdirSync(bootstrapParent);
-  const parentStat=fs.lstatSync(bootstrapParent);
+  if(!fs.existsSync(stagedParent))fs.mkdirSync(stagedParent);
+  const parentStat=fs.lstatSync(stagedParent);
   need(parentStat.isDirectory()&&!parentStat.isSymbolicLink(),
-    'OPERATOR_BOOTSTRAP_PARENT_UNSAFE');
-  git(['worktree','add','--detach',FIXED.bootstrap,FIXED.release]);
-  need(git(['-C',FIXED.bootstrap,'rev-parse','HEAD']).toString().trim()===FIXED.release,
-    'OPERATOR_BOOTSTRAP_SOURCE_UNVERIFIED');
+    'OPERATOR_STAGED_PARENT_UNSAFE');
   // Exact V1 approval: no unrelated Writer bridge or prior recovery replay.
   const pinnedRaw=show(FIXED.release,FIXED.approval);
   need(sha(pinnedRaw)===FIXED.approvalSha256,'OPERATOR_APPROVAL_RAW_DRIFT');
