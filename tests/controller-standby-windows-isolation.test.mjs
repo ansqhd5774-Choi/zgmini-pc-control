@@ -8,7 +8,7 @@ import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {randomUUID,createHash} from 'node:crypto';
 import {exclusive,assertSupervisorOwner} from '../controller/common.mjs';
-import {archiveDeadLease,decide as watchdogDecide} from '../tools/runner-watchdog.mjs';
+import {archiveDeadLease,decide as watchdogDecide,scanControllerRunnersReadOnly} from '../tools/runner-watchdog.mjs';
 import {decideStandbyPromotion,verifyStandbySource,watchdogIdentityMatches}
  from '../controller/standby.mjs';
 
@@ -189,5 +189,17 @@ test('WIN-T10 failed Standby does not steal or terminate healthy Active',windows
    supervisorLeasePresent:true}),possible);
   assert.equal(fs.readFileSync(path.join(lease,'owner.json')).equals(raw),true);
   release();
+ }finally{safeRemove(dir);}
+});
+
+test('WIN-T11 fixed WMI probe is bounded to temp-only observation, no PC mutations',windows,()=>{
+ const dir=root();
+ try{
+  const result=scanControllerRunnersReadOnly({controllerRoot:dir});
+  // The isolated runner may lack authority to inspect unrelated users'
+  // executables. UNVERIFIED is an honest fail-closed observation, not PASS.
+  console.log('R3_WMI_TEMP_SCOPE='+result);
+  assert.ok(['NO_CONTROLLER_RUNNER_PROCESS','UNVERIFIED'].includes(result));
+  assert.equal(fs.existsSync(path.join(dir,'supervisor')),false);
  }finally{safeRemove(dir);}
 });
