@@ -209,7 +209,19 @@ test('unexpected workspace entry and reparse/symlink do not pass',async t=>{
   fs.unlinkSync(path.join(path.dirname(f.files.result),'extra.txt'));
   const real=path.join(f.root,'reports','backup-result.json');
   fs.renameSync(f.files.result,real);
-  fs.symlinkSync(real,f.files.result,'file');
+  // Even when Windows denies creating a symlink fixture, the missing original
+  // RESULT.json must fail closed before any GitHub call.
+  await assert.rejects(run(f,g),{code:'RECOVERY_WORKSPACE_UNEXPECTED'});
+  try{
+    fs.symlinkSync(real,f.files.result,'file');
+  }catch(error){
+    if(process.platform==='win32'&&error?.code==='EPERM'){
+      t.diagnostic('Windows runner denied symlink fixture; missing-result guard verified');
+      assert.equal(g.calls.length,0);
+      return;
+    }
+    throw error;
+  }
   await assert.rejects(run(f,g),{code:'RECOVERY_FILE_UNSAFE_FILE'});
   assert.equal(g.calls.length,0);
 });
