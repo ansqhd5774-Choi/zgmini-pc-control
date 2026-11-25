@@ -196,7 +196,7 @@ test('R4 admission fails closed for old manifest drift, approval and wrong sourc
   x=>x.approval.revision=3,
   x=>x.approval.approvalBasis='other',
   x=>x.approval.scope='OTHER',
-  x=>x.approval.expectedControllerSha=NEXT_TARGET,
+  x=>x.approval.expectedControllerSha='invalid',
   x=>x.approval.expectedControllerFiles['controller/standby.mjs']='0'.repeat(64),
   x=>x.approval.targetSha256='0'.repeat(64),
   x=>x.approval.standby.mode='ACTIVE_2_STANDBY_0',
@@ -219,7 +219,8 @@ test('R4 admission fails closed for old manifest drift, approval and wrong sourc
 test('R4 Controller must already be installed with exact five standby file hashes',()=>{
  const host={controllerSourceSha:R4_TARGET,controllerFiles:{
   ...R4_CONTROLLER_FILES,'controller/extra.mjs':'d'.repeat(64)}};
- assert.equal(verifyR4ControllerHost(host),true);
+ assert.equal(verifyR4ControllerHost(host,R4_TARGET),true);
+ assert.equal(verifyR4ControllerHost({...host,controllerSourceSha:NEXT_TARGET},NEXT_TARGET),true);
  for(const mutation of [
   x=>{x.controllerSourceSha=NEXT_TARGET;},
   x=>{delete x.controllerFiles['controller/standby.mjs'];},
@@ -229,7 +230,7 @@ test('R4 Controller must already be installed with exact five standby file hashe
   const actual={controllerSourceSha:host.controllerSourceSha,
    controllerFiles:{...host.controllerFiles}};
   mutation(actual);
-  assert.throws(()=>verifyR4ControllerHost(actual),/WATCHDOG_R4_/);
+  assert.throws(()=>verifyR4ControllerHost(actual,R4_TARGET),/WATCHDOG_R4_/);
  }
 });
 
