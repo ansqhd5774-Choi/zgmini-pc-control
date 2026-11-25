@@ -247,6 +247,41 @@ export async function main(){
  let history=fs.existsSync(path.join(home,'RESTART_HISTORY.json'))?read(path.join(home,'RESTART_HISTORY.json')):[];
  let healthySince=null;
  const status=(state,extra={})=>write(path.join(home,'STATUS.json'),{at:new Date().toISOString(),pid:process.pid,state,...extra});
+ // Standby is opt-in only after an exact approved watchdog B install
+ // has written this capability to INSTALL.json. Legacy recovery stays intact.
+ const standbyMode=installed.standby?.mode==='ACTIVE_1_STANDBY_1'&&installed.standby?.approved===true;
+ let standby=null,standbyStarts=[];
+ function ensureStandby(){
+  if(!standbyMode||standby)return;
+  standbyStarts=standbyStarts.filter(t=>Date.now()-t<3600000);
+  if(standbyStarts.length>=3)return;
+  try{
+   const host=read(path.join(control,'host.json'));
+   if(!/^[a-f0-9]{64}$/.test(host.controllerFiles?.['controller/standby.mjs']??''))
+    throw Error('STANDBY_SOURCE_NOT_ATTESTED');
+   const sourceSha=verifyController();
+   const child=spawn(node,[path.join(control,'controller/standby.mjs')],{
+    cwd:control,windowsHide:true,stdio:['ignore','ignore','ignore','ipc'],
+    env:{...process.env,ZGMINI_WATCHDOG_NONCE:nonce,
+     ZGMINI_WATCHDOG_PID:String(process.pid)}
+   });
+   standbyStarts.push(Date.now());
+   const current={child,ready:false,promoting:false,sourceSha};
+   standby=current;
+   child.on('message',message=>{
+    if(standby!==current)return;
+    if(message?.type==='READY'&&message.pid===child.pid&&
+      message.sourceSha===sourceSha)current.ready=true;
+    if(message?.type==='PROMOTION_ATTEMPTED'&&message.pid===child.pid)
+     standby=null; // No longer a passive Standby; Supervisor must own lease.
+    if(message?.type==='PROMOTION_BLOCKED'||message?.type==='PROMOTION_FAILED'){
+     current.ready=false;current.error=message.code??'STANDBY_PROMOTION_UNVERIFIED';
+    }
+   });
+   child.once('exit',()=>{if(standby===current)standby=null;});
+   child.once('error',()=>{if(standby===current)standby=null;});
+  }catch{status('BLOCKED_STANDBY_SETUP');}
+ }
  async function tick(){
   try{
    const ownerFile=path.join(control,'leases/supervisor/owner.json');
@@ -263,6 +298,16 @@ export async function main(){
    }
    healthySince=null;
    if(state!=='RECOVER'){status(state,{supervisorPid:owner?.pid??null,heartbeatAt:hb?.at??null});return;}
+   if(standbyMode&&(!standby||!standby.ready||standby.promoting)){
+    status('BLOCKED_STANDBY_NOT_READY');return;
+   }
+   if(standbyMode&&owner&&(
+    hb?.pid!==owner.pid||!Array.isArray(hb.children)||
+    hb.children.some(c=>!Number.isSafeInteger(c.pid)||c.pid<=0||
+     alive(c.pid)!==false))){
+    // Dead Supervisor != proven exited Runner children. Never kill them.
+    status('BLOCKED_OLD_RUNNER_CHILD_UNVERIFIED');return;
+   }
    if(!workflowActive()){status('PAUSED_WORKFLOW');return;}
    history=history.filter(x=>Date.now()-x<3600000);
    if(history.length>=3){status('BLOCKED_RESTART_LIMIT');return;}
@@ -272,6 +317,18 @@ export async function main(){
    fs.mkdirSync(path.join(home,'archives'),{recursive:true});
    const archived=archiveDeadLease(path.join(control,'leases/supervisor'),alive,path.join(home,'archives','supervisor-'+Date.now()+'-'+randomUUID()));
    history.push(Date.now());write(path.join(home,'RESTART_HISTORY.json'),history);
+   if(standbyMode){
+    const candidate=standby;
+    candidate.promoting=true;candidate.ready=false;
+    try{
+     candidate.child.send({type:'PROMOTE',oldChildrenStopped:true},error=>{
+      if(error)status('BLOCKED_STANDBY_IPC_DELIVERY_UNKNOWN');
+     });
+    }catch{status('BLOCKED_STANDBY_IPC_DELIVERY_UNKNOWN');return;}
+    // No active/pass claim until the next tick verifies real owner+heartbeat.
+    status('STARTING',{standbyPid:candidate.child.pid,sourceSha,archivedLease:archived});
+    return;
+   }
    const out=fs.openSync(path.join(home,'SUPERVISOR_OUTPUT.log'),'a');
    try{
     const child=spawn(node,[path.join(control,'controller/supervisor.mjs')],{cwd:control,windowsHide:true,detached:true,stdio:['ignore',out,out],env:{...process.env}});
@@ -377,7 +434,7 @@ export async function main(){
      status:'BLOCKED',code:c,issueNumber});
   }finally{handoffActive=false;}
  }
- await tick();setInterval(tick,15000);
+ ensureStandby();await tick();setInterval(()=>{ensureStandby();void tick();},15000);
  void pollHandoff();setInterval(()=>{void pollHandoff();},60000);
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)main().catch(()=>{process.exitCode=1;});
