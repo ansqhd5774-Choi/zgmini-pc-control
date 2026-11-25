@@ -1,3 +1,4 @@
+import {createHash} from 'node:crypto';
 // Exact two-file Controller B approval publication. The independent original
 // delegation, source CI and byte construction are validated by the provided
 // prepareSelectiveApprovalPublication caller before the first GitHub write.
@@ -10,12 +11,27 @@ const branchFor=target=>'codex/ci-controller-b-'+target;
 const approvalPaths=target=>[
  'approvals/controller-updates/'+target+'.json',
  'approvals/controller-selective-targets/'+target+'.json'];
-function exactPair(prepared,target){
+function exactPair(prepared,target,sourcePrNumber,approvalPrNumber){
  const paths=approvalPaths(target);
- if(prepared?.state!=='SELECTIVE_APPROVAL_FILES_PREPARED'||!Array.isArray(prepared.files)||
-  prepared.files.length!==2||prepared.files.some((f,i)=>f.path!==paths[i]||
-    !Buffer.isBuffer(f.bytes)||!f.bytes.length||f.bytes.length>32768))
+ if(prepared?.state!=='SELECTIVE_APPROVAL_FILES_PREPARED'||
+  prepared.canPublish!==false||prepared.canExecute!==false||
+  prepared.targetSha!==target||prepared.sourcePrNumber!==sourcePrNumber||
+  prepared.approvalPrNumber!==approvalPrNumber||
+  !Array.isArray(prepared.files)||prepared.files.length!==2||
+  prepared.files.some((f,i)=>f.path!==paths[i]||
+    !Buffer.isBuffer(f.bytes)||!f.bytes.length||f.bytes.length>32768||
+    typeof f.sha256!=='string'||!/^[a-f0-9]{64}$/.test(f.sha256)||
+    createHash('sha256').update(f.bytes).digest('hex')!==f.sha256))
   fail('CI_APPROVAL_PREPARATION_DENIED');
+ // The reference consumed by the installed receiver must bind this exact
+ // real approval PR, not the temporary preallocation number or source PR.
+ try{
+  const [manifest,pin]=prepared.files.map(f=>JSON.parse(f.bytes.toString('utf8')));
+  const approval='https://github.com/'+REPO+'/pull/'+approvalPrNumber;
+  if(manifest.targetSha!==target||pin.targetSha!==target||
+     manifest.approval?.ref!==approval||pin.approvalRef!==approval)
+   fail('CI_APPROVAL_PREPARATION_DENIED');
+ }catch{fail('CI_APPROVAL_PREPARATION_DENIED')}
  return prepared.files;
 }
 function safePr(pr,number,branch,baseSha){
@@ -44,7 +60,7 @@ export async function publishExactControllerApprovalPair({
  const repo=await io.readRepository();
  if(repo?.id!==1442936296||repo.full_name!==REPO||repo.private!==true||
   repo.owner?.login!=='ansqhd5774-Choi')fail('CI_APPROVAL_REPOSITORY_DENIED');
- const preliminary=exactPair(await prepare(2147483647),targetSha);
+ const preliminary=exactPair(await prepare(2147483647),targetSha,sourcePrNumber,2147483647);
  const name=branchFor(targetSha),paths=approvalPaths(targetSha);
  const base=await io.readMain();
  if(!sha(base?.commit?.sha))fail('CI_APPROVAL_MAIN_UNVERIFIED');
@@ -103,7 +119,7 @@ export async function publishExactControllerApprovalPair({
  if(original.head.sha!==oldHead)fail('CI_APPROVAL_HEAD_DRIFT');
  // The approval PR number is now allocated. Repeat the independent
  // source/delegation/CI validation against the actual immutable reference.
- const files=exactPair(await prepare(pr.number),targetSha);
+ const files=exactPair(await prepare(pr.number),targetSha,sourcePrNumber,pr.number);
  const already=await io.readPrFiles(pr.number);
  if(!Array.isArray(already)||already.length>3)
   fail('CI_APPROVAL_DIFF_UNVERIFIED');

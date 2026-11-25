@@ -273,10 +273,16 @@ function exactPrPublisherFixture(){
   branchSha:null,pr:null,seed:null,final:false,created:0,updates:0,commits:new Map(),trees:new Map()};
  let next=3;
  const head=()=>String(next++).padStart(40,'c');
- const prepare=async number=>({state:'SELECTIVE_APPROVAL_FILES_PREPARED',files:[
-  {path:paths[0],bytes:Buffer.from(JSON.stringify({schema:'manifest',approvalPr:number}))},
-  {path:paths[1],bytes:Buffer.from(JSON.stringify({schema:'pin',approvalPr:number}))}
- ]});
+ const prepare=async number=>{
+  const approval='https://github.com/'+repository.full_name+'/pull/'+number;
+  const files=[
+   {path:paths[0],bytes:Buffer.from(JSON.stringify({schema:'manifest',targetSha:target,approval:{ref:approval}}))},
+   {path:paths[1],bytes:Buffer.from(JSON.stringify({schema:'pin',targetSha:target,approvalRef:approval}))}
+  ];
+  return {state:'SELECTIVE_APPROVAL_FILES_PREPARED',canPublish:false,canExecute:false,
+   targetSha:target,sourcePrNumber:15,approvalPrNumber:number,
+   files:files.map(f=>({...f,sha256:createHash('sha256').update(f.bytes).digest('hex')}))};
+ };
  const io={
   readRepository:async()=>({id:1442936296,full_name:repository.full_name,private:true,
    owner:{login:'ansqhd5774-Choi'}}),
@@ -383,4 +389,28 @@ test('fixed GitHub approval PR ports cannot write other branches or arbitrary fi
  assert.throws(()=>io.createPr({head:'main',base:'main',draft:false}),/INPUT_DENIED/);
  assert.throws(()=>io.updateBranch('main',{sha:'a'.repeat(40),force:false}),/BRANCH_DENIED/);
  assert.equal(calls.length,0);
+});
+
+test('publisher rejects a preparer result bound to wrong approval PR without committing final pair',async()=>{
+ const f=exactPrPublisherFixture(),normal=f.prepare;
+ const prepared=async n=>n===2147483647?normal(n):{...(await normal(n)),approvalPrNumber:n+1};
+ await assert.rejects(()=>publishExactControllerApprovalPair({
+  targetSha:f.target,sourcePrNumber:15,sourceMainSha:f.main,prepare:prepared,io:f.io
+ }),/CI_APPROVAL_PREPARATION_DENIED/);
+ assert.equal(f.state.created,1);
+ assert.equal(f.state.updates,0);
+ assert.equal(f.events.filter(x=>x==='tree').length,1);
+});
+test('publisher rejects incorrect original source identity and altered output bytes before the first write',async()=>{
+ const f=exactPrPublisherFixture(),base=f.prepare;
+ for(const prepare of [
+  async n=>({...await base(n),sourcePrNumber:16}),
+  async n=>{const x=await base(n);x.files[1].bytes=Buffer.from('{}');return x;},
+  async n=>{const x=await base(n);x.canPublish=true;return x;}
+ ]){
+  await assert.rejects(()=>publishExactControllerApprovalPair({
+   targetSha:f.target,sourcePrNumber:15,sourceMainSha:f.main,prepare,io:f.io
+  }),/CI_APPROVAL_PREPARATION_DENIED/);
+  assert.deepEqual(f.events,[]);
+ }
 });
