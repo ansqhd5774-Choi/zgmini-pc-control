@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+// Reuse the existing approved Maintenance/C996 recovery suite for W04 C-package checks.
+import './w04-3516-operator-once.test.mjs';
 import {test} from 'node:test';
 import {createHash} from 'node:crypto';
 import fs from 'node:fs';
