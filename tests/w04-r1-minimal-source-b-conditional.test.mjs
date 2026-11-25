@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
@@ -27,8 +28,17 @@ const readApproval=()=>{
 };
 
 test('W04 R1 minimal 18-file source inventory has pinned exact raw bytes',()=>{
- const raw=fs.readFileSync(path.join(root,sourceManifestPath));
+ // The approved bytes are the Git object, not a reused Windows checkout:
+ // a prior checkout may have transformed this already-merged manifest to CRLF.
+ const raw=execFileSync('git',['show','HEAD:'+sourceManifestPath],
+  {cwd:root,encoding:'buffer',maxBuffer:2_000_000});
+ assert.equal(raw.includes(Buffer.from('\r\n')),false,
+  'approved source manifest Git blob must be LF');
  assert.equal(digest(raw),sourceManifestSha);
+ const worktree=fs.readFileSync(path.join(root,sourceManifestPath));
+ if(worktree.includes(Buffer.from('\r\n')))
+  assert.notEqual(digest(worktree),sourceManifestSha,
+   'transformed checkout must not impersonate immutable source manifest');
  const m=JSON.parse(raw);
  assert.equal(m.schema,'ZGMINI_PC_SOURCE_BUNDLE_MANIFEST_V1');
  assert.equal(m.sourceSha,sourceSha);
