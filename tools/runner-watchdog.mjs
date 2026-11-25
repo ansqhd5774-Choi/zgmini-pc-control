@@ -51,9 +51,14 @@ export function decide({paused,owner,live,heartbeat,now=Date.now()}){
 // present, tied to the old owner, and every recorded child is proven exited.
 // Other active Workers remain protected by their existing request/seat leases.
 export function provenOldRunnerExit({owner,heartbeat,pidAlive=alive}={}){
- if(!owner||!Number.isSafeInteger(owner.pid)||owner.pid<=0||
-   heartbeat?.pid!==owner.pid||!Array.isArray(heartbeat.children)||
-   heartbeat.children.length!==6)return false;
+ // A lease may be absent after a clean Supervisor exit. In that case the
+ // previous heartbeat PID itself must be proven dead; a missing heartbeat
+ // or a recycled/live PID is never a clean-start witness.
+ const oldPid=owner?.pid??heartbeat?.pid;
+ if(!Number.isSafeInteger(oldPid)||oldPid<=0||
+   heartbeat?.pid!==oldPid||!Array.isArray(heartbeat.children)||
+   heartbeat.children.length!==6||
+   (owner==null&&pidAlive(oldPid)!==false))return false;
  const seen=new Set(),pids=new Set();
  for(const child of heartbeat.children){
   if(!Number.isSafeInteger(child?.seat)||child.seat<1||child.seat>6||
