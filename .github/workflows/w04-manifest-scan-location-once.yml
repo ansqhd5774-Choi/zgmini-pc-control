@@ -1,0 +1,19 @@
+name: W04 isolated manifest finding location
+on:
+  push:
+    branches: [codex/w04-repair-manifest-scan-diagnostic-20261126]
+permissions:
+  contents: read
+jobs:
+  scan-location:
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - run: node tools/w04-manifest-scan-location-once.mjs
