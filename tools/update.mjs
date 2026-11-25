@@ -1610,12 +1610,24 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
      const protectedStateUnchanged=JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore);
      const runnerState=apiRunners();
      const runnerSetVerified=dedicatedPcRunnerRows(runnerState,{requireOnline:true})!==null;
+     const postSourceVerified=result.requestedSourceSha===manifest.postSourceSha&&
+       result.sourceRepository==='ansqhd5774-Choi/zgmini'&&
+       result.sourceBranch===manifest.postSourceBranch&&
+       result.controlSourceSha===manifest.targetSha;
+     // The bot-reported payload is a different event from verified execution.
+     // Preserve the observed status/source comparison without retroactive PASS,
+     // and retain any already correlated Run/Job identity.
+     const current=json(ledgerFile);
+     writeJson(ledgerFile,{...current,postcheckLink:{
+      ...(current.postcheckLink??{}),
+      schema:'ZGMINI_MAINTENANCE_POSTCHECK_LINK_V1',
+      requestId:issue.requestId,issueNumber:postIssueNumber,
+      state:'RESULT_REPORTED',code:'POSTCHECK_BOT_RESULT_OBSERVED',
+      reportedStatus:['PASS','FAIL','BLOCKED'].includes(result.status)?result.status:null,
+      postSourceVerified,observedAtUtc:new Date().toISOString()}});
      return {status:result.status,code:result.code,actualExecutionSha:result.actualExecutionSha,
        issueNumber:postIssueNumber,protectedStateUnchanged,runnerSetVerified,
-       postSourceVerified:result.requestedSourceSha===manifest.postSourceSha&&
-         result.sourceRepository==='ansqhd5774-Choi/zgmini'&&
-         result.sourceBranch===manifest.postSourceBranch&&
-         result.controlSourceSha===manifest.targetSha};
+       postSourceVerified};
     }
     // Existing request only: bounded Run/Job observation explains the first
     // missing link. No repost, label re-drive, workflow toggle or lease write.
