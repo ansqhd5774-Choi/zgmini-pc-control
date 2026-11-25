@@ -147,6 +147,9 @@ export function createOperatingSidecarProbe({manifest,requestId,sourceApproved})
 // Source-only preflight for an approved exact one-file B manifest. This does
 // not claim a lease, pause a Task, run the Sidecar or authorize installation.
 const SHA64=/^[0-9a-f]{64}$/;
+// The verified R3 AFTER is not the original B preimage. This is diagnostic
+// classification only; neither the B contract nor any approval is changed.
+const INSTALLED_R3_AFTER='583297b451f168a32a2a5de4b0b04c9b14449aab9a041c954a420203cf04f188';
 export function projectSidecarBManifestPreimageReadonly(raw){
  const empty={schema:'ZGMINI_CNN_SIDECAR_B_PREIMAGE_PINS_V1',
   status:'STATE_UNKNOWN',code:'CNN_B_PREIMAGE_PINS_UNVERIFIED',
@@ -157,7 +160,13 @@ export function projectSidecarBManifestPreimageReadonly(raw){
     raw.head!==raw.configSource||
     !SHA64.test(raw.taskDefinitionSha256??'')||
     !SHA64.test(raw.wrapperSha256??'')||
-    raw.targetSha256!==PREIMAGE)return empty;
+    !SHA64.test(raw.targetSha256??''))return empty;
+ if(raw.targetSha256===INSTALLED_R3_AFTER)
+  return {...empty,status:'BLOCKED',code:'CNN_B_R3_AFTER_ALREADY_INSTALLED',
+   head:raw.head,configSource:raw.configSource,
+   taskDefinitionSha256:raw.taskDefinitionSha256,
+   wrapperSha256:raw.wrapperSha256,beforeSha256:raw.targetSha256};
+ if(raw.targetSha256!==PREIMAGE)return empty;
  return {...empty,status:'PASS',code:'CNN_B_PREIMAGE_PINS_COLLECTED',
   head:raw.head,configSource:raw.configSource,
   taskDefinitionSha256:raw.taskDefinitionSha256,

@@ -134,3 +134,21 @@ test('CNN B Core readiness fails closed on unknown Task evidence',async()=>{
  }
  assert.equal(core(null).status,'STATE_UNKNOWN');
 });
+
+test('already installed R3 after-image is classified without authorizing original B',async()=>{
+ const {projectSidecarBManifestPreimageReadonly:project}=await import('./operating-probe.mjs');
+ const installedR3='583297b451f168a32a2a5de4b0b04c9b14449aab9a041c954a420203cf04f188';
+ const raw={head:HEAD,configSource:HEAD,taskDefinitionSha256:HASH,
+  wrapperSha256:HASH,targetSha256:installedR3,secret:'NEVER_EXPOSE'};
+ const found=project(raw);
+ assert.equal(found.status,'BLOCKED');
+ assert.equal(found.code,'CNN_B_R3_AFTER_ALREADY_INSTALLED');
+ assert.equal(found.beforeSha256,installedR3);
+ assert.equal(found.head,HEAD);
+ assert.equal(found.operationalWrites,0);
+ assert.equal(found.providerCalls,0);
+ assert.equal(found.d1Writes,0);
+ assert.doesNotMatch(JSON.stringify(found),/NEVER_EXPOSE|secret/);
+ assert.equal(project({...raw,configSource:'c'.repeat(40)}).status,'STATE_UNKNOWN');
+ assert.equal(project({...raw,targetSha256:'f'.repeat(64)}).status,'STATE_UNKNOWN');
+});
