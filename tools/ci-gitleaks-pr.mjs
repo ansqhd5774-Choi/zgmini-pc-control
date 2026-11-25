@@ -11,6 +11,17 @@ export const GITLEAKS_ZIP_SHA256='d29144deff3a68aa93ced33dddf84b7fdc26070add4aa0
 // Reserve a distinct result code for actual findings while treating all tool
 // execution failures as hard errors. No findings, stderr or secrets are logged.
 export const GITLEAKS_FINDINGS_EXIT_CODE=2;
+const RULE_ID=/^[a-z][a-z0-9-]{0,79}$/;
+// Parse ONLY the reporter's rule IDs; it must never surface the matched bytes,
+// paths, line numbers or secret-bearing unparsed scanner output.
+export function summarizeRuleOnlyOutput(output){
+  if(typeof output!=='string'||output.length>20000)throw Error('GITLEAKS_REPORT_UNSAFE');
+  const lines=output.trim().split(/\r?\n/);
+  if(lines.length<1||lines.length>1000||lines.some(rule=>!RULE_ID.test(rule)))
+    throw Error('GITLEAKS_REPORT_UNSAFE');
+  return {findingCount:lines.length,ruleIds:[...new Set(lines)].sort()};
+}
+
 export function requireGitleaksClean(scan){
   if(!scan||scan.error||scan.signal||scan.status===null||scan.status===undefined)
     throw Error('GITLEAKS_EXECUTION_FAILED');
@@ -59,10 +70,20 @@ export function scanPr(){
     const exe=path.join(folder,'gitleaks.exe');
     if(!fs.existsSync(exe))throw Error('GITLEAKS_EXE_MISSING');
     // Never log findings, raw matches, reports or unredacted tool stderr.
+    // The official reporter writes rule IDs only to captured stdout, never to
+    // an Actions log or a file containing raw findings. Template is inert.
+    const template=path.join(folder,'gitleaks-rule-only.tmpl');
+    fs.writeFileSync(template,'{{range .}}{{.RuleID}}\\n{{end}}',{flag:'wx',mode:0o600});
     const scan=spawnSync(exe,['git','--redact=100','--no-banner','--no-color',
-      `--exit-code=${GITLEAKS_FINDINGS_EXIT_CODE}`,`--log-opts=${range.base}..${range.head}`],{
+      `--exit-code=${GITLEAKS_FINDINGS_EXIT_CODE}`,'--report-format=template',`--report-template=${template}`,'--report-path=-',`--log-opts=${range.base}..${range.head}`],{
       cwd:process.cwd(),windowsHide:true,stdio:'pipe',encoding:'utf8',
       maxBuffer:8*1024*1024});
+    if(!scan.error&&!scan.signal&&scan.status===GITLEAKS_FINDINGS_EXIT_CODE){
+      // Only validated rule identifiers and counts leave the scan process.
+      const summary=summarizeRuleOnlyOutput(scan.stdout);
+      console.log('GITLEAKS_FINDINGS_METADATA_ONLY count='+summary.findingCount+
+        ' rules='+summary.ruleIds.join(','));
+    }
     requireGitleaksClean(scan);
     console.log('PASS: Gitleaks source PR commit-range scan, details withheld.');
   }finally{
