@@ -341,6 +341,43 @@ test('CI reuse does not submit or falsely succeed on incomplete or mixed prior I
   assert.equal(f.posts,0);assert.equal(f.saved,null);
  }
 });
+test('CI lost POST response may recover exact bot Issue in its original successful run',async()=>{
+ const f=workloadPublisherFixture(),create=f.ports.createIssue;
+ f.ports.createIssue=async e=>{await create(e);throw Error('response lost');};
+ // Before creation the inventory is empty. After the lost response it may
+ // contain the original Issue: this remains a read-only same-run recovery.
+ f.ports.findPriorRequests=async()=>f.actual?[f.actual]:[];
+ const result=await submitExistingControllerApprovalFromCi(f.input,f.ports);
+ assert.equal(result.status,'REQUEST_READBACK_VERIFIED');
+ assert.equal(result.issueNumber,42);assert.equal(f.saved.phase,'READBACK_VERIFIED');
+ assert.match(result.receiptMarker,/^ZGMINI_CI_CONTROLLER_B_RECEIPT=42:[a-f0-9]{64}$/);
+ const later=await submitExistingControllerApprovalFromCi({...f.input,runId:900},f.ports);
+ assert.equal(later.code,'MAINTENANCE_CI_EXISTING_RECEIPT_NO_REPOST');
+ assert.equal(later.receiptMarker,undefined);assert.equal(f.posts,1);
+});
+test('CI first readback failure can recover the same bot Issue without another POST',async()=>{
+ const f=workloadPublisherFixture(),read=f.ports.readIssue;let reads=0;
+ f.ports.readIssue=async()=>{reads++;if(reads===1)throw Error('readback temporarily unavailable');return read();};
+ const result=await submitExistingControllerApprovalFromCi(f.input,f.ports);
+ assert.equal(result.status,'REQUEST_READBACK_VERIFIED');
+ assert.equal(result.issueNumber,42);assert.equal(reads,2);
+ assert.equal(f.saved.phase,'READBACK_VERIFIED');
+ assert.equal(f.posts,1);assert.match(result.receiptMarker,/^ZGMINI_CI_CONTROLLER_B_RECEIPT=42:/);
+});
+test('CI uncertain recovery rejects multiple candidates or wrong actor without new POST or marker',async()=>{
+ for(const corrupt of [
+  f=>[f.actual,{...f.actual,number:43}],
+  f=>[{...f.actual,user:f.owner}]
+ ]){
+  const f=workloadPublisherFixture(),create=f.ports.createIssue;
+  f.ports.createIssue=async e=>{await create(e);throw Error('response lost');};
+  f.ports.findPriorRequests=async()=>f.actual?corrupt(f):[];
+  const result=await submitExistingControllerApprovalFromCi(f.input,f.ports);
+  assert.equal(result.status,'STATE_UNKNOWN');assert.equal(result.code,'MAINTENANCE_CREATE_OUTCOME_UNKNOWN');
+  assert.equal(result.receiptMarker,undefined);assert.equal(f.saved.phase,'CREATION_UNKNOWN');
+  assert.equal(f.posts,1);
+ }
+});
 test('unknown CI POST preserves original durable receipt and forbids retry',async()=>{
  const f=workloadPublisherFixture();f.ports.createIssue=async()=>{f.posts++;throw Error('lost response');};
  assert.equal((await submitExistingControllerApprovalFromCi(f.input,f.ports)).code,'MAINTENANCE_CREATE_OUTCOME_UNKNOWN');
