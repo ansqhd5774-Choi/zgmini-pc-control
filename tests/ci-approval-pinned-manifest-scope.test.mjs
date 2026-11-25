@@ -88,7 +88,7 @@ function treeFixture(){
   [root+'/compare/'+m.selectiveSource.mainSha+'...'+rev]:lineage(m.selectiveSource.mainSha,rev),
   [root+'/compare/'+merge+'...'+rev]:lineage(merge,rev)
  };
- const f={v,m,s,root,merge,rev,overlay,data,file,ports:{getJson:async p=>{if(!Object.hasOwn(data,p))throw Error('missing');return structuredClone(data[p]);},readFileBytes:async (r,sha,p)=>p===v.selectivePin.path&&sha===merge?v.selectiveObservation.bytes:file}};
+ const f={v,m,s,root,merge,rev,overlay,data,file,ports:{getJson:async p=>{if(!Object.hasOwn(data,p))throw Error('missing');return structuredClone(data[p]);},readFileBytes:async (r,sha,p)=>sha===merge&&p===v.pin.path?v.observation.bytes:sha===merge&&p===v.selectivePin.path?v.selectiveObservation.bytes:file}};
  return f;
 }
 for(const [name,edit,state] of [
@@ -100,7 +100,8 @@ for(const [name,edit,state] of [
  ['source not on main',f=>{f.data[f.root+'/compare/'+f.m.selectiveSource.mainSha+'...'+f.rev].status='diverged'},'REJECTED'],
  ['unmerged approval',f=>{f.data[f.root+'/pulls/1'].merged=false},'REJECTED'],
  ['approval not on main',f=>{f.data[f.root+'/compare/'+f.merge+'...'+f.rev].status='diverged'},'REJECTED'],
- ['merged pin mismatch',f=>{f.ports.readFileBytes=async()=>Buffer.from('{}')},'REJECTED'],
+ ['merged pin mismatch',f=>{const read=f.ports.readFileBytes;f.ports.readFileBytes=async(r,s,p)=>p===f.v.selectivePin.path?Buffer.from('{}'):read(r,s,p)},'REJECTED'],
+ ['merged manifest mismatch',f=>{const read=f.ports.readFileBytes;f.ports.readFileBytes=async(r,s,p)=>p===f.v.pin.path?Buffer.from('{}'):read(r,s,p)},'REJECTED'],
  ['source bytes mismatch',f=>{const read=f.ports.readFileBytes;f.ports.readFileBytes=async(r,s,p)=>s===f.m.selectiveSource.mainSha?Buffer.from('wrong'):read(r,s,p)},'REJECTED'],
  ['branch moves during read',f=>{const read=f.ports.getJson;let count=0;f.ports.getJson=async p=>{const v=await read(p);if(p===f.root+'/branches/main'&&++count===2)v.commit.sha='e'.repeat(40);return v}},'EVIDENCE_MISSING'],
  ['unknown request',f=>{f.v.requestState='UNKNOWN'},'WAIT_RESOURCE']
