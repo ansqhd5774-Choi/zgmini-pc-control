@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {classifyMaintenancePostcheckLink as classify} from '../tools/maintenance-contract.mjs';
+import {classifyMaintenancePostcheckLink as classify,
+ summarizeMaintenancePostcheckLocalPointer as localPointer} from '../tools/maintenance-contract.mjs';
 
 const id='pc-update-11111111-1111-4111-8111-111111111111';
 const source='a'.repeat(40);
@@ -93,4 +94,36 @@ test('workflow late-label branch stays opt-in and matches source entry contract'
  assert.match(entry,/event\.action==='opened'/);
  assert.match(entry,/event\.action==='labeled'/);
  assert.match(entry,/event\.label\?\.name==='pc-job'/);
+});
+
+test('existing local pointer is correlated to exact postcheck run, source and Controller',()=>{
+ const args={requestId:id,issueNumber:42,runId:777,attempt:1,seat:3,
+  operation:'core-status',sourceBranch:'main',sourceSha:source,controllerSha:'b'.repeat(40)};
+ const pointer={issueNumber:42,report:{schema:'ZGMINI_PC_RESULT_V1',
+  jobId:'run-777-1-seat-3',requestId:id+'-postcheck',operation:'core-status',
+  sourceBranch:'main',requestedSourceSha:source,controlSourceSha:'b'.repeat(40),
+  status:'PASS',code:'CORE_READONLY_DIAGNOSIS',result:{private:'do not transmit'}}};
+ const result=localPointer({...args,pointer});
+ assert.deepEqual(result,{status:'LOCAL_RESULT_MATCHED',
+  code:'POSTCHECK_EXISTING_LOCAL_RESULT_MATCHED',
+  resultStatus:'PASS',resultCode:'CORE_READONLY_DIAGNOSIS'});
+ assert.equal(JSON.stringify(result).includes('private'),false);
+ for(const changed of [
+  {...pointer,issueNumber:43},
+  {...pointer,report:{...pointer.report,jobId:'run-778-1-seat-3'}},
+  {...pointer,report:{...pointer.report,sourceBranch:'other'}},
+  {...pointer,report:{...pointer.report,requestedSourceSha:'c'.repeat(40)}},
+  {...pointer,report:{...pointer.report,controlSourceSha:'d'.repeat(40)}},
+  {...pointer,report:{...pointer.report,status:'SYNTHETIC_PASS'}},
+  null
+ ])assert.equal(localPointer({...args,pointer:changed}).status,'LOCAL_RESULT_UNVERIFIED');
+});
+
+test('postcheck local report readback remains bounded and never triggers another job',()=>{
+ const src=fs.readFileSync(fileURLToPath(new URL('../tools/update.mjs',import.meta.url)),'utf8');
+ assert.match(src,/controlRoot,'reports'/);
+ assert.match(src,/stat\.isFile\(\)&&!stat\.isSymbolicLink\(\)&&stat\.nlink===1/);
+ assert.match(src,/stat\.size>0&&stat\.size<=131072/);
+ assert.match(src,/summarizeMaintenancePostcheckLocalPointer\(\{/);
+ assert.match(src,/VERIFY_AND_UPLOAD_EXISTING_RESULT_NO_REEXECUTION/);
 });
