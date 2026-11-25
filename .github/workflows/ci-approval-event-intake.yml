@@ -9,6 +9,7 @@ on:
 permissions:
   actions: read
   contents: read
+  pull-requests: read # Existing private approval PR metadata only; no write access.
 jobs:
   observe-source-completion:
     if: >-
