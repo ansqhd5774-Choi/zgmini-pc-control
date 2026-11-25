@@ -204,10 +204,31 @@ test('CI CLI calls the existing owner submitter using the exact original receipt
  await assert.rejects(()=>main(argv,{githubApi}),/RECEIPT_EXISTS_USE_RECONCILE/);
  assert.equal(posts,1);
 });
-test('CI CLI rejects absent, malformed and oversized run id before IO',async()=>{
+test('CI CLI rejects malformed and oversized explicit run id before IO',async()=>{
  const args=['submit-ci-prepared','--prepared-file','missing','--installed-sha',OLD,'--receipt-file','missing'];
  const githubApi=()=>{throw Error('unexpected API call')};
- for(const suffix of [[],['--run-id','1;bad'],['--run-id','9007199254740992']]){
+ for(const suffix of [['--run-id','1;bad'],['--run-id','9007199254740992']]){
   await assert.rejects(()=>main([...args,...suffix],{githubApi}),/MAINTENANCE_REQUEST_USAGE/);
  }
+});
+
+test('approval publication can resolve exact source CI without a supplied run ID',async()=>{
+ const f=setup(),p=ciPorts(f);delete p.runId;
+ p.listRuns=async head=>{assert.equal(head,p.pr.head.sha);return {workflow_runs:[
+  {...p.run,id:124,head_sha:'e'.repeat(40)},{...p.run,id:125,conclusion:'failure'},p.run]};};
+ const result=await submitCiPreparedMaintenanceIssue(f.expected,p);
+ assert.equal(result.status,'REQUEST_READBACK_VERIFIED');assert.equal(f.posts,1);
+});
+test('no matching successful CI does not issue a request',async()=>{
+ const f=setup(),p=ciPorts(f);delete p.runId;
+ p.listRuns=async()=>({workflow_runs:[{...p.run,conclusion:'failure'}]});
+ await assert.rejects(()=>submitCiPreparedMaintenanceIssue(f.expected,p),/CI_SUCCESS_NOT_FOUND/);
+ assert.equal(f.posts,0);assert.equal(f.saved,null);
+});
+test('listed success must survive exact independent run readback',async()=>{
+ const f=setup(),p=ciPorts(f);delete p.runId;
+ p.listRuns=async()=>({workflow_runs:[p.run]});
+ p.readRun=async()=>({...p.run,conclusion:'cancelled'});
+ await assert.rejects(()=>submitCiPreparedMaintenanceIssue(f.expected,p),/CI_APPROVAL_SOURCE_MISMATCH/);
+ assert.equal(f.posts,0);assert.equal(f.saved,null);
 });
