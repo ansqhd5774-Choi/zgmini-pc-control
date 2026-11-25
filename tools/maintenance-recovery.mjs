@@ -166,6 +166,11 @@ const proof2960={issueNumber:2982,runId:45186420113,jobId:137733094098,
  runnerName:'zgmini-pc-04',resultPath:'results/45186420113-1-seat-4.json'};
 const REC3409='pc-update-71ea39dc-7048-4e10-9d11-d4be7f6c3ec0';
 const TARGET3409='6b3c9c0ce77354d81babe4c9ea7785663c6c2cb4';
+const REC3516='pc-update-c087fa10-88e2-42e3-bc60-c758ab93f0c1';
+const TARGET3516='83679b013ac9a9820331d93311ec97e572b18e13';
+// This is the original independent operating read, never the missing #3519.
+const proof3516={issueNumber:3528,runId:45579963186,jobId:139087219551,
+ runnerName:'zgmini-pc-03',resultPath:'results/pc-process-inventory-45579963186-1-operating.json'};
 const proof3409={issueNumber:3438,runId:45457196689,jobId:138669741465,
  runnerName:'zgmini-pc-03',resultPath:'results/45457196689-1-seat-3.json'};
 // Exact, fixed historical contracts only. This table grants no execution
@@ -184,6 +189,15 @@ export function fixedInstalledRecoveryCase(id){
   proofSourceBranch:'main',
   proofSourceSha:'8410a857d2d8cd47beae811152a676c6eee07a75',
   proof:proof3409,allowUnchangedBaseline:true});
+ if(id===REC3516)return Object.freeze({issueNumber:3516,postIssueNumber:3519,
+  targetSha:TARGET3516,postSourceBranch:'main',
+  postSourceSha:'b6049aac81b3442a58b08050ee138921f87a09e6',
+  // Independently attested readonly run on the already-installed Controller.
+  // Unlike #3409 this is an operating process inventory, NOT a core-status run.
+  proofType:'OPERATING_PROCESS_INVENTORY',
+  proofSourceBranch:'main',
+  proofSourceSha:'8bd11c9a396e19e7881ce7d21cd52c3cb520f6e2',
+  proof:proof3516,allowUnchangedBaseline:true});
  return null;
 }
 // #3409's original recovery approval and its Writer preimage remain immutable.
@@ -445,7 +459,19 @@ async function reconcileInstalledRecoveryFixed({id,source,g,before}){
  // are different requests. Pin and verify both; never equate their source SHAs.
  const evidenceIssue=github('issues/'+proofCase.issueNumber);
  let evidenceBody;try{evidenceBody=JSON.parse(evidenceIssue.body);}catch{}
- const proofIssueExact=evidenceIssue.number===proofCase.issueNumber&&
+ const is3516=fixed.proofType==='OPERATING_PROCESS_INVENTORY';
+ // An independently emitted inventory receipt is narrowly permitted for
+ // #3516 only. It cannot impersonate the missing original #3519 postcheck.
+ const proofIssueExact=is3516?(
+  evidenceIssue.number===3528&&evidenceIssue.title==='pc-process-inventory-readonly'&&
+  evidenceIssue.user?.login==='ansqhd5774-Choi'&&
+  evidenceBody?.schema==='ZGMINI_PC_PROCESS_INVENTORY_REQUEST_V1'&&
+  evidenceBody.operation==='process-inventory-readonly'&&
+  evidenceBody.role==='operating'&&
+  evidenceBody.probe==='w04-3516-maintenance-status-readonly'&&
+  evidenceBody.requestId===receipt.requestId
+ ):(
+  evidenceIssue.number===proofCase.issueNumber&&
   evidenceIssue.title==='pc-job'&&
   evidenceIssue.user?.login==='ansqhd5774-Choi'&&
   evidenceIssue.labels?.some(l=>l.name==='pc-job')&&
@@ -454,16 +480,52 @@ async function reconcileInstalledRecoveryFixed({id,source,g,before}){
   evidenceBody.sourceRepository==='ansqhd5774-Choi/zgmini'&&
   evidenceBody.sourceBranch===fixed.proofSourceBranch&&
   evidenceBody.sourceSha===fixed.proofSourceSha&&
-  evidenceBody.requestId===receipt.requestId;
+  evidenceBody.requestId===receipt.requestId
+ );
  const run=github('actions/runs/'+proofCase.runId);
  const job=github('actions/jobs/'+proofCase.jobId);
- const step=job.steps?.filter(s=>s.name==='Execute fixed host allowlist entry');
- const success=postExact&&proofIssueExact&&run?.id===proofCase.runId&&
+ const expectedStep=is3516?'Collect read-only runtime process snapshot on existing operating PC':
+  'Execute fixed host allowlist entry';
+ const step=job.steps?.filter(s=>s.name===expectedStep);
+ const commonSuccess=postExact&&proofIssueExact&&run?.id===proofCase.runId&&
   run.event==='issues'&&run.status==='completed'&&run.conclusion==='success'&&
   job?.id===proofCase.jobId&&job.run_id===run.id&&
-  job.runner_name===proofCase.runnerName&&job.name==='approved-pc-job'&&
+  job.runner_name===proofCase.runnerName&&
   job.status==='completed'&&job.conclusion==='success'&&
   Array.isArray(step)&&step.length===1&&step[0].conclusion==='success'&&
+  Number.isFinite(Date.parse(receipt.observedAtUtc??receipt.finishedAt))&&
+  Date.parse(receipt.observedAtUtc??receipt.finishedAt)>Date.parse(ledger.updatedAt);
+ const status3516=receipt.w043516MaintenanceStatus;
+ const inventoryVerified=is3516&&
+  run.head_sha===fixed.proofSourceSha&&
+  run.path==='.github/workflows/pc-process-inventory-readonly.yml'&&
+  run.display_title==='pc-process-inventory-readonly'&&
+  job.name==='operating-process-snapshot'&&
+  receipt.schema==='ZGMINI_PC_PROCESS_INVENTORY_RESULT_V1'&&
+  receipt.issueNumber===proofCase.issueNumber&&
+  receipt.runId===String(proofCase.runId)&&
+  receipt.attempt==='1'&&receipt.role==='operating'&&
+  receipt.status==='PASS'&&receipt.code==='W04_3516_STATUS_OBSERVED'&&
+  receipt.operationalWrites===0&&receipt.providerCalls===0&&
+  receipt.d1Writes===0&&receipt.automaticRetries===0&&
+  status3516?.requestId===id&&status3516.actualControllerSha===targetSha&&
+  status3516.workflowState==='active'&&
+  status3516?.historicalRequest?.status==='RECOVERY_REQUIRED'&&
+  status3516.historicalRequest.code==='POSTCHECK_OUTCOME_UNKNOWN'&&
+  status3516.historicalRequest.postIssueNumber===fixed.postIssueNumber&&
+  status3516.protectedStateUnchanged===true&&
+  status3516.protectedDifferenceClass==='UNCHANGED'&&
+  status3516?.recoveryCas?.status==='LINEAGE_CORRELATED'&&
+  status3516.recoveryCas.originalLedgerMatches===true&&
+  status3516.recoveryCas.ownerMarkerMatches===true&&
+  status3516.recoveryCas.recoveryTimelineMatches===true&&
+  status3516.recoveryCas.ownerAlive===false&&
+  status3516.recoveryCas.recoveryEligible===false&&
+  Object.keys(status3516.recoveryCas.casDigests??{}).length===7&&
+  Object.keys(cas).every(k=>
+   status3516.recoveryCas.casDigests[k]===cas[k]);
+ const coreVerified=!is3516&&
+  job.name==='approved-pc-job'&&
   receipt.schema==='ZGMINI_PC_RESULT_V1'&&receipt.status==='PASS'&&
   receipt.code==='CORE_READONLY_DIAGNOSIS'&&receipt.operation==='core-status'&&
   receipt.sourceRepository==='ansqhd5774-Choi/zgmini'&&
@@ -471,9 +533,11 @@ async function reconcileInstalledRecoveryFixed({id,source,g,before}){
   receipt.sourceBranch===fixed.proofSourceBranch&&
   receipt.actualExecutionSha===targetSha&&
   receipt.protectedStateUnchanged===true&&receipt.providerCalls===0&&
-  receipt.d1Writes===0&&receipt.sqliteOpened===false&&
-  Number.isFinite(Date.parse(receipt.finishedAt))&&
-  Date.parse(receipt.finishedAt)>Date.parse(ledger.updatedAt);
+  receipt.d1Writes===0&&receipt.sqliteOpened===false;
+ const success=commonSuccess&&(inventoryVerified||coreVerified);
+ // An independent inventory is read-only evidence, never original postcheck
+ // PASS. All existing live-owner, Supervisor, CAS and protection checks below
+ // are still required independently immediately before lease archive.
  // Existing maintainer source/issue/Controller path already validated by
  // the original independent inspection; never infer six Runner API states
  // from a 403 or substitute new A success for the missing #2965 result.
