@@ -178,6 +178,7 @@ test('configured auto approval context binds initial grant and exact PR scope',a
   if(route==='pulls/29')return {number:29,head:{sha:head,repo:{full_name:repo}},base:{ref:'main',repo:{full_name:repo}}};
   if(route==='contents/'+v.path+'?ref='+head)return {path:v.path,type:'file',encoding:'base64',sha:blob,content:bytes.toString('base64')};
   if(route==='issues/comments/456')return {id:456};
+  if(route==='compare/'+manifest.installedSha+'...'+v.target)return {status:'ahead'};
   throw Error('unexpected route');
  },readJobLogs:async()=>''});
  const ctx=await read(v.target,29);
@@ -185,6 +186,8 @@ test('configured auto approval context binds initial grant and exact PR scope',a
  assert.equal(ctx.delegation.scope.businessApprovalSha256,policy.businessApprovalSha256);
  assert.equal(ctx.delegation.scope.authorityChangesExcluded,true);
  assert.equal((await ctx.getJson('repos/'+repo+'/issues/comments/456')).id,456);
+ assert.equal((await ctx.getJson('repos/'+repo+'/compare/'+manifest.installedSha+'...'+v.target)).status,'ahead');
+ assert.throws(()=>ctx.getJson('repos/'+repo+'/../secrets'),/SOURCE_INVALID/);
  await assert.rejects(()=>read(v.target,30),/POLICY_SCOPE_MISMATCH/);
  await assert.rejects(()=>ctx.readFileBytes('other/repo',head,v.path),/SOURCE_INVALID/);
  assert.throws(()=>ctx.getJson('repos/'+repo+'/actions/secrets'),/SOURCE_INVALID/);

@@ -147,7 +147,7 @@ export function createAutoApprovalContextReader({policy,getJson,readJobLogs}={})
   return {policy:structuredClone(config),delegation,readFileBytes,readJobLogs,
    getJson:route=>{
     if(route==='repos/'+repo)return getJson('');
-    if(typeof route!=='string'||!route.startsWith(root)||route.includes('..')||
+    if(typeof route!=='string'||!route.startsWith(root)||
        !/^(?:issues\/\d+|issues\/comments\/\d+|branches\/(?:main|codex%2F[a-z0-9-]+)|compare\/[a-f0-9]{40}\.\.\.[a-f0-9]{40}|git\/commits\/[a-f0-9]{40}|pulls\/\d+|actions\/runs\/\d+(?:\/attempts\/\d+\/jobs\?per_page=100)?|actions\/workflows\/416355595\/runs\?head_sha=[a-f0-9]{40}&event=pull_request&status=success&per_page=100)$/.test(route.slice(root.length)))
      throw Error('CI_PUBLICATION_SOURCE_INVALID');
     return getJson(route.slice(root.length));
