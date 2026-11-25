@@ -22,10 +22,11 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - name: Setup Node
-        uses: actions/setup-node@49933ea5288ca8642d1e84afbd3f7d6820020
-        with:
-          node-version: '22'
+      # Use the hosted Ubuntu runtime, fail closed if Node.js is too old.
+      - name: Check available Node.js runtime
+        run: |
+          node --version
+          node -e "if (Number(process.versions.node.split('.')[0]) < 22) process.exit(1)"
       - name: Verify bounded pair contract and original one-shot preservation
         run: |
           node --check er1-dec31-symbol-batch-a-entry.mjs
