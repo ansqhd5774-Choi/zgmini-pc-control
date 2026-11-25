@@ -81,8 +81,11 @@ export function sanitizeR6BResult(raw,request,env){
   lastPass:['SOURCE_VERIFIED','REGISTERED_KEY_PRESENT','D1_READONLY_PREFLIGHT',
    'ONE_SHOT_CLAIMED',
    'PUBLISH_READBACK','COLLECT_READBACK'].includes(raw.lastPass)?raw.lastPass:null,
-  firstFail:['PREFLIGHT','COLLECT_OR_PUBLISH','CORE_LOCK_RELEASE']
-   .includes(raw.firstFail)?raw.firstFail:null};
+  // Bounded W04-only failure stages are safe to return; never surface a
+  // raw exception, lock owner or local path through the report.
+  firstFail:['PREFLIGHT','COLLECT_OR_PUBLISH','CORE_LOCK_RELEASE'].includes(raw.firstFail)||
+   (raw.code.startsWith('W04_REPAIR_')&&
+    ['CORE_LOCK','HISTORY_REPAIR'].includes(raw.firstFail))?raw.firstFail:null};
  if(!['SUCCESS','PARTIAL','NOOP'].includes(raw.status))return simple;
  // The immutable workflow's real effect step must have exited successfully;
  // a stale/forged local SUCCESS file cannot override a failed Actions step.
