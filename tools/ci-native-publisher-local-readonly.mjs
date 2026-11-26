@@ -3,11 +3,57 @@
 // Never publish original policy, approval/request bytes, secret, root path,
 // durable claim content, or grant any native A/Writer B execution authority.
 import path from 'node:path';
+import fs from 'node:fs';
 import {createHash} from 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
 import {createNativePublisherLocalPolicyPorts} from '../ci-approval/native-publisher-entry.mjs';
 
 const EFFECTS=['A_READONLY','B_WRITER_SOURCE'];
+const STANDARD_SCOPE_ROOT='E:\\ZGmini\\data\\pc-writer\\ci-native';
+const STANDARD_FILES=Object.freeze({
+ A_READONLY:['ci-native-a-approved.json','ci-native-a-installed-proof.json'],
+ B_WRITER_SOURCE:['ci-native-writer-b-approved.json','ci-native-writer-b-installed-proof.json']
+});
+const candidate=(state,effects=Object.fromEntries(EFFECTS.map(effect=>[
+ effect,{scopeFile:'NOT_CHECKED',installedProofFile:'NOT_CHECKED'}
+])))=>Object.freeze({state,effects,executionAuthorized:false,operationalWrites:0});
+
+/**
+ * Optional fixed-path existence probe, only used when CI root variables are
+ * missing. This is not the independently installed scope, an alternate
+ * approval root or proof of B installation. No contents, names or paths leave
+ * the host and no files are opened.
+ */
+export function inspectStandardNativeScopeCandidate({
+ platform=process.platform,filesystem=fs
+}={}){
+ if(platform!=='win32')return candidate('NOT_CHECKED_NON_WINDOWS');
+ const root=path.win32.normalize(STANDARD_SCOPE_ROOT);
+ try{
+  for(let current=root;;){
+   const st=filesystem.lstatSync(current);
+   if(!st.isDirectory()||st.isSymbolicLink())return candidate('ROOT_UNVERIFIED');
+   const parent=path.win32.dirname(current);
+   if(parent===current)break;
+   current=parent;
+  }
+ }catch(error){
+  return candidate(error?.code==='ENOENT'?'ROOT_ABSENT':'ROOT_UNVERIFIED');
+ }
+ const inspect=(filename,limit)=>{
+  try{
+   const st=filesystem.lstatSync(path.win32.join(root,filename));
+   return st.isFile()&&!st.isSymbolicLink()&&st.size>0&&st.size<=limit
+    ?'PRESENT_UNVERIFIED':'UNVERIFIED';
+  }catch(error){return error?.code==='ENOENT'?'ABSENT':'UNVERIFIED';}
+ };
+ const effects=Object.fromEntries(EFFECTS.map(effect=>{
+  const [scope,proof]=STANDARD_FILES[effect];
+  return [effect,{scopeFile:inspect(scope,131072),
+   installedProofFile:inspect(proof,65536)}];
+ }));
+ return candidate('ROOT_PRESENT_UNVERIFIED',effects);
+}
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 const enabled=(env,key)=>env?.[key]==='true'?'ENABLED':
  env?.[key]==='false'?'DISABLED':'UNSET_OR_INVALID';
@@ -20,7 +66,8 @@ const effectResult=(code,fields={})=>Object.freeze({
 
 /** This observation is NOT an installed grant or a CI dispatch decision. */
 export function inspectCiNativePublisherLocalReadonly({
- env=process.env,createPorts=createNativePublisherLocalPolicyPorts
+ env=process.env,createPorts=createNativePublisherLocalPolicyPorts,
+ inspectStandardScope=inspectStandardNativeScopeCandidate
 }={}){
  const out={
   schema:'ZGMINI_CI_NATIVE_PUBLISHER_LOCAL_READONLY_V1',
@@ -32,6 +79,7 @@ export function inspectCiNativePublisherLocalReadonly({
   executionAOptIn:enabled(env,'ZGMINI_CI_NATIVE_A_EXEC_ENABLED'),
   executionWriterBOptIn:enabled(env,'ZGMINI_CI_NATIVE_WRITER_B_EXEC_ENABLED'),
   independentRootsVerified:false,
+  standardScopeCandidate:candidate('NOT_CHECKED_CONFIGURED_ROOTS'),
   effects:{
    A_READONLY:effectResult('CI_NATIVE_LOCAL_SCOPE_NOT_OBSERVED'),
    B_WRITER_SOURCE:effectResult('CI_NATIVE_LOCAL_SCOPE_NOT_OBSERVED')
@@ -40,7 +88,15 @@ export function inspectCiNativePublisherLocalReadonly({
   canPublish:false,canExecute:false,canInstall:false,
   operationalWrites:0,providerCalls:0,d1Writes:0,automaticRetries:0
  };
- if(!out.scopeRootConfigured||!out.receiptRootConfigured)return Object.freeze(out);
+ if(!out.scopeRootConfigured||!out.receiptRootConfigured){
+  // Do not infer that absent configuration means absent installed files.
+  // Read a fixed non-authoritative candidate only, with no user-supplied path.
+  let observed;
+  try{observed=inspectStandardScope();}catch{
+   observed=candidate('OBSERVATION_UNVERIFIED');
+  }
+  return Object.freeze({...out,standardScopeCandidate:observed});
+ }
  let local;
  try{
   local=createPorts({
