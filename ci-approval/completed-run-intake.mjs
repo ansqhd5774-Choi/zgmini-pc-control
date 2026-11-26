@@ -282,7 +282,7 @@ export async function observeLateOwnerMergedControllerApproval(event,{getJson}={
   }catch{return out('EVIDENCE_MISSING','OWNER_APPROVAL_PR_READ_UNAVAILABLE');}
   for(const file of files){
    const match=typeof file?.filename==='string'&&
-    file.filename.match(/^approvals\\/controller-updates\\/([a-f0-9]{40})\\.json$/);
+    file.filename.match(/^approvals\/controller-updates\/([a-f0-9]{40})\.json$/);
    if(!match)continue;
    const targetSha=match[1];
    if(file.status!=='added'||!sha(file.sha))
@@ -295,7 +295,7 @@ export async function observeLateOwnerMergedControllerApproval(event,{getJson}={
       throw Error('APPROVAL_UNVERIFIED');
      const bytes=Buffer.from(f.content,'base64');
      if(!bytes.length||bytes.length>65536||
-        createHash('sha1').update(Buffer.from('blob '+bytes.length+'\\0'))
+        createHash('sha1').update(Buffer.from('blob '+bytes.length+'\0'))
          .update(bytes).digest('hex')!==file.sha)
       throw Error('APPROVAL_UNVERIFIED');
      return bytes;
