@@ -10,6 +10,9 @@ test('exact isolated Windows host, fixed non-TEMP ProgramData root, separate Run
  assert.match(source,/\$root = 'C:\\ProgramData\\ZGMINI-CI\\ControllerBReceipts'/);
  assert.match(source,/MachineName\.ToUpperInvariant\(\)/);
  assert.match(source,/Win32_Service/);
+ assert.match(source,/\$serviceName = 'actions\.runner\.ansqhd5774-Choi-zgmini-pc-control\.zgmini-handoff-ci-spare-01'/);
+ assert.match(source,/\$_.Name -ceq \$serviceName/);
+ assert.doesNotMatch(source,/\$_\.Name -match/);
  assert.match(source,/DEDICATED_RUNNER_ACCOUNT_REQUIRED/);
 });
 test('no Actions or unattended self-authorizing setup',()=>{
