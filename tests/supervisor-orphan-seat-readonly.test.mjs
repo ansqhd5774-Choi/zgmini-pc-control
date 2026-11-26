@@ -87,9 +87,9 @@ test('fixed Windows-only WMI source is bounded, read-only and no shell',()=>{
  assert.equal(captured.options.shell,false);
  assert.equal(captured.options.windowsHide,true);
  assert.equal(captured.options.timeout,15000);
- assert.match(captured.args[3],/Get-CimInstance -ClassName Win32_Process/);
- assert.match(captured.args[3],/Get-CimInstance -ClassName Win32_Service/);
- assert.doesNotMatch(captured.args[3],/Stop-Process|Remove-Item|Start-Process|Set-CimInstance|Invoke-Expression|\\btaskkill\\b/);
+ assert.match(captured.args[4],/Get-CimInstance -ClassName Win32_Process/);
+ assert.match(captured.args[4],/Get-CimInstance -ClassName Win32_Service/);
+ assert.doesNotMatch(captured.args[4],/Stop-Process|Remove-Item|Start-Process|Set-CimInstance|Invoke-Expression|\\btaskkill\\b/);
  for(const candidate of [
   {platform:'linux',env:{SystemRoot:['C:','Windows'].join(slash)}},
   {platform:'win32',env:{SystemRoot:'X:/other'}},
