@@ -14,7 +14,9 @@ import {validateMaintenanceRequest,validateUpdateRequest,
   validateR54BIssueEnvelope,validateR54BManifestRequest,
   R54_B_ISSUE_TITLE,R54_B_OPERATION,R54_B_SOURCE_FILES,
   SOURCE_BUNDLE_OPERATION,SOURCE_BUNDLE_ISSUE_TITLE,
-  validateSourceBundleIssueEnvelope,validateSourceBundleBApproval} from "./maintenance-contract.mjs";
+  validateSourceBundleIssueEnvelope,validateSourceBundleBApproval,
+  S6_ONCE_ISSUE_TITLE,S6_ONCE_OPERATION,
+  validateS6OnceIssueEnvelope,validateS6OnceBManifest} from "./maintenance-contract.mjs";
 import {acquireMaintenanceLock} from "./maintenance-lock.mjs";
 
 const CONTROL_REPOSITORY="ansqhd5774-Choi/zgmini-pc-control";
@@ -385,7 +387,8 @@ export function createMaintenanceAgent({
     return exec(nodeBinary,[updateScript,...args],updateTimeoutMs,safeUpdaterEnv());
   }
   async function updaterStatus(id,operation="controller-update"){
-    const subcommand=operation===R54_B_OPERATION?'r54-b-status'
+    const subcommand=operation===S6_ONCE_OPERATION?'s6-once-status'
+      :operation===R54_B_OPERATION?'r54-b-status'
       :operation===SOURCE_BUNDLE_OPERATION?'source-bundle-status'
       :operation==="employment-r6-host-register"?"host-r6-status":"status";
     try{return parseJsonOutput(await updater([subcommand,"--request-id",id]),"UPDATE_STATUS_INVALID");}
@@ -443,7 +446,9 @@ export function createMaintenanceAgent({
       "--json","number,title,state,body,author,labels,comments"],"GITHUB_ISSUE_READ_FAILED");
   }
   async function manifestBytes(request){
-    const approvedPath=request.operation===R54_B_OPERATION
+    const approvedPath=request.operation===S6_ONCE_OPERATION
+      ?`approvals/controller-s6/${request.approvalManifestSha256}.json`
+      :request.operation===R54_B_OPERATION
       ?'approvals/theme-nine-r54/sixfile-source.json'
       :request.operation===SOURCE_BUNDLE_OPERATION
       ?`approvals/source-bundles/${request.approvalManifestSha256}.json`
@@ -707,7 +712,7 @@ export function createMaintenanceAgent({
     return persistResult(entry,result);
   }
   async function rejectAdmission(issue,reason){
-    const code=/^(?:UPDATE|R6_HOST|R54_B|SOURCE_BUNDLE|ISSUE)_[A-Z0-9_]{1,70}$/.test(reason??'')
+    const code=/^(?:UPDATE|R6_HOST|R54_B|SOURCE_BUNDLE|S6_ONCE|ISSUE)_[A-Z0-9_]{1,70}$/.test(reason??'')
       ?reason:'ISSUE_CONTRACT_INVALID';
     const digest=sha256(typeof issue.body==='string'?issue.body:'');
     const marker=`<!-- zgmini-pc-maintenance-rejected:${issue.number}:${digest} -->`;
@@ -874,7 +879,48 @@ export function createMaintenanceAgent({
     return {status:result.status,code:result.code,requestId:request.requestId,
       originalRequestId:fixed.originalId};
   }
+  async function processS6OnceIssue(issue){
+    // S6 is a new B operational effect. A valid source/manifest/read-only
+    // preflight is never sufficient authority to stop live processes.
+    if(!issueIsTrusted(issue,{allowedActors,title:S6_ONCE_ISSUE_TITLE,label}))
+      return {status:'IGNORED',issueNumber:issue?.number};
+    if(typeof issue.body!=='string'||Buffer.byteLength(issue.body)>MAX_BODY_BYTES)
+      return rejectAdmission(issue,'S6_ONCE_ISSUE_BODY_INVALID');
+    let request;
+    try{
+      request=validateS6OnceIssueEnvelope(parseIssueBody(issue.body),{
+        actor:issue.author.login,allowedActors,controlRepository:repo});
+    }catch(error){return rejectAdmission(issue,error?.code??error?.message);}
+    if(loadLedger(request.requestId))
+      return {status:'STATE_UNKNOWN',code:'S6_ONCE_PRIOR_LEDGER_RECONCILE_FIRST',
+        requestId:request.requestId,executionStarted:false,operationalWrites:0};
+    let readonly;
+    try{
+      readonly=parseJsonOutput(await updater(['s6-once-status','--request-id',
+        request.requestId]),'S6_ONCE_STATUS_UNVERIFIED');
+      if(readonly?.status!=='READONLY'||
+         readonly.code!=='S6_ONCE_LIVE_PREIMAGE_OBSERVED'||
+         readonly.installAttempted!==false||
+         readonly.operationalWrites!==0||
+         readonly.actualControllerSha!==request.targetControllerSha||
+         readonly.installLock?.held!==false||!readonly.s6Live)
+        throw coded('S6_ONCE_LIVE_PREIMAGE_UNVERIFIED');
+      const bytes=await manifestBytes(request);
+      validateS6OnceBManifest(request,bytes,{actor:issue.author.login,
+        allowedActors,controlRepository:repo,live:readonly.s6Live});
+    }catch(error){
+      return {status:'BLOCKED',code:safeCode(error?.code??error?.message),
+        requestId:request.requestId,executionStarted:false,operationalWrites:0};
+    }
+    // The reviewed standalone executable adapter/7-file source update is
+    // deliberately not yet installed. Never interpret source admission as
+    // permission to invoke 'apply', kill a Controller or release a lease.
+    return {status:'BLOCKED',code:'S6_ONCE_EXECUTION_PORT_NOT_CONNECTED',
+      requestId:request.requestId,preflight:'EXACT_B_SOURCE_AND_LIVE_CAS_MATCHED',
+      executionStarted:false,operationalWrites:0};
+  }
   async function processIssue(issue){
+    if(issue?.title===S6_ONCE_ISSUE_TITLE)return processS6OnceIssue(issue);
     if(issue?.title===INSTALLED_RECOVERY_ISSUE_TITLE)
       return processInstalledRecoveryIssue(issue);
     const ciOrigin=issue?.title===ISSUE_TITLE&&issue.state==='OPEN'&&
@@ -1077,7 +1123,7 @@ export function createMaintenanceAgent({
       // Summary filtering avoids unnecessary reads; processIssue still verifies
       // the full Issue actor, label, request body and approval before applying.
       if(![ISSUE_TITLE,R6_HOST_ISSUE_TITLE,R54_B_ISSUE_TITLE,SOURCE_BUNDLE_ISSUE_TITLE,
-        INSTALLED_RECOVERY_ISSUE_TITLE].includes(entry?.title))continue;
+        INSTALLED_RECOVERY_ISSUE_TITLE,S6_ONCE_ISSUE_TITLE].includes(entry?.title))continue;
       seen.add(number);
       const cached=settledIssueCache.get(number);
       const updatedAt=entry?.updatedAt;
