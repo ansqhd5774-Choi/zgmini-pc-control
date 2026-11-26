@@ -30,7 +30,9 @@ const denied=(state,code,extra={})=>Object.freeze({state,code,dispatched:false,e
 export async function dispatchApprovedCiEffect({policy,requestBytes,ports}={}){
  if(!policy||policy.enabled!==true)return denied('DISABLED','CI_NATIVE_DISPATCH_POLICY_DISABLED');
  const effect=policy.effect,receiver=RECEIVERS[effect];
- if(!receiver||policy.schema!=='ZGMINI_CI_NATIVE_DISPATCH_V1'||
+ const eventBound=policy.sourceRunMode==='EVENT_COMPLETION_V1';
+ if((policy.sourceRunMode!==undefined&&!eventBound)||
+    !receiver||policy.schema!=='ZGMINI_CI_NATIVE_DISPATCH_V1'||
    policy.receiverWorkflowPath!==receiver||!hex(policy.receiverWorkflowBlobSha,40)||
    !id(policy.sourceRunId)||!id(policy.sourceAttempt)||!id(policy.sourceWorkflowId)||
    !hex(policy.sourceHeadSha,40)||!hex(policy.sourceWorkflowBlobSha,40)||
@@ -85,11 +87,16 @@ export async function dispatchApprovedCiEffect({policy,requestBytes,ports}={}){
  // Compare *all* material authority fields with the installed trusted scope.
  // A changed approval hash or source run must never mint a new effect claim.
  const installedFields=['effect','receiverWorkflowPath','receiverWorkflowBlobSha',
-  'sourceRunId','sourceAttempt','sourceWorkflowId','sourceWorkflowPath',
+  'sourceAttempt','sourceWorkflowId','sourceWorkflowPath',
   'sourceHeadSha','sourceWorkflowBlobSha','businessApprovalSha256',
-  'approvedRequestSha256','policyRevision'];
+  'approvedRequestSha256','policyRevision','sourceRunMode'];
+ // The only dynamic field is a successful CI run ID. EVENT_COMPLETION_V1
+ // must be granted in the installed policy without any preselected run ID.
+ // Fixed legacy grants continue to compare the exact installed run number.
  if(installed?.enabled!==true||
-   installedFields.some(k=>installed[k]!==policy[k]))
+   installedFields.some(k=>installed[k]!==policy[k])||
+   (eventBound?Object.hasOwn(installed,'sourceRunId')||policy.sourceAttempt!==1:
+     installed.sourceRunId!==policy.sourceRunId))
   return denied('EVIDENCE_MISSING','CI_NATIVE_DISPATCH_RECEIVER_NOT_ATTESTED',{effectKey:key});
  let prior;
  try{prior=await ports.loadReceipt(key);}catch{return denied('STATE_UNKNOWN','CI_NATIVE_DISPATCH_RECEIPT_READ_UNKNOWN',{effectKey:key});}
