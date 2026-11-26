@@ -3119,7 +3119,7 @@ test('S6 one-shot UNKNOWN journal classification preserves claim/stop uncertaint
   .status,'STATE_UNKNOWN');
  const sample={schema:SCHEMA,role:'operating',requestId:'fixedA',status:'PASS',
   code:'S6_ONCE_JOURNAL_PHASE_OBSERVED',s6OnceJournal:attempted};
- assert.doesNotMatch(toText(sample),/ownerSha256|nonce|pid|approvalManifest|token|secret/i);
+ assert.doesNotMatch(toText(sample),/ownerSha256|nonce|watchdogPid=|standbyPids=|ownerPid=|approvalManifest|token|secret|[a-f0-9]{64}/i);
  const ioFailure=inspectS6OnceJournalReadonly({
   io:{lstatSync(){throw Error('SECRET_OWNER_LOCAL_PATH');}}
  });
