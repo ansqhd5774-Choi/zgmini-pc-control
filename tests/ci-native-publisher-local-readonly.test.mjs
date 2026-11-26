@@ -4,7 +4,7 @@ import path from 'node:path';
 import os from 'node:os';
 import {createHash} from 'node:crypto';
 import fs from 'node:fs';
-import {inspectCiNativePublisherLocalReadonly} from '../tools/ci-native-publisher-local-readonly.mjs';
+import {inspectCiNativePublisherLocalReadonly,inspectStandardNativeScopeCandidate} from '../tools/ci-native-publisher-local-readonly.mjs';
 import {authenticateProcess,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 
@@ -76,6 +76,70 @@ test('absent native scope root or receipt root is observed without attempting an
   assert.equal(r.independentRootsVerified,false);
   assert.equal(calls,0);
   assert.doesNotMatch(JSON.stringify(r),/SECRET_INTERNAL_PATH|PRIVATE_NATIVE/);
+ }
+});
+test('missing variables distinguish standard fixed scope candidate without granting authority',()=>{
+ const env=roots();
+ delete env.ZGMINI_CI_NATIVE_SCOPE_ROOT;
+ const hint={state:'ROOT_PRESENT_UNVERIFIED',
+  effects:{A_READONLY:{scopeFile:'PRESENT_UNVERIFIED',installedProofFile:'ABSENT'},
+   B_WRITER_SOURCE:{scopeFile:'ABSENT',installedProofFile:'ABSENT'}},
+  executionAuthorized:false,operationalWrites:0};
+ let calls=0;
+ const out=inspectCiNativePublisherLocalReadonly({env,
+  inspectStandardScope:()=>{calls++;return hint;},
+  createPorts:()=>assert.fail('unconfigured roots must not read installed policy')});
+ assert.equal(calls,1);
+ assert.equal(out.code,'CI_NATIVE_LOCAL_ROOTS_NOT_CONFIGURED');
+ assert.deepEqual(out.standardScopeCandidate,hint);
+ assert.equal(out.independentRootsVerified,false);
+ assert.equal(out.independentGitHubInstallationReceiptVerified,false);
+ assert.equal(out.canExecute,false);
+ assert.equal(out.canPublish,false);
+ assert.equal(out.canInstall,false);
+ assert.doesNotMatch(JSON.stringify(out),/E:\\\\|SECRET_|PRIVATE_NATIVE/);
+});
+test('standard candidate probe uses only fixed Windows lstat metadata, never file contents',()=>{
+ const observed=[];
+ const files=new Set(['ci-native-a-approved.json','ci-native-a-installed-proof.json',
+  'ci-native-writer-b-approved.json','ci-native-writer-b-installed-proof.json']);
+ const filesystem={
+  lstatSync:p=>{
+   observed.push(p);
+   const name=path.win32.basename(p);
+   if(files.has(name))return {
+    isDirectory:()=>false,isSymbolicLink:()=>false,isFile:()=>true,size:24};
+   return {isDirectory:()=>true,isSymbolicLink:()=>false,isFile:()=>false};
+  },
+  readFileSync:()=>assert.fail('contents must not be read'),
+  readdirSync:()=>assert.fail('no directory listing'),
+  writeFileSync:()=>assert.fail('no writes')
+ };
+ const v=inspectStandardNativeScopeCandidate({platform:'win32',filesystem});
+ assert.equal(v.state,'ROOT_PRESENT_UNVERIFIED');
+ assert.equal(v.effects.A_READONLY.scopeFile,'PRESENT_UNVERIFIED');
+ assert.equal(v.effects.B_WRITER_SOURCE.installedProofFile,'PRESENT_UNVERIFIED');
+ assert.equal(v.executionAuthorized,false);
+ assert.equal(v.operationalWrites,0);
+ assert.equal(observed.length,9); // five ancestor directories + four fixed files
+ assert.ok(observed.every(p=>p.startsWith('E:\\\\')));
+ assert.equal(observed.filter(p=>files.has(path.win32.basename(p))).length,4);
+ assert.doesNotMatch(JSON.stringify(v),/E:\\\\|ci-native-a-approved|ci-native-writer-b-approved/);
+});
+test('standard scope candidate absence, reparse points and wrong host stay non-authorizing',()=>{
+ const missing={code:'ENOENT'};
+ const absent=inspectStandardNativeScopeCandidate({platform:'win32',
+  filesystem:{lstatSync:()=>{throw missing;}}});
+ assert.equal(absent.state,'ROOT_ABSENT');
+ const alias=inspectStandardNativeScopeCandidate({platform:'win32',
+  filesystem:{lstatSync:()=>({isDirectory:()=>true,isSymbolicLink:()=>true})}});
+ assert.equal(alias.state,'ROOT_UNVERIFIED');
+ const nonWindows=inspectStandardNativeScopeCandidate({platform:'linux',
+  filesystem:{lstatSync:()=>assert.fail('no non-Windows probe')}});
+ assert.equal(nonWindows.state,'NOT_CHECKED_NON_WINDOWS');
+ for(const v of [absent,alias,nonWindows]){
+  assert.equal(v.executionAuthorized,false);
+  assert.equal(v.operationalWrites,0);
  }
 });
 test('unverified or overlapping roots fail closed without exposing filesystem error',()=>{
