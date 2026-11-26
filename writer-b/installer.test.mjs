@@ -633,6 +633,38 @@ test('second safe idle observation may defer, without a third try or source swit
  assert.equal(state.coreEnabled,true);assert.equal(state.retained,false);
 });
 
+test('pre-pause race code cannot authorize retry after partial Task disable',async()=>{
+ const {io,state}=mockIO();let attempts=0;
+ const verify=io.verifyOriginalState;
+ io.pauseCore=async()=>{
+  attempts++;state.steps.push('pause-partial');
+  state.coreEnabled=false;
+  throw Object.assign(new Error('Task changed despite race indication'),
+   {code:'WRITER_B_CORE_PREPAUSE_RACE_DEFERRED'});
+ };
+ let firstVerification=true;
+ io.verifyOriginalState=async(...args)=>{
+  if(firstVerification){
+   firstVerification=false;
+   state.steps.push('original-changed');
+   assert.equal(state.coreEnabled,false);
+   throw Object.assign(new Error('Task no longer enabled'),
+    {code:'WRITER_B_ORIGINAL_STATE_STOP'});
+  }
+  return verify(...args);
+ };
+ const out=await performWriterBInstall(auth(),io);
+ assert.equal(out.status,'WRITER_B_INSTALL_STOP_RESTORED');
+ assert.equal(out.code,'WRITER_B_ORIGINAL_STATE_STOP');
+ assert.equal(out.recovery,'ORIGINAL_VERIFIED');
+ assert.equal(attempts,1);
+ assert.equal(state.steps.includes('original-changed'),true);
+ assert.equal(state.steps.filter(x=>x==='window-final').length,1);
+ assert.equal(state.steps.includes('switch'),false);
+ assert.equal(state.coreEnabled,true);
+ assert.equal(state.retained,false);
+});
+
 test('reserved Core maintenance never extends its separately approved hold',async()=>{
  const {io,state}=mockIO();let attempts=0;
  io.pauseCore=async()=>{
