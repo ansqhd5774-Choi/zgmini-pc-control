@@ -437,3 +437,36 @@
 - 별도 S6 소스 main 변경 `d2e8fece77c8aa01cf54669800e0a36154e8e2d1`은 4개 maintenance 파일이고 native PR 변경 8파일과 분리 확인; 변경 보존.
 - 기존 PC 운영 A [Run 45883221676](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45883221676) Job 140127435932도 `queued`/runner_id 0으로 실제 Native 설치·활성 Scope readback 불가; 무인 운영 완료 **0/3** 유지.
 - 다음 필수 실행: 같은 C996 정확 HEAD 종료 확인 → 3/3 성공 시 #4088 squash merge 및 main blob 재조회 → 유효 기존 승인 정책과 실제 Runtime에서의 각 효과 종단 실증. `queued` 상태에서 수동 검사 완화나 중복 작업 생성 금지.
+
+## 18. 열네 번째 실행 기록 — 2026-11-27 KST
+
+### 이벤트 기반 A/Writer B 자연 CI 발행 소스 통합 완료
+
+- [PR #4088](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4088) 정확 최종 HEAD **`535f38c3584ec81d4f4eddfd33ecdd6599a62ff5`**.
+- 세 CI의 정확한 commit `head_sha`, `completed/success`를 각각 GitHub Actions Run 원본으로 확인:
+  - Windows Source [45888855283](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45888855283) **SUCCESS**, native Publisher/Dispatch/Receiver 정규 회귀시험 포함
+  - Secret Scan [45888855329](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45888855329) **SUCCESS**
+  - C996 [45888855342](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45888855342) **SUCCESS**
+- 정확 HEAD CI 3/3 이후 정규 squash **main 병합 `5b8c751d4c8b711797c36b1a461b543abc11298e`**, PR `closed/merged` 및 main HEAD 확인. S6 변경 `d2e8fece77c8aa01cf54669800e0a36154e8e2d1` 보존.
+- main 8개 파일 readback blob:
+  - `ci-approval/native-publisher-entry.mjs` `d2a6f9c33ba45a78dcff09460ea0042791baad47`
+  - `ci-approval/native-dispatch.mjs` `c32743e9c8db2c7b5b4b94064976bbb591a22b76`
+  - `ci-approval/native-receiver-observe.mjs` `c924982ba0766fd3e2341429952d3b54b473bb25`
+  - `ci-approval/native-receiver-contract.mjs` `b9690c22cffd1e18ea529c210bb7fe6bcb8854dc`
+  - `tests/ci-native-dispatch.test.mjs` `43c6f96e1dc7b7f3e1f3eeee6908d181dced4618`
+  - `tests/ci-native-publisher-entry.test.mjs` `b3b827da64613a43f673e2c12ac88b4f381695a4`
+  - `tests/ci-native-receiver-observe.test.mjs` `da867bd629f5c468f4dd8b11690331b931472535`
+  - `tests/ci-native-receiver-contract.test.mjs` `45f99107adbfbf5b7304770fc3c663631c7ee069`
+
+### 변경 경계 및 운영 잔여
+
+- 기존 고정 source Run 방식 및 Auth/Controller/Writer 효과·lease·CAS·rollback은 유지. 사전 승인 scope에서 선택한 `EVENT_COMPLETION_V1`에만 실제 완료 Run ID를 인증 결합해 매번 신뢰된 source SHA/workflow/approval/receiver pin을 검사한다.
+- 전체 설치된 B-native 정책의 실행 플래그·어댑터 SHA 등 필드와 발행 scope의 동등성 검증(`isDeepStrictEqual`). 승인 원문 SHA drift는 발행 **이전** 거부하여 단회 claim을 소모하지 않는다. 별도 승인 없이 새 권한 생성/활성화하지 않는다.
+- 운영 PC 설치·변수·독립 정책의 현재 readback은 미입증. 기존 운영 A [45883221676](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45883221676)는 앞선 관측에서 계속 `queued`/runner_id 0이었으며, 해당 실행을 다시 발행하지 않는다.
+- **종단 운영 완료율 A/Writer B/Controller B = 0/3**. PR·CI·GitHub 병합을 실PC 무인 실행 영수증으로 계산하지 않음.
+
+### 다음 필수 작업
+
+1. 기존 운영 A Run 및 실제 PC Native scope/독립 proof/승인 원문/설치 소스를 readback. 불가능하면 해당 효과의 미확인만 보류.
+2. 이미 승인된 운영 설치 권한이 정확히 입증되는 범위에서만 기존 정규 B(lease/CAS/백업/복구)로 실제 필요한 파일/정책을 설치하고 SHA·영구 결과 확인. 승인 없이 보안 변수나 C급 변경 금지.
+3. A, Writer B, Controller B의 자연 CI 완료→독립 승인 판정→정규 단회 발행→Windows 수신/실행→JSON/TXT 영구 영수증·원본 readback. 다른 범위의 S6 장애를 전역 완료 조건으로 확대하지 않음.
