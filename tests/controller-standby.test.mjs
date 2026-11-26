@@ -7,7 +7,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {decideStandbyPromotion as decide,watchdogIdentityMatches,
  verifyStandbySource} from '../controller/standby.mjs';
 import {assertSupervisorOwner} from '../controller/common.mjs';
-import {provenOldRunnerExit,classifyRunnerExecutableProof,verifiedColdStandbyStart,selectStandbyCandidate} from '../tools/runner-watchdog.mjs';
+import {provenOldRunnerExit,classifyRunnerExecutableProof,verifiedColdStandbyStart,selectStandbyCandidate,canReconcileExitedPendingPromotion} from '../tools/runner-watchdog.mjs';
 
 const eligible=()=>({
  sourceVerified:true,watchdogBound:true,supervisorLeasePresent:false,
@@ -35,6 +35,39 @@ test('unknown source, Watchdog, owner or children never promotes',()=>{
   assert.notEqual(decide(x),ok,key);
  }
 });
+test('exited standby promotion may clear the fence only with exact zero-owner and six-seat exit proof',()=>{
+ const pending={child:{pid:77101},promoting:true,ready:false,slot:1};
+ const heartbeat={pid:77000,children:Array.from({length:6},(_,i)=>({
+  seat:i+1,pid:77010+i
+ }))};
+ const proof='NO_CONTROLLER_RUNNER_PROCESS';
+ const stopped=()=>false;
+ const ok=opts=>canReconcileExitedPendingPromotion({
+  pending,owner:null,heartbeat,runnerExecutableProof:proof,pidAlive:stopped,...opts
+ });
+ assert.equal(ok(),true);
+ assert.equal(ok({pending:null}),false);
+ assert.equal(ok({pending:{...pending,promoting:false}}),false);
+ assert.equal(ok({pending:{...pending,child:{pid:0}}}),false);
+ assert.equal(ok({owner:{pid:77000}}),false);
+ assert.equal(ok({heartbeat:null}),false);
+ assert.equal(ok({heartbeat:{...heartbeat,children:heartbeat.children.slice(0,5)}}),false);
+ assert.equal(ok({runnerExecutableProof:'ACTIVE_RUNNER_PROCESS'}),false);
+ assert.equal(ok({runnerExecutableProof:'UNVERIFIED'}),false);
+ assert.equal(ok({pidAlive:pid=>pid===77101?true:false}),false);
+ assert.equal(ok({pidAlive:pid=>pid===77101?null:false}),false);
+ assert.equal(ok({pidAlive:pid=>pid===77000?true:false}),false);
+ assert.equal(ok({pidAlive:pid=>pid===77015?true:false}),false);
+ // The coordinator must not re-elect if it cannot prove this exact exit.
+ const source=fs.readFileSync(new URL('../tools/runner-watchdog.mjs',import.meta.url),'utf8');
+ assert.match(source,/const safe=canReconcileExitedPendingPromotion\(/);
+ assert.match(source,/if\(!safe\)\{\s*status\('BLOCKED_STANDBY_PROMOTION_OUTCOME_UNKNOWN'\);return;/);
+ assert.ok(source.indexOf('const safe=canReconcileExitedPendingPromotion(')<
+  source.indexOf('promotionPending=null;',source.indexOf('const safe=canReconcileExitedPendingPromotion(')));
+ assert.match(source,/if\(standbyMode&&!verifiedColdStandbyStart/);
+ assert.match(source,/scanControllerRunnersReadOnly\(\)!=='NO_CONTROLLER_RUNNER_PROCESS'/);
+});
+
 test('no second independent standby leader election or Runner launch',()=>{
  const src=fs.readFileSync(new URL('../controller/standby.mjs',import.meta.url),'utf8');
  assert.match(src,/typeof process\.send!=='function'/);
