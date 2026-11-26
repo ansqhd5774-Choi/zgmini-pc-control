@@ -550,3 +550,21 @@
 2. A·Writer B: 격리 PC native read-only scope + Owner-B installed proof + 저장된 request/approval SHA + 발행 영구 receipt root의 실존/신뢰/원본 readback 확인. 없으면 허위 정책 생성 금지; 해당 효과의 승인 범위/원본이 갖춰진 뒤에만 기존 Workflow 조건을 허용.
 3. Controller B: 현재 `approvedV2PinMatches=false`·`approvedReceiptGuardPinMatches=false`의 **설치/원본 정확 SHA 차이**를 승인된 읽기 경로로 구분하고 기존 Owner B 설치/승인 계약으로만 처리. 다른 B 효과와 공유 lease가 실제 충돌할 때만 직렬화.
 4. 검증 가능한 효과부터 자연 CI 완료 → exact dispatch/원장 → 운영 A·Writer/Controller B 실행 → 설치 SHA와 JSON/TXT remote 결과를 동일 requestId/effect에 대조. 각 효과 종료 PASS만 실제 1/3 카운트.
+
+## 22. 열여덟 번째 실행 기록 — 운영 A 정책 CAS 실측 및 이전 핀 판정 정정 (2026-11-27 KST)
+
+### 운영 Runner 복구 후 추가 원본 증거
+- 기존 총괄의 독립 A #4092 [Run 45896563100](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45896563100) `results/pc-process-inventory-45896563100-1-operating.json/.txt`: `READ_ONLY_OBSERVED/S6_ONCE_JOURNAL_PHASE_OBSERVED`, 운영 `zgmini-pc-05`, 원본 claim 존재, journal `RECOVERY_REQUIRED`/`WATCHDOG_RELEASE_OUTCOME_UNVERIFIED`/`S6_PORT_PROMOTION_UNVERIFIED`, `leaseReleaseAcknowledged=true`, `backlogState=RESUMED`, `successEstablished=false`, `originalRequestRetried=false`. Git blob JSON `681976a4681d44f34f831b57bc231b2e507c8a8f`, TXT `9343616c9a498675eef3e1303c0deeacd369cbcd`. Runner 재연결과 S6 과거 승격 완료 구분, 총괄 원본 CAS 복구 권한 보존.
+- 운영 복구 뒤 실제 #4080 [Run 45883221676](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45883221676) `PASS/PROCESS_INVENTORY_COLLECTED`: `zgmini-pc-01..06` 6 Online, Supervisor heartbeat/identity 정상, Controller SHA `3c7d4cfefacf072fd35cb19706b352c64c5e4fd2`, 유지보수기 source `5a85f803fd9cb280561395f88a3544ee8e7d4660`, lease 없음, Workflow active. 이 증거는 Native 자동화 B 승인 영수증이 아니다.
+
+### Controller B 설치 승인 진단 오류의 정확한 구분
+- 이전 §21에 적힌 `#4080 ciControllerBReceiver.approvedV2PinMatches=false`, `approvedReceiptGuardPinMatches=false`는 **현재 설치 정책의 무효 판정이 아니며**, `tools/pc-process-inventory-readonly.mjs::inspectCiControllerBReceiverReadOnly`에 하드코딩된 **두 과거 설치 버전** `08c0df1c...`/`73f70de9...` 및 당시 Workflow blob을 대상으로 하는 비교값이다. `executionAuthorized=false`는 이 **읽기 전용 응답의 고정 필드**이지 검증된 실제 보안 권한 무효 사건의 리턴이 아니다.
+- 앞선 독립 A #4025 [Run 45870801994](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45870801994), 원본 `results/pc-process-inventory-45870801994-1-operating.json/.txt`: `PASS/CI_POLICY_CAS_READONLY_OBSERVED`; 실설치 maintainer `5a85f803fd9cb280561395f88a3544ee8e7d4660`, 설치 manifest SHA256 `0e1903fd9052b1e2c72812fde07c6338a79287e673a4cd9e715dedf23883f589`, workflowId `430972394`, 설치 정책 blob `27e48ecde81bdf6f15cccffcffd9b3e70482a5f3`, enabled shape PASS. 같은 blob은 현재 `main`의 `.github/workflows/ci-approval-controller-b.yml`과 정확 일치하며 승인 명세 `approvals/maintenance-handoffs/5a85f803fd9cb280561395f88a3544ee8e7d4660.json`과도 일치한다.
+- 다만 #4025은 S6 #4069 이전이므로 **현재 설치 manifest 바이트 동일성은 미확인**. 사용자 지시 범위의 고정 A [#4100](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4100), requestId `62d2bc4c-412a-4c56-a943-bdfc0479f019`, operation `process-inventory-readonly`, probe `ci-controller-b-policy-cas-readonly`를 **1회** 발행. [Run 45897081642](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45897081642) 등록, 운영 Reader 실제 실행 확인, 최초 조회 당시 `in_progress`; 최종 JSON/TXT·현재 manifest SHA 결과는 아직 반환되지 않았으므로 PASS/FAIL을 만들지 않는다. 중복 요청·재시도 금지.
+- 별도 격리 PC 자동 발행 진단 #4029 [Run 45871432737](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45871432737): `CI_CONTROLLER_B_AUTO_POLICY_NOT_CONFIGURED`, `ZGMINI_CI_CONTROLLER_B_ENABLED=false`, `policyConfigured=false`, 독립 Owner 업무 허가 미입증. 이는 **현재 검증 가능한 자동 B 발행 차단 범위**로, 설치 정책 CAS PASS와 별개의 효과다. 현 시점 활성화 변수 값 직접 readback은 없으며 과거 결과와 Source skip만 이용해 현재 상태를 단정하지 않는다.
+- Native A·Writer B 별도 격리 `ZGMINI_CI_NATIVE_SCOPE_ROOT`/영구 영수증 root의 실제 설치 원본과 독립 B proof readback은 미확인. GitHub `main`의 자동화 Source 병합·CI PASS는 보존하며 별도 새로운 비즈니스 권한/설치 증명을 제조하지 않는다.
+
+### 다음 실제 실행
+1. **기존 #4100 Run 45897081642** 완료를 확인해 소진된 A의 JSON/TXT·source SHA·raw manifest SHA와 #4025를 대조하고 변경이면 원본 설치 계약으로만 분기한다.
+2. Controller B Publisher: 기존 owner-approved business grant와 정확 GitHub 변수 및 격리 PC 정책 구성의 readback을 공식 승인 경로로 확인, 새 효과/보안 권한을 임의 생성하지 않는다.
+3. Native A/Writer B: 격리 PC read-only 정책/설치 proof/claim roots의 실제 preimage가 확보된 뒤에만 독립 실행 권한 평가; 동일 Run 재발행 금지. 각 효과별 자동 CI→단회 발행→Windows 실행→JSON/TXT 결과가 실제로 성립할 때에만 운영 0/3을 올린다.
