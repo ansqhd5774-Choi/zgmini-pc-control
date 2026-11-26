@@ -6,8 +6,8 @@ import {
  PROTECTION_POLICY,error,exact
 } from './contract.mjs';
 
-export const R4_TARGET='c0c4dcff6c8071b1318cca956e43ba82718c4975';
-export const R4_SOURCE_SHA256='4029b768d8dcbb75353106b761b5da672433e693a8be033411c62abebfd27470';
+export const R4_TARGET='f9c2760ae92ce98ca20784e4a26150edbd0e3578';
+export const R4_SOURCE_SHA256='9150a024bcb979b69a9d908c75b8eb7cec6794d22506384a28b64a722074951b';
 export const R4_PREIMAGE_SHA256='3f99ea3357c6731cc9000bde1273db915cb07ba5fa480718194deb6330c29072';
 export const R4_INSTALL_PREIMAGE_SHA256='28c8017d469a0e2b13af96e01e686bae874d174b1ddac9e6a170ee2487bd6829';
 export const R4_MANIFEST_SCHEMA='ZGMINI_PC_WATCHDOG_B_MANIFEST_V4';
@@ -17,6 +17,7 @@ export const R4_STANDBY=Object.freeze({mode:'ACTIVE_1_STANDBY_1',approved:true})
 export const R4_CONTROLLER_FILES=Object.freeze({
  'controller/common.mjs':'91e4ceb5d26412893cc047670a420338aa8ef293e95498f852ac0a2f5edd6cc6',
  'controller/engine.mjs':'6112b5a357d6ecba2ffb299857c2649ee51ca97e1e7755162efd69337976769f',
+ 'controller/operations.mjs':'d4a76910806cba861b3253f5fd24eccc8968fcbaa66133999483034b2f661cd3',
  'controller/entry.mjs':'407ea8693ab48a03b04ec77fe63f86d05537a37661b42c9ddcd55f5b36aa01d7',
  'controller/supervisor.mjs':'5ec0952872adcaa16eb14adec614f024bac7264deb5b59fb68b9080f0edb0344',
  'controller/standby.mjs':'e18c09b7e9b90fc483d5200e1e0c4741d2e4f93e049328566d710e37c21be7e7'
