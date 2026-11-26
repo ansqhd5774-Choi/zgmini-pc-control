@@ -144,3 +144,23 @@ test('read-only A cannot report PASS if actual worker wrote D1 or operational fi
  }})});
  assert.equal(r.code,'CI_NATIVE_A_UNEXPECTED_WRITE_OR_PROVIDER_EFFECT');
 });
+
+for(const [reason,change] of [
+ ['missing installed execution SHA',r=>{delete r.actualExecutionSha}],
+ ['stale installed execution SHA',r=>{r.actualExecutionSha='d'.repeat(40)}],
+ ['missing protected-state verification',r=>{delete r.protectedStateUnchanged}],
+ ['observed protected-state drift',r=>{r.protectedStateUnchanged=false}],
+ ['wrong run receipt job ID',r=>{r.jobId='run-999999-1-seat-1'}]
+])test('native A refuses forged PASS provenance: '+reason,async()=>{
+ const x=make();
+ const r=await runNativeAReadOnly({...x,executeJob:async raw=>{
+  const report={schema:'ZGMINI_PC_RESULT_V1',requestId:raw.requestId,
+   operation:raw.operation,status:'PASS',code:'RUNNER_COMMAND_EXECUTED',
+   jobId:'run-110004-1-seat-1',actualExecutionSha:x.host.controllerSourceSha,
+   protectedStateUnchanged:true,providerCalls:0,d1Writes:0,operationalWrites:0};
+  change(report);return {report};
+ }});
+ assert.equal(r.state,'BLOCKED');
+ assert.equal(r.code,'CI_NATIVE_A_PASS_PROVENANCE_UNVERIFIED');
+ assert.equal(r.sanitized,undefined);
+});
