@@ -167,7 +167,7 @@
 - 원본 source Workflow의 SHA-1 Git blob 및 raw content를 해당 `head_sha`에서 다시 읽어 고정한다. 신뢰 설치 readback의 12개 주요 필드와 기 설정 정책을 대조하며 위조 승인·source run·path를 거부한다.
 - `workflow_dispatch` 응답은 구형 204(실행 ID 없음) 및 2026-03-10 API의 200(정확 `workflow_run_id`, API URL, HTML URL)만 허용한다. 발행 결과가 확인되어도 **PC 실행 성공은 별도 증거**다. [공식 GitHub 변경 기록](https://github.blog/changelog/2026-02-19-workflow-dispatch-api-now-returns-run-ids/).
 - 기존 A/Writer Owner-only workflow·PC Runner 권한·설치 정책·운영 DB·D1·예약 **변경 없음**. 신규 readback 전송 함수는 실제 Workflow/PC측 receiver 연결이 없으므로 운영 호출 0.
-- 이번 HEAD **`dee4fa414b94777156817a28dd9a95872b2bd00a`**, 신규 GitHub CI Run C996 **#45878463061**, Controller Source **#45878463073**, Secret Scan **#45878463236** (아직 확정되지 않은 상태; PASS 주장 금지). 로컬 기존 22개 시험에 추가로 소스 Pin·설치 인수 인증 등 9개 테스트를 추가했다. **GitHub CI 전체 결과를 이 파일럿의 합격 기준**으로 사용한다.
+- 이번 HEAD **`dee4fa414b94777156817a28dd9a95872b2bd00a`**, 신규 GitHub CI Run C996 **#45878463061**, Controller Source **#45878463073**, Secret Scan **#45878463236** (2026-11-27 KST 최신 확인: Secret Scan **SUCCESS**, C996·Controller Source는 **QUEUED**; 3/3 확인 전 병합·운영 완료 주장 금지). 로컬 기존 22개 시험에 추가로 소스 Pin·설치 인수 인증 등 9개 테스트를 추가했다. **GitHub CI 전체 결과를 이 파일럿의 합격 기준**으로 사용한다.
 
 ### 남은 실제 구현 순서
 
