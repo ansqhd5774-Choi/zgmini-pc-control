@@ -116,6 +116,11 @@ export async function runNativeAReadOnly({observation,scope,host,controllerPolic
     report.operation!==admission.operation||
     !['PASS','FAIL','BLOCKED','STATE_UNKNOWN'].includes(report.status))
   return failed('CI_NATIVE_A_RESULT_UNVERIFIED');
+ // An engine reporting PASS with unexpected operational/provider writes is
+ // not a verified read-only A completion, even if the fixed Worker exited 0.
+ if(report.status==='PASS'&&
+    (report.operationalWrites!==0||report.providerCalls!==0||report.d1Writes!==0))
+  return failed('CI_NATIVE_A_UNEXPECTED_WRITE_OR_PROVIDER_EFFECT');
  return Object.freeze({state:report.status,code:report.code,
   canExecute:false,operationalWrites:report.operationalWrites??0,
   sanitized:Object.freeze({
