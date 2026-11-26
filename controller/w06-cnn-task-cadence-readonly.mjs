@@ -1,11 +1,89 @@
 // W06 fixed read-only Windows Task cadence/action evidence. No Task mutation,
-// provider, SQLite, D1 or launch of any Task action. Never return raw actions.
+// provider calls, SQLite/D1 writes or Task launches. Never return raw actions.
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {DatabaseSync} from 'node:sqlite';
 import {createHash} from 'node:crypto';
 import {decodeTaskXmlBytes} from '../writer-b/windows-guards.mjs';
 import {hasOnlyApprovedMinuteTrigger,hasOnlyApprovedSingleExec} from '../task-create-b/windows-adapter.mjs';
+
+
+// Local PC SQLite-only HTTP evidence, independent of D1 publication and Task
+// Scheduler success. No provider calls, schema writes or raw payload output.
+const CNN_HTTP_DB=String.raw`E:\ZGmini\data\pc-writer\storage\core.sqlite`;
+const CNN_ACTIVATED_UTC=Date.parse('2026-11-26T15:04:00.000Z');
+const CNN_HTTP_SQL="SELECT snapshot_key,body FROM public_feed_snapshots_v1 WHERE kind='input' AND feed_key='fear-greed-http-checks' AND snapshot_key IN (?,?) ORDER BY snapshot_key ASC LIMIT 2";
+const isoMs=n=>Number.isSafeInteger(n)&&n>0&&n<=8.64e15?
+ new Date(n).toISOString():null;
+export function projectW06HttpChecksReadonly(rows,{observedAtMs}={}){
+ const empty={status:'UNVERIFIED',code:'CNN_HTTP_LOCAL_CHECK_UNVERIFIED',
+  sqliteOpened:true,twoDayCount:null,afterActivationCount:null,
+  recentTenMinutesCount:null,verifiedCount:null,verifiedAfterActivation:null,
+  http2xxCount:null,http429Count:null,http5xxCount:null,fetchFailedCount:null,
+  latestCheckedAt:null,latestVerifiedAt:null,latestHttpStatus:null,
+  latestOutcome:null,providerCalls:0,sqliteWrites:0,d1Writes:0};
+ if(!Number.isSafeInteger(observedAtMs)||observedAtMs<=CNN_ACTIVATED_UTC||
+  !Array.isArray(rows)||rows.length>2)return empty;
+ const utcDay=new Date(observedAtMs).toISOString().slice(0,10);
+ const prevDay=new Date(observedAtMs-86400000).toISOString().slice(0,10);
+ const dates=new Set([prevDay,utcDay]),seenDates=new Set(),checks=[];
+ try{
+  for(const row of rows){
+   if(typeof row?.snapshot_key!=='string'||!dates.has(row.snapshot_key)||
+    seenDates.has(row.snapshot_key)||typeof row.body!=='string'||
+    Buffer.byteLength(row.body,'utf8')>700000)throw Error('SHAPE');
+   seenDates.add(row.snapshot_key);
+   const parsed=JSON.parse(row.body);
+   if(parsed?.version!=='CNN_HTTP_CHECKS_R1'||parsed.date!==row.snapshot_key||
+    !Array.isArray(parsed.checks)||parsed.checks.length>1500)throw Error('SHAPE');
+   for(const x of parsed.checks){
+    if(!isoMs(x?.requestedAt)||!isoMs(x?.checkedAt)||
+     x.checkedAt<x.requestedAt||x.checkedAt>observedAtMs+300000||
+     new Date(x.checkedAt).toISOString().slice(0,10)!==row.snapshot_key||
+     !['FETCH_FAILED','HTTP_FAILED','INVALID_OUTPUT','VERIFIED'].includes(x.outcome)||
+     (x.outcome==='FETCH_FAILED'?x.httpStatus!==null:
+      !Number.isInteger(x.httpStatus)||x.httpStatus<100||x.httpStatus>599))
+     throw Error('CHECK');
+    checks.push({checkedAt:x.checkedAt,httpStatus:x.httpStatus,outcome:x.outcome});
+   }
+  }
+ }catch{return empty}
+ checks.sort((a,b)=>a.checkedAt-b.checkedAt);
+ const last=checks.at(-1),verified=checks.filter(x=>x.outcome==='VERIFIED');
+ return {...empty,status:'READ',code:'CNN_HTTP_LOCAL_2DAY_READ',
+  twoDayCount:checks.length,
+  afterActivationCount:checks.filter(x=>x.checkedAt>=CNN_ACTIVATED_UTC).length,
+  recentTenMinutesCount:checks.filter(x=>x.checkedAt>=observedAtMs-600000).length,
+  verifiedCount:verified.length,
+  verifiedAfterActivation:verified.filter(x=>x.checkedAt>=CNN_ACTIVATED_UTC).length,
+  http2xxCount:checks.filter(x=>x.httpStatus>=200&&x.httpStatus<300).length,
+  http429Count:checks.filter(x=>x.httpStatus===429).length,
+  http5xxCount:checks.filter(x=>x.httpStatus>=500&&x.httpStatus<600).length,
+  fetchFailedCount:checks.filter(x=>x.outcome==='FETCH_FAILED').length,
+  latestCheckedAt:isoMs(last?.checkedAt),latestVerifiedAt:isoMs(verified.at(-1)?.checkedAt),
+  latestHttpStatus:last?.httpStatus??null,latestOutcome:last?.outcome??null};
+}
+export function inspectW06HttpChecksReadonly({filesystem=fs,connect=p=>
+ new DatabaseSync(p,{readOnly:true,timeout:1000}),clock=Date.now}={}){
+ const failure=c=>({status:'UNVERIFIED',code:c,sqliteOpened:false,
+  providerCalls:0,sqliteWrites:0,d1Writes:0});
+ let db;
+ try{
+  const stat=filesystem.lstatSync(CNN_HTTP_DB);
+  if(!stat.isFile()||stat.isSymbolicLink()||stat.size<1)
+   return failure('CNN_HTTP_DB_UNSAFE');
+  db=connect(CNN_HTTP_DB);
+  db.exec('PRAGMA query_only=ON');
+  const observedAtMs=clock();
+  if(!Number.isSafeInteger(observedAtMs))return failure('CNN_HTTP_CLOCK_UNVERIFIED');
+  const day=new Date(observedAtMs).toISOString().slice(0,10);
+  const prev=new Date(observedAtMs-86400000).toISOString().slice(0,10);
+  const rows=db.prepare(CNN_HTTP_SQL).all(prev,day);
+  return projectW06HttpChecksReadonly(rows,{observedAtMs});
+ }catch{return failure('CNN_HTTP_DB_READ_UNVERIFIED')}
+ finally{try{db?.close()}catch{}}
+}
 
 export const PROBE='w06-cnn-task-cadence-readonly';
 const TASK_B='ZGMINI-PC-CNN-Minute';
@@ -222,7 +300,7 @@ export function inspectW06TaskCadenceReadonly({platform=process.platform,
  try{
   const projected=projectW06TaskCadence(JSON.parse(observed.stdout.replace(/^\uFEFF/,'').trim()));
   if(projected.tasks?.some(x=>x.name===TASK_B))
-   return {...projected,taskRecovery:inspectW06TaskBRecoveryReadonly({systemRoot})};
+   return {...projected,taskRecovery:inspectW06TaskBRecoveryReadonly({systemRoot}),cnnHttpChecks:inspectW06HttpChecksReadonly()};
   return projected;
  }
  catch{return failure('W06_TASK_PROBE_PARSE_INVALID');}
