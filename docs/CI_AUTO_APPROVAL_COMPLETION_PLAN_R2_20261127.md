@@ -381,3 +381,26 @@
 1. 기존 현재 운영 PC 읽기 전용 Run 및 원장을 회수해 설치 유지보수기 `tools/maintenance-agent.mjs`의 실제 런타임 SHA, 독립 Native Scope/proof, GH 활성화 변수, effect별 기존 업무 승인 원문을 확인한다. 현재 미접수 Runner Job은 중복 발행하지 않는다.
 2. 인증된 PC B 설치·Scope 설정이 기존 승인 범위와 정확히 맞는 경우에만 기존 정규 승인/CAS/백업/복귀 절차로 적용하고 설치·결과 JSON/TXT readback 후 운영 소스 버전을 확정한다. C/새 보안 권한/승인 외 효과는 사용자 추가 승인 없이는 실행하지 않는다.
 3. A/Writer B/Controller B의 자연 CI 완료→기존 승인 판정→정규 단회 제출→PC 실행→저장·영수증 종단 검증. 현재 실증이 없는 유형은 미완료로 유지한다.
+
+## 17. 열세 번째 실행 기록 — 2026-11-27 KST
+
+### 현재 운영·CI 진단
+
+- 운영 A Run [45883221676](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45883221676) Job 140127435932 `queued`, runner_id=0, runner_name 없음. PC Runtime 설치 SHA·Native Scope·활성화 설정은 아직 실측 불가. 원래 A 요청을 중복 발행하지 않음.
+- #4078은 `pc-job` Workflow Run 미생성, #4082는 Run 생성 뒤 `queued/pending`; 둘을 동일 장애 원인으로 합치지 않으며 S6의 workflow pause는 journal 없이는 미입증.
+- 최신 main에서 시작: `a9c974ff32f91878fcf7f42c4afb2e997973a0a6`; 다른 담당자의 S6 #4087 공유 쓰기와 무관한 Native 소스만 변경.
+
+### 신규 실제 코드 결함 — 미래 CI Run ID 사전 고정 불가능
+
+- 기존 Native A/Writer 발행 정책은 설치 시 `sourceRunId`를 요구하면서 오직 **CI 완료 이벤트**에서 자동 발행한다. 새 Run ID는 실행 생성 이후에 결정되므로, 이미 지난 완료 이벤트에 맞추어 정책을 설치하는 방식으로는 완전 자동 운용이 연결되지 않는다.
+- [PR #4088](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4088), 전용 소스 브랜치 `codex/ci-native-event-run-bind-20261127`, HEAD `fb0fe5fedf337b5f509ab920aaa2e80e54af0142`.
+- 기존 고정 Run-ID 모드는 유지하고 명시 사전 설치 승인 정책 `sourceRunMode: EVENT_COMPLETION_V1`에서만 Run ID를 제외한다. source commit SHA, CI Workflow ID/path/blob, 승인 원문 SHA256, 요청 SHA256, receiver blob/revision은 독립 B 승인 정책에 고정한다.
+- 실제 `workflow_run.completed`의 repository/actor/commit/workflow/first attempt/success를 먼저 검증한 뒤 실제 Run ID를 메모리에서 바인딩한다. 기존 REST 원문 재조회·독립 설치 proof·단회 effect-key 영구 claim을 사용하고 receiver에서 GitHub Bot 원본·입력·소스 Run과 workflow blob을 재검증한다. 허위·범위 외·중복 효과는 거부.
+- 변경 8파일(기존 Native 발행·디스패치·수신 4 + 관련 회귀시험 4), GitHub 변수, 운영 소스, PC Task, DB, 예약, 신규 승인·요청 없음.
+- 정확 HEAD CI: Windows Source [45888064051](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45888064051), C996 [45888063831](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45888063831), Secret Scan [45888063915](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45888063915), 최초 확인 시 `queued`, 병합 아님.
+
+### 다음
+
+1. #4088 정확 HEAD CI 3/3 확인; 실패 시 실제 원인 최소 수정, 성공 시 main 병합 및 blob readback.
+2. 기존 정규 A 운영 Run에서 PC 설치/정책 source를 확보하고 사용 가능한 승인 Scope만 실제 활성화; 정책 코드가 자동으로 승인 원본을 생성하는 것으로 해석하지 않는다.
+3. 승인된 A/Writer/Controller B 각 자연 CI 완료→정규 단회 제출→PC 실행·사후 검사→원격 JSON/TXT readback. 현재 무인 운영 완료율 **0/3**.
