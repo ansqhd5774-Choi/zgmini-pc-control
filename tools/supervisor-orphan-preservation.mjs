@@ -18,7 +18,7 @@ export function assessOrphanRunnerPreservation({supervisorOwner,supervisorAlive,
  // Controller-specific classification. Bare process counts are insufficient.
  if(!rows||rows.schema!=='ZGMINI_R3_STANDBY_RUNNER_WMI_A_V1'
    ||rows.evidence!=='SINGLE_INSTANT_WMI_NOT_PROMOTION_AUTHORIZATION'
-   ||rows.controllerListenerCount!==6||rows.controllerWorkerCount<0
+   ||rows.controllerListenerCount!==6||!Number.isSafeInteger(rows.controllerWorkerCount)||rows.controllerWorkerCount<0
    ||rows.unknownPathCount!==0||rows.unknownListenerCount!==0
    ||rows.unknownWorkerCount!==0||rows.missingWmiPathCount!==0
    ||rows.nonAbsoluteWmiPathCount!==0||rows.canonicalizationFailedCount!==0
