@@ -12,6 +12,7 @@ import {collectAutomationStatus} from './automation-status.mjs';
 import {installedControllerBPolicy} from './maintenance-contract.mjs';
 import {inspectCiControllerBReceiptRootReadonly} from './ci-controller-b-receipt-root-readonly.mjs';
 import {inspectCiControllerBActivationReadonly} from './ci-controller-b-activation-readonly.mjs';
+import {inspectCiNativePublisherLocalReadonly} from './ci-native-publisher-local-readonly.mjs';
 import {inspectReceiptCOperatorServiceReadonly,inspectReceiptCFixedPathsReadonly} from './ci-controller-b-c-operator-readonly.mjs';
 import {inspectProviderActivity} from '../controller/provider-activity-runtime-readonly.mjs';
 import {inspectHttp32TwoHostCheckpoints} from '../controller/http32-two-host-checkpoints-readonly.mjs';
@@ -91,6 +92,7 @@ const S6_CURRENT_MAINTAINER_SOURCES=new Set([
 const R4_GUARDIAN_ORIGIN_PROBE='controller-standby-r4-guardian-origin-readonly';
 const CI_RECEIPT_ROOT_PROBE='ci-controller-b-receipt-root-readonly';
 const CI_CONTROLLER_B_ACTIVATION_PROBE='ci-controller-b-activation-readonly';
+const CI_NATIVE_PUBLISHER_LOCAL_PROBE='ci-native-publisher-local-readonly';
 const CI_CONTROLLER_B_POLICY_CAS_PROBE='ci-controller-b-policy-cas-readonly';
 // Existing A only: observe whether the same fixed WMI process-path query
 // used by the candidate Watchdog can classify installed Runner executables.
@@ -666,13 +668,14 @@ export function authenticateProcess(event,env,role){
  const isR4GuardianOrigin=withW05&&raw.probe===R4_GUARDIAN_ORIGIN_PROBE;
  const isCiReceiptRoot=withW05&&raw.probe===CI_RECEIPT_ROOT_PROBE;
  const isCiActivation=withW05&&raw.probe===CI_CONTROLLER_B_ACTIVATION_PROBE;
+ const isCiNativeLocal=withW05&&raw.probe===CI_NATIVE_PUBLISHER_LOCAL_PROBE;
  const isCiPolicyCas=withW05&&raw.probe===CI_CONTROLLER_B_POLICY_CAS_PROBE;
  const allowedOperatingProbe=isOperator||is2960||is3409||isEr1Postcheck||is3516||
   isD05Writer||isD05PrivateReceipt||isD05Theme||isD05Registration||is3160||
   isCnnStaticGuard||isCnnGitPredicates||isCnnBPins||isCnnBResources||
   isCnnBCore||isW06Task||isR3Watchdog||isR3Wmi||isR4Runtime||isR5Runtime||isS6Preimage||isS6NextPreimage||isS6Predrain||isS6Journal||isS6CurrentJournal||isS6ReceiverLedger||isR4GuardianOrigin||isCiPolicyCas;
  const acceptedProbe=(role==='operating'&&allowedOperatingProbe)||
-  (role==='handoff'&&(isCiReceiptRoot||isCiActivation));
+  (role==='handoff'&&(isCiReceiptRoot||isCiActivation||isCiNativeLocal));
  if(!raw||(!basic&&!withJobs&&!withW05)||
    raw.schema!==SCHEMA||raw.operation!==ROLE_OPERATION||raw.role!==role||
    (withJobs&&role!=='operating')||
@@ -715,6 +718,7 @@ export function authenticateProcess(event,env,role){
   ...(isR4GuardianOrigin?{watchdogR4GuardianOrigin:true}:{}),
   ...(isCiReceiptRoot?{ciControllerBReceiptRoot:true}:{}),
   ...(isCiActivation?{ciControllerBActivation:true}:{}),
+  ...(isCiNativeLocal?{ciNativePublisherLocal:true}:{}),
   ...(isCiPolicyCas?{ciControllerBPolicyCas:true}:{})};
 }
 export function sanitizeProbe(raw){
@@ -3364,6 +3368,11 @@ export function collect(role,ctx,env=process.env){
   return {...base,status:observed.status,code:observed.code,
    ciControllerBPolicyCas:observed};
  }
+ if(ctx.ciNativePublisherLocal===true){
+  const observed=inspectCiNativePublisherLocalReadonly({env});
+  return {...base,status:observed.status,code:observed.code,
+   ciNativePublisherLocal:observed};
+ }
  if(ctx.ciControllerBActivation===true){
   const observed=inspectCiControllerBActivationReadonly({
    enabled:env.ZGMINI_CI_CONTROLLER_B_ENABLED,
@@ -3665,6 +3674,19 @@ export function toText(r){
    'watchdogManifestSha256='+(r.watchdogR3Preimage.manifestSha256??'UNKNOWN'),
    'watchdogSourceMatchesManifest='+r.watchdogR3Preimage.installedMatch
   ]:[]),
+  ...(r.ciNativePublisherLocal?[
+   'ciNativePublisherLocal='+r.ciNativePublisherLocal.code,
+   'ciNativePolicyRootConfigured='+r.ciNativePublisherLocal.scopeRootConfigured,
+   'ciNativeReceiptRootConfigured='+r.ciNativePublisherLocal.receiptRootConfigured,
+   'ciNativeRootsIndependent='+r.ciNativePublisherLocal.independentRootsVerified,
+   'ciNativeAPublisher='+r.ciNativePublisherLocal.publisherAOptIn,
+   'ciNativeWriterBPublisher='+r.ciNativePublisherLocal.publisherWriterBOptIn,
+   'ciNativeAExecution='+r.ciNativePublisherLocal.executionAOptIn,
+   'ciNativeWriterBExecution='+r.ciNativePublisherLocal.executionWriterBOptIn,
+   'ciNativeAScope='+r.ciNativePublisherLocal.effects.A_READONLY.code,
+   'ciNativeWriterBScope='+r.ciNativePublisherLocal.effects.B_WRITER_SOURCE.code,
+   'ciNativeIndependentReceiptVerified=false',
+   'ciNativeExecutionAuthorized=false']:[]),
   ...(r.ciControllerBActivation?[
    'ciControllerBActivation='+r.ciControllerBActivation.code,
    'ciPublisherDisabled='+r.ciControllerBActivation.variableEnabledVerified,
