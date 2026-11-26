@@ -56,8 +56,9 @@ test('W06 proposed manifest contains exact pins but cannot authorize any Task in
  assert.equal(proposed.status,'PROPOSED_B');
  assert.equal(proposed.taskName,TASK);
  assert.equal(proposed.installedSourceSha,'393cee0da46515ff056543173fcd1253a858b3d7');
- assert.equal(proposed.candidateSourceSha,'b59930202eefc7f598ea9839fe24a7a0425e46b7');
- assert.equal(proposed.candidateFileSha256,'4b9a22d064cb4b489d3fc07c6cc2cfa1595770bd7011862a5879a5a8ce7550c9');
+ assert.equal(proposed.candidateSourceSha,'0bae713aa6df1f4c00037db908050c74ae3dd20c');
+ assert.equal(proposed.candidateFileSha256,'694474d9966ef0a06dd46bb5d5b684150c5d66b5fcf989501fc4f9aa1502a7e7');
+ assert.equal(proposed.launcherSha256,'73c8cf4381fd328182a9fad0a7cb5753cf9093e58524f0c9a04be4df7032d733');
  assert.equal(proposed.coreTaskXmlSha256,'dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028');
  assert.equal(proposed.sidecarSourceSha256,'eb3c43bf8fba6ea4e51f3e84b77f9ec13000db9d9e38077ffd914950d7080b6b');
  assert.equal(proposed.allowCnnHttpRequests,true);
