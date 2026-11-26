@@ -71,7 +71,7 @@ test('B: fixed template digest is independent of private principal and minute',(
  const replace=data=>Buffer.from(data,'utf16le');
  const alternate=replace(bytes.enabledXml.toString('utf16le')
   .replace('2026-11-26T12:35:00.000Z','2026-11-27T00:01:00.000Z')
-  .replace('PC\\\\test','OTHER\\\\name'));
+  .replace(/<UserId>[^<]+<\/UserId>/,'<UserId>OTHER_USER</UserId>')));
  assert.equal(normalizedW06TaskTemplate(bytes.enabledXml),
   normalizedW06TaskTemplate(alternate));
  const tampered=replace(bytes.enabledXml.toString('utf16le').replace('PT1M','PT5M'));
