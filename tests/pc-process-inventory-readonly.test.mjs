@@ -3075,6 +3075,72 @@ test('S6 A negative evidence returns bounded stage code without raw identity or 
  assert.equal(projectS6ApprovalPreimageReadonly(null).code,'S6_A_ROSTER_UNAVAILABLE');
 });
 
+import {projectS6ReceiverLedgerReadonly,inspectS6ReceiverLedgerReadonly}
+ from '../tools/pc-process-inventory-readonly.mjs';
+test('S6 original receiver #3947 and distinct one-shot claim correlate without replay authority',()=>{
+ const e=event(),body=JSON.parse(e.issue.body);
+ const scoped={...e,issue:{...e.issue,body:JSON.stringify({...body,
+  probe:'controller-s6-once-receiver-ledger-readonly'})}};
+ assert.equal(authenticateProcess(scoped,env,'operating').s6ReceiverLedger,true);
+ assert.throws(()=>authenticateProcess(scoped,env,'handoff'));
+ for(const extra of [
+  {path:'E:/private'},{requestIdTarget:'foreign'},
+  {probe:'controller-s6-once-receiver-ledger-readonly;cmd'}
+ ]){
+  assert.throws(()=>authenticateProcess({...e,issue:{...e.issue,
+   body:JSON.stringify({...body,probe:'controller-s6-once-receiver-ledger-readonly',...extra})}},
+   env,'operating'));
+ }
+ const id='pc-s6-d7c0a971-5219-4a3a-9dce-30b0543b0e72';
+ const receiver={schema:'ZGMINI_PC_MAINTENANCE_LEDGER_V1',
+  requestId:id,issueNumber:3947,actor:'ansqhd5774-Choi',
+  fingerprint:'a'.repeat(64),bodyDigest:'b'.repeat(64),
+  targetControllerSha:'182bb46f2838306ba40d8b4ec32bac40ab75b69a',
+  status:'UNKNOWN',reportUploadStatus:'VERIFIED',
+  result:{requestId:id,status:'UNKNOWN',code:'S6_ONCE_OUTCOME_UNKNOWN',
+   firstFail:'S6_ONCE_OUTCOME_UNKNOWN'}};
+ const port={requestId:id,status:'READ_ONLY_OBSERVED',
+  code:'S6_ONCE_CLAIM_ABSENT_AT_OBSERVATION',claimPresent:false,
+  priorOwnerByteMatch:true};
+ const good=projectS6ReceiverLedgerReadonly(receiver,port);
+ assert.equal(good.status,'READ_ONLY_OBSERVED');
+ assert.equal(good.receiverClaimPresent,true);
+ assert.equal(good.portClaimPresent,false);
+ assert.equal(good.receiverUploadVerified,true);
+ assert.equal(good.historicalEffectEstablished,false);
+ assert.equal(good.replayAuthorized,false);
+ for(const bad of [
+  {...receiver,issueNumber:3948},{...receiver,result:{...receiver.result,status:'PASS'}},
+  {...receiver,actor:'ANOTHER_ACTOR'},{...receiver,fingerprint:'secret'},
+  {...receiver,bodyDigest:'INVALID'}
+ ]){
+  assert.equal(projectS6ReceiverLedgerReadonly(bad,port).status,'STATE_UNKNOWN');
+ }
+ assert.equal(projectS6ReceiverLedgerReadonly(receiver,{...port,claimPresent:true}).status,
+  'STATE_UNKNOWN');
+ const spoofed=projectS6ReceiverLedgerReadonly(receiver,{...port,
+  code:'SECRET_PRIVATE_PORT_LEDGER'});
+ assert.equal(spoofed.status,'STATE_UNKNOWN');
+ assert.doesNotMatch(JSON.stringify(spoofed),/SECRET_PRIVATE_PORT_LEDGER/);
+ assert.equal(projectS6ReceiverLedgerReadonly(null,port).receiverClaimPresent,null);
+ assert.doesNotMatch(JSON.stringify(good),/ownerPid|nonce|fingerprint|bodyDigest|SECRET|[a-f0-9]{64}/i);
+ const filename=path.join('E:/ZGmini/automation/pc-maintenance','requests',
+  createHash('sha256').update(id).digest('hex')+'.json');
+ const bytes=Buffer.from(JSON.stringify({...receiver,privateSecret:'SECRET_PRIVATE_DATA'}));
+ const mock={lstatSync(p){
+  if(p===filename)return {isFile:()=>true,isSymbolicLink:()=>false,
+   nlink:1,size:bytes.length};
+  return {isDirectory:()=>true,isSymbolicLink:()=>false};
+ },readFileSync(p){assert.equal(p,filename);return bytes;}};
+ const observed=inspectS6ReceiverLedgerReadonly({io:mock,
+  inspectPort:()=>port});
+ assert.equal(observed.code,'S6_RECEIVER_UNKNOWN_PORT_CLAIM_ABSENT_AT_OBSERVATION');
+ assert.doesNotMatch(JSON.stringify(observed),/SECRET_PRIVATE_DATA/);
+ const badReader=inspectS6ReceiverLedgerReadonly({io:{
+  lstatSync(){throw Error('PRIVATE_LOCAL_PATH');}},inspectPort:()=>port});
+ assert.equal(badReader.status,'STATE_UNKNOWN');
+ assert.doesNotMatch(JSON.stringify(badReader),/PRIVATE_LOCAL_PATH/);
+});
 import {projectS6OnceJournalReadonly,
  inspectS6OnceJournalReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 

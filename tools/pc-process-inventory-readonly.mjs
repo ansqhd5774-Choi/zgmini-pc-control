@@ -65,6 +65,7 @@ const R4_RUNTIME_PROBE='controller-standby-r4-runtime-readonly';
 const R5_RUNTIME_PROBE='controller-standby-r5-runtime-readonly';
 const S6_PREIMAGE_PROBE='controller-s6-once-approval-preimage-readonly';
 const S6_JOURNAL_PROBE='controller-s6-once-journal-readonly';
+const S6_RECEIVER_LEDGER_PROBE='controller-s6-once-receiver-ledger-readonly';
 const S6_JOURNAL_REQUEST='pc-s6-d7c0a971-5219-4a3a-9dce-30b0543b0e72';
 const S6_JOURNAL_APPROVAL_SHA='b8fed5bebec6a473730ed0b09ede5b5dc173db53af5cfc1e619e34a45bb8aefd';
 const S6_INSTALLED_MAINTAINER='05ef3bd6b5dc753c5abfbecccacc09375eb18d10';
@@ -611,13 +612,14 @@ export function authenticateProcess(event,env,role){
  const isR5Runtime=withW05&&raw.probe===R5_RUNTIME_PROBE;
  const isS6Preimage=withW05&&raw.probe===S6_PREIMAGE_PROBE;
  const isS6Journal=withW05&&raw.probe===S6_JOURNAL_PROBE;
+ const isS6ReceiverLedger=withW05&&raw.probe===S6_RECEIVER_LEDGER_PROBE;
  const isR4GuardianOrigin=withW05&&raw.probe===R4_GUARDIAN_ORIGIN_PROBE;
  const isCiReceiptRoot=withW05&&raw.probe===CI_RECEIPT_ROOT_PROBE;
  const isCiActivation=withW05&&raw.probe===CI_CONTROLLER_B_ACTIVATION_PROBE;
  const allowedOperatingProbe=isOperator||is2960||is3409||isEr1Postcheck||is3516||
   isD05Writer||isD05PrivateReceipt||isD05Theme||isD05Registration||is3160||
   isCnnStaticGuard||isCnnGitPredicates||isCnnBPins||isCnnBResources||
-  isCnnBCore||isW06Task||isR3Watchdog||isR3Wmi||isR4Runtime||isR5Runtime||isS6Preimage||isS6Journal||isR4GuardianOrigin;
+  isCnnBCore||isW06Task||isR3Watchdog||isR3Wmi||isR4Runtime||isR5Runtime||isS6Preimage||isS6Journal||isS6ReceiverLedger||isR4GuardianOrigin;
  const acceptedProbe=(role==='operating'&&allowedOperatingProbe)||
   (role==='handoff'&&(isCiReceiptRoot||isCiActivation));
  if(!raw||(!basic&&!withJobs&&!withW05)||
@@ -655,6 +657,7 @@ export function authenticateProcess(event,env,role){
   ...(isR5Runtime?{watchdogR5Runtime:true}:{}),
    ...(isS6Preimage?{s6ApprovalPreimage:true}:{}),
    ...(isS6Journal?{s6OnceJournal:true}:{}),
+   ...(isS6ReceiverLedger?{s6ReceiverLedger:true}:{}),
   ...(isR4GuardianOrigin?{watchdogR4GuardianOrigin:true}:{}),
   ...(isCiReceiptRoot?{ciControllerBReceiptRoot:true}:{}),
   ...(isCiActivation?{ciControllerBActivation:true}:{})};
@@ -3063,6 +3066,91 @@ export function inspectS6OnceJournalReadonly({
  }catch{return unknown('S6_ONCE_'+stage+'_READ_UNVERIFIED');}
 }
 
+/**
+ * Read-only reconciliation of the original #3947 receiver acceptance claim
+ * with the separate one-shot effect claim. This fixed A diagnostic never
+ * decides whether a new B attempt is authorized or safe to replay.
+ */
+export function projectS6ReceiverLedgerReadonly(receiver,port){
+ const base={schema:'ZGMINI_S6_RECEIVER_LEDGER_A_V1',
+  requestId:S6_JOURNAL_REQUEST,issueNumber:3947,status:'STATE_UNKNOWN',
+  code:'S6_RECEIVER_LEDGER_UNVERIFIED',receiverClaimPresent:null,
+  receiverResultStatus:null,receiverResultCode:null,
+  receiverUploadVerified:null,portClaimPresent:null,
+  portStatus:null,portCode:null,portOwnerByteMatch:null,
+  historicalEffectEstablished:false,replayAuthorized:false,
+  operationalWrites:0,providerCalls:0,d1Writes:0};
+ const fail=code=>({...base,code});
+ if(receiver===null)return fail('S6_RECEIVER_CLAIM_ABSENT_AT_OBSERVATION');
+ if(!receiver||typeof receiver!=='object'||Array.isArray(receiver)
+   ||receiver.schema!=='ZGMINI_PC_MAINTENANCE_LEDGER_V1'
+   ||receiver.requestId!==S6_JOURNAL_REQUEST||receiver.issueNumber!==3947
+   ||receiver.targetControllerSha!=='182bb46f2838306ba40d8b4ec32bac40ab75b69a'
+   ||receiver.status!=='UNKNOWN'||receiver.result?.status!=='UNKNOWN'
+   ||receiver.result?.requestId!==S6_JOURNAL_REQUEST
+   ||receiver.result?.code!=='S6_ONCE_OUTCOME_UNKNOWN'
+   ||receiver.result?.firstFail!=='S6_ONCE_OUTCOME_UNKNOWN'
+   ||typeof receiver.fingerprint!=='string'
+   ||!/^[a-f0-9]{64}$/.test(receiver.fingerprint)
+   ||typeof receiver.bodyDigest!=='string'
+   ||!/^[a-f0-9]{64}$/.test(receiver.bodyDigest)
+   ||receiver.actor!=='ansqhd5774-Choi')
+  return fail('S6_RECEIVER_LEDGER_IDENTITY_OR_RESULT_UNVERIFIED');
+ if(!port||port.requestId!==S6_JOURNAL_REQUEST||
+    port.status!=='READ_ONLY_OBSERVED'||
+    port.code!=='S6_ONCE_CLAIM_ABSENT_AT_OBSERVATION'||
+    port.claimPresent!==false||port.priorOwnerByteMatch!==true)
+  return {...base,receiverClaimPresent:true,
+   receiverResultStatus:'UNKNOWN',receiverResultCode:'S6_ONCE_OUTCOME_UNKNOWN',
+   receiverUploadVerified:receiver.reportUploadStatus==='VERIFIED',
+   portClaimPresent:port?.claimPresent===false?false:null,
+   portStatus:port?.status==='READ_ONLY_OBSERVED'?port.status:null,
+   portCode:'S6_PORT_JOURNAL_CORRELATION_UNVERIFIED',
+   portOwnerByteMatch:port?.priorOwnerByteMatch===true?true:null,
+   code:'S6_RECEIVER_PORT_CORRELATION_UNVERIFIED'};
+ return {...base,status:'READ_ONLY_OBSERVED',
+  code:'S6_RECEIVER_UNKNOWN_PORT_CLAIM_ABSENT_AT_OBSERVATION',
+  receiverClaimPresent:true,receiverResultStatus:'UNKNOWN',
+  receiverResultCode:'S6_ONCE_OUTCOME_UNKNOWN',
+  receiverUploadVerified:receiver.reportUploadStatus==='VERIFIED',
+  portClaimPresent:false,portStatus:'READ_ONLY_OBSERVED',
+  portCode:'S6_ONCE_CLAIM_ABSENT_AT_OBSERVATION',
+  portOwnerByteMatch:true};
+}
+export function inspectS6ReceiverLedgerReadonly({
+ io=fs,maintenanceHome='E:/ZGmini/automation/pc-maintenance',
+ inspectPort=()=>inspectS6OnceJournalReadonly()
+}={}){
+ const unknown=code=>projectS6ReceiverLedgerReadonly(null,null);
+ try{
+  const parent=path.join(maintenanceHome,'requests');
+  for(const dir of [maintenanceHome,parent]){
+   const st=io.lstatSync(dir);
+   if(!st.isDirectory()||st.isSymbolicLink())return {
+    ...unknown(),code:'S6_RECEIVER_DIRECTORY_UNVERIFIED'};
+  }
+  const name=createHash('sha256').update(S6_JOURNAL_REQUEST).digest('hex')+'.json';
+  const filename=path.join(parent,name);
+  let stat;
+  try{stat=io.lstatSync(filename);}
+  catch(e){
+   if(e?.code==='ENOENT')return projectS6ReceiverLedgerReadonly(null,null);
+   return {...unknown(),code:'S6_RECEIVER_CLAIM_READ_UNVERIFIED'};
+  }
+  if(!stat.isFile()||stat.isSymbolicLink()||stat.nlink!==1
+    ||stat.size<1||stat.size>32768)
+   return {...unknown(),code:'S6_RECEIVER_LEDGER_FILE_UNVERIFIED'};
+  const buf=io.readFileSync(filename);
+  if(!Buffer.isBuffer(buf)||buf.length!==stat.size)
+   return {...unknown(),code:'S6_RECEIVER_LEDGER_BYTES_UNVERIFIED'};
+  const receiver=JSON.parse(buf.toString('utf8'));
+  const port=inspectPort();
+  return projectS6ReceiverLedgerReadonly(receiver,port);
+ }catch{
+  return {...unknown(),code:'S6_RECEIVER_LEDGER_READ_UNVERIFIED'};
+ }
+}
+
 export function collect(role,ctx,env=process.env){
  const host=os.hostname().toUpperCase();
  const runnerName=String(env.RUNNER_NAME||'');
@@ -3101,6 +3189,11 @@ export function collect(role,ctx,env=process.env){
  if(ctx.watchdogR4GuardianOrigin===true){
   const proof=inspectR4GuardianOriginReadonly();
   return {...base,status:proof.status,code:proof.code,watchdogR4GuardianOrigin:proof};
+ }
+ if(ctx.s6ReceiverLedger===true){
+  const evidence=inspectS6ReceiverLedgerReadonly();
+  return {...base,status:evidence.status,code:evidence.code,
+   s6ReceiverLedger:evidence};
  }
  if(ctx.s6OnceJournal===true){
   const evidence=inspectS6OnceJournalReadonly();
