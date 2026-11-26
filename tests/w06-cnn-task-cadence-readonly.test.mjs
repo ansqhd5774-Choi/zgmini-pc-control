@@ -176,6 +176,44 @@ test('W06 HTTP PC read-only separates 60s attempted GET from D1 publication',()=
  ],{observedAtMs:now});
  assert.equal(unsafe.status,'UNVERIFIED');
 });
+test('W06 gap attribution distinguishes failed fetch, slow HTTP and unexplained verified predecessor without asserting causality',()=>{
+ const time=value=>Date.parse('2026-11-26T'+value+':00.000Z');
+ const sample=(at,checked,outcome)=>({requestedAt:time(at),checkedAt:time(checked),
+  httpStatus:outcome==='FETCH_FAILED'?null:200,outcome,
+  sourceObservedAt:outcome==='VERIFIED'?'2026-11-26T01:59:59.000Z':null,
+  score:outcome==='VERIFIED'?15:null});
+ const data=[
+  sample('17:03','17:03','VERIFIED'),
+  sample('17:04','17:04','FETCH_FAILED'),
+  sample('17:10','17:10','VERIFIED'),
+  sample('17:11','17:11','VERIFIED'),
+  sample('17:13','17:14:45','VERIFIED'),
+  sample('17:20','17:20','VERIFIED')
+ ];
+ const rows=[{snapshot_key:'2026-11-26',body:JSON.stringify({
+  version:'CNN_HTTP_CHECKS_R1',date:'2026-11-26',checks:data
+ })}];
+ const r=projectW06HttpChecksReadonly(rows,{observedAtMs:time('17:30')});
+ assert.equal(r.status,'READ');
+ assert.deepEqual(r.sinceInstallLongGapPreviousOutcomeCounts,
+  {VERIFIED:2,FETCH_FAILED:1,HTTP_FAILED:0,INVALID_OUTPUT:0});
+ assert.equal(r.sinceInstallLongGapSlowPreviousCount,1);
+ assert.deepEqual(r.sinceInstallRecentLongGapContexts,[
+  {intervalSeconds:360,previousOutcome:'FETCH_FAILED',previousHttpDurationSeconds:0,nextOutcome:'VERIFIED'},
+  {intervalSeconds:120,previousOutcome:'VERIFIED',previousHttpDurationSeconds:0,nextOutcome:'VERIFIED'},
+  {intervalSeconds:420,previousOutcome:'VERIFIED',previousHttpDurationSeconds:105,nextOutcome:'VERIFIED'}
+ ]);
+ const output=JSON.stringify(r);
+ assert.doesNotMatch(output,/sourceObservedAt|score|SECRET|PRIVATE|inputUrl|requestId/);
+ assert.equal(r.providerCalls,0);
+ assert.equal(r.sqliteWrites,0);
+ assert.equal(r.d1Writes,0);
+ const unknown=projectW06HttpChecksReadonly([], {observedAtMs:time('17:30')});
+ assert.equal(unknown.status,'READ');
+ assert.deepEqual(unknown.sinceInstallLongGapPreviousOutcomeCounts,
+  {VERIFIED:0,FETCH_FAILED:0,HTTP_FAILED:0,INVALID_OUTPUT:0});
+});
+
 test('W06 HTTP evidence uses bounded native SQLite read-only query without mutation',()=>{
  let readOnly=false,sql='',params=[],closed=false;
  const now=Date.parse('2026-11-26T15:20:00.000Z');
