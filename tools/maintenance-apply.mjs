@@ -1,3 +1,4 @@
+import {assessS6ControllerTransition} from './maintenance-contract.mjs';
 // This coordinator runs ONLY in a maintenance process outside the supervisor tree.
 // All machine-specific operations are injected so the safety transitions can be tested
 // without touching a real runner, scheduled task, or database.
@@ -376,4 +377,131 @@ export async function reconcileInterruptedRollback(original,port,persist){
   await record('INTERRUPTED_ROLLBACK_VERIFIED',{status:'ROLLED_BACK',actualInstalledSha:original.installedShaBefore,protectedStateUnchanged:true});
   }catch(error){await record(maintenanceFailureCode(error,recoveryOperation),{status:'RECOVERY_REQUIRED',failureOperation:recoveryOperation});}
  return out;
+}
+
+
+/**
+ * S6 one-shot independent-maintainer coordinator.
+ *
+ * This is a phase coordinator, NOT an Issue/approval consumer, CLI command or
+ * installed operating-PC action. The installed independent maintainer must
+ * separately pin its own bytes, authenticate an exact B approval, owner and
+ * protected CAS, then provide verified fixed ports. No generic shell, runtime
+ * script path, taskkill, rollback, lease deletion, Runner start or replay
+ * exists here. Port calls are not safe to connect to untrusted Issue fields.
+ *
+ * Keeping controller-install held after a stopped tree blocks Watchdog
+ * promotion. The only eligible sequence is: attest idle six-seat baseline;
+ * pause intake; wait for drain; verify+stop owned tree; verify no old Runner;
+ * resume intake while install lease is still held; verify release guard;
+ * release only the maintainer-owned install lease; observe exactly one
+ * promotion and preserve the original request ledger for a separate A job.
+ */
+export async function runApprovedS6FailoverOnce(request,port){
+ const result=(status,code,extra={})=>Object.freeze({
+  schema:'ZGMINI_S6_ONCE_RESULT_V1',
+  status,code,requestId:request?.requestId??null,
+  operationalEffectUnverified:status!=='POSTCHECK_PENDING',
+  failoverTested:false,promotionApproved:false,
+  ...extra
+ });
+ const id=request?.requestId;
+ if(request?.operation!=='controller-s6-failover-once'||
+    !/^pc-s6-[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(id??''))
+  return result('BLOCKED','S6_ONCE_REQUEST_INVALID');
+ const required=['read','attestApproval','captureBaseline','observe','claimOnce',
+  'persist','pauseIntake','waitForDrain','verifyStopGuard','stopOwnTree',
+  'resumeIntake','verifyReleaseGuard','releaseOwnedInstallLease',
+  'waitForPromotion','now'];
+ if(!port||required.some(name=>typeof port[name]!=='function'))
+  return result('BLOCKED','S6_ONCE_PORTS_UNVERIFIED');
+ // No attempt is replayed, even when its last result is inconclusive.
+ const prior=await port.read(id);
+ if(prior!==null&&prior!==undefined)
+  return result('STATE_UNKNOWN','S6_ONCE_EXISTING_CLAIM_RECONCILE',{
+   originalPhase:typeof prior.phase==='string'?prior.phase:null});
+ if(await port.attestApproval(request)!==true)
+  return result('BLOCKED','S6_ONCE_EXACT_APPROVAL_OR_OPERATOR_UNVERIFIED');
+ const baseline=await port.captureBaseline(request);
+ if(baseline?.requestId!==id)
+  return result('BLOCKED','S6_ONCE_BASELINE_IDENTITY_MISMATCH');
+ const observe=async phase=>{
+  const snapshot=await port.observe(phase,baseline);
+  const verdict=assessS6ControllerTransition({
+   phase,baseline,observed:snapshot,now:port.now()
+  });
+  if(verdict.status!=='OBSERVED')
+   throw fail(verdict.code);
+  return verdict;
+ };
+ try{await observe('PRE_DRAIN');}
+ catch(error){return result('BLOCKED',maintenanceFailureCode(error,'preDrain'));}
+ // Claim is atomic, unique and durable: an uncertain claim must not run.
+ if(await port.claimOnce(request,baseline)!==true)
+  return result('STATE_UNKNOWN','S6_ONCE_CLAIM_OUTCOME_UNVERIFIED');
+ let phase='CLAIMED',mutationAttempted=false,leaseReleaseAcknowledged=false;
+ const journal=async(next,extra={})=>{
+  phase=next;
+  await port.persist({schema:'ZGMINI_S6_ONCE_JOURNAL_V1',
+   requestId:id,phase:next,at:new Date(port.now()).toISOString(),
+   ...extra});
+ };
+ try{
+  await journal('CLAIMED');
+  await journal('INTAKE_PAUSE_ATTEMPT');
+  mutationAttempted=true;
+  await port.pauseIntake();
+  await journal('INTAKE_PAUSED');
+  await port.waitForDrain();
+  await journal('DRAINED');
+  // Verify the exact old owner, independent ancestry, 6 idle seats,
+  // protected before bytes, source SHA and live lease immediately before stop.
+  if(await port.verifyStopGuard(request,baseline)!==true)
+   throw fail('S6_ONCE_STOP_GUARD_UNVERIFIED');
+  await journal('OLD_TREE_STOP_ATTEMPT');
+  await port.stopOwnTree(request,baseline); // NEVER kill from the coordinator
+  await journal('OLD_TREE_STOP_SUBMITTED');
+  await observe('STOPPED_HELD');
+  await journal('OLD_TREE_STOP_VERIFIED');
+  await journal('INTAKE_RESUME_ATTEMPT');
+  await port.resumeIntake(); // no new Runner can serve until Watchdog promotes
+  await journal('INTAKE_RESUMED');
+  if(await port.verifyReleaseGuard(request,baseline)!==true)
+   throw fail('S6_ONCE_RELEASE_GUARD_UNVERIFIED');
+  await journal('OWNED_LEASE_RELEASE_ATTEMPT');
+  // Ownership/CAS are re-checked by the port. Do not release a peer lease.
+  await port.releaseOwnedInstallLease(request,baseline);
+  leaseReleaseAcknowledged=true;
+  await journal('OWNED_LEASE_RELEASED');
+  // A fast promotion may skip the transient released-without-Runners state.
+  // A failed observation is not a license to retry, stop or promote anyone.
+  let releaseObserved=false,fastPromoted=false;
+  try{await observe('WATCHDOG_RELEASED');releaseObserved=true;}
+  catch{
+   // The old-Runner-empty interval may be shorter than the status probe.
+   // Do not infer promotion from a missing interval; require independent
+   // PROMOTED proof and otherwise wait read-only for its bounded outcome.
+   try{await observe('PROMOTED');fastPromoted=true;}
+   catch{/* pending or failed release evidence: read-only wait follows */}
+  }
+  await journal(releaseObserved?'WATCHDOG_RELEASE_OBSERVED':
+   fastPromoted?'FAST_PROMOTION_OBSERVED':'WATCHDOG_RELEASE_OUTCOME_UNVERIFIED');
+  if(!fastPromoted)await port.waitForPromotion(request,baseline);
+  await observe('PROMOTED');
+  await journal('PROMOTED_READBACK_VERIFIED',{status:'POSTCHECK_PENDING'});
+  // Existing A job and backlog readback must be performed separately; do not
+  // counterfeit an A result or claim complete failover here.
+  return result('POSTCHECK_PENDING','S6_ONCE_PROMOTION_OBSERVED_A_JOB_PENDING',{
+   lastPhase:'PROMOTED_READBACK_VERIFIED',leaseReleaseAcknowledged:true});
+ }catch(error){
+  const code=maintenanceFailureCode(error,phase);
+  // No automatic rollback/retry, no lease deletion, no forced fallback.
+  // Intake or stop may already have happened, even if the port timed out.
+  const status=mutationAttempted?'RECOVERY_REQUIRED':'STATE_UNKNOWN';
+  try{await journal('RECOVERY_REQUIRED',{status,code,failedAt:phase,
+   leaseReleaseAcknowledged,mutationAttempted});}catch{/* original ledger may be uncertain */}
+  return result(status,mutationAttempted?'S6_ONCE_RUNTIME_OUTCOME_RECONCILE':
+   'S6_ONCE_JOURNAL_UNVERIFIED',{
+   failedCode:code,failedAt:phase,leaseReleaseAcknowledged,mutationAttempted});
+ }
 }

@@ -1242,15 +1242,20 @@ export function assessS6ControllerTransition({phase,baseline,observed,now=Date.n
     observed.controllerSha!==baseline.controllerSha||
     observed.protectedSha256!==baseline.protectedSha256||
     observed.watchdogPid!==baseline.watchdogPid||
+    observed.oldSupervisorNonce!==baseline.oldSupervisorNonce||
     observed.oldOwnerIdentityMatched!==true)
   return out('S6_IDENTITY_OR_PROTECTION_CHANGED');
- if(observed.relatedLeasesAbsent!==true||observed.pendingWorkCount!==0)
+ // A promoted Controller may legitimately accept fresh unrelated work.
+ // The pre-drain/release boundaries require idle; post-promotion requires
+ // its *old* request ledger preserved, not a global six-seat idle condition.
+ if(phase!=='PROMOTED'&&
+    (observed.relatedLeasesAbsent!==true||observed.pendingWorkCount!==0))
   return out('S6_RELATED_WORK_OR_LEASE_UNVERIFIED');
- const seatsOk=()=>Array.isArray(observed.runnerSeats)&&
+ const seatsOk=(requireIdle=true)=>Array.isArray(observed.runnerSeats)&&
   observed.runnerSeats.length===6&&
   observed.runnerSeats.every((row,i)=>record(row)&&
    row.seat===i+1&&row.name==='zgmini-pc-0'+(i+1)&&
-   row.status==='online'&&row.busy===false);
+   row.status==='online'&&(requireIdle?row.busy===false:typeof row.busy==='boolean'));
  if(phase==='PRE_DRAIN'){
   if(observed.workflowState!=='active'||observed.maintenanceLeaseHeld!==false||
      observed.watchdogPaused!==false||observed.controllerDraining!==false)
@@ -1288,8 +1293,10 @@ export function assessS6ControllerTransition({phase,baseline,observed,now=Date.n
     observed.controllerDraining!==false)
   return out('S6_PROMOTED_CONTROL_NOT_OPEN');
  if(!pid(observed.activeSupervisorPid)||
-    observed.activeSupervisorPid===baseline.oldSupervisorPid||
+    !baseline.standbyPids.includes(observed.activeSupervisorPid)||
     observed.oldSupervisorAlive!==false||
+    !/^[a-f0-9-]{36}$/.test(observed.newOwnerNonce??'')||
+    observed.newOwnerNonce===baseline.oldSupervisorNonce||
     observed.heartbeatFresh!==true||
     observed.activeOwnerNonceChanged!==true||
     observed.watchdogStatusHealthy!==true||
@@ -1298,6 +1305,6 @@ export function assessS6ControllerTransition({phase,baseline,observed,now=Date.n
     observed.previousOwnerFenced!==true||
     observed.existingRequestLedgerPreserved!==true)
   return out('S6_PROMOTION_OR_LEDGER_UNVERIFIED');
- if(!seatsOk())return out('S6_PROMOTED_SIX_RUNNERS_NOT_VERIFIED');
+ if(!seatsOk(false))return out('S6_PROMOTED_SIX_RUNNERS_NOT_VERIFIED');
  return out('S6_PROMOTION_READBACK_OBSERVED_NOT_PROVEN',true);
 }

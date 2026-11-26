@@ -9,7 +9,7 @@ import {nextRuntimeFiles,requireHandoffApproval,approvedRuntimeChanges} from '..
 import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
-import {applyApprovedUpdate,maintenanceFailureCode,reconcileInterruptedRollback} from '../tools/maintenance-apply.mjs';
+import {applyApprovedUpdate,maintenanceFailureCode,reconcileInterruptedRollback,runApprovedS6FailoverOnce} from '../tools/maintenance-apply.mjs';
 import {isolatedControllerStage,recoveryOperatorProofStatus,waitForSupervisorStopIdle} from '../tools/update.mjs';
 
 test('independent recovery proof keeps strict identity and returns exact sanitized failure categories',()=>{
@@ -1008,4 +1008,168 @@ test('owner or protection drift aborts next idle retry before readback or stop',
   assert.equal(clock,3000);
   assert.equal(reads,1);
  }
+});
+
+
+// The one-shot S6 coordinator uses only injectable ports. None of these tests
+// touches operating-PC processes, GitHub intake, install leases or source.
+const S6_TS=Date.parse('2026-11-26T12:35:00.000Z');
+const s6Request=()=>({
+ operation:'controller-s6-failover-once',
+ requestId:'pc-s6-11111111-2222-4333-8444-555555555555'
+});
+const s6Base=()=>({
+ requestId:s6Request().requestId,controllerSha:'a'.repeat(40),
+ approvalManifestSha256:'b'.repeat(64),protectedSha256:'c'.repeat(64),
+ oldSupervisorPid:41001,
+ oldSupervisorNonce:'11111111-2222-4333-8444-555555555555',
+ watchdogPid:41002,standbyPids:[41003,41004]
+});
+function s6Observe(phase,{fast=false,failPre=false,failHeld=false,failPromoted=false}={}){
+ const b=s6Base();
+ const snap={
+  requestId:b.requestId,controllerSha:b.controllerSha,
+  protectedSha256:b.protectedSha256,watchdogPid:b.watchdogPid,
+  oldSupervisorNonce:b.oldSupervisorNonce,oldOwnerIdentityMatched:true,
+  relatedLeasesAbsent:true,pendingWorkCount:0,
+  independentOperatorAttested:true,exactApprovalBytesAttested:true,
+  observedAtUtc:new Date(S6_TS-1000).toISOString(),
+  workflowState:'active',maintenanceLeaseHeld:false,
+  watchdogPaused:false,controllerDraining:false,oldSupervisorAlive:true,
+  activeSupervisorPid:b.oldSupervisorPid,heartbeatFresh:true,
+  standbyReadyCount:2,standbyOwnersUnique:true,
+  runnerSeats:Array.from({length:6},(_,i)=>({
+   seat:i+1,name:'zgmini-pc-0'+(i+1),status:'online',busy:false
+  }))
+ };
+ if(phase==='PRE_DRAIN')return failPre?{
+  ...snap,runnerSeats:[...snap.runnerSeats.slice(0,5),{...snap.runnerSeats[5],busy:true}]
+ }:snap;
+ const stopped={
+  ...snap,oldSupervisorAlive:false,oldSixChildrenStopped:true,
+  runnerExecutableProof:'NO_CONTROLLER_RUNNER_PROCESS',
+  workflowState:'disabled_manually',maintenanceLeaseHeld:true,
+  watchdogPaused:!failHeld
+ };
+ if(phase==='STOPPED_HELD')return stopped;
+ const release={...stopped,workflowState:'active',
+  maintenanceLeaseHeld:false,watchdogPaused:false};
+ if(phase==='WATCHDOG_RELEASED')return fast?{
+  ...release,runnerExecutableProof:'ACTIVE_RUNNER_PROCESS'
+ }:release;
+ if(phase==='PROMOTED')return {
+  ...release,oldSupervisorAlive:false,oldSixChildrenStopped:true,
+  activeSupervisorPid:41003,activeOwnerNonceChanged:true,
+  newOwnerNonce:'99999999-2222-4333-8444-555555555555',
+  watchdogStatusHealthy:!failPromoted,standbyReadyCount:1,
+  previousOwnerFenced:true,existingRequestLedgerPreserved:true
+ };
+ throw Error('UNEXPECTED_TEST_PHASE');
+}
+function s6Fixture(options={}){
+ const calls=[],journal=[];
+ const add=x=>(calls.push(x),true);
+ const port={
+  now:()=>S6_TS,
+  read:async()=>{add('read');return options.prior??null;},
+  attestApproval:async()=>{add('attestApproval');return options.approval!==false;},
+  captureBaseline:async()=>{add('captureBaseline');return s6Base();},
+  observe:async phase=>{add('observe:'+phase);
+   return s6Observe(phase,options);
+  },
+  claimOnce:async()=>{add('claimOnce');return options.claim!==false;},
+  persist:async entry=>{journal.push(entry);add('persist:'+entry.phase);
+   if(options.failPersist===entry.phase)throw Object.assign(Error('S6_TEST_JOURNAL_FAIL'),{code:'S6_TEST_JOURNAL_FAIL'});
+  },
+  pauseIntake:async()=>{add('pauseIntake');if(options.failPause)throw Object.assign(Error('S6_TEST_PAUSE_UNKNOWN'),{code:'S6_TEST_PAUSE_UNKNOWN'});},
+  waitForDrain:async()=>{add('waitForDrain');},
+  verifyStopGuard:async()=>{add('verifyStopGuard');return options.stopGuard!==false;},
+  stopOwnTree:async()=>{add('stopOwnTree');if(options.failStop)throw Object.assign(Error('S6_TEST_STOP_UNKNOWN'),{code:'S6_TEST_STOP_UNKNOWN'});},
+  resumeIntake:async()=>{add('resumeIntake');},
+  verifyReleaseGuard:async()=>{add('verifyReleaseGuard');return options.releaseGuard!==false;},
+  releaseOwnedInstallLease:async()=>{add('releaseOwnedInstallLease');
+   if(options.failRelease)throw Object.assign(Error('S6_TEST_RELEASE_UNKNOWN'),{code:'S6_TEST_RELEASE_UNKNOWN'});
+  },
+  waitForPromotion:async()=>{add('waitForPromotion');}
+ };
+ return {port,calls,journal};
+}
+test('S6 coordinator keeps exact one-shot owner transitions and never marks the A job complete',async()=>{
+ const {port,calls,journal}=s6Fixture();
+ const r=await runApprovedS6FailoverOnce(s6Request(),port);
+ assert.equal(r.status,'POSTCHECK_PENDING');
+ assert.equal(r.code,'S6_ONCE_PROMOTION_OBSERVED_A_JOB_PENDING');
+ assert.equal(r.failoverTested,false);
+ assert.equal(r.promotionApproved,false);
+ assert.equal(r.leaseReleaseAcknowledged,true);
+ assert.equal(calls.filter(x=>x==='stopOwnTree').length,1);
+ assert.equal(calls.filter(x=>x==='releaseOwnedInstallLease').length,1);
+ assert.ok(calls.indexOf('pauseIntake')<calls.indexOf('waitForDrain'));
+ assert.ok(calls.indexOf('waitForDrain')<calls.indexOf('verifyStopGuard'));
+ assert.ok(calls.indexOf('verifyStopGuard')<calls.indexOf('stopOwnTree'));
+ assert.ok(calls.indexOf('stopOwnTree')<calls.indexOf('observe:STOPPED_HELD'));
+ assert.ok(calls.indexOf('observe:STOPPED_HELD')<calls.indexOf('resumeIntake'));
+ assert.ok(calls.indexOf('resumeIntake')<calls.indexOf('verifyReleaseGuard'));
+ assert.ok(calls.indexOf('verifyReleaseGuard')<calls.indexOf('releaseOwnedInstallLease'));
+ assert.ok(calls.indexOf('releaseOwnedInstallLease')<calls.indexOf('waitForPromotion'));
+ assert.deepEqual(journal.at(-1).phase,'PROMOTED_READBACK_VERIFIED');
+ assert.equal(journal.at(-1).status,'POSTCHECK_PENDING');
+});
+test('S6 coordinator refuses duplicate, wrong operation, unverifiable approval or busy seats without effect',async()=>{
+ for(const [request,opts,code] of [
+  [{...s6Request(),operation:'controller-update'}, {}, 'S6_ONCE_REQUEST_INVALID'],
+  [s6Request(),{prior:{phase:'STOPPED_HELD'}},'S6_ONCE_EXISTING_CLAIM_RECONCILE'],
+  [s6Request(),{approval:false},'S6_ONCE_EXACT_APPROVAL_OR_OPERATOR_UNVERIFIED'],
+  [s6Request(),{failPre:true},'S6_SIX_RUNNERS_NOT_IDLE_VERIFIED'],
+  [s6Request(),{claim:false},'S6_ONCE_CLAIM_OUTCOME_UNVERIFIED']
+ ]){
+  const {port,calls}=s6Fixture(opts);
+  const r=await runApprovedS6FailoverOnce(request,port);
+  assert.equal(r.code,code);
+  assert.equal(r.failoverTested,false);
+  assert.equal(calls.includes('pauseIntake'),false);
+  assert.equal(calls.includes('stopOwnTree'),false);
+  assert.equal(calls.includes('releaseOwnedInstallLease'),false);
+ }
+});
+test('S6 coordinator never releases install lease after uncertain pause, stop, WMI or release guard',async()=>{
+ for(const opts of [
+  {failPause:true},{stopGuard:false},{failStop:true},
+  {failHeld:true},{releaseGuard:false}
+ ]){
+  const {port,calls,journal}=s6Fixture(opts);
+  const r=await runApprovedS6FailoverOnce(s6Request(),port);
+  assert.equal(r.status,'RECOVERY_REQUIRED',JSON.stringify({opts,r}));
+  assert.equal(r.leaseReleaseAcknowledged,false);
+  assert.equal(calls.includes('releaseOwnedInstallLease'),false);
+  assert.equal(calls.filter(x=>x==='stopOwnTree').length<=1,true);
+  assert.equal(journal.at(-1).phase,'RECOVERY_REQUIRED');
+ }
+});
+test('S6 coordinator cannot retry ambiguous owned lease release',async()=>{
+ const {port,calls,journal}=s6Fixture({failRelease:true});
+ const r=await runApprovedS6FailoverOnce(s6Request(),port);
+ assert.equal(r.status,'RECOVERY_REQUIRED');
+ assert.equal(r.leaseReleaseAcknowledged,false); // false means not attested, not proved held
+ assert.equal(calls.filter(x=>x==='releaseOwnedInstallLease').length,1);
+ assert.equal(calls.includes('waitForPromotion'),false);
+ assert.equal(journal.at(-1).phase,'RECOVERY_REQUIRED');
+});
+test('S6 coordinator allows a fast unique promotion without inventing a missing release interval',async()=>{
+ const {port,calls,journal}=s6Fixture({fast:true});
+ const r=await runApprovedS6FailoverOnce(s6Request(),port);
+ assert.equal(r.status,'POSTCHECK_PENDING');
+ assert.equal(calls.includes('waitForPromotion'),false);
+ assert.equal(journal.some(x=>x.phase==='FAST_PROMOTION_OBSERVED'),true);
+ assert.equal(r.failoverTested,false);
+});
+test('S6 coordinator reports uncertain promotion and does not stop another tree',async()=>{
+ const {port,calls,journal}=s6Fixture({failPromoted:true});
+ const r=await runApprovedS6FailoverOnce(s6Request(),port);
+ assert.equal(r.status,'RECOVERY_REQUIRED');
+ assert.equal(r.leaseReleaseAcknowledged,true);
+ assert.equal(calls.filter(x=>x==='stopOwnTree').length,1);
+ assert.equal(calls.filter(x=>x==='releaseOwnedInstallLease').length,1);
+ assert.equal(journal.at(-1).phase,'RECOVERY_REQUIRED');
+ assert.equal(r.failoverTested,false);
 });
