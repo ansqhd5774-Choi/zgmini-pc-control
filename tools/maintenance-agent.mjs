@@ -1026,7 +1026,10 @@ export function createMaintenanceAgent({
       // Promotion observation without an independent A job is never SUCCESS.
       // The once-only claim survives an uncertain upload or execution response.
       result=normalizedResult(request,{...executed,
-        actualControllerSha:request.targetControllerSha,
+        // A failed S6 effect has no authenticated post-effect installed SHA.
+        // Only the independently observed promoted state can carry target.
+        actualControllerSha:executed.status==='POSTCHECK_PENDING'?
+          request.targetControllerSha:null,
         // This is the failure boundary (not a verified completed phase).
         lastPhase:executed.status==='RECOVERY_REQUIRED'?
           (executed.failedAt??null):executed.lastPhase,
