@@ -16,6 +16,21 @@ const TASK_B_WRAPPER=path.win32.join(TASK_B_HOME,'run-local-cnn-minute.vbs');
 const TASK_B_WRAPPER_SHA='73c8cf4381fd328182a9fad0a7cb5753cf9093e58524f0c9a04be4df7032d733';
 const TASK_B_CORE_SHA='dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028';
 const hex=bytes=>createHash('sha256').update(bytes).digest('hex');
+// Evaluate the effective scheduler privilege independently from XML.
+// Task Scheduler may omit a default RunLevel when reserializing an XML Task.
+export function classifyW06TaskRunLevel(xml,nativeValue){
+ const raw=[...String(xml).matchAll(/<RunLevel>([^<]{1,64})<\/RunLevel>/gi)]
+  .map(m=>m[1].trim());
+ const xmlLevel=raw.length===0?'OMITTED':raw.length!==1?'AMBIGUOUS':
+  raw[0]==='LeastPrivilege'?'LEAST_PRIVILEGE':
+  raw[0]==='HighestAvailable'?'HIGHEST_AVAILABLE':'OTHER';
+ const native=String(nativeValue??'').trim().toLowerCase();
+ const effectiveLevel=['limited','leastprivilege','0'].includes(native)?'LIMITED':
+  ['highest','highestavailable','1'].includes(native)?'HIGHEST':'UNVERIFIED';
+ return {xmlLevel,effectiveLevel,
+  nativeLeastPrivilege:effectiveLevel==='UNVERIFIED'?null:effectiveLevel==='LIMITED'};
+}
+
 // Fixed-shape diagnostics only; never return command/arguments, account IDs,
 // XML, wrapper source, backup bytes, lock payload or provider credentials.
 export function assessW06TaskBXmlReadonly(xml,coreXml,{systemRoot=String.raw`C:\Windows`}={}){
@@ -74,11 +89,30 @@ export function inspectW06TaskBRecoveryReadonly({
   const launcher=safeReadExact(TASK_B_WRAPPER,8192,filesystem);
   const lock=safeReadExact(path.win32.join(TASK_B_HOME,'writer-source-install.lock'),256,filesystem);
   const journal=safeReadExact(path.win32.join(dir,'journal.jsonl'),65536,filesystem);
+  // Fixed, read-only TaskScheduler CIM property; never mutate the Task.
+  // No principal or execution arguments leave the operating PC.
+  let nativeRunLevel=null;
+  try{
+   const powershell=path.win32.join(systemRoot,'System32',
+    'WindowsPowerShell','v1.0','powershell.exe');
+   if(filesystem.existsSync(powershell)){
+    const ps="$ErrorActionPreference='Stop';"+
+     "$t=@(Get-ScheduledTask -TaskName 'ZGMINI-PC-CNN-Minute' -ErrorAction Stop);"+
+     "if($t.Count -ne 1 -or $t[0].TaskPath -ne '\\'){throw 'TASK_SCOPE_STOP'};"+
+     "[Console]::Out.Write([string]$t[0].Principal.RunLevel)";
+    const level=run(powershell,['-NoProfile','-NonInteractive','-Command',ps],{
+     shell:false,windowsHide:true,timeout:15000,maxBuffer:1024,encoding:null});
+    if(!level?.error&&level?.status===0&&Buffer.isBuffer(level.stdout))
+     nativeRunLevel=level.stdout.toString('utf8');
+   }
+  }catch{/* Keep unverified: never infer a safe privilege from missing evidence. */}
+  const runLevel=classifyW06TaskRunLevel(task.xml,nativeRunLevel);
   return {
    status:'PASS',code:'W06_B_DISABLED_TASK_RECOVERY_SHAPE_READ',
    operation:'W06_TASK_B_FIXED_READ_ONLY_RECONCILIATION',
    taskPresent:true,taskXmlSha256:hex(task.bytes),
    definition:assessW06TaskBXmlReadonly(task.xml,core.xml,{systemRoot}),
+   runLevel,
    launcherPresent:launcher!==null,launcherShaMatches:launcher!==null&&hex(launcher)===TASK_B_WRAPPER_SHA,
    journalPresent:journal!==null,coreBackupPresent:backup!==null,
    coreBackupShaMatches:backup!==null&&hex(backup)===TASK_B_CORE_SHA,
