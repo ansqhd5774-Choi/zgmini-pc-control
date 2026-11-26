@@ -66,7 +66,10 @@ export function classifyR3RunnerWmiRows(raw,{
   evidence:'SINGLE_INSTANT_WMI_NOT_PROMOTION_AUTHORIZATION',
   promotionApproved:false,operationalWrites:0,providerCalls:0,d1Writes:0};
  const unknown=(code)=>({...base,status:'STATE_UNKNOWN',code,
-  controllerListenerCount:null,controllerWorkerCount:null,unknownPathCount:null});
+  controllerListenerCount:null,controllerWorkerCount:null,unknownPathCount:null,
+  unknownListenerCount:null,unknownWorkerCount:null,
+  missingWmiPathCount:null,nonAbsoluteWmiPathCount:null,
+  canonicalizationFailedCount:null});
  if(!raw||!Array.isArray(raw.rows)||raw.rows.length>256)
   return unknown('STANDBY_WMI_ROWS_UNVERIFIED');
  let root;
@@ -76,28 +79,45 @@ export function classifyR3RunnerWmiRows(raw,{
   return unknown('STANDBY_WMI_CONTROLLER_ROOT_UNVERIFIED');
  const prefix=root.replace(/[\\]+$/,'')+'\\runners\\';
  const seen=new Set();let listeners=0,workers=0,unknownPaths=0;
+ let unknownListenerCount=0,unknownWorkerCount=0;
+ let missingWmiPathCount=0,nonAbsoluteWmiPathCount=0,canonicalizationFailedCount=0;
+ const uncertain=(name,kind)=>{
+  unknownPaths++;
+  if(name==='runner.listener.exe')unknownListenerCount++;
+  else unknownWorkerCount++;
+  if(kind==='MISSING')missingWmiPathCount++;
+  else if(kind==='NON_ABSOLUTE')nonAbsoluteWmiPathCount++;
+  else canonicalizationFailedCount++;
+ };
  for(const row of raw.rows){
   const name=typeof row?.name==='string'?row.name.toLowerCase():'';
   if(!Number.isSafeInteger(row?.pid)||row.pid<1||seen.has(row.pid)||
    !['runner.listener.exe','runner.worker.exe'].includes(name))
    return unknown('STANDBY_WMI_PROCESS_SHAPE_INVALID');
   seen.add(row.pid);
-  if(typeof row.executablePath!=='string'||!path.win32.isAbsolute(row.executablePath)){
-   unknownPaths++;continue;
+  if(typeof row.executablePath!=='string'||!row.executablePath){
+   uncertain(name,'MISSING');continue;
+  }
+  if(!path.win32.isAbsolute(row.executablePath)){
+   uncertain(name,'NON_ABSOLUTE');continue;
   }
   let exe;
   try{exe=path.win32.normalize(canonicalize(row.executablePath)).toLowerCase();}
-  catch{unknownPaths++;continue;}
-  if(!path.win32.isAbsolute(exe)){unknownPaths++;continue;}
+  catch{uncertain(name,'CANONICALIZATION');continue;}
+  if(!path.win32.isAbsolute(exe)){uncertain(name,'NON_ABSOLUTE');continue;}
   if(exe.startsWith(prefix)){
    if(name==='runner.listener.exe')listeners++;
    else workers++;
   }
  }
  if(unknownPaths)return {...base,status:'STATE_UNKNOWN',code:'STANDBY_WMI_EXECUTABLE_PATH_UNVERIFIED',
-  controllerListenerCount:listeners,controllerWorkerCount:workers,unknownPathCount:unknownPaths};
+  controllerListenerCount:listeners,controllerWorkerCount:workers,unknownPathCount:unknownPaths,
+  unknownListenerCount,unknownWorkerCount,missingWmiPathCount,
+  nonAbsoluteWmiPathCount,canonicalizationFailedCount};
  return {...base,status:'PASS',code:'STANDBY_WMI_EXECUTABLE_PATHS_CLASSIFIED',
-  controllerListenerCount:listeners,controllerWorkerCount:workers,unknownPathCount:0};
+  controllerListenerCount:listeners,controllerWorkerCount:workers,unknownPathCount:0,
+  unknownListenerCount:0,unknownWorkerCount:0,missingWmiPathCount:0,
+  nonAbsoluteWmiPathCount:0,canonicalizationFailedCount:0};
 }
 export function inspectR3RunnerWmiReadonly({
  run=spawnSync,filesystem=fs,env=process.env,
@@ -108,6 +128,8 @@ export function inspectR3RunnerWmiReadonly({
   status:'STATE_UNKNOWN',code,promotionApproved:false,
   evidence:'SINGLE_INSTANT_WMI_NOT_PROMOTION_AUTHORIZATION',
   controllerListenerCount:null,controllerWorkerCount:null,unknownPathCount:null,
+  unknownListenerCount:null,unknownWorkerCount:null,missingWmiPathCount:null,
+  nonAbsoluteWmiPathCount:null,canonicalizationFailedCount:null,
   operationalWrites:0,providerCalls:0,d1Writes:0});
  if(process.platform!=='win32'||typeof env.SystemRoot!=='string'||
    !/^[a-z]:[\\/]windows$/i.test(env.SystemRoot))
@@ -2587,6 +2609,11 @@ export function toText(r){
    'wmiControllerListenerCount='+(r.standbyRunnerWmi.controllerListenerCount??'UNKNOWN'),
    'wmiControllerWorkerCount='+(r.standbyRunnerWmi.controllerWorkerCount??'UNKNOWN'),
    'wmiUnknownPathCount='+(r.standbyRunnerWmi.unknownPathCount??'UNKNOWN'),
+   'wmiUnknownListenerCount='+(r.standbyRunnerWmi.unknownListenerCount??'UNKNOWN'),
+   'wmiUnknownWorkerCount='+(r.standbyRunnerWmi.unknownWorkerCount??'UNKNOWN'),
+   'wmiMissingPathCount='+(r.standbyRunnerWmi.missingWmiPathCount??'UNKNOWN'),
+   'wmiNonAbsolutePathCount='+(r.standbyRunnerWmi.nonAbsoluteWmiPathCount??'UNKNOWN'),
+   'wmiCanonicalizationFailedCount='+(r.standbyRunnerWmi.canonicalizationFailedCount??'UNKNOWN'),
    'standbyPromotionApproved=false']:[]),
   ...(r.watchdogR3Preimage?[
    'watchdogR3Preimage='+r.watchdogR3Preimage.code,
