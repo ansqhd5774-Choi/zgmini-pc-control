@@ -409,8 +409,8 @@ test('R5 requires natural R4 process restart with a live Active and one READY St
   a=>{a.options.pidAlive=pid=>pid!==16012;},
   a=>{a.options.pidAlive=pid=>pid!==16011;}
  ]){
-  const a=structuredClone({installed,owner,status,options});
-  a.options.pidAlive=()=>true;
+  const a={installed:structuredClone(installed),owner:structuredClone(owner),
+   status:structuredClone(status),options:{...options}};
   modify(a);
   assert.throws(()=>verifyR5FirstStandbyReady(a.installed,a.owner,a.status,
    a.options),/WATCHDOG_R5_/);
