@@ -42,6 +42,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           ZGMINI_CI_NATIVE_RECEIPT_ROOT: ${{ vars.ZGMINI_CI_NATIVE_RECEIPT_ROOT }}
+          ZGMINI_CI_NATIVE_SCOPE_ROOT: ${{ vars.ZGMINI_CI_NATIVE_SCOPE_ROOT }}
           ZGMINI_CI_NATIVE_EFFECT: A_READONLY
         run: node ci-approval/native-publisher-entry.mjs
   issue-approved-native-writer-b:
@@ -78,5 +79,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           ZGMINI_CI_NATIVE_RECEIPT_ROOT: ${{ vars.ZGMINI_CI_NATIVE_RECEIPT_ROOT }}
+          ZGMINI_CI_NATIVE_SCOPE_ROOT: ${{ vars.ZGMINI_CI_NATIVE_SCOPE_ROOT }}
           ZGMINI_CI_NATIVE_EFFECT: B_WRITER_SOURCE
         run: node ci-approval/native-publisher-entry.mjs
