@@ -11,7 +11,7 @@ import {
   validateInfrastructureDelta,validateControllerOnlyInstallDelta,
   deployableControllerTreePaths,isControllerSourceTestPath,
   prepareControllerUpdateRequest,selectPreservedRecoveryProtection,
-  recoveryProtectedSnapshotStillPinned,
+  recoveryProtectedSnapshotStillPinned,assessS6ControllerTransition,
 } from "../tools/maintenance-contract.mjs";
 
 const OLD="c491d95fdb594a729f08deff68d86e04c18a9544";
@@ -614,4 +614,159 @@ test('optional CI policy approval is prevalidated before receiver stop or any fi
  assert.ok(gate>=0&&stop>=0&&backup>=0&&replaced>=0&&manifest>=0);
  assert.ok(gate<stop&&gate<backup&&gate<replaced&&gate<manifest);
  assert.equal(body.slice(replaced,manifest).includes('approvedHandoffCiPolicy('),false);
+});
+
+
+// S6 independent phase evidence is descriptive only: never an authority token
+// to stop a Supervisor/Runner, disable intake, or release someone else's lease.
+const S6_NOW=Date.parse('2026-11-26T12:05:00.000Z');
+const s6Baseline=()=>({
+ requestId:'pc-s6-11111111-2222-4333-8444-555555555555',
+ controllerSha:'a'.repeat(40),approvalManifestSha256:'b'.repeat(64),
+ protectedSha256:'c'.repeat(64),oldSupervisorPid:31001,
+ oldSupervisorNonce:'11111111-2222-4333-8444-555555555555',
+ watchdogPid:31002,standbyPids:[31003,31004]
+});
+const s6Snapshot=()=>({
+ requestId:s6Baseline().requestId,controllerSha:s6Baseline().controllerSha,
+ protectedSha256:s6Baseline().protectedSha256,
+ independentOperatorAttested:true,exactApprovalBytesAttested:true,
+ observedAtUtc:new Date(S6_NOW-1000).toISOString(),
+ watchdogPid:31002,oldOwnerIdentityMatched:true,
+ relatedLeasesAbsent:true,pendingWorkCount:0,
+ workflowState:'active',maintenanceLeaseHeld:false,
+ watchdogPaused:false,controllerDraining:false,
+ oldSupervisorAlive:true,activeSupervisorPid:31001,
+ heartbeatFresh:true,standbyReadyCount:2,standbyOwnersUnique:true,
+ runnerSeats:Array.from({length:6},(_,i)=>({
+  seat:i+1,name:'zgmini-pc-0'+(i+1),status:'online',busy:false
+ }))
+});
+const s6=(phase,observed=s6Snapshot(),baseline=s6Baseline())=>
+ assessS6ControllerTransition({phase,observed,baseline,now:S6_NOW});
+const s6Stopped=()=>({
+ ...s6Snapshot(),oldSupervisorAlive:false,oldSixChildrenStopped:true,
+ runnerExecutableProof:'NO_CONTROLLER_RUNNER_PROCESS',
+ workflowState:'disabled_manually',maintenanceLeaseHeld:true,
+ watchdogPaused:true
+});
+
+test('S6 independent phase evidence is never an executable approval',()=>{
+ const result=s6('PRE_DRAIN');
+ assert.equal(result.status,'OBSERVED');
+ assert.equal(result.code,'S6_PRE_DRAIN_OBSERVED_NO_EFFECT');
+ assert.equal(result.authorizesMutation,false);
+ assert.equal(result.promotionApproved,false);
+ assert.equal(result.failoverTested,false);
+ assert.ok(Object.isFrozen(result));
+ assert.doesNotMatch(assessS6ControllerTransition.toString(),
+  /taskkill|spawnSync|execFileSync|writeFileSync|rmSync|renameSync/);
+});
+
+test('S6 phase evidence refuses malformed provenance, missing independent attestation and stale time',()=>{
+ const good=s6Baseline();
+ assert.equal(s6('UNKNOWN').code,'S6_BASELINE_INVALID');
+ assert.equal(s6('PRE_DRAIN',s6Snapshot(),{...good,watchdogPid:31001}).code,
+  'S6_BASELINE_INVALID');
+ assert.equal(s6('PRE_DRAIN',s6Snapshot(),{...good,approvalManifestSha256:'bad'}).code,
+  'S6_BASELINE_INVALID');
+ const snap=s6Snapshot();
+ for(const key of ['independentOperatorAttested','exactApprovalBytesAttested']){
+  assert.equal(s6('PRE_DRAIN',{...snap,[key]:false}).code,
+   'S6_OPERATOR_OR_APPROVAL_UNVERIFIED');
+ }
+ assert.equal(s6('PRE_DRAIN',{...snap,observedAtUtc:new Date(S6_NOW-45000).toISOString()}).code,
+  'S6_OBSERVATION_STALE_OR_UNKNOWN');
+ assert.equal(s6('PRE_DRAIN',{...snap,observedAtUtc:new Date(S6_NOW+1000).toISOString()}).code,
+  'S6_OBSERVATION_STALE_OR_UNKNOWN');
+ for(const patch of [
+  {requestId:'pc-s6-other'},{controllerSha:'d'.repeat(40)},
+  {protectedSha256:'d'.repeat(64)},{oldOwnerIdentityMatched:false},
+  {watchdogPid:31005}
+ ])assert.equal(s6('PRE_DRAIN',{...snap,...patch}).code,
+  'S6_IDENTITY_OR_PROTECTION_CHANGED');
+});
+
+test('S6 pre-drain is blocked on busy, missing or unverified six-seat state',()=>{
+ const snap=s6Snapshot();
+ assert.equal(s6('PRE_DRAIN',{...snap,workflowState:'disabled_manually'}).code,
+  'S6_PRE_DRAIN_CONTROL_NOT_OPEN');
+ assert.equal(s6('PRE_DRAIN',{...snap,maintenanceLeaseHeld:true}).code,
+  'S6_PRE_DRAIN_CONTROL_NOT_OPEN');
+ assert.equal(s6('PRE_DRAIN',{...snap,controllerDraining:true}).code,
+  'S6_PRE_DRAIN_CONTROL_NOT_OPEN');
+ assert.equal(s6('PRE_DRAIN',{...snap,oldSupervisorAlive:null}).code,
+  'S6_PRE_DRAIN_RUNTIME_UNVERIFIED');
+ assert.equal(s6('PRE_DRAIN',{...snap,standbyReadyCount:1}).code,
+  'S6_PRE_DRAIN_RUNTIME_UNVERIFIED');
+ for(const rows of [
+  snap.runnerSeats.slice(0,5),
+  snap.runnerSeats.map((r,i)=>i===0?{...r,busy:true}:r),
+  snap.runnerSeats.map((r,i)=>i===0?{...r,name:'other-runner'}:r),
+  snap.runnerSeats.map((r,i)=>i===0?{...r,seat:2}:r),
+  snap.runnerSeats.map((r,i)=>i===0?{...r,status:'offline'}:r)
+ ])assert.equal(s6('PRE_DRAIN',{...snap,runnerSeats:rows}).code,
+  'S6_SIX_RUNNERS_NOT_IDLE_VERIFIED');
+ assert.equal(s6('PRE_DRAIN',{...snap,relatedLeasesAbsent:false}).code,
+  'S6_RELATED_WORK_OR_LEASE_UNVERIFIED');
+ assert.equal(s6('PRE_DRAIN',{...snap,pendingWorkCount:1}).code,
+  'S6_RELATED_WORK_OR_LEASE_UNVERIFIED');
+});
+
+test('S6 stopped under maintenance lease cannot be counted as Watchdog promotion',()=>{
+ const snap=s6Stopped();
+ const r=s6('STOPPED_HELD',snap);
+ assert.equal(r.status,'OBSERVED');
+ assert.equal(r.code,'S6_STOPPED_HELD_WATCHDOG_PAUSED');
+ assert.equal(r.authorizesMutation,false);
+ assert.equal(r.failoverTested,false);
+ assert.equal(s6('WATCHDOG_RELEASED',snap).code,
+  'S6_WATCHDOG_RELEASE_BOUNDARY_NOT_CLEAR');
+ assert.equal(s6('STOPPED_HELD',{...snap,maintenanceLeaseHeld:false}).code,
+  'S6_HELD_STOP_BOUNDARY_NOT_ATTESTED');
+ assert.equal(s6('STOPPED_HELD',{...snap,watchdogPaused:false}).code,
+  'S6_HELD_STOP_BOUNDARY_NOT_ATTESTED');
+ assert.equal(s6('STOPPED_HELD',{...snap,watchdogPaused:null}).status,
+  'BLOCKED');
+});
+
+test('S6 release is blocked by live old Runner, unknown WMI or shared pause',()=>{
+ const stopped=s6Stopped();
+ const ready={...stopped,maintenanceLeaseHeld:false,workflowState:'active',
+  watchdogPaused:false};
+ assert.equal(s6('WATCHDOG_RELEASED',ready).code,
+  'S6_WATCHDOG_RECOVERY_ELIGIBILITY_OBSERVED');
+ for(const patch of [
+  {oldSupervisorAlive:true},{oldSixChildrenStopped:false},
+  {runnerExecutableProof:'UNVERIFIED'},
+  {runnerExecutableProof:'ACTIVE_RUNNER_PROCESS'}
+ ])assert.equal(s6('WATCHDOG_RELEASED',{...ready,...patch}).code,
+  'S6_OLD_TREE_OR_WMI_NOT_CLEARED');
+ for(const patch of [
+  {maintenanceLeaseHeld:true},{watchdogPaused:true},
+  {controllerDraining:true},{workflowState:'disabled_manually'}
+ ])assert.equal(s6('WATCHDOG_RELEASED',{...ready,...patch}).code,
+  'S6_WATCHDOG_RELEASE_BOUNDARY_NOT_CLEAR');
+});
+
+test('S6 promoted readback needs unique new owner, fencing, preserved ledger and six online seats',()=>{
+ const good={...s6Snapshot(),oldSupervisorAlive:false,
+  activeSupervisorPid:31009,activeOwnerNonceChanged:true,
+  watchdogStatusHealthy:true,previousOwnerFenced:true,
+  existingRequestLedgerPreserved:true,standbyReadyCount:1};
+ const observed=s6('PROMOTED',good);
+ assert.equal(observed.code,'S6_PROMOTION_READBACK_OBSERVED_NOT_PROVEN');
+ assert.equal(observed.status,'OBSERVED');
+ assert.equal(observed.failoverTested,false); // real independent receipt still required
+ for(const patch of [
+  {activeSupervisorPid:31001},{activeSupervisorPid:null},
+  {activeOwnerNonceChanged:false},{heartbeatFresh:false},
+  {watchdogStatusHealthy:false},{standbyReadyCount:0},
+  {previousOwnerFenced:false},{existingRequestLedgerPreserved:false}
+ ])assert.equal(s6('PROMOTED',{...good,...patch}).code,
+  'S6_PROMOTION_OR_LEDGER_UNVERIFIED');
+ assert.equal(s6('PROMOTED',{...good,runnerSeats:good.runnerSeats.slice(1)}).code,
+  'S6_PROMOTED_SIX_RUNNERS_NOT_VERIFIED');
+ assert.equal(s6('PROMOTED',{...good,workflowState:'disabled_manually'}).code,
+  'S6_PROMOTED_CONTROL_NOT_OPEN');
 });

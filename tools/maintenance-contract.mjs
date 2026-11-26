@@ -1195,3 +1195,109 @@ export function classifyMaintenancePostcheckWorkflowRegistration(workflow){
    code:'POSTCHECK_WORKFLOW_DISABLED',workflowId:workflow.id};
  return base;
 }
+
+
+/**
+ * S6 same-host HA transition evidence only. Independent maintainer observers
+ * must authenticate each input from local owner/manifest/Runner/GitHub sources.
+ * An Issue body, a caller-supplied flag, or this PASS is NEVER execution
+ * authority. This function has no process, lease, workflow or file side effects.
+ *
+ * The current Controller-update maintainer stops a Supervisor tree while
+ * intake is disabled and controller-install is held. The Watchdog will NOT
+ * promote in that state. These phases deliberately distinguish its held stop
+ * from the separately authorized release and subsequent observed promotion.
+ */
+export function assessS6ControllerTransition({phase,baseline,observed,now=Date.now()}={}){
+ const out=(code,pass=false)=>Object.freeze({
+  schema:'ZGMINI_S6_TRANSITION_EVIDENCE_V1',
+  status:pass?'OBSERVED':'BLOCKED',code,
+  authorizesMutation:false,promotionApproved:false,failoverTested:false
+ });
+ const record=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
+ const sha40=x=>typeof x==='string'&&/^[a-f0-9]{40}$/.test(x);
+ const sha64=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
+ const pid=x=>Number.isSafeInteger(x)&&x>0;
+ const roles=['PRE_DRAIN','STOPPED_HELD','WATCHDOG_RELEASED','PROMOTED'];
+ if(!roles.includes(phase)||!record(baseline)||!record(observed)||
+    !/^pc-s6-[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(baseline.requestId??'')||
+    !sha40(baseline.controllerSha)||!sha64(baseline.approvalManifestSha256)||
+    !sha64(baseline.protectedSha256)||!pid(baseline.oldSupervisorPid)||
+    !/^[a-f0-9-]{36}$/.test(baseline.oldSupervisorNonce??'')||
+    !pid(baseline.watchdogPid)||!Array.isArray(baseline.standbyPids)||
+    baseline.standbyPids.length!==2||
+    !baseline.standbyPids.every(pid)||new Set([
+      baseline.oldSupervisorPid,baseline.watchdogPid,...baseline.standbyPids
+    ]).size!==4||!Number.isFinite(now))
+  return out('S6_BASELINE_INVALID');
+ // The independent operator and exact approval bytes MUST be independently
+ // attested by the caller. These flags alone do not constitute that evidence.
+ if(observed.independentOperatorAttested!==true||
+    observed.exactApprovalBytesAttested!==true)
+  return out('S6_OPERATOR_OR_APPROVAL_UNVERIFIED');
+ const at=Date.parse(observed.observedAtUtc??'');
+ if(!Number.isFinite(at)||now-at<0||now-at>=45000)
+  return out('S6_OBSERVATION_STALE_OR_UNKNOWN');
+ if(observed.requestId!==baseline.requestId||
+    observed.controllerSha!==baseline.controllerSha||
+    observed.protectedSha256!==baseline.protectedSha256||
+    observed.watchdogPid!==baseline.watchdogPid||
+    observed.oldOwnerIdentityMatched!==true)
+  return out('S6_IDENTITY_OR_PROTECTION_CHANGED');
+ if(observed.relatedLeasesAbsent!==true||observed.pendingWorkCount!==0)
+  return out('S6_RELATED_WORK_OR_LEASE_UNVERIFIED');
+ const seatsOk=()=>Array.isArray(observed.runnerSeats)&&
+  observed.runnerSeats.length===6&&
+  observed.runnerSeats.every((row,i)=>record(row)&&
+   row.seat===i+1&&row.name==='zgmini-pc-0'+(i+1)&&
+   row.status==='online'&&row.busy===false);
+ if(phase==='PRE_DRAIN'){
+  if(observed.workflowState!=='active'||observed.maintenanceLeaseHeld!==false||
+     observed.watchdogPaused!==false||observed.controllerDraining!==false)
+   return out('S6_PRE_DRAIN_CONTROL_NOT_OPEN');
+  if(observed.oldSupervisorAlive!==true||
+     observed.activeSupervisorPid!==baseline.oldSupervisorPid||
+     observed.heartbeatFresh!==true||
+     observed.standbyReadyCount!==2||observed.standbyOwnersUnique!==true)
+   return out('S6_PRE_DRAIN_RUNTIME_UNVERIFIED');
+  if(!seatsOk())return out('S6_SIX_RUNNERS_NOT_IDLE_VERIFIED');
+  return out('S6_PRE_DRAIN_OBSERVED_NO_EFFECT',true);
+ }
+ if(phase==='STOPPED_HELD'||phase==='WATCHDOG_RELEASED'){
+  if(observed.oldSupervisorAlive!==false||
+     observed.oldSixChildrenStopped!==true||
+     observed.runnerExecutableProof!=='NO_CONTROLLER_RUNNER_PROCESS')
+   return out('S6_OLD_TREE_OR_WMI_NOT_CLEARED');
+  if(phase==='STOPPED_HELD'){
+   if(observed.maintenanceLeaseHeld!==true||
+      observed.workflowState!=='disabled_manually'||
+      observed.watchdogPaused!==true)
+    return out('S6_HELD_STOP_BOUNDARY_NOT_ATTESTED');
+   // Holding the install lease legitimately blocks the Watchdog. This
+   // observation does not permit promotion or release of someone else's lock.
+   return out('S6_STOPPED_HELD_WATCHDOG_PAUSED',true);
+  }
+  if(observed.maintenanceLeaseHeld!==false||
+     observed.workflowState!=='active'||observed.watchdogPaused!==false||
+     observed.controllerDraining!==false)
+   return out('S6_WATCHDOG_RELEASE_BOUNDARY_NOT_CLEAR');
+  return out('S6_WATCHDOG_RECOVERY_ELIGIBILITY_OBSERVED',true);
+ }
+ if(observed.maintenanceLeaseHeld!==false||
+    observed.workflowState!=='active'||observed.watchdogPaused!==false||
+    observed.controllerDraining!==false)
+  return out('S6_PROMOTED_CONTROL_NOT_OPEN');
+ if(!pid(observed.activeSupervisorPid)||
+    observed.activeSupervisorPid===baseline.oldSupervisorPid||
+    observed.oldSupervisorAlive!==false||
+    observed.heartbeatFresh!==true||
+    observed.activeOwnerNonceChanged!==true||
+    observed.watchdogStatusHealthy!==true||
+    !Number.isSafeInteger(observed.standbyReadyCount)||
+    observed.standbyReadyCount<1||observed.standbyReadyCount>2||
+    observed.previousOwnerFenced!==true||
+    observed.existingRequestLedgerPreserved!==true)
+  return out('S6_PROMOTION_OR_LEDGER_UNVERIFIED');
+ if(!seatsOk())return out('S6_PROMOTED_SIX_RUNNERS_NOT_VERIFIED');
+ return out('S6_PROMOTION_READBACK_OBSERVED_NOT_PROVEN',true);
+}
