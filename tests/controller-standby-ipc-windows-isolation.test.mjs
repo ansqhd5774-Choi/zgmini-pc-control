@@ -9,6 +9,7 @@ import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {randomUUID,createHash} from 'node:crypto';
+import {selectStandbyCandidate} from '../tools/runner-watchdog.mjs';
 
 const win={skip:process.platform!=='win32'};
 const hash=b=>createHash('sha256').update(b).digest('hex');
@@ -174,5 +175,43 @@ test('IPC-T05 two READY candidates race, but exact temp supervisor lease has onl
     saw(loser,'PROMOTION_FAILED')!==undefined,true);
   assert.equal(fs.readdirSync(path.join(fx.control,'leases')).filter(x=>x==='supervisor').length,1);
   assert.equal(JSON.parse(fs.readFileSync(path.join(fx.control,'PROMOTED.json'))).ownerPid,owner.pid);
+ }finally{await cleanup(fx,a,b);}
+});
+
+test('IPC-T06 single Watchdog selector promotes only one of two real READY processes',win,async()=>{
+ const fx=fixture(),a=startCandidate(fx),b=startCandidate(fx);
+ try{
+  await waitFor(()=>saw(a,'READY')&&saw(b,'READY'),'DUAL_READY');
+  const first={child:a.child,ready:true,promoting:false,slot:1};
+  const second={child:b.child,ready:true,promoting:false,slot:2};
+  const selected=selectStandbyCandidate(first,second,{dual:true});
+  assert.equal(selected,first);
+  const pending=selected;
+  assert.equal(selectStandbyCandidate(first,second,{dual:true,promotionPending:pending}),null);
+  selected.child.send({type:'PROMOTE',oldChildrenStopped:true});
+  await waitFor(()=>saw(a,'PROMOTION_ATTEMPTED'),'ONLY_PRIMARY_PROMOTES');
+  await waitFor(()=>fs.existsSync(path.join(fx.control,'PROMOTED.json')),'ONLY_ONE_OWNER');
+  assert.equal(saw(b,'PROMOTION_ATTEMPTED'),undefined);
+  assert.equal(saw(b,'PROMOTION_BLOCKED'),undefined);
+  assert.equal(saw(b,'READY').pid,b.child.pid);
+  const owner=JSON.parse(fs.readFileSync(path.join(fx.control,'leases','supervisor','owner.json')));
+  assert.equal(owner.pid,a.child.pid);
+ }finally{await cleanup(fx,a,b);}
+});
+test('IPC-T07 unavailable first slot permits only the second READY process',win,async()=>{
+ const fx=fixture(),a=startCandidate(fx),b=startCandidate(fx);
+ try{
+  await waitFor(()=>saw(a,'READY')&&saw(b,'READY'),'DUAL_READY');
+  const first={child:a.child,ready:false,promoting:false,slot:1};
+  const second={child:b.child,ready:true,promoting:false,slot:2};
+  const selected=selectStandbyCandidate(first,second,{dual:true});
+  assert.equal(selected,second);
+  selected.child.send({type:'PROMOTE',oldChildrenStopped:true});
+  await waitFor(()=>saw(b,'PROMOTION_ATTEMPTED'),'FALLBACK_PROMOTES');
+  await waitFor(()=>fs.existsSync(path.join(fx.control,'PROMOTED.json')),'FALLBACK_OWNS');
+  assert.equal(saw(a,'PROMOTION_ATTEMPTED'),undefined);
+  assert.equal(saw(a,'READY').pid,a.child.pid);
+  const owner=JSON.parse(fs.readFileSync(path.join(fx.control,'leases','supervisor','owner.json')));
+  assert.equal(owner.pid,b.child.pid);
  }finally{await cleanup(fx,a,b);}
 });
