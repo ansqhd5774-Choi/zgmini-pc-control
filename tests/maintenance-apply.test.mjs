@@ -1030,7 +1030,8 @@ function s6Observe(phase,{fast=false,failPre=false,failHeld=false,failPromoted=f
  const snap={
   requestId:b.requestId,controllerSha:b.controllerSha,
   protectedSha256:b.protectedSha256,watchdogPid:b.watchdogPid,
-  oldOwnerIdentityMatched:true,relatedLeasesAbsent:true,pendingWorkCount:0,
+  oldSupervisorNonce:b.oldSupervisorNonce,oldOwnerIdentityMatched:true,
+  relatedLeasesAbsent:true,pendingWorkCount:0,
   independentOperatorAttested:true,exactApprovalBytesAttested:true,
   observedAtUtc:new Date(S6_TS-1000).toISOString(),
   workflowState:'active',maintenanceLeaseHeld:false,
@@ -1059,6 +1060,7 @@ function s6Observe(phase,{fast=false,failPre=false,failHeld=false,failPromoted=f
  if(phase==='PROMOTED')return {
   ...release,oldSupervisorAlive:false,oldSixChildrenStopped:true,
   activeSupervisorPid:41003,activeOwnerNonceChanged:true,
+  newOwnerNonce:'99999999-2222-4333-8444-555555555555',
   watchdogStatusHealthy:!failPromoted,standbyReadyCount:1,
   previousOwnerFenced:true,existingRequestLedgerPreserved:true
  };
