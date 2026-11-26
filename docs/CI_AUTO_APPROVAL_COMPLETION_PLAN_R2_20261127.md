@@ -838,3 +838,30 @@
 
 **이후 실행:** Controller B에 새로운 구체 **Owner 승인·미실행** 자연 B 효과 및 기존 보안 활성화 경로가 확보되면 이미 유효한 root·receiver 증명은 재사용하고 단회 CI 발행/운영 설치 결과를 확인한다. Native A/Writer B는 B-installed 독립 scope·proof의 정규 설치 근거가 먼저 필요하다. 본문 31절의 과거 root 미검증은 이 32절 원본 로그로 정정한다.
 
+## 33. 스물아홉 번째 실행 기록 — 기존 Owner 승인 PR의 늦은 Source CI 이벤트 누락 최소 수정 (2026-11-27 KST)
+
+### 실제 코드 실패 조건
+
+- `ci-approval/completed-run-intake.mjs::observePublishedControllerApprovals`의 기존 `main push`는 manifest가 추가된 시점에 **해당 PR 소스 CI SUCCESS**가 있어야 `submitExistingControllerApprovalFromCi`를 호출한다. Owner가 PR을 병합했을 때 source CI가 아직 진행 중이면 `SOURCE_CI_UNVERIFIED` → `NOT_SUBMITTED`로 종료된다.
+- 해당 CI가 나중에 SUCCESS로 끝나도 기존 `workflow_run` job은 `ZGMINI_CI_CONTROLLER_B_POLICY != ''`를 추가 요구하고, 고정 실행기 `main({publish:true})`은 `workflow_run`을 오직 독립 자동 생성 정책 경로로 처리했다. **기존 Owner-merged 명세에는 별도 생성 정책이 필수 아님**(이전 #4136), 따라서 push/CI 완료 이벤트 순서가 바뀌면 승인 효과를 놓치는 구조적 공백. 이 오류는 현재 ENABED=false/Owner 신규 효과 미확보 등 운영 차단과 독립된 **소스 경로 문제**로 분류한다.
+- 이 수정은 [#3925/#3926](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3926)의 영수증 root CROSS_RUN PASS를 재사용하고, 기존 운영 설치에 관한 새 재진단·A 재요청/Owner 명세 재발행을 요구하지 않는다.
+
+### 최소 소스 수정 및 HEAD CI
+
+- 최신 `main` `25f1861392e1bc6caee08d8925d1457958b5101f`에서 별도 `codex/pc-automation-process-improvement-late-owner-ci-20261127` 소스 브랜치 생성. [PR #4147](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4147)에서 정확 **2파일**만 수정 (`ci-approval/completed-run-intake.mjs`, `tests/ci-approval-completed-run-intake.test.mjs`).
+- 추가 `observeLateOwnerMergedControllerApproval`는 완료 event를 **실제 GitHub Actions REST `actions/runs/{id}`로 재검증**, 고정 Source CI `workflowId=416355595`, PR 이벤트, 비공개 저장소, 성공 run/head SHA와 run attempt 정합성 확인. `commits/{head_sha}/pulls` 결과는 단지 후보로 사용, 실제 PR `merged_by` Owner login+ID+type, base=head 저장소·main·head SHA, 승인 JSON `added` 상태, 정확 Git blob, **병합 SHA 시점과 현재 main의 동일 승인 원문 바이트** 및 manifest.target/ref 확인. URL/Issue 또는 bot/branch text를 Owner 승인으로 승격하지 않음.
+- `publishLateOwnerMergedControllerApproval`는 위 exact 결과만 기존 `submitExistingControllerApprovalFromCi`로 전달하고, 실제 재검증·effect key·durable claim·Issue prior inventory 및 **unknown 시 재POST 금지**는 기존 엔진을 재사용. 관련 Owner 미병합/타 계정/타 저장소/변경 승인/CI 실패/불완전 API는 fail-closed, PC 설치·Provider·DB/D1 호출 없음.
+- 첫 소스 CI 실패에서 새 정규식·Git blob NUL 구분자 표현 오류를 발견 후 수정. 두 번째 CI는 **배포 gating을 검사한 신규 테스트의 escape 오류**였고 기능 test는 통과했음. 해당 테스트 수정 후 정확 최종 HEAD **`14a86d57ee30c3223bbb6daf51a2399eed143169`**:
+  - [ZGMINI Controller Maintenance Source Tests 45905381816](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45905381816) **completed/success**, 신규 owner/CI/manifest byte·가짜 Owner 거부 테스트 포함.
+  - [ZGMINI PC Secret Scan 45905381781](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45905381781) **completed/success**.
+  - [C996 R5 Readonly Source Checks 45905381812](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45905381812) **completed/success**.
+- **exact HEAD CI 3/3 성공 → PR #4147 ready → squash merge `main` SHA `fcbbf12cd662544ee308295c13076d4ca2f4aeba`**. `main` readback에 신규 함수를 확인, source Git blob **`68045e68cd94635ea9fb4ba0e7a9bf486e062438`**, tests blob **`33f0033adb59894ba2a79544943f8d6489c1d04d`** 일치.
+
+### 배포/운영은 별개의 정확 단계
+
+- 현재 **Production** `.github/workflows/ci-approval-controller-b.yml` Git blob **`27e48ecde81bdf6f15cccffcffd9b3e70482a5f3`**, publisher **고정 checkout SHA `cfe57f3d720219613c87eff21338de0d35edbf6b`** 및 `workflow_run`의 `vars.ZGMINI_CI_CONTROLLER_B_POLICY != ''` gating을 **변경하지 않았다**. 따라서 `main`의 소스 수정만으로 이 늦은 Owner CI 경로가 **실운영에서 활성화되지 않는다**. 이 불변성은 receiver 기존 승인 Workflow pin/CAS를 깨뜨리지 않기 위한 보호다.
+- 남은 정확 실행은 현재 Receiver pin과 대상 소스/설정의 정규 B approval, `ci-approval-controller-b.yml` job gate를 **기존 Owner-merged branch와 생성 approval branch로 구분**한 후 새 exact Workflow/blob·고정 publisher checkout의 공식 운영 설치·CAS/readback. 보안/Actions 변수 `ZGMINI_CI_CONTROLLER_B_ENABLED` 변경은 별도 기존 C급 권한 규칙 준수, 현재 false 임의 활성화 금지. 실제 신규/미소진 Owner 승인 B 효과 없으면 운영 POST/설치 완료로 오판하지 않는다.
+- Native A 및 Native Writer B의 별개 Scope/root/Owner B-installed proof 미구성은 #4143 원본대로이며 이번 수정으로 완료되지 않았다. 이미 완료된 #4036 및 과거 #4117 재실행·영수증 소급 생성 금지.
+
+**종료: 소스 결함 수정·관련 CI/병합 완료. 실제 무인 CI 자동 승인 발행→PC 실행→결과 검증 여전히 A·Writer B·Controller B `0/3 (0%)`이며, 이 기록 자체가 추가 인가·설치·활성화 완료가 아니다.**
+
