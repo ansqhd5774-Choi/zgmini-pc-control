@@ -3128,3 +3128,15 @@ test('S6 one-shot UNKNOWN journal classification preserves claim/stop uncertaint
  assert.doesNotMatch(JSON.stringify(ioFailure),/SECRET_OWNER_LOCAL_PATH/);
  assert.equal(ioFailure.operationalWrites,0);
 });
+
+test('S6 exact B approval raw LF bytes match pinned SHA on Windows checkout',()=>{
+ // The isolated Windows CI and operating A checkout must hash the exact
+ // approved main blob. Do not normalize a mismatching manifest at runtime.
+ const digest='b8fed5bebec6a473730ed0b09ede5b5dc173db53af5cfc1e619e34a45bb8aefd';
+ const attr=fs.readFileSync(new URL('../.gitattributes',import.meta.url),'utf8');
+ assert.match(attr,/^approvals\/controller-s6\/\*\.json text eol=lf$/m);
+ const bytes=fs.readFileSync(new URL('../approvals/controller-s6/'+digest+'.json',
+  import.meta.url));
+ assert.equal(createHash('sha256').update(bytes).digest('hex'),digest);
+ assert.equal(bytes.includes(13),false);
+});
