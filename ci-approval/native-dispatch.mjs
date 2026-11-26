@@ -33,24 +33,26 @@ export async function dispatchApprovedCiEffect({policy,requestBytes,ports}={}){
  if(!receiver||policy.schema!=='ZGMINI_CI_NATIVE_DISPATCH_V1'||
    policy.receiverWorkflowPath!==receiver||!hex(policy.receiverWorkflowBlobSha,40)||
    !id(policy.sourceRunId)||!id(policy.sourceAttempt)||!id(policy.sourceWorkflowId)||
-   !hex(policy.sourceHeadSha,40)||!hex(policy.businessApprovalSha256,64)||
+   !hex(policy.sourceHeadSha,40)||!hex(policy.sourceWorkflowBlobSha,40)||
+   !hex(policy.businessApprovalSha256,64)||
    !hex(policy.approvedRequestSha256,64)||!hex(policy.policyRevision,40)||
    typeof policy.sourceWorkflowPath!=='string'||
    !/^\.github\/workflows\/[a-z0-9-]+\.yml$/.test(policy.sourceWorkflowPath)||
    !Buffer.isBuffer(requestBytes)||!requestBytes.length||requestBytes.length>32768||
    hash(requestBytes)!==policy.approvedRequestSha256)
   return denied('EVIDENCE_MISSING','CI_NATIVE_DISPATCH_SCOPE_UNVERIFIED');
- const methods=['readSourceRun','readReceiverWorkflow','readInstalledReceiver','loadReceipt','saveReceipt','dispatchWorkflow'];
+ const methods=['readSourceRun','readSourceWorkflow','readReceiverWorkflow','readInstalledReceiver','loadReceipt','saveReceipt','dispatchWorkflow'];
  if(!ports||methods.some(k=>typeof ports[k]!=='function'))
   return denied('EVIDENCE_MISSING','CI_NATIVE_DISPATCH_PORT_UNAVAILABLE');
  // An approval effect stays the same across policy or receiver revisions.
  // Excluding those transport versions from the claim key prevents reposts.
  const key=hash(JSON.stringify([effect,policy.businessApprovalSha256,
    policy.approvedRequestSha256]));
- let run,receiverFile,installed;
+ let run,sourceFile,receiverFile,installed;
  try{
-  [run,receiverFile,installed]=await Promise.all([
+  [run,sourceFile,receiverFile,installed]=await Promise.all([
    ports.readSourceRun(policy.sourceRunId,policy.sourceAttempt),
+   ports.readSourceWorkflow(policy.sourceWorkflowPath,policy.sourceHeadSha),
    ports.readReceiverWorkflow(receiver,'main'),ports.readInstalledReceiver(effect)
   ]);
  }catch{return denied('EVIDENCE_MISSING','CI_NATIVE_DISPATCH_READ_UNVERIFIED',{effectKey:key});}
@@ -61,6 +63,16 @@ export async function dispatchApprovedCiEffect({policy,requestBytes,ports}={}){
    run.repository.full_name!==REPO||run.repository.private!==true||
    run.head_repository?.id!==REPO_ID)
   return denied('EVIDENCE_MISSING','CI_NATIVE_DISPATCH_RUN_UNVERIFIED',{effectKey:key});
+ // A successful run ID alone does not prove that it executed the pinned
+ // review policy. Verify the exact Git blob at that historical revision.
+ if(sourceFile?.type!=='file'||sourceFile.path!==policy.sourceWorkflowPath||
+   sourceFile.encoding!=='base64'||sourceFile.sha!==policy.sourceWorkflowBlobSha||
+   typeof sourceFile.content!=='string'||sourceFile.content.length>131072)
+  return denied('EVIDENCE_MISSING','CI_NATIVE_DISPATCH_SOURCE_PIN_UNVERIFIED',{effectKey:key});
+ const sourceBytes=Buffer.from(sourceFile.content,'base64');
+ if(!sourceBytes.length||sourceBytes.length>65536||
+   blobHash(sourceBytes)!==policy.sourceWorkflowBlobSha)
+  return denied('EVIDENCE_MISSING','CI_NATIVE_DISPATCH_SOURCE_BYTES_UNVERIFIED',{effectKey:key});
  if(receiverFile?.type!=='file'||receiverFile.path!==receiver||
    receiverFile.encoding!=='base64'||receiverFile.sha!==policy.receiverWorkflowBlobSha||
    typeof receiverFile.content!=='string'||receiverFile.content.length>131072)
@@ -69,11 +81,15 @@ export async function dispatchApprovedCiEffect({policy,requestBytes,ports}={}){
  if(!receiverBytes.length||receiverBytes.length>65536||
    blobHash(receiverBytes)!==policy.receiverWorkflowBlobSha)
   return denied('EVIDENCE_MISSING','CI_NATIVE_DISPATCH_RECEIVER_BYTES_UNVERIFIED',{effectKey:key});
- // Installed readback is separate from a repository blob or candidate claim.
- if(installed?.effect!==effect||installed?.enabled!==true||
-   installed.receiverWorkflowBlobSha!==policy.receiverWorkflowBlobSha||
-   installed.policyRevision!==policy.policyRevision||
-   installed.approvedRequestSha256!==policy.approvedRequestSha256)
+ // A caller-supplied policy cannot independently prove a business grant.
+ // Compare *all* material authority fields with the installed trusted scope.
+ // A changed approval hash or source run must never mint a new effect claim.
+ const installedFields=['effect','receiverWorkflowPath','receiverWorkflowBlobSha',
+  'sourceRunId','sourceAttempt','sourceWorkflowId','sourceWorkflowPath',
+  'sourceHeadSha','sourceWorkflowBlobSha','businessApprovalSha256',
+  'approvedRequestSha256','policyRevision'];
+ if(installed?.enabled!==true||
+   installedFields.some(k=>installed[k]!==policy[k]))
   return denied('EVIDENCE_MISSING','CI_NATIVE_DISPATCH_RECEIVER_NOT_ATTESTED',{effectKey:key});
  let prior;
  try{prior=await ports.loadReceipt(key);}catch{return denied('STATE_UNKNOWN','CI_NATIVE_DISPATCH_RECEIPT_READ_UNKNOWN',{effectKey:key});}
