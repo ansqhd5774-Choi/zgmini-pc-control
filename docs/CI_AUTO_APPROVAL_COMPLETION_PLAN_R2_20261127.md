@@ -800,3 +800,26 @@
 
 **종료 진행률: 실제 무인 자동화 0/3(0%). 이번 턴 완료는 source CI/merge + 새 읽기 A 2/2 및 표준 후보 경로 부재의 근거 확보이며 운영 적용/승인 권한 부여/실제 PC 효과가 아니다.**
 
+## 31. 스물일곱 번째 실행 기록 — Native 승인 설치 원본과 Controller B Root 문제 분리 (2026-11-27 KST)
+
+### 원본 비교 — 실제 설치 성공과 CI Native 독립 설치 증명을 분리
+
+- 현재 `main` 검토 기준 SHA `cb108b0ec62e72ccaee38db51f5d77a945c31973`. 정규 [#4036](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4036)의 실운영 B 결과 `results/maintenance-pc-update-86b98541-34f9-45f7-bfbb-62d278f00b46.json` Git blob **`6f95e0c7abb56dcc63b62ec22aba14baab203fa0`** 직접 재조회. `SUCCEEDED/APPROVED_UPDATE_AND_DIAGNOSTIC_VERIFIED`, target/actual Controller `3c7d4cfefacf072fd35cb19706b352c64c5e4fd2`, `protectedStateUnchanged=true`; **`ciNativeEffect`·`ciNativePolicySha256`은 이 실제 영수증에 없음**. 정상 B 설치는 유지하되 Native A/Writer B 발행 권한 또는 신규 설치 증명으로 재분류하지 않는다.
+- `tools/maintenance-contract.mjs`는 Controller-only/selected B 승인 명세의 `ciNativeApproval`에 정확 `effect`와 `nativePolicySha256`를 요구하고, `tools/maintenance-agent.mjs::attachApprovedNativeBReceipt`는 **실제 Owner actor + Controller B SUCCESS + protected state + 정확 승인 annotation**을 만족한 결과에만 Native 필드를 추가한다. `ci-approval/native-publisher-entry.mjs::verifyNativeInstalledProof`는 GitHub에 저장된 동일 Native B 설치 영수증과 정책 해시를 다시 요구한다. unrelated #4036 성공 결과는 의도적으로 거절된다.
+- 현재 저장소 코드 인덱스에서 `ciNativeApproval path:approvals/controller-updates`, `ciNativePolicySha256 path:approvals/controller-updates`, `ciNativeEffect path:results`, `ciNativePolicySha256 path:results`, `ci-native-a-approved.json path:approvals`, `ci-native-writer-b-approved.json path:approvals`는 **각 검색 결과 0건**. 파일 트리의 전체 Controller update 명세 **181개**, 유지보수 JSON 결과 **203개**를 확인했지만 모두 원문 바이트 단위 전수 검증한 것은 아니므로 **검색 미발견 = 전체 무존재**로 주장하지 않는다. 현 시점 사용 가능한 **정확 Native B 승인·성공 영수증은 미확보**.
+- [#4143](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4143) 표준 후보 루트 `ROOT_ABSENT` + Native scope/receipt 변수 미구성 4 opt-in 확인은 Native A/Writer B에만 적용한다.
+
+### 반대 증거 — Controller B의 receipt root를 일괄 미구성으로 취급하지 않음
+
+- 기존 고유 [#3913](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3913) / [Run 45841959058](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45841959058) 2026-11-26T14:44:23Z 격리 PC 현장 결과 재사용. JSON `results/pc-process-inventory-45841959058-1-handoff.json`, blob **`696b3aaba9158e1bd94da705582fdbcb123a6f1a`**. 당시 `ciControllerBReceiptRoot: PARTIAL/CI_RECEIPT_ROOT_DIRECTORY_PRESENT_READONLY`, `configured=true`, `directoryPresent=true`, `readable=true`. 이전 사용자 직접 C 경로 준비 및 변수 등록을 거친 **Controller B root 후보는 그 시점 실제 존재·읽기**가 확인됐다. 따라서 Native A/Writer B의 별개 ROOT_ABSENT를 Controller B에 전파하지 않는다.
+- 같은 결과에서 Controller B **`writableVerified=false`, `durableAcrossRunsVerified=false`**, 즉 한 번 읽기 확인이 지속 가능한 고유 영수증 저장 보장은 아니다. 이후 [#4138](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4138) 2026-11-26T22:05:17Z 격리 PC 조회에서는 `ZGMINI_CI_CONTROLLER_B_ENABLED=false`, 생성 승인 `POLICY` 미구성으로 확인됐고 새 읽기는 receipt root를 재조회하지 않았다. 과거 root 존재를 **현재 쓰기/내구성 PASS**로 승격시키지 않는다.
+- [#4136](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4136)의 소스 교정대로 **Owner-merged 기존 B `push` 경로는 generated approval POLICY 값 없이도 소스 계약상 가능**하지만, 현재 `ENABLED=false` 및 지속 claim 영수증 쓰기, 실행되지 않은 승인 효과의 실제 이벤트가 별개 미충족. 보안/Actions 변수 임의 변경·기존 완료 B #4036 재실행 금지.
+
+### 실행 결정 및 남은 실제 작업
+
+1. Native A/Writer B는 기존에 사용 가능한 Native 전용 Owner B 승인 원본·CI policy exact hash·독립 proof를 먼저 확보해야 하며, 실제 무인 실행 권한 없이 임의 manifest·독립 scope 파일·해시를 제조하거나 단순 `true`로 바꾸지 않는다. 범위 밖 운영 인증·GitHub Actions 변수·격리 host trust-root 설치가 필요하면 기존 C급 직접 인증 계약을 보존한다. 관련 승인 없는 작업의 `AUTOMATION_BLOCKED`만 유지.
+2. Controller B는 **과거 root 읽기 확인은 재사용**, 최신 ENABLED와 별도로 root 쓰기·내구성/정확 사용 가능성의 독립 증거가 있을 때만 기존 승인 자연 `push` 실증 진행. 현재 새로운 원본 B 효과와 CI receipt 설치/실행 승인 경계가 없으므로 완료된 #4036을 재발행하지 않는다. 무관한 B 업무/Runner 복구 중단 금지.
+3. 이번에는 소스 변경·불필요한 PC 반복 A/B 요청·보안 변수 변경 없이 이미 있는 원본과 현행 코드의 실패 조건을 구분했다. **실제 무인 CI→승인 명세 발행→PC 실행→영수증 A/Writer B/Controller B 0/3 (0%)** 유지. 새로운 PR/설치 성공을 주장하지 않는다.
+
+**다음 필요 행동:** 독립 Native B 설치·승인 원본이 있는 정확한 운영 scope 확보 또는 승인된 정규 설치 절차로 증명을 실제 생성·검증. Controller B는 현행 저장 root를 다시 만드는 대신 기존 경로의 영구 쓰기 검증 및 아직 실행되지 않은 구체 승인 효과 이벤트 확인. 보안/권한 변경의 직접 사용자 단계와 개발 단계는 구분한다.
+
