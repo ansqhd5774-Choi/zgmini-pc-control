@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import {parseCanonicalBody,validateRequest,decideUpgradeState,
   TARGET,ORIGINAL,REPLACEMENT,INITIAL_SCOPE,FINAL_SCOPE,
   NEXT_TARGET,NEXT_SOURCE_SHA,R3_REQUEST_ID,R3_MANIFEST_SCHEMA,validateR3Request} from '../watchdog-b/contract.mjs';
@@ -322,8 +324,13 @@ test('R5 admission pins exact R4 staged raw bytes and dual-passive target',()=>{
  assert.equal(R5_PREIMAGE_SHA256,R4_SOURCE_SHA256);
  assert.equal(R5_CONTROLLER_SHA,'182bb46f2838306ba40d8b4ec32bac40ab75b69a');
  assert.equal(Object.keys(R5_CONTROLLER_FILES).length,7);
- assert.equal(shaR5(fs.readFileSync(new URL('../tools/runner-watchdog.mjs',import.meta.url))),
-  R5_SOURCE_SHA256);
+ // R5 approval pins historical immutable source bytes. New Watchdog fixes
+ // must never rewrite this approved hash; validate the old exact Git tree.
+ const historicalR5=execFileSync('git',
+  ['show',R5_TARGET+':tools/runner-watchdog.mjs'],
+  {cwd:fileURLToPath(new URL('../',import.meta.url)),encoding:null,
+   timeout:15000,maxBuffer:1000000});
+ assert.equal(shaR5(historicalR5),R5_SOURCE_SHA256);
  assert.deepEqual(admitR5(x),{
   requestId:x.body.requestId,issueNumber:x.event.issue.number,
   targetSha:R5_TARGET,oldSha:R5_PREIMAGE_SHA256,
