@@ -9,6 +9,8 @@ import {R4_GUARDIAN_TARGET,R4_GUARDIAN_REQUEST_ID}
  from './guardian-r4-contract.mjs';
 import {R5_GUARDIAN_TARGET,R5_GUARDIAN_REQUEST_ID}
  from './guardian-r5-contract.mjs';
+import {R6_GUARDIAN_TARGET,R6_GUARDIAN_REQUEST_ID}
+ from './guardian-r6-contract.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const TITLE='pc-watchdog-guardian-activate';
 const SCRIPT='a2ec241d98a2ca93508443deb5b4688ecbccb905';
@@ -61,10 +63,12 @@ function main(){
   ||event.issue?.user?.login!=='ansqhd5774-Choi'
   ||event.issue?.title!==TITLE)fail('WATCHDOG_ACTIVATION_REPORT_ACTOR_DENIED');
  const body=JSON.parse(event.issue.body);
+ const r6=body.targetSha===R6_GUARDIAN_TARGET;
  const r5=body.targetSha===R5_GUARDIAN_TARGET;
  const r4=body.targetSha===R4_GUARDIAN_TARGET;
  if(!ID.test(body.requestId??'')||
-   !(r5?body.requestId===R5_GUARDIAN_REQUEST_ID:
+   !(r6?body.requestId===R6_GUARDIAN_REQUEST_ID:
+     r5?body.requestId===R5_GUARDIAN_REQUEST_ID:
      r4?body.requestId===R4_GUARDIAN_REQUEST_ID:
      body.requestId===APPROVED_REQUEST_ID&&body.targetSha===SCRIPT))
   fail('WATCHDOG_ACTIVATION_REPORT_REQUEST_INVALID');
@@ -74,7 +78,7 @@ function main(){
  const result=normalizeResult(raw);
  const payload={schema:'ZGMINI_PC_WATCHDOG_ACTIVATION_B_RESULT_V1',
   requestId:body.requestId,issueNumber:event.issue.number,
-  targetSha:r5?R5_GUARDIAN_TARGET:r4?R4_GUARDIAN_TARGET:SCRIPT,
+  targetSha:r6?R6_GUARDIAN_TARGET:r5?R5_GUARDIAN_TARGET:r4?R4_GUARDIAN_TARGET:SCRIPT,
   runId:process.env.GITHUB_RUN_ID??null,
   attempt:process.env.GITHUB_RUN_ATTEMPT,...result};
  const stem='results/watchdog-activation-'+body.requestId;
@@ -83,7 +87,8 @@ function main(){
   'schema='+payload.schema,'requestId='+payload.requestId,'status='+payload.status,
   'code='+payload.code,'newProcessAttested='+payload.newProcessAttested,
   'watchdogFileWrites=0','next='+(payload.status==='PASS'
-   ?r5?'VERIFY_R5_ACTIVE_AND_TWO_STANDBY_RUNTIME':
+   ?r6?'VERIFY_R6_ACTIVE_AND_TWO_STANDBY_RUNTIME':
+     r5?'VERIFY_R5_ACTIVE_AND_TWO_STANDBY_RUNTIME':
      r4?'VERIFY_R4_ACTIVE_AND_STANDBY_RUNTIME':'READ_EXISTING_HANDOFF_ISSUE_1378':
      'STOP_INSPECT_EXISTING_CLAIM_NO_RETRY'),
   ''].join('\r\n')));
