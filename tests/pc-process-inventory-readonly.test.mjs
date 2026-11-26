@@ -2962,11 +2962,15 @@ test('S6 private A candidate does not approve B, attest independent maintainer o
   supervisor:{pid:14004,mode:'LISTENING',sourceSha:'c'.repeat(40),
    children:[{seat:1},{seat:2},{seat:3},{seat:4},{seat:5},{seat:6}]},
   ownerSha256:digest,protectedSha256:digest};
- const current={...raw,maintainerSourceSha:'20a2939d419675ede3e8ab38a3ea3b70756981ac'};
+ const current={...raw,maintainerSourceSha:'5a85f803fd9cb280561395f88a3544ee8e7d4660'};
  const currentProof=projectS6ApprovalPreimageReadonly(current,{now:at,sourceVersion:'CURRENT'});
  assert.equal(currentProof.status,'PASS');
  assert.equal(currentProof.s6Live.installedMaintainerSha,
-  '20a2939d419675ede3e8ab38a3ea3b70756981ac');
+  '5a85f803fd9cb280561395f88a3544ee8e7d4660');
+ assert.equal(projectS6ApprovalPreimageReadonly({...current,maintainerSourceSha:'20a2939d419675ede3e8ab38a3ea3b70756981ac'},
+  {now:at,sourceVersion:'CURRENT'}).code,'S6_A_MAINTAINER_SOURCE_UNVERIFIED');
+ assert.equal(projectS6ApprovalPreimageReadonly({...current,maintainerFilesVerified:false},
+  {now:at,sourceVersion:'CURRENT'}).code,'S6_A_MAINTAINER_SOURCE_UNVERIFIED');
  assert.equal(currentProof.bAuthorization,false);
  assert.equal(currentProof.promotionApproved,false);
  assert.equal(projectS6ApprovalPreimageReadonly(current,{now:at}).code,
