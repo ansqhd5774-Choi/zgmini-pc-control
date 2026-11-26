@@ -47,6 +47,8 @@ on:
       - 'controller/pc-source-origin-readonly.mjs'
       - 'tests/pc-source-origin-readonly.test.mjs'
       - 'controller/core-runtime-source-readonly.mjs'
+      - 'controller/us-breadth-r2-private-readonly.mjs'
+      - 'tests/us-breadth-r2-private-readonly.test.mjs'
       - 'controller/provider-activity-runtime-readonly.mjs'
       - 'controller/http32-two-host-checkpoints-readonly.mjs'
       - 'tests/provider-activity-runtime-readonly.test.mjs'
@@ -278,6 +280,9 @@ jobs:
         run: |
           echo CI_TESTED_INTEGRATION_SHA=%GITHUB_SHA%
           node --test tests/controller-ci-scope.test.mjs
+      - name: Verify fixed US R2 receipt inventory and private SHA, without PC or provider IO
+        if: hashFiles('tests/us-breadth-r2-private-readonly.test.mjs') != ''
+        run: node --test --test-concurrency=1 tests/us-breadth-r2-private-readonly.test.mjs
       - name: Verify CI approval shadow decisions and non-executable candidates
         if: hashFiles('tests/ci-approval-shadow-decision.test.mjs', 'tests/ci-approval-contract-adapter.test.mjs') != ''
         run: node --test --test-concurrency=1 tests/ci-approval-shadow-decision.test.mjs tests/ci-approval-contract-adapter.test.mjs
