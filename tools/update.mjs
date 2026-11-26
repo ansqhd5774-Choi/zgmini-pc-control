@@ -29,8 +29,8 @@ validateControllerConfigTransition,controllerAdmissionForPurpose,
  R6_HOST_CANDIDATE_SHA256,validateR54BIssueEnvelope,
  validateR54BManifestRequest,R54_B_ISSUE_TITLE,R54_B_OPERATION,
  R54_B_SOURCE_FILES,SOURCE_BUNDLE_OPERATION,SOURCE_BUNDLE_ISSUE_TITLE,
- validateSourceBundleIssueEnvelope,validateSourceBundleBApproval}
-  from './maintenance-contract.mjs';
+ validateSourceBundleIssueEnvelope,validateSourceBundleBApproval,
+ validateS6OnceBManifest} from './maintenance-contract.mjs';
 import {acquireMaintenanceLock,maintenanceLockStatus} from './maintenance-lock.mjs';
 import {planSourceBundleRegistration,stageApprovedSourceBundle,
  applyPreparedSourceBundleHostCas} from './source-bundle-register.mjs';
@@ -3166,6 +3166,248 @@ export function readS6OnceCurrentPreimage(requestId){
   },
   observedAtUtc:new Date().toISOString(),
   oldSupervisorAlive:true,standbyReadyCount:2,sixIdleRunnersVerified:true
+ };
+}
+
+
+
+
+/** Same immutable request ledger bytes must remain after S6. Never follow
+ * symlinks, omit a missing entry, or count newly added A receipts as damage.
+ * The caller supplies a securely pinned baseline; this is read-only. */
+export function s6PriorRequestLedgerPreserved(pinned,{root=path.join(controlRoot,'ledger'),io=fs}={}){
+ if(!pinned||typeof pinned!=='object'||Array.isArray(pinned)||
+    Object.keys(pinned).length>10000)return false;
+ try{
+  for(const [name,expected] of Object.entries(pinned)){
+   if(!/^[a-z0-9-]{8,80}\.json$/.test(name)||!/^[a-f0-9]{64}$/.test(expected))
+    return false;
+   const file=path.join(root,name);
+   const stat=io.lstatSync(file);
+   if(!stat.isFile()||stat.isSymbolicLink()||
+      sha256(io.readFileSync(file))!==expected)return false;
+  }
+  return true;
+ }catch{return false;}
+}
+
+
+/** Supervisor restarts reinsert child seats at the end of its Map. The
+ * heartbeat order is not seat order; verify a full unique seat/PID set and
+ * canonicalize before pinning old-runner exit evidence. */
+export function normalizeS6OldChildren(children,{requireAlive=false}={}){
+ if(!Array.isArray(children)||children.length!==6)return null;
+ const rows=[],seats=new Set(),pids=new Set();
+ for(const item of children){
+  if(!item||typeof item!=='object'||
+     !Number.isSafeInteger(item.seat)||item.seat<1||item.seat>6||
+     !Number.isSafeInteger(item.pid)||item.pid<=0||
+     (requireAlive&&item.alive!==true)||
+     seats.has(item.seat)||pids.has(item.pid))return null;
+  seats.add(item.seat);pids.add(item.pid);
+  rows.push({seat:item.seat,pid:item.pid});
+ }
+ if(seats.size!==6)return null;
+ return rows.sort((a,b)=>a.seat-b.seat);
+}
+
+
+/** Fixed evidence that the same pinned Watchdog receiver, original approved
+ * source and current on-disk bytes survived every phase of S6. This is
+ * observation only, never a process or execution authority. */
+export function s6WatchdogPinMatches({baseline,install,receiver,status,sourceSha256}={}){
+ const sha=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
+ const nonce=x=>typeof x==='string'&&/^[a-f0-9-]{36}$/.test(x);
+ return sha(baseline?.watchdogSourceSha256)&&
+  sha(install?.sha256)&&sha(sourceSha256)&&
+  install.sha256===baseline.watchdogSourceSha256&&
+  sourceSha256===baseline.watchdogSourceSha256&&
+  nonce(baseline?.watchdogReceiverNonce)&&
+  receiver?.nonce===baseline.watchdogReceiverNonce&&
+  Number.isSafeInteger(baseline?.watchdogPid)&&baseline.watchdogPid>0&&
+  receiver?.pid===baseline.watchdogPid&&status?.pid===baseline.watchdogPid;
+}
+
+/**
+ * Preserve the *exact* S6 old owner, six children and earlier request ledger
+ * hashes before any operational effect. A candidate manifest only becomes
+ * acceptable after the independent live source and owner CAS comparison.
+ * The returned nonce/PIDs must remain inside the authorized Windows process.
+ */
+export function captureS6OncePinnedBaseline(issue,approvedBytes,{actor=null}={}){
+ const observation=readS6OnceCurrentPreimage(issue?.requestId);
+ const receiver=json(path.join('E:/ZGmini/automation/pc-watchdog','receiver/owner.json'));
+ need(receiver.pid===observation.s6Live.watchdogPid&&
+  /^[a-f0-9-]{36}$/.test(receiver.nonce??''),
+  'S6_BASELINE_WATCHDOG_RECEIVER_CHANGED');
+ const pinned=validateS6OnceBManifest(issue,approvedBytes,{
+  actor,controlRepository,live:observation.s6Live});
+ need(pinned.operationalEffectExecuted===false&&pinned.authorization===false,
+  'S6_BASELINE_ADMISSION_NOT_EFFECT_AUTHORITY');
+ const {owner,status}=readOwner();
+ const sortedChildren=normalizeS6OldChildren(status.children,{requireAlive:true});
+ need(status.pid===owner.pid&&status.mode==='LISTENING'&&
+  sortedChildren!==null,
+  'S6_BASELINE_SIX_CHILDREN_UNVERIFIED');
+ const root=path.join(controlRoot,'ledger');
+ need(fs.existsSync(root)&&fs.statSync(root).isDirectory(),
+  'S6_BASELINE_REQUEST_LEDGER_UNAVAILABLE');
+ const names=fs.readdirSync(root);
+ need(names.length<=10000,'S6_BASELINE_LEDGER_SCOPE_EXCEEDED');
+ const ledgerHashes={};
+ for(const name of names){
+  need(/^[a-z0-9-]{8,80}\.json$/.test(name),
+   'S6_BASELINE_UNKNOWN_LEDGER_ENTRY');
+  const file=path.join(root,name);
+  need(fs.lstatSync(file).isFile()&&!fs.lstatSync(file).isSymbolicLink(),
+   'S6_BASELINE_LEDGER_NOT_PLAIN_FILE');
+  ledgerHashes[name]=sha256(fs.readFileSync(file));
+ }
+ need(fs.existsSync(path.join(controlRoot,'leases/supervisor/owner.json')),
+  'S6_BASELINE_OWNER_VANISHED');
+ const rawOwner=fs.readFileSync(path.join(controlRoot,'leases/supervisor/owner.json'));
+ need(sha256(rawOwner)===observation.s6Live.ownerSha256&&
+  JSON.parse(rawOwner.toString('utf8')).nonce===owner.nonce,
+  'S6_BASELINE_OWNER_CAS_CHANGED');
+ return Object.freeze({
+  requestId:issue.requestId,controllerSha:observation.actualControllerSha,
+  approvalManifestSha256:issue.approvalManifestSha256,
+  protectedSha256:observation.s6Live.protectedSha256,
+  ownerSha256:observation.s6Live.ownerSha256,
+  watchdogSourceSha256:observation.s6Live.watchdogSourceSha256,
+  watchdogReceiverNonce:receiver.nonce,
+  oldSupervisorPid:owner.pid,oldSupervisorNonce:owner.nonce,
+  watchdogPid:observation.s6Live.watchdogPid,
+  standbyPids:Object.freeze([...observation.s6Live.standbyPids]),
+  oldChildren:Object.freeze(sortedChildren.map(row=>Object.freeze(row))),
+  ledgerHashes:Object.freeze({...ledgerHashes})
+ });
+}
+
+/**
+ * Operating PC local-only, read-only S6 phase evidence collector.
+ * This is not a B approval, stop command or lease release. Never upload raw
+ * nonce/PID values to a public issue or use these fields as authority.
+ * Port caller independently authenticates exact B bytes and installed origin.
+ */
+export async function readS6OncePhaseReadback({phase,baseline,
+ exactApprovalBytesAttested=false,independentOperatorAttested=false,now=Date.now()}={}){
+ need(['PRE_DRAIN','STOPPED_HELD','WATCHDOG_RELEASED','PROMOTED'].includes(phase),
+  'S6_READBACK_PHASE_DENIED');
+ const uuid=x=>typeof x==='string'&&/^[a-f0-9-]{36}$/.test(x);
+ need(baseline&&/^pc-s6-[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(
+   baseline.requestId??'')&&validSha(baseline.controllerSha)&&
+  uuid(baseline.oldSupervisorNonce)&&uuid(baseline.watchdogReceiverNonce)&&
+  /^[a-f0-9]{64}$/.test(baseline.watchdogSourceSha256??'')&&
+  /^[a-f0-9]{64}$/.test(baseline.ownerSha256??'')&&
+  /^[a-f0-9]{64}$/.test(baseline.protectedSha256??'')&&
+  Number.isSafeInteger(baseline.oldSupervisorPid)&&baseline.oldSupervisorPid>0&&
+  normalizeS6OldChildren(baseline.oldChildren)!==null,
+  'S6_READBACK_PINNED_BASELINE_INVALID');
+ need(exactApprovalBytesAttested===true&&independentOperatorAttested===true,
+  'S6_READBACK_INDEPENDENT_ATTESTATION_REQUIRED');
+ const pidAlive=pid=>{
+  if(!Number.isSafeInteger(pid)||pid<=0)return null;
+  try{process.kill(pid,0);return true;}
+  catch(error){return error?.code==='ESRCH'?false:null;}
+ };
+ const wdRoot='E:/ZGmini/automation/pc-watchdog';
+ const wdSource=path.join(wdRoot,'runner-watchdog.mjs');
+ const wdInstall=json(path.join(wdRoot,'INSTALL.json'));
+ // Hold the exact hashed bytes for the pure read-only scanner import.
+ // Never import a path that could change between digest check and evaluation.
+ const verifiedWatchdogBytes=fs.readFileSync(wdSource);
+ need(/^[a-f0-9]{64}$/.test(wdInstall.sha256??'')&&
+  sha256(verifiedWatchdogBytes)===wdInstall.sha256&&
+  wdInstall.standby?.approved===true&&
+  wdInstall.standby?.mode==='ACTIVE_1_STANDBY_2',
+  'S6_READBACK_WATCHDOG_SOURCE_UNVERIFIED');
+ const wdOwner=json(path.join(wdRoot,'receiver/owner.json'));
+ const wd=json(path.join(wdRoot,'STATUS.json'));
+ need(s6WatchdogPinMatches({baseline,install:wdInstall,receiver:wdOwner,
+  status:wd,sourceSha256:sha256(verifiedWatchdogBytes)}),
+  'S6_READBACK_WATCHDOG_PIN_OR_OWNER_CHANGED');
+ const observedAge=now-Date.parse(wd.at??'');
+ const wdFresh=Number.isFinite(observedAge)&&observedAge>=0&&observedAge<45000&&
+  wd.pid===wdOwner.pid&&wd.pid===baseline.watchdogPid&&pidAlive(wd.pid)===true;
+ need(wdFresh,'S6_READBACK_WATCHDOG_OWNER_UNVERIFIED');
+ const ownerFile=path.join(controlRoot,'leases/supervisor/owner.json');
+ const raw=fs.existsSync(ownerFile)?fs.readFileSync(ownerFile):null;
+ const owner=raw?JSON.parse(raw.toString('utf8')):null;
+ const oldOwnerPresent=raw!==null&&sha256(raw)===baseline.ownerSha256&&
+  owner?.pid===baseline.oldSupervisorPid&&owner?.nonce===baseline.oldSupervisorNonce;
+ const archiveDir=path.join(wdRoot,'archives');
+ let oldOwnerArchived=false;
+ if(fs.existsSync(archiveDir)){
+  const entries=fs.readdirSync(archiveDir);
+  need(entries.length<=512,'S6_READBACK_ARCHIVE_SCOPE_EXCEEDED');
+  for(const entry of entries){
+   if(!/^supervisor-[0-9]+-[a-f0-9-]{36}$/.test(entry))continue;
+   const file=path.join(archiveDir,entry,'owner.json');
+   if(!fs.existsSync(file))continue;
+   const bytes=fs.readFileSync(file);
+   if(sha256(bytes)!==baseline.ownerSha256)continue;
+   const archived=JSON.parse(bytes.toString('utf8'));
+   if(archived.pid===baseline.oldSupervisorPid&&
+      archived.nonce===baseline.oldSupervisorNonce){oldOwnerArchived=true;break;}
+  }
+ }
+ need(oldOwnerPresent||oldOwnerArchived,'S6_READBACK_ORIGINAL_OWNER_CAS_UNVERIFIED');
+ const hbFile=path.join(controlRoot,'SUPERVISOR_STATUS.json');
+ const heartbeat=fs.existsSync(hbFile)?json(hbFile):null;
+ const activePid=owner?.pid??null;
+ const hbAge=now-Date.parse(heartbeat?.at??'');
+ const heartbeatFresh=activePid!==null&&heartbeat?.pid===activePid&&
+  Number.isFinite(hbAge)&&hbAge>=0&&hbAge<45000;
+ const leases=fs.readdirSync(path.join(controlRoot,'leases'))
+  .filter(x=>x!=='supervisor'&&!x.startsWith('supervisor.dead-'));
+ const pending=['in_progress','queued','waiting'].map(state=>{
+  const response=github('actions/workflows/pc-job.yml/runs?status='+state+'&per_page=1');
+  need(Number.isSafeInteger(response.total_count)&&response.total_count>=0,
+   'S6_READBACK_PENDING_COUNT_UNVERIFIED');
+  return response.total_count;
+ }).reduce((a,b)=>a+b,0);
+ const seats=requireCompleteRunnerInventory(github('actions/runners?per_page=100'));
+ // Pinned deployed Watchdog provides the ONE existing WMI scanner.
+ // It has a process.argv main guard; importing it from updater never starts tick.
+ const wdModule=await import('data:text/javascript;base64,'+
+  verifiedWatchdogBytes.toString('base64'));
+ need(typeof wdModule.scanControllerRunnersReadOnly==='function',
+  'S6_READBACK_WMI_SCANNER_UNVERIFIED');
+ const runnerExecutableProof=wdModule.scanControllerRunnersReadOnly();
+ const oldAlive=pidAlive(baseline.oldSupervisorPid);
+ const oldSixChildrenStopped=oldAlive===false&&
+  baseline.oldChildren.every(x=>pidAlive(x.pid)===false);
+ const installed=installedManifest();
+ const protectedSha256=sha256(JSON.stringify(protectedSnapshot()));
+ const newNonce=owner?.nonce??null;
+ // Compare hashes of all prior local request ledgers; subsequent A jobs can add
+ // entries but may never overwrite a previous receipt.
+ const existingRequestLedgerPreserved=s6PriorRequestLedgerPreserved(baseline.ledgerHashes);
+ return {
+  requestId:baseline.requestId,controllerSha:installed.installedSha,
+  protectedSha256,watchdogPid:wd.pid,
+  oldSupervisorNonce:baseline.oldSupervisorNonce,
+  oldOwnerIdentityMatched:oldOwnerPresent||oldOwnerArchived,
+  observedAtUtc:new Date(now).toISOString(),
+  independentOperatorAttested:true,exactApprovalBytesAttested:true,
+  relatedLeasesAbsent:leases.length===0,pendingWorkCount:pending,
+  workflowState:github('actions/workflows/pc-job.yml').state,
+  maintenanceLeaseHeld:maintenanceLockStatus(maintenanceRoot,'controller-install').held,
+  watchdogPaused:wd.state==='PAUSED',
+  controllerDraining:fs.existsSync(path.join(controlRoot,'DRAIN')),
+  oldSupervisorAlive:oldAlive,
+  activeSupervisorPid:activePid,heartbeatFresh,
+  standbyReadyCount:wd.standbyReadyCount,standbyOwnersUnique:
+   Number.isSafeInteger(wd.standbyPid)&&Number.isSafeInteger(wd.secondStandbyPid)&&
+   wd.standbyPid>0&&wd.secondStandbyPid>0&&wd.standbyPid!==wd.secondStandbyPid,
+  runnerSeats:seats.map((x,i)=>({seat:i+1,name:x.name,status:x.status,busy:x.busy})),
+  oldSixChildrenStopped,runnerExecutableProof,newOwnerNonce:newNonce,
+  activeOwnerNonceChanged:newNonce!==null&&newNonce!==baseline.oldSupervisorNonce,
+  watchdogStatusHealthy:wd.state==='HEALTHY'&&wdFresh,
+  previousOwnerFenced:oldOwnerArchived&&oldAlive===false&&
+   owner?.pid!==baseline.oldSupervisorPid,
+  existingRequestLedgerPreserved
  };
 }
 
