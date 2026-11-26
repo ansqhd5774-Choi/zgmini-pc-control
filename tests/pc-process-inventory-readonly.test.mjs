@@ -2900,6 +2900,7 @@ test('R5 A admits exact #4036 approved R2 Controller but never promotes or write
  assert.equal(valid.operationalWrites,0);
  const reject=[
   v=>{v.controllerHost.controllerSourceSha='f'.repeat(40);},
+  v=>{v.controllerHost.controllerSourceSha='__proto__';},
   v=>{v.controllerHost.controllerFiles['controller/operations.mjs']='d4a76910806cba861b3253f5fd24eccc8968fcbaa66133999483034b2f661cd3';},
   v=>{delete v.controllerHost.controllerFiles['controller/us-breadth-r2-private-readonly.mjs'];},
   v=>{v.controllerHost.controllerFiles['controller/us-breadth-r2-private-readonly.mjs']='0'.repeat(64);},
