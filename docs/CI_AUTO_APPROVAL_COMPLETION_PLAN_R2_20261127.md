@@ -525,3 +525,28 @@
 - **기능 범위 완료:** 이전 운영-PC E: 기본경로를 별도 격리 PC Publisher에서 무조건 사용하던 source 결함 수정. `ZGMINI_CI_NATIVE_SCOPE_ROOT`는 **독립적으로 설치·관리하는 읽기 전용 B-approved 정책 루트**이고, 기존 `ZGMINI_CI_NATIVE_RECEIPT_ROOT`는 단회 발행 영수증 전용 쓰기 root로 유지. 두 path의 포함/중첩·symlink·checkout/TEMP 정책 사용 거부. 실제 Owner-B 승인 증명 및 A/Writer receiver 기존 source/실행/권한 검사 유지.
 - **운영 적용 미완료:** 해당 새 변수의 실제 등록·격리 PC 경로/ACL/정확한 Owner-approved Scope·proof 설치를 소스 변경만으로 단정하지 않는다. 정책·파일·GH 변수·Controller·Core·DB를 운영 변경한 적 없고 신규 A/B 요청도 발행하지 않았다. Native/Controller B 활성화 여부와 실제 운영 Windows Runner 6개 상태는 여전히 직접 실측하지 못했다. 운영 무인 완료율 **0/3** 유지.
 - **다음 직접 필수 실행:** 기존 독립 승인 계약에서 격리 PC의 승인 정책 root를 실제 준비/검증하고 `ZGMINI_CI_NATIVE_SCOPE_ROOT` 변수를 허가된 범위에서 연결 → 운영 PC Runner와 설치 승인 SHA 확인 → A/Writer B/Controller B의 각 실제 단회 원본 결과 JSON/TXT까지 확인. 새 관리자/보안 범위 승인이 필요하면 효과·정확 경로/해시를 분리해 처리하고 설정 변경으로 승인 증거를 대체하지 않는다.
+
+## 21. 열일곱 번째 실행 기록 — 운영 Runner 6/6 실제 복구 및 Native 활성화 계약 분리 (2026-11-27 KST)
+
+### 현장 Runner/기존 A 완료 증거
+
+- 사용자 제공 GitHub Runners 화면(2026-11-27 오전): `zgmini-pc-01..06` 6/6 **Idle**, 격리 `zgmini-handoff-ci-spare-01` **Active**. UI 스냅샷을 전 기간의 동작으로 확대하지 않음.
+- 기존 원본 [#4080 A Run 45883221676](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45883221676), Job 140127435932가 운영 `zgmini-pc-03`에서 **completed/success** (2026-11-26 21:09:46~21:11:18 UTC). 기존 #4080 Issue 댓글 [7203475101](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4080#issuecomment-7203475101)에서 고유 원격 결과 `results/pc-process-inventory-45883221676-1-operating.json/.txt` 2/2 readback PASS.
+- 원본 JSON blob `9c204f8a5d427826d8d5b82777432967049ac2de` / TXT `801ac65dc0a20a2f5fd54e25b436481f80e47465`: `PROCESS_INVENTORY_COLLECTED`, 실제 `observedAtUtc=2026-11-26T21:10:54.821Z`, `maintenance.runtimeState=HEALTHY`, `automationState=HEALTHY`, `workflowState=active`, `runtimeSignals` Controller source verified/Supervisor identity·fresh heartbeat/6 children/allSixOnline **각 true**, `installLockHeld=false`. Runner roster `QUERY_RETURNED`: 6/6 online, 당해 실행 중 03만 Busy. 0 operational writes/retries.
+- 실제 설치 `actualControllerSha=3c7d4cfefacf072fd35cb19706b352c64c5e4fd2`, `maintenanceSourceSha=5a85f803fd9cb280561395f88a3544ee8e7d4660`. **main 최신 SHA와 운영 설치 SHA를 혼동 금지**.
+- 기존 [#4082 W06 Run 45884082348](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45884082348) Job 140130350496 `zgmini-pc-01`에서 **completed/success**, 단 실제 JSON/TXT `results/45884082348-1-seat-1.json/.txt` (blob `86a310ecefbe9e7c39f76e91436297dc699203f0` / `528a850e66df6ffaea4faee6f490c26c21df8fbe`)는 **STATE_UNKNOWN / CNN_APPROVED_D1_READ_UNVERIFIED**, `firstFail=ALLOWLISTED_OPERATION`, SQLite opened/보호 hash 불변, D1/API NOT_CHECKED. W06 원담당 범위로 분리; 동일 요청 재실행하지 않는다. #4082 opened+labeled 이중 Run 중 후발 [45884083567](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45884083567)은 skipped.
+
+### Runner 복구와 Native 무인 승인 0/3의 분리
+
+- 기존 S6 #4069은 원본 `UNKNOWN`; 소스/수동 읽기 원장에서 `RECOVERY_REQUIRED`, `failedAt=WATCHDOG_RELEASE_OUTCOME_UNVERIFIED` 확인 이력이 있으며, 새로운 운영 Runner 정상화만으로 **원래 S6 승격 종단 성공/원장 소급 완료로 판단하지 않는다**. S6 총괄이 담당하는 원본 CAS/lease 보존. main 최신 `b08f3a482e9bb39523f47675ae06bc6e02e01d2d`는 신규 S6 시작 전 독립 crash-safe 복구 증명을 요구하는 fail-closed 소스 병합, 기존 운영 설치와 구분.
+- **Native Controller B 실측 미승인**: #4080 JSON의 `ciControllerBReceiver.policyState=PRESENT_FORMAT_ONLY`, `approvedV2PinMatches=false`, `approvedReceiptGuardPinMatches=false`, `executionAuthorized=false`, `installedSourceIntegrityAsserted=false`. 이것은 단순 Runner OFFLINE 문제가 아니라 **독립 설치 승인/pin이 실제로 안 맞는 별도 실행 경계**. 임의 GitHub 설정 true/미승인 재설치 금지.
+- Native A/Writer Publisher [Run 45890646874](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45890646874) 2개 Job 모두 skipped, Controller B [45890736341](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45890736341) skipped. CI opt-in bool의 현재 값은 GitHub 연결에서 조회 불가; skipped를 승인 증명으로 해석하지 않는다.
+- 지난 PR #4085/#4086/#4088/#4089의 source-only 3/3 및 main 병합은 유효. 그러나 격리 PC의 `ZGMINI_CI_NATIVE_SCOPE_ROOT`·영구 claim root 및 B-installed proof/업무 원문 실측은 미확인. 원본 Owner-B 정책/영수증 외 다른 파일을 승인 source로 대신 쓰지 않는다.
+- 무인 실제 A·Writer B·Controller B **0/3 (0%)** 유지. 운영 Runner 복구를 이 분모에 자동 추가하지 않는다. 새 A/B 요청·CI 재실행·정책 발행·GitHub 변수/파일/DB/Task 변경 **0건**.
+
+### 다음 필수 실행
+
+1. 운영 Runner 재배정은 **회복됨**으로 최신 결과 반영하고 불필요한 Runner 복구/재등록 조사 중단.
+2. A·Writer B: 격리 PC native read-only scope + Owner-B installed proof + 저장된 request/approval SHA + 발행 영구 receipt root의 실존/신뢰/원본 readback 확인. 없으면 허위 정책 생성 금지; 해당 효과의 승인 범위/원본이 갖춰진 뒤에만 기존 Workflow 조건을 허용.
+3. Controller B: 현재 `approvedV2PinMatches=false`·`approvedReceiptGuardPinMatches=false`의 **설치/원본 정확 SHA 차이**를 승인된 읽기 경로로 구분하고 기존 Owner B 설치/승인 계약으로만 처리. 다른 B 효과와 공유 lease가 실제 충돌할 때만 직렬화.
+4. 검증 가능한 효과부터 자연 CI 완료 → exact dispatch/원장 → 운영 A·Writer/Controller B 실행 → 설치 SHA와 JSON/TXT remote 결과를 동일 requestId/effect에 대조. 각 효과 종료 PASS만 실제 1/3 카운트.
