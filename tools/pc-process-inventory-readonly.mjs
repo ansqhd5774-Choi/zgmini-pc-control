@@ -399,11 +399,12 @@ export function assessR5StandbyRuntimeSnapshot(snapshot,{
   'controller/operations.mjs':'bac7412c51c156d31b68f725f2532011cccf38359fe18e66a4d3851aa3a2b803',
   'controller/us-breadth-r2-private-readonly.mjs':'e5f1d87626c0fb192831f4fc76fc9e13931af6105a38e503f90f7e656d180fb1'
  };
- const fixedControllerRosters={
-  '182bb46f2838306ba40d8b4ec32bac40ab75b69a':w06ControllerFiles,
-  '3c7d4cfefacf072fd35cb19706b352c64c5e4fd2':breadthR2ControllerFiles
- };
- const roster=fixedControllerRosters[host?.controllerSourceSha];
+ // Compare the untrusted source ID as a literal; never index an Object
+ // with it (prototype keys such as "__proto__" must fail closed).
+ const roster=host?.controllerSourceSha==='182bb46f2838306ba40d8b4ec32bac40ab75b69a'
+  ?w06ControllerFiles
+  :host?.controllerSourceSha==='3c7d4cfefacf072fd35cb19706b352c64c5e4fd2'
+   ?breadthR2ControllerFiles:null;
  const controllerTargetMatch=!!roster&&
   !!host.controllerFiles&&typeof host.controllerFiles==='object'&&
   !Array.isArray(host.controllerFiles)&&
