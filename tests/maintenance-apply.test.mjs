@@ -10,7 +10,8 @@ import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {applyApprovedUpdate,maintenanceFailureCode,reconcileInterruptedRollback,runApprovedS6FailoverOnce} from '../tools/maintenance-apply.mjs';
-import {isolatedControllerStage,recoveryOperatorProofStatus,waitForSupervisorStopIdle} from '../tools/update.mjs';
+import {isolatedControllerStage,recoveryOperatorProofStatus,waitForSupervisorStopIdle,
+ s6PriorRequestLedgerPreserved} from '../tools/update.mjs';
 
 test('independent recovery proof keeps strict identity and returns exact sanitized failure categories',()=>{
  assert.deepEqual(recoveryOperatorProofStatus({exitCode:0,stdout:'INDEPENDENT_OPERATOR\r\n'}),{verified:true,code:'RECOVERY_OPERATOR_VERIFIED'});
@@ -1223,4 +1224,49 @@ test('S6 readonly PC preflight checks deployed Watchdog bytes, not just INSTALL 
  assert.match(body,/maintenanceLockStatus\(maintenanceRoot,'controller-install'\)/);
  assert.match(body,/protectedSnapshot\(\)/);
  assert.doesNotMatch(body,/taskkill|fs\.unlinkSync|fs\.renameSync|spawn\(|\.release\(/);
+});
+
+
+test('S6 existing requestId ledger hashes retain original bytes even after new A job is added',t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-s6-ledger-test-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const id='pc-test-11111111-2222-4333-8444-555555555555.json';
+ const file=path.join(root,id);
+ const raw=Buffer.from('{"schema":"ZGMINI_PC_RESULT_V1","status":"PASS"}\n');
+ fs.writeFileSync(file,raw);
+ const pinned={[id]:createHash('sha256').update(raw).digest('hex')};
+ assert.equal(s6PriorRequestLedgerPreserved(pinned,{root}),true);
+ fs.writeFileSync(path.join(root,'pc-new-abcdef12-3456-4321-8123-abcdefabcdef.json'),
+  'new authorized result');
+ assert.equal(s6PriorRequestLedgerPreserved(pinned,{root}),true);
+ fs.writeFileSync(file,'{"status":"FAIL"}');
+ assert.equal(s6PriorRequestLedgerPreserved(pinned,{root}),false);
+ fs.unlinkSync(file);
+ assert.equal(s6PriorRequestLedgerPreserved(pinned,{root}),false);
+});
+test('S6 ledger readback fails closed for traversal, malformed SHA and symlinked ledger data',()=>{
+ const fake={
+  lstatSync:()=>({isFile:()=>true,isSymbolicLink:()=>true}),
+  readFileSync:()=>Buffer.from('never read')
+ };
+ const digest='a'.repeat(64),root='X:/S6-test-ledger';
+ assert.equal(s6PriorRequestLedgerPreserved({'../owner.json':digest},{root,io:fake}),false);
+ assert.equal(s6PriorRequestLedgerPreserved({'pc-test-abcdef12.json':'invalid'},{root,io:fake}),false);
+ assert.equal(s6PriorRequestLedgerPreserved({'pc-test-abcdef12.json':digest},{root,io:fake}),false);
+ assert.equal(s6PriorRequestLedgerPreserved(null,{root,io:fake}),false);
+});
+test('S6 local readback uses actual deployed Watchdog WMI and never publishes a synthetic pass',()=>{
+ const s=fs.readFileSync(new URL('../tools/update.mjs',import.meta.url),'utf8');
+ const begin=s.indexOf('export async function readS6OncePhaseReadback(');
+ const end=s.indexOf('export async function command(',begin);
+ assert.ok(begin>0&&end>begin);
+ const code=s.slice(begin,end);
+ assert.match(code,/sha256\(fs\.readFileSync\(wdSource\)\)===wdInstall\.sha256/);
+ assert.match(code,/watchdogModule|wdModule\.scanControllerRunnersReadOnly\(\)/);
+ assert.match(code,/oldSixChildrenStopped/);
+ assert.match(code,/oldOwnerArchived/);
+ assert.match(code,/existingRequestLedgerPreserved/);
+ assert.match(code,/previousOwnerFenced/);
+ assert.match(code,/exactApprovalBytesAttested===true&&independentOperatorAttested===true/);
+ assert.doesNotMatch(code,/taskkill|fs\.unlinkSync|fs\.renameSync|fs\.writeFileSync|spawn\(/);
 });
