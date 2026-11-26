@@ -2919,6 +2919,39 @@ test('R5 A admits exact #4036 approved R2 Controller but never promotes or write
  assert.equal(r5Assess(stale).code,'WATCHDOG_R5_HEALTH_STATUS_UNVERIFIED');
 });
 
+test('R5 A classifies only allowlisted Watchdog health state after owner verification',()=>{
+ for(const state of ['PAUSED','PAUSED_WORKFLOW','BLOCKED_LIVE_OR_UNKNOWN',
+   'BLOCKED_STANDBY_NOT_READY','BLOCKED_OLD_RUNNER_CHILD_UNVERIFIED',
+   'STARTING']){
+  const x=r5RuntimeFixture();x.status.state=state;
+  const p=r5Assess(x);
+  assert.equal(p.status,'STATE_UNKNOWN');
+  assert.equal(p.code,'WATCHDOG_R5_HEALTH_STATUS_UNVERIFIED');
+  assert.equal(p.statusFresh,true);
+  assert.equal(p.watchdogOwnerVerified,true);
+  assert.equal(p.watchdogHealthState,state);
+  assert.equal(p.promotionApproved,false);
+  assert.equal(p.operationalWrites,0);
+ }
+ const healthy=r5Assess(r5RuntimeFixture());
+ assert.equal(healthy.watchdogHealthState,'HEALTHY');
+ const malicious=r5RuntimeFixture();
+ malicious.status.state='C:/secret; nonce=hidden';
+ const rejected=r5Assess(malicious);
+ assert.equal(rejected.watchdogHealthState,'UNRECOGNIZED');
+ assert.doesNotMatch(JSON.stringify(rejected),/secret|hidden|nonce/i);
+ const stale=r5RuntimeFixture();
+ stale.status.at='2026-11-26T01:10:40Z';
+ const staleResult=r5Assess(stale);
+ assert.equal(staleResult.code,'WATCHDOG_R5_HEALTH_STATUS_UNVERIFIED');
+ assert.equal(staleResult.watchdogHealthState,'STALE_OR_UNVERIFIED');
+ const invalidOwner=r5RuntimeFixture();
+ invalidOwner.status.pid=999999;
+ const invalid=r5Assess(invalidOwner);
+ assert.equal(invalid.code,'WATCHDOG_R5_PROCESS_OWNER_UNVERIFIED');
+ assert.equal(invalid.watchdogHealthState,undefined);
+});
+
 test('R5 A fails closed on missing second slot, stale status, source or controller drift',()=>{
  const changes=[
   [x=>{x.status.secondStandbyRole='STARTING';},'WATCHDOG_R5_SECOND_STANDBY_IPC_UNVERIFIED'],
