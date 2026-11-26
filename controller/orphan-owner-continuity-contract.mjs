@@ -36,7 +36,7 @@ export function assessOrphanOwnerContinuity({
     !sha64(hostBytesSha256)||hostBytesSha256!==expectedHostBytesSha256)
   return denyWith('CONTINUITY_SOURCE_OR_OWNER_CAS_UNVERIFIED');
  if(!validPid(oldOwner?.pid)||typeof oldOwner?.nonce!=='string'||
-    !/^[0-9a-f-]{36}$/i.test(oldOwner.nonce)||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(oldOwner.nonce)||
     !Number.isFinite(oldOwner?.bootAt)||!Number.isFinite(currentBootAt)||
     Math.abs(oldOwner.bootAt-currentBootAt)>=10000||
     oldOwnerAlive!==false||oldSupervisorIdentityProven!==true)
