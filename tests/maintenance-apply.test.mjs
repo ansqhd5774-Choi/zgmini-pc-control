@@ -1261,7 +1261,8 @@ test('S6 local readback uses actual deployed Watchdog WMI and never publishes a 
  const end=s.indexOf('export async function command(',begin);
  assert.ok(begin>0&&end>begin);
  const code=s.slice(begin,end);
- assert.match(code,/sha256\(fs\.readFileSync\(wdSource\)\)===wdInstall\.sha256/);
+ assert.match(code,/sha256\(verifiedWatchdogBytes\)===wdInstall\.sha256/);
+ assert.match(code,/import\('data:text\/javascript;base64,'\+/);
  assert.match(code,/watchdogModule|wdModule\.scanControllerRunnersReadOnly\(\)/);
  assert.match(code,/oldSixChildrenStopped/);
  assert.match(code,/oldOwnerArchived/);
