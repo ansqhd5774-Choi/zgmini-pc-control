@@ -84,7 +84,7 @@ export function assessOrphanOwnerContinuity({
  if(inheritedNonceLocalProof?.method!=='PRIVATE_WINDOWS_SUPERVISOR_LAUNCH_LINEAGE'||
     inheritedNonceLocalProof.verified!==true||
     inheritedNonceLocalProof.seatCount!==6||
-    inheritedNonceLocalProof.oldOwnerMatches===false)
+    inheritedNonceLocalProof.oldOwnerMatches!==true)
   return denyWith('CONTINUITY_INHERITED_RUNNER_NONCE_UNVERIFIED');
  if(approvalManifestAuthenticated!==true)
   return denyWith('CONTINUITY_EFFECT_APPROVAL_NOT_ESTABLISHED');
