@@ -54,3 +54,37 @@ test('W06 minute bounded collection wait is one exact CAS Writer B file with pro
  assert.equal(Object.hasOwn(approved,'coreMaintenance'),false,
   'existing natural Core idle and task policy remain unchanged');
 });
+
+test('W06 one-file B reuses already-installed 360-second maintenance scope after zero natural idle samples',()=>{
+ const natural=load('approvals/writer-updates/w06-cnn-minute-bounded-eligibility-onefile-20261127.json');
+ const reserved=load('approvals/writer-updates/w06-cnn-minute-bounded-eligibility-onefile-maint360-20261127.json');
+ assert.equal(validateWriterBManifest(reserved),reserved);
+ assert.equal(reserved.coreMaintenance,'PAUSE_NEW_STARTS_DRAIN_360S_V1');
+ const {coreMaintenance,...withoutMaintenance}=reserved;
+ assert.deepEqual(withoutMaintenance,natural,
+  'approved file, SHA, source CAS, Task XML, launcher and no-effect fields unchanged');
+ const precedent=load('approvals/writer-updates/w06-cnn-minute-ninefile-pause360-20261126.json');
+ assert.equal(precedent.coreMaintenance,reserved.coreMaintenance,
+  'previous W06 maintenance approval uses the exact same bounded effect');
+ const precedentResult=load('results/writer-b-source-install-2bf33e8b-5bd4-4e56-a9ce-3a0a763cda02.json');
+ assert.equal(precedentResult.status,'WRITER_B_INSTALLED_VERIFIED');
+ assert.equal(precedentResult.sourceSha,reserved.baseHead);
+ assert.equal(precedentResult.manifestSha256,
+  'd7b68d89d428126e919ceb0156f5a64666a792ea81898dff9deefbe259f795bf');
+ const failedNatural=load('results/writer-b-source-install-294ef0aa-3178-44ac-8dd8-9b476ee2b806.json');
+ assert.equal(failedNatural.status,'WRITER_B_PREFLIGHT_STOP');
+ assert.equal(failedNatural.code,'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED');
+ assert.equal(failedNatural.idleObservation.readySamples,0);
+ assert.equal(failedNatural.idleObservation.activeSamples,159);
+ assert.equal(failedNatural.idleObservation.otherSamples,0);
+ assert.equal(failedNatural.sourceSha,null);
+ const recoveredRace=load('results/writer-b-source-install-e25c0b36-2949-45f0-ab49-083afcd5980d.json');
+ assert.equal(recoveredRace.status,'WRITER_B_INSTALL_STOP_RESTORED');
+ assert.equal(recoveredRace.recovery,'ORIGINAL_VERIFIED');
+ assert.equal(recoveredRace.sourceSha,null);
+ assert.equal(reserved.runCount,1);
+ assert.equal(reserved.files.length,1);
+ for(const flag of ['allowProviderCalls','allowDbChanges','allowD1Writes',
+  'allowTaskDefinitionChanges','allowOtherSourceChanges'])
+  assert.equal(reserved[flag],false);
+});
