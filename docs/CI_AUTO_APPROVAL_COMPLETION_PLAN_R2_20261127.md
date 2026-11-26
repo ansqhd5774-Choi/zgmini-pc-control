@@ -307,3 +307,27 @@
 2. Native A/Writer의 실제 사용 가능한 **정규 설치 승인 원본**에 per-effect 정책·원문 해시를 결합하는 **운영 영수증 producer/검증**의 미연결 지점을 최소 구현한다. 단지 verifier가 기대하는 두 필드를 임의 채우거나 새 로컬 정책 파일을 스스로 생성해서는 안 된다.
 3. 각 효과의 현재 PC native scope·설치 SHA·활성화 변수·CI Run을 기존 정규 읽기 경로로 확인한다. 확인한 허가 효과부터 자연 이벤트→수신→PC 단회 실행→지속 JSON/TXT readback; Controller B 독립 파일럿을 병행하되 자원 쓰기만 직렬화한다.
 4. 확실한 운영 영수증이 생기기 전까지 유형별 0/3을 유지한다.
+
+## 14. 열 번째 실행 기록 — 2026-11-27 KST
+
+### #4085 CI 및 실제 main 변동
+
+- A 결과 증명 강화 [PR #4085](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4085), HEAD `79cf7661e4e3c3fa3b6969ef4a71eea8d0e1fe54`: Run 45886304836 Windows Source 진행(관측 시 91단계 중 90 완료), C996 45886304905 / Secret Scan 45886304824는 queued. 신규 native A 관련 Windows Source 단계 PASS. **3/3 최종 성공 전 병합 보류**.
+- 다른 담당자의 S6 PR #4084가 최신 main `9aa64971ecac09f3832f77ad3b377f93a021de94`에 병합됨. 변경 2파일(`tools/pc-process-inventory-readonly.mjs`, 해당 시험)이고 이번 범위와 분리·보존한다.
+
+### #4086 — B 명시 승인 정책과 실행 결과 영수증 생산 경로 연결
+
+- 신규 소스 브랜치 `codex/ci-native-b-approved-receipt-20261127` (당시 main `0ca88b407da8fff2782f9cd802fcd8c86b68e8ed`) 및 [PR #4086](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4086). HEAD `076d7a46893fff8e44bdd8c979954c6e926f2b87`, 현재 main 대비 mergeable.
+- 정확 원인: native publisher는 B 결과 `ciNativeEffect`·`ciNativePolicySha256`를 반드시 확인하지만 기존 maintainer는 해당 값 producer가 없었다. 기존 B 성공 증거를 임의 native 효과로 승격할 수 없어 소스상 연결 결함.
+- `tools/maintenance-contract.mjs`: **기존 Owner가 직접 승인한 정확 B manifest에 한해** 선택적 `ciNativeApproval`(schema/effect/policy SHA256)을 검증한다. `A_READONLY` 또는 `B_WRITER_SOURCE`만 가능, `pc-controller-maintenance` + `controllerOnlyInstall` + `selectiveSource` 한정. CI bot 자체에 권한 부여 불가. 원문 SHA와 기존 인증·CAS·복귀 계약 보존.
+- `tools/maintenance-agent.mjs`: 검증된 Owner B manifest와 실제 동일 request/target의 `SUCCEEDED`, `protectedStateUnchanged=true`, 설치 SHA 일치 시에만 기존 유지보수기 영구 결과 JSON에 native effect/policy hash를 첨부. updater stdout, 과거 B 영수증, 일반 승인 manifest는 이 권한을 생성할 수 없다.
+- `tests/maintenance-contract.test.mjs`, `tests/maintenance-agent.test.mjs`: 범위 밖, 변조, Bot, 설치 SHA drift, 실패·UNKNOWN, 중복 실행, 업데이터 위조 입력을 거부하는 회귀시험 추가. 정확 4파일 blob readback 완료.
+- 정확 HEAD CI 등록: C996 [45886695741](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45886695741), Windows Source [45886695686](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45886695686), Secret Scan [45886695672](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45886695672). 관측 시 **3/3 queued**, 병합·운영 설치 전.
+- 이 소스 수정은 새 Owner 승인 원본, 로컬 독립 native Scope/proof, GitHub 변수 권한 및 설치 영수증의 실제 존재를 **자동 생성하지 않는다**. PC·GH 변수·업무 쓰기·새 Issue/Runner/예약 변경 0.
+
+### 다음 필수 실행
+
+1. #4085, #4086 각각 정확 HEAD의 CI 3/3 결과를 회수하고, 실패에 해당하는 최소 코드만 정정한다. 정상일 때만 main 병합 및 실제 blob 확인.
+2. 실제 승인된 개별 A/Writer/Controller 업무에서 동일 B 명세의 명시 native 정책 해시, 독립 로컬 Scope/proof 설치, 활성화 변수와 실제 PC 버전을 **현재 Runtime으로 검증**한다. Source-only 개발을 실행 완료로 세지 않는다.
+3. A, Writer B, Controller B의 실제 자연 CI 이벤트 → 원본 인증 → PC 단회 실행 → JSON/TXT 지속 영수증 및 설치 SHA readback. 특히 Controller B 기존 미구성 정책은 무단 활성화하지 않는다.
+4. 운영 무인 완료 증거 없음: **0/3** 유지. 구형 성공·CI PASS·PR 자체를 신규 무인 성공으로 승격하지 않는다.
