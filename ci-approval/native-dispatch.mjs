@@ -86,17 +86,16 @@ export async function dispatchApprovedCiEffect({policy,requestBytes,ports}={}){
  // A caller-supplied policy cannot independently prove a business grant.
  // Compare *all* material authority fields with the installed trusted scope.
  // A changed approval hash or source run must never mint a new effect claim.
- const installedFields=['effect','receiverWorkflowPath','receiverWorkflowBlobSha',
-  'sourceAttempt','sourceWorkflowId','sourceWorkflowPath',
-  'sourceHeadSha','sourceWorkflowBlobSha','businessApprovalSha256',
-  'approvedRequestSha256','policyRevision','sourceRunMode'];
- // The only dynamic field is a successful CI run ID. EVENT_COMPLETION_V1
- // must be granted in the installed policy without any preselected run ID.
- // Fixed legacy grants continue to compare the exact installed run number.
+ // The complete installed policy is the authority, including execution
+ // enable flags and adapter/Controller SHA pins. Comparing only transport
+ // fields would let a modified local scope silently elevate its effect.
+ // For an event-bound policy, remove ONLY the authenticated runtime Run ID:
+ // it is deliberately absent from the independently installed B proof.
+ const authorizedPolicy={...policy};
+ if(eventBound)delete authorizedPolicy.sourceRunId;
  if(installed?.enabled!==true||
-   installedFields.some(k=>installed[k]!==policy[k])||
-   (eventBound?Object.hasOwn(installed,'sourceRunId')||policy.sourceAttempt!==1:
-     installed.sourceRunId!==policy.sourceRunId))
+    (eventBound&&policy.sourceAttempt!==1)||
+    JSON.stringify(installed)!==JSON.stringify(authorizedPolicy))
   return denied('EVIDENCE_MISSING','CI_NATIVE_DISPATCH_RECEIVER_NOT_ATTESTED',{effectKey:key});
  let prior;
  try{prior=await ports.loadReceipt(key);}catch{return denied('STATE_UNKNOWN','CI_NATIVE_DISPATCH_RECEIPT_READ_UNKNOWN',{effectKey:key});}
