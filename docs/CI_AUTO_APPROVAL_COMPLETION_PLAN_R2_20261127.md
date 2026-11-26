@@ -120,11 +120,11 @@
 
 - 실제 소스 브랜치: `codex/ci-auto-approval-receiver-admission-failclosed-20261127` (최신 main `0560970d0bcca0d223ef12a61a9ee1fd36290e1d` 기반).
 - [PR #4044](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4044): 합성 판정의 수신기 인증 증거 누락 시 `EVIDENCE_MISSING/CI_RECEIVER_ADMISSION_NOT_PROVEN`으로 반환. A / Writer B / Controller B 음성 회귀 4건 추가.
-- 코드 HEAD `85066e3ca47864229a81e38fb457e2b8e8d047e6`, 변경 파일 2개. 해당 PR의 격리 실제 CI 결과·병합 여부는 **별도 확인 전 미입증**.
+- 코드 HEAD `85066e3ca47864229a81e38fb457e2b8e8d047e6`, 변경 파일 2개. **관련 정확 HEAD CI 3/3 SUCCESS**: C996 [45875962218](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45875962218), PC Secret Scan [45875962227](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45875962227), Controller Maintenance Source Tests [45875962206](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45875962206). [PR #4044](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4044) `main` 병합 SHA **`422cd4044973154038fa0575ad30cc1bd8791c1c`**; main 실제 파일 두 개 blob `44451bb808cf3a2353dd6d84674814f32f68b87b` 및 `37db824e3a46a85654c088ef0cd9984ba98693f6` readback 완료.
 - 실제 Owner-only Workflow, Writer 수신기, A 허용목록, CI 인증 정책, GitHub 변수, PC Runtime **변경 0**. PR #4044의 모의 판정 개선을 실제 무인 실행 완료로 세지 않는다.
 
 ### 다음 필수 코드 작업
 
 1. A·Writer B 각각의 기존 Owner 인증과 신규 CI 제출 주체를 **동일한 신원으로 가장하지 않고** 분리할 실제 허용 수신·서명/영수증 계약을 특정한다.
 2. 독립 검증·계정 범위·단회 요청/기존 영수증·재생 방지를 만족하는 공식 경로만 최소 변경한다. 인증/관리자 권한 변경이 필요한 범위는 별도 근거로 분리한다.
-3. PR #4044 정확 HEAD 격리 CI 완료 시 기존 증거와 통합 여부를 확인한다. 그 결과와 무관하게 실제 A·Writer 종단 실증은 아직 0건으로 보존한다.
+3. PR #4044 정확 HEAD CI·병합·main readback은 완료. **운영 동작이나 자동 승인 활성화를 변경하지 않았다.** 실제 A·Writer 종단 실증 0건으로 보존하고, 다음 구현의 검증된 코드 결과와 분리한다.
