@@ -2643,7 +2643,7 @@ test('R4 Watchdog runtime A accepts only the exact W06 selective Controller B su
  assert.equal(r4Assess(beforeRestart).code,'WATCHDOG_R4_NATURAL_RESTART_PENDING');
 });
 
-test('R4 fixed read-only file evidence rejects aliases and reports only safe status',()=>{
+test('R4 fixed read-only file evidence rejects a later R5 source and unsafe aliases',()=>{
  const wd=path.resolve('fixture-r4-watchdog'),controller=path.resolve('fixture-r4-controller');
  const exactSource=fs.readFileSync(new URL('../tools/runner-watchdog.mjs',import.meta.url));
  const x=r4RuntimeFixture();
@@ -2667,8 +2667,14 @@ test('R4 fixed read-only file evidence rejects aliases and reports only safe sta
  });
  const options={watchdogHome:wd,controllerHome:controller,
   now:r4Now,pidAlive:()=>true};
+ // The mutable checkout now contains the newer R5 Watchdog. It MUST NOT
+ // be misattributed to the immutable on-disk R4 STAGED source in this fixture.
+ assert.notEqual(createHash('sha256').update(exactSource).digest('hex'),
+  x.install.sha256);
  const matched=inspectR4StandbyRuntimeReadonly({...options,filesystem:makeFs()});
- assert.equal(matched.status,'PASS');
+ assert.equal(matched.status,'STATE_UNKNOWN');
+ assert.equal(matched.code,'WATCHDOG_R4_STAGE_OR_CONTROLLER_SOURCE_UNVERIFIED');
+ assert.equal(matched.installedMatch,false);
  assert.equal(matched.failoverTested,false);
  assert.equal(writes,0);
  const denied=inspectR4StandbyRuntimeReadonly({...options,
