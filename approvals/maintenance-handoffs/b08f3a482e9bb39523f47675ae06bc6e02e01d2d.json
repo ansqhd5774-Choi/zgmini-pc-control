@@ -1,0 +1,49 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "5a85f803fd9cb280561395f88a3544ee8e7d4660",
+  "targetSha": "b08f3a482e9bb39523f47675ae06bc6e02e01d2d",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "2026-11-27 KST Owner instruction '작업해라' continues the expressly scoped R4 §43 plan to prepare and apply the independent maintainer S6 full-Runner-stop safety patch. This one-shot approval covers only the exact four file byte differences from installed maintainer 5a85f803fd9cb280561395f88a3544ee8e7d4660 to immutable merged source b08f3a482e9bb39523f47675ae06bc6e02e01d2d. No CI native B effect is authorized by this handoff: preserve the installed ciControllerBPolicy byte-for-byte, do not add a ciControllerBPolicy override or enable any GitHub variable, and do not submit any new Controller B/Writer B/S6 effect. Apply only after original receiver/source/manifest, startup, Windows origin, owner, lease, backup and rollback CAS are verified by the existing independent operator. The prior S6 #4069 is RECOVERY_REQUIRED and shall never be replayed by this handoff.",
+  "files": {
+    "tools/maintenance-contract.mjs": "3e35f49ea0003998853f5f0f41d253c426e3da9904082ae47bb86c3cd0044a27",
+    "tools/maintenance-apply.mjs": "cf0d9c82fa25c343c0d540b6c432c3e6d090c9924474851c22c277867d841096",
+    "tools/maintenance-agent.mjs": "401699eadbd6dfde45ae27cd6c139a1e1f7e54f2b2638df2f398836b709a3d0f",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "9ebd662cf1fca0ddc1438260f4ece29d1abea5511a0be2e83fc45f49cda04fa6",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "af31ab1f6a159aa1d8467d2585eb16750e8a1a293f9ecfb90b85c388d8640d70",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "23f3709ed0387cfb0132d9546f0fd6e2f10eabfad4212a67a170d5201a4a5de0"
+  },
+  "runtimeChangedFiles": [
+    "tools/maintenance-contract.mjs",
+    "tools/maintenance-apply.mjs",
+    "tools/maintenance-agent.mjs",
+    "tools/update.mjs"
+  ],
+  "checks": {
+    "sourceCi": "Run relevant exact approval-manifest and independent handoff regression checks on the candidate HEAD before merge; prior PR #4091 fail-closed source and prior S6 phase/CI-native protection source are merged, but CI success is not operating-PC installation.",
+    "byteProvenance": "Independent SHA-256 verification against immutable installed source 5a85f803... matches all nine previously approved files 9/9. Target source b08f3a4... nine file SHA-256 independently calculated, exactly four executable modules differ. The 9 protected files in subsequent main cb108b0ec62e72ccaee38db51f5d77a945c31973 have no changes from target.",
+    "installedWindowsEvidence": "#4024 independent Windows maintainer handoff PASS/STOPPED_RECEIVER_HANDOFF_AND_WINDOWS_ORIGIN_VERIFIED, #4025 Run 45870801994 installed source 5a85f803..., raw MAINTENANCE_INSTALL.json SHA256 0e1903fd9052b1e2c72812fde07c6338a79287e673a4cd9e715dedf23883f589, CI B installed workflow ID 430972394/blob 27e48ecde81bdf6f15cccffcffd9b3e70482a5f3; #4134 Run 45901495132 verified same source, receiver LISTENING, maintenance files verified, 6 Runner Online, install lease absent. These observations are historical and do not substitute the immediately-before-B on-host CAS.",
+    "policyPreservation": "The installed ciControllerBPolicy is inherited, unchanged, by approvedHandoffCiPolicy when ciControllerBPolicy is absent from this approval. The four-file source diff includes opt-in CI native receipt validation, but this handoff gives no ciNativeApproval to any Controller B manifest, does not enable it and does not change workflow policy identifiers.",
+    "preflight": "Before any mutation, existing handoff tool must verify installed sourceSha, seven original SHA256 files, startup source bytes, no unfinished handoff, direct-file path safety, independent Windows receiver WMI origin, stopped/cooperatively stopped receiver, no controller-install lease, exact Git source/approval bytes, and approved backup/rollback. Operator must separately verify fresh installed manifest raw digest/CAS against #4025 historical pin or preserve an observed exact new value with documented provenance, without overwriting unknown state.",
+    "runSafety": "Do not operate until any Watchdog/Runner maintenance job writing the same installation is settled. The operator must not stop, restart or promote Watchdog/Supervisor/Runners, change workflow flags, delete the S6 #4069 ledger or replay #4078; no new business data effects."
+  },
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "effects": [
+    "One exact existing operator seven-to-seven maintainer receiver handoff from 5a85f803... to b08f3a4... with four runtime byte changes; retain the other three runtime modules unchanged",
+    "Install S6 independent-crash-recovery fail-closed preclaim guard; prevent entire six Runner stop without separately verified recovery",
+    "Preserve existing S6 nonzero recovery phase reporting and CI-native optional Owner B attestation safety checks without granting a new CI-native effect or changing the installed policy",
+    "Verify on Windows receiver origin capture and raw installed target file hashes before declaring PASS"
+  ],
+  "preserve": [
+    "Controller R2 source 3c7d4cfefacf072fd35cb19706b352c64c5e4fd2, Watchdog R6 staged files, active Supervisor and 6 Runner seats, operating schedule/SQLite/Writer/D1/Task",
+    "Current installed CI Controller B workflow ID 430972394, workflow blob 27e48ecde81bdf6f15cccffcffd9b3e70482a5f3 and unchanged policy enable/path; any drift blocks",
+    "S6 #4069 RECOVERY_REQUIRED source/journal/claim/lease and #4078 missing backlog replay; no prior S6 replay and no new workflow toggle",
+    "Existing rollback snapshot and receiver lease/origin; return RECOVERY_REQUIRED if postwrite Receiver proof or rollback is unverified"
+  ],
+  "scopeNote": "This is a bounded approval candidate on a source branch. A PR, passing tests, or main merge does not authorize bypassing a failed Windows preimage CAS and is not installation evidence. Only a distinct one-shot approved independent Windows handoff, with exact source tree & manifest bytes and fresh operator preflight, may change installed maintainer bytes; postcheck by installed source + CI policy + Controller and six Runner health is required."
+}
