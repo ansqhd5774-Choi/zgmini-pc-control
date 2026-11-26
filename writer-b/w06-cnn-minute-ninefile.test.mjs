@@ -19,3 +19,38 @@ test('W06 exact nine-file scope with no new effects, original PC receipts and R2
  assert.equal(Object.hasOwn(m,'coreMaintenance'),false);
  for(const effect of ['allowProviderCalls','allowDbChanges','allowD1Writes','allowTaskDefinitionChanges','allowOtherSourceChanges'])assert.equal(m[effect],false);
 });
+
+test('W06 minute bounded collection wait is one exact CAS Writer B file with protected Task consumer',()=>{
+ const approved=load('approvals/writer-updates/w06-cnn-minute-bounded-eligibility-onefile-20261127.json');
+ assert.equal(validateWriterBManifest(approved),approved);
+ assert.equal(approved.baseHead,'393cee0da46515ff056543173fcd1253a858b3d7');
+ assert.equal(approved.baseConfigSourceSha,approved.baseHead);
+ assert.equal(approved.candidateSourceSha,'4a13569367ff0f1afc5138f971d86a8fa99c3329');
+ assert.deepEqual(approved.files,[{
+  path:'worker/public-feed-refresh.mjs',change:'M',
+  beforeSha256:'193034cadb0dc49af3f6f435402fd23fe3e76ac085ffe270490363903bc4d052',
+  afterSha256:'63923160a66a1cf958c9f2619d8535c2038772f1fc92f40c0025d16e33aecb4c'
+ }]);
+ const observed=load('results/45856284910-1-seat-3.json');
+ assert.equal(observed.status,'PASS');
+ assert.equal(observed.code,'WRITER_APPROVED_PREIMAGE_READONLY');
+ assert.equal(observed.result.sourceHead,approved.baseHead);
+ assert.equal(observed.result.approvedConfigSource,approved.baseHead);
+ assert.equal(observed.result.sourceIdentityConsistent,true);
+ const target=observed.result.scopedPreimage.files.find(x=>x.path===approved.files[0].path);
+ assert.equal(target.sha256,approved.files[0].beforeSha256);
+ assert.equal(target.trackedDirty,false);
+ assert.deepEqual(approved.runtimeDependencies.consumers,[{
+  id:'w06-minute-launcher',kind:'LAUNCHER',
+  path:'E:\\ZGmini\\data\\pc-writer\\run-local-cnn-minute.vbs',
+  sha256:'73c8cf4381fd328182a9fad0a7cb5753cf9093e58524f0c9a04be4df7032d733',
+  dependsOn:['worker/public-feed-refresh.mjs']
+ }]);
+ assert.equal(approved.runtimeDependencies.taskXmlSha256,
+  'dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028');
+ assert.equal(approved.runCount,1);
+ for(const key of ['allowProviderCalls','allowDbChanges','allowD1Writes',
+  'allowTaskDefinitionChanges','allowOtherSourceChanges'])assert.equal(approved[key],false);
+ assert.equal(Object.hasOwn(approved,'coreMaintenance'),false,
+  'existing natural Core idle and task policy remain unchanged');
+});
