@@ -35,6 +35,17 @@ function requestFromEvent(event,env){
   'SIDECAR_B_REPORT_REQUEST_STOP');
  return req;
 }
+// Aggregate counters only, never process identities, command lines or raw probes.
+export function sanitizedIdleObservation(x){
+ if(!x||typeof x!=='object'||Array.isArray(x))return null;
+ const names=['samples','coreActiveSamples','sidecarActiveSamples',
+  'controllerBusySamples','writerBusySamples'];
+ const windowMs=x.windowMs;
+ if(!Number.isSafeInteger(windowMs)||windowMs<0||windowMs>420000||
+  names.some(k=>!Number.isSafeInteger(x[k])||x[k]<0||x[k]>1000)||
+  x.samples<1||names.slice(1).some(k=>x[k]>x.samples))return null;
+ return {windowMs,...Object.fromEntries(names.map(k=>[k,x[k]]))};
+}
 export function sanitizeSidecarBReport({raw,request,env,readCurrent}){
  const base={schema:SCHEMA,requestId:request.requestId,
   status:'SIDECAR_B_STATE_UNKNOWN',
@@ -60,7 +71,10 @@ export function sanitizeSidecarBReport({raw,request,env,readCurrent}){
   'SIDECAR_B_PREFLIGHT_OR_RUNTIME_STOP','SIDECAR_B_RECOVERY_REQUIRED',
   'SIDECAR_B_STATE_UNKNOWN'
  ].includes(raw.status))
-  return {...base,status:raw.status,code:raw.code};
+  return {...base,status:raw.status,code:raw.code,
+   ...(raw.code==='SIDECAR_B_PROBE_RESOURCE_STOP'&&
+     sanitizedIdleObservation(raw.idleObservation)?
+     {idleObservation:sanitizedIdleObservation(raw.idleObservation)}:{})};
  return base;
 }
 const asText=r=>[
@@ -71,7 +85,9 @@ const asText=r=>[
  'AFTER_SHA256='+(r.afterSha256??'UNKNOWN'),
  'BACKUP_VERIFIED='+r.backupVerified,
  'CHANGED_FILE_COUNT='+r.changedFileCount,
- 'RETRY='+r.retry,''].join('\n');
+ 'RETRY='+r.retry,
+ ...(r.idleObservation?Object.entries(r.idleObservation).map(
+  ([k,v])=>'IDLE_'+k+'='+v):[]),''].join('\n');
 const apiHeaders=token=>({
  accept:'application/vnd.github+json',
  authorization:'Bearer '+token,

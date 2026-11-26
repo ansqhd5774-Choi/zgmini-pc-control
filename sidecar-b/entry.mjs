@@ -66,7 +66,10 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
  }catch(e){
   result={...result,status:cleanCode(e)==='SIDECAR_B_RECOVERY_UNVERIFIED_STOP'?
    'SIDECAR_B_RECOVERY_REQUIRED':'SIDECAR_B_PREFLIGHT_OR_RUNTIME_STOP',
-   code:cleanCode(e)};
+   code:cleanCode(e),
+   ...(e?.idleObservation&&
+     cleanCode(e)==='SIDECAR_B_PROBE_RESOURCE_STOP'?
+     {idleObservation:e.idleObservation}:{})};
  }
  try{
   const file=path.join(env.RUNNER_TEMP,'cnn-sidecar-b-result.json');
