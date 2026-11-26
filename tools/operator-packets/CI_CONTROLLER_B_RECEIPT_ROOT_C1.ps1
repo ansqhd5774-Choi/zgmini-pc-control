@@ -7,6 +7,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $hostName = 'DESKTOP-N62L0NG'
 $runnerName = 'zgmini-handoff-ci-spare-01'
+$serviceName = 'actions.runner.ansqhd5774-Choi-zgmini-pc-control.zgmini-handoff-ci-spare-01'
 $base = 'C:\ProgramData'
 $parent = 'C:\ProgramData\ZGMINI-CI'
 $root = 'C:\ProgramData\ZGMINI-CI\ControllerBReceipts'
@@ -82,7 +83,7 @@ try {
     Stop-C 'CI_RECEIPT_ADMIN_C_REQUIRED'
   }
   $services = @(Get-CimInstance -ClassName Win32_Service | Where-Object {
-    $_.Name -match ('^actions\.runner\..*\.' + [regex]::Escape($runnerName) + '$') -and
+    $_.Name -ceq $serviceName -and
     $_.State -eq 'Running'
   })
   if ($services.Count -ne 1) { Stop-C 'CI_RECEIPT_RUNNER_SERVICE_UNVERIFIED' }
