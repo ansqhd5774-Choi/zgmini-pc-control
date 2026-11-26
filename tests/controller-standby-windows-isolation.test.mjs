@@ -8,7 +8,8 @@ import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {randomUUID,createHash} from 'node:crypto';
 import {exclusive,assertSupervisorOwner} from '../controller/common.mjs';
-import {archiveDeadLease,decide as watchdogDecide,scanControllerRunnersReadOnly} from '../tools/runner-watchdog.mjs';
+import {archiveDeadLease,decide as watchdogDecide,scanControllerRunnersReadOnly,
+ provenOldRunnerExit,classifyRunnerExecutableProof,selectStandbyCandidate} from '../tools/runner-watchdog.mjs';
 import {decideStandbyPromotion,verifyStandbySource,watchdogIdentityMatches}
  from '../controller/standby.mjs';
 
@@ -212,4 +213,66 @@ test('WIN-T11 fixed WMI probe is bounded to temp-only observation, no PC mutatio
   assert.ok(['NO_CONTROLLER_RUNNER_PROCESS','UNVERIFIED'].includes(result));
   assert.equal(fs.existsSync(path.join(dir,'supervisor')),false);
  }finally{safeRemove(dir);}
+});
+
+test('WIN-T12 dead Supervisor cannot promote while even one of six actual children lives',windows,async()=>{
+ const dir=root();
+ // All spawned processes are isolated test-owned Node children, never PC Runners.
+ const child=spawn(process.execPath,['-e','setInterval(()=>{},60000)'],{
+  cwd:dir,windowsHide:true,stdio:'ignore'
+ });
+ const closed=new Promise((resolve,reject)=>{
+  child.once('close',resolve);child.once('error',reject);
+ });
+ const pidAlive=pid=>{
+  if(pid!==child.pid)return false; // Other five historical children are simulated dead.
+  try{process.kill(pid,0);return true;}
+  catch(e){return e?.code==='ESRCH'?false:null;}
+ };
+ try{
+  assert.ok(Number.isSafeInteger(child.pid)&&child.pid>0);
+  await until(()=>pidAlive(child.pid)===true,3000);
+  const oldOwner={pid:987654321};
+  const heartbeat={pid:oldOwner.pid,children:Array.from({length:6},(_,i)=>({
+   seat:i+1,pid:i===5?child.pid:9000010+i
+  }))};
+  // PID-dead Supervisor is only a recovery signal, not permission to promote.
+  assert.equal(watchdogDecide({owner:oldOwner,live:false,
+   heartbeat:new Date().toISOString()}),'RECOVER');
+  assert.equal(provenOldRunnerExit({owner:oldOwner,heartbeat,pidAlive}),false);
+  // Losing even one six-seat record never permits a replacement owner.
+  assert.equal(provenOldRunnerExit({owner:oldOwner,heartbeat:{
+   ...heartbeat,children:heartbeat.children.slice(0,5)},pidAlive}),false);
+  child.kill();
+  await closed;
+  assert.equal(pidAlive(child.pid),false);
+  assert.equal(provenOldRunnerExit({owner:oldOwner,heartbeat,pidAlive}),true);
+  assert.equal(fs.existsSync(path.join(dir,'supervisor')),false);
+ }finally{
+  if(child.exitCode===null)child.kill();
+  await Promise.race([closed.catch(()=>{}),new Promise(resolve=>setTimeout(resolve,1000))]);
+  safeRemove(dir);
+ }
+});
+
+test('WIN-T13 old Controller Runner executable keeps S6 failover blocked after wrapper exits',windows,()=>{
+ // Classifier inputs are synthetic Windows paths: no real host process is queried.
+ const controlRoot='C:\\ZGmini\\automation\\pc-control';
+ const observer=rows=>classifyRunnerExecutableProof(rows,{
+  controllerRoot:controlRoot,canonicalize:value=>value
+ });
+ const oldListener={pid:53001,name:'Runner.Listener.exe',
+  executablePath:path.win32.join(controlRoot,'runners','seat-1','bin','Runner.Listener.exe')};
+ assert.equal(observer([oldListener]),'ACTIVE_RUNNER_PROCESS');
+ assert.equal(observer([{...oldListener,executablePath:''}]),'UNVERIFIED');
+ assert.equal(observer([]),'NO_CONTROLLER_RUNNER_PROCESS');
+ const primary={ready:true,promoting:false,child:{pid:53002},slot:1};
+ const fallback={ready:true,promoting:false,child:{pid:53003},slot:2};
+ const safeCandidate=rows=>observer(rows)==='NO_CONTROLLER_RUNNER_PROCESS'
+  ?selectStandbyCandidate(primary,fallback,{dual:true}):null;
+ assert.equal(safeCandidate([oldListener]),null);
+ assert.equal(safeCandidate([{...oldListener,executablePath:''}]),null);
+ assert.equal(safeCandidate([]),primary);
+ assert.equal(selectStandbyCandidate(primary,fallback,{dual:true,
+  promotionPending:primary}),null);
 });
