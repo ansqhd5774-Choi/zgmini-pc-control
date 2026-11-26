@@ -14,6 +14,7 @@ import {NEXT_TARGET as TARGET,NEXT_SOURCE_SHA as REPLACEMENT,
  FINAL_SCOPE,APPROVED_CONTROLLER_SHA} from './contract.mjs';
 import {verifyR5ControllerHost} from './standby-r5-contract.mjs';
 import {R4_GUARDIAN_TARGET,R4_GUARDIAN_SOURCE_SHA256,
+ R4_GUARDIAN_INSTALL_RAW_SHA256,
  R4_GUARDIAN_STAGE_REQUEST_ID,validateR4GuardianRequest,
  verifyR4GuardianPrecheck,verifyR4GuardianPostcheck}
  from './guardian-r4-contract.mjs';
@@ -131,13 +132,15 @@ export async function execute(){
     activationScriptDigest:digest(fs.readFileSync(fileURLToPath(import.meta.url)))})
   :validateActivation(event,body,approval,digest(apBytes),digest(helperBytes));
  const script=path.join(home,'runner-watchdog.mjs');
- const install=load(path.join(home,'INSTALL.json'));
+ const manifestFile=path.join(home,'INSTALL.json');
+ const install=load(manifestFile);
+ const installedManifestDigest=digest(fs.readFileSync(manifestFile));
  const source=digest(fs.readFileSync(script));
  const stage=load(path.join(home,'upgrades',selectedStage+'.json'));
  const owner=load(path.join(home,'receiver/owner.json'));
  const status=load(path.join(home,'STATUS.json'));
  if(isR4)verifyR4GuardianPrecheck({install,sourceDigest:source,
-   stage,owner,status,pidAlive:active});
+   installedManifestDigest,stage,owner,status,pidAlive:active});
  else statusReady({owner,status,source,manifest:install,stage});
  if(active(owner.pid)!==true)fail('WATCHDOG_ACTIVATION_OLD_PID_NOT_RUNNING');
  const startup=path.join(process.env.APPDATA||'',
@@ -189,6 +192,7 @@ export async function execute(){
   if(active(owner.pid)!==true
    ||load(path.join(home,'receiver/owner.json')).nonce!==owner.nonce
    ||digest(fs.readFileSync(script))!==selectedSource
+   ||(isR4&&digest(fs.readFileSync(manifestFile))!==R4_GUARDIAN_INSTALL_RAW_SHA256)
    ||JSON.stringify(protection())!==JSON.stringify(pre))
    return record('BLOCKED','WATCHDOG_ACTIVATION_PRESTOP_CAS_FAILED');
   // Exactly ONE identity-attested old Watchdog PID is terminated; the
@@ -208,13 +212,15 @@ export async function execute(){
    try{witness('ATTEST',current.pid);}
    catch{return record('RECOVERY_REQUIRED','WATCHDOG_ACTIVATION_NEW_ORIGIN_UNVERIFIED');}
    if(digest(fs.readFileSync(script))!==selectedSource
-     ||load(path.join(home,'INSTALL.json')).sha256!==selectedSource
+     ||load(manifestFile).sha256!==selectedSource
+     ||(isR4&&digest(fs.readFileSync(manifestFile))!==R4_GUARDIAN_INSTALL_RAW_SHA256)
      ||JSON.stringify(protection())!==JSON.stringify(pre))
     return record('RECOVERY_REQUIRED','WATCHDOG_ACTIVATION_POST_SOURCE_OR_PROTECTION_DRIFT');
    if(isR4){
     try{
-     verifyR4GuardianPostcheck({install:load(path.join(home,'INSTALL.json')),
-      sourceDigest:digest(fs.readFileSync(script)),oldOwner:owner,
+     verifyR4GuardianPostcheck({install:load(manifestFile),
+      sourceDigest:digest(fs.readFileSync(script)),
+      installedManifestDigest:digest(fs.readFileSync(manifestFile)),oldOwner:owner,
       newOwner:current,status:live,signalledAt:initial.at,pidAlive:active});
     }catch{continue;} // Keep the bounded window for IPC READY; never retry ACTIVATE.
    }
