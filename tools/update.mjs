@@ -3695,6 +3695,18 @@ export function makeS6OnceOwnedOperatingPort({request,approvedBytes,
     await wait(3000);
    }
    need(false,'S6_PORT_PROMOTION_UNVERIFIED');
+  },
+  reconcileBacklog:async()=>{
+   claimOwned();
+   need(installLease===null,'S6_PORT_REPLAY_REQUIRES_RELEASED_INSTALL_LEASE');
+   const snap=await observed('PROMOTED',baseline);
+   need(assessS6ControllerTransition({phase:'PROMOTED',
+    baseline,observed:snap}).status==='OBSERVED',
+    'S6_PORT_REPLAY_REQUIRES_VERIFIED_PROMOTION');
+   // Reuse the same source implementation as Controller update rollback.
+   // Only original Owner pc-job Issues inside the verified pause window;
+   // POSTING is durable and an uncertain result is never replayed twice.
+   return reconcileMaintenanceBacklog({backlogFile,requestId});
   }
  });
 }
