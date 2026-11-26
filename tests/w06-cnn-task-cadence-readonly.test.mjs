@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {PROBE,projectW06TaskCadence,inspectW06TaskCadenceReadonly} from
+import {PROBE,projectW06TaskCadence,inspectW06TaskCadenceReadonly,assessW06TaskBXmlReadonly,inspectW06TaskBRecoveryReadonly} from
  '../controller/w06-cnn-task-cadence-readonly.mjs';
 
 const sample=(extra={})=>({schema:'ZGMINI_W06_CNN_TASK_CADENCE_RAW_V1',
@@ -70,4 +70,25 @@ test('W06 probe uses fixed Windows command, no shell, never runs any Task',()=>{
  assert.equal(inspectW06TaskCadenceReadonly({
   platform:'win32',systemRoot:'C:\\Windows',exists:()=>true,
   run:()=>({status:1,stdout:'PRIVATE_ERROR'})}).status,'STATE_UNKNOWN');
+});
+
+test('W06 retained disabled Task diagnostic checks exact XML semantics without sharing raw identifiers',()=>{
+ const task='<Task><Triggers><TimeTrigger><Repetition><Interval>PT1M</Interval></Repetition></TimeTrigger></Triggers>'+
+  '<Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy><ExecutionTimeLimit>PT30M</ExecutionTimeLimit><Enabled>false</Enabled></Settings>'+
+  '<Principals><Principal><UserId>SAFE_USER</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>'+
+  '<Actions><Exec><Command>C:\\\\Windows\\\\System32\\\\wscript.exe</Command>'+
+  '<Arguments>"E:\\\\ZGmini\\\\data\\\\pc-writer\\\\run-local-cnn-minute.vbs"</Arguments>'+
+  '<WorkingDirectory>E:\\\\ZGmini\\\\projects\\\\zgmini-earnings-history-pc-release</WorkingDirectory>'+
+  '</Exec></Actions></Task>';
+ const core='<Task><Principals><Principal><UserId>SAFE_USER</UserId></Principal></Principals></Task>';
+ const exact=assessW06TaskBXmlReadonly(task,core,{systemRoot:'C:\\\\Windows'});
+ for(const key of ['oneTimeTrigger','oneExecAction','commandExact','argumentsExact',
+  'workingDirExact','principalMatchesCore','logonInteractiveToken',
+  'runLevelLeastPrivilege','ignoreNew','limitPT30M'])assert.equal(exact[key],true,key);
+ assert.equal(exact.explicitSettingsEnabled,'false');
+ assert.doesNotMatch(JSON.stringify(exact),/SAFE_USER|wscript\\.exe|run-local-cnn-minute\\.vbs|C:/);
+ const altered=assessW06TaskBXmlReadonly(task.replace('PT30M','PT5M'),core);
+ assert.equal(altered.limitPT30M,false);
+ assert.equal(inspectW06TaskBRecoveryReadonly({
+  filesystem:{existsSync:()=>false}}).status,'STATE_UNKNOWN');
 });
