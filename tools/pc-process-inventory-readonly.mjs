@@ -1407,13 +1407,16 @@ export function compactD05WriterResult(base,status){
 // paths, owner identity, credentials or issuer authority. Only the independent
 // maintenance handoff can install the actual receiver policy.
 export function inspectCiControllerBReceiverReadOnly(filesystem=fs){
- // Exact V2 source/Workflow PIN attestation; no installed manifest bytes, local
- // paths, owner identity or policy contents leave the operating PC.
+ // Preserve historical V2 verification and add a separate exact post-guard
+ // install pin, without disclosing policy bytes or widening execution authority.
  const approvedSource='08c0df1c4315019d85502dca2b0e4fd980eef48a';
  const approvedWorkflowPin='d3c175329a7ac955f5b45ce2b13dad78ce272d9a';
- const result=(policyState,manifestReadable,approvedV2PinMatches=null)=>({
+ const receiptGuardSource='73f70de98b030d4bac0af48ac50023ec1bd7ce1f';
+ const receiptGuardWorkflowPin='b568bbc5de05b2d6fff75419b88322b3e2de020c';
+ const result=(policyState,manifestReadable,approvedV2PinMatches=null,approvedReceiptGuardPinMatches=null)=>({
   schema:'ZGMINI_CI_CONTROLLER_B_RECEIVER_READONLY_V1',
-  policyState,manifestReadable,approvedV2PinMatches,executionAuthorized:false,
+  policyState,manifestReadable,approvedV2PinMatches,approvedReceiptGuardPinMatches,
+  executionAuthorized:false,
   installedSourceIntegrityAsserted:false,operationalWrites:0,providerCalls:0,d1Writes:0
  });
  try{
@@ -1433,7 +1436,9 @@ export function inspectCiControllerBReceiverReadOnly(filesystem=fs){
    if(!policy)return result('UNVERIFIED',true);
    return result('PRESENT_FORMAT_ONLY',true,
     manifest.sourceSha===approvedSource&&
-    policy.workflowBlobSha===approvedWorkflowPin&&policy.workflowId===430972394);
+    policy.workflowBlobSha===approvedWorkflowPin&&policy.workflowId===430972394,
+    manifest.sourceSha===receiptGuardSource&&
+    policy.workflowBlobSha===receiptGuardWorkflowPin&&policy.workflowId===430972394);
   }catch{return result('INVALID',true);}
  }catch{return result('UNVERIFIED',false);}
 }
