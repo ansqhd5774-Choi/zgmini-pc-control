@@ -70,6 +70,25 @@ function nativeTaskEnabled(name){
  need(value==='true'||value==='false','TASK_CREATE_B_NATIVE_ENABLED_UNVERIFIED_STOP');
  return value==='true';
 }
+// Never infer least privilege solely from an omitted XML default.
+// Schtasks normalizes away <RunLevel>LeastPrivilege</RunLevel> on this PC.
+export function approvedTaskRunLevel(xml,nativeIsLimited){
+ if(typeof xml!=='string'||nativeIsLimited!==true)return false;
+ const tags=[...xml.matchAll(/<RunLevel>([^<]{1,64})<\/RunLevel>/gi)];
+ return tags.length===0||(tags.length===1&&tags[0][1]==='LeastPrivilege');
+}
+function nativeTaskLeastPrivilege(name){
+ need(name===TASK,'TASK_CREATE_B_RUNLEVEL_SCOPE_STOP');
+ const ps="$ErrorActionPreference='Stop';"+
+  "$t=@(Get-ScheduledTask -TaskName 'ZGMINI-PC-CNN-Minute' -ErrorAction Stop);"+
+  "if($t.Count -ne 1){throw 'TASK_SCOPE_STOP'};"+
+  "[Console]::Out.Write([string]$t[0].Principal.RunLevel)";
+ const value=run(BIN.powershell,['-NoProfile','-NonInteractive','-Command',ps])
+  .toString('utf8').trim().toLowerCase();
+ need(['limited','leastprivilege','0','highest','highestavailable','1'].includes(value),
+  'TASK_CREATE_B_RUNLEVEL_UNVERIFIED_STOP');
+ return ['limited','leastprivilege','0'].includes(value);
+}
 // Any second action (including COM handlers) would execute outside the
 // approved one-command CNN path. Do not infer safety from finding one Exec.
 export function hasOnlyApprovedSingleExec(xml){
@@ -179,7 +198,7 @@ export function createOperatingTaskCreateBPort(proof){
    xml.includes('<MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>')&&
    xml.includes('<ExecutionTimeLimit>PT30M</ExecutionTimeLimit>')&&
    xml.includes('<LogonType>InteractiveToken</LogonType>')&&
-   xml.includes('<RunLevel>LeastPrivilege</RunLevel>')&&
+   approvedTaskRunLevel(xml,nativeTaskLeastPrivilege(TASK))&&
    hasOnlyApprovedMinuteTrigger(xml)&&hasOnlyApprovedSingleExec(xml)&&
    (xml.match(/<Exec\b/gi)??[]).length===1&&
    commands.length===1&&args.length===1&&working.length===1&&
