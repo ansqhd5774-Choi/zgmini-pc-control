@@ -37,7 +37,7 @@ test('W06 reuses exact owner-scoped Writer B workflow without adding Cron',()=>{
  const source=fs.readFileSync(fileURLToPath(new URL(
   '../.github/workflows/pc-writer-b-source-once.yml',import.meta.url)),'utf8');
  assert.match(source,/github\.event\.issue\.title == 'pc-writer-task-create-once'/);
- assert.match(source,/contains\(github\.event\.issue\.labels\.\*\.name, 'pc-writer-task-create-b'\)/);
+ assert.match(source,/contains\(github\.event\.issue\.labels\.\*\.name, 'pc-writer-b-install'\)/);
  assert.match(source,/group: zgmini-writer-source-b-one-at-a-time/);
  assert.match(source,/id: w06taskapprove/);
  assert.match(source,/ref: \$\{\{ steps\.w06taskapprove\.outputs\.candidateSourceSha \}\}/);
@@ -46,5 +46,5 @@ test('W06 reuses exact owner-scoped Writer B workflow without adding Cron',()=>{
  assert.match(source,/task-create-b\\report\.mjs/);
  assert.doesNotMatch(source,/^\s*schedule\s*:/m);
  assert.equal(ISSUE_TITLE,'pc-writer-task-create-once');
- assert.equal(ISSUE_LABEL,'pc-writer-task-create-b');
+ assert.equal(ISSUE_LABEL,'pc-writer-b-install');
 });
