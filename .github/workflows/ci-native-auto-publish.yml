@@ -1,0 +1,82 @@
+# Native A/Writer B publisher: uses existing CI result and *installed* approved B
+# receiver proof. The two jobs are independently disabled until exact policies
+# and their durable receipt roots are installed. No PC operational calls here.
+name: ZGMINI CI Native Approved A Writer Publisher
+on:
+  workflow_run:
+    workflows: ['ZGMINI Controller Maintenance Source Tests']
+    types: [completed]
+permissions: {}
+jobs:
+  issue-approved-native-a:
+    if: >-
+      vars.ZGMINI_CI_NATIVE_A_ENABLED == 'true' &&
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.id == 1442936296 &&
+      github.event.repository.private == true &&
+      github.ref == 'refs/heads/main' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.id == 1442936296
+    permissions:
+      contents: read
+      actions: write
+    concurrency:
+      group: zgmini-native-publish-a
+      cancel-in-progress: false
+      queue: max
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 8
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify approved native A source then submit one workflow dispatch
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ZGMINI_CI_NATIVE_RECEIPT_ROOT: ${{ vars.ZGMINI_CI_NATIVE_RECEIPT_ROOT }}
+          ZGMINI_CI_NATIVE_EFFECT: A_READONLY
+        run: node ci-approval/native-publisher-entry.mjs
+  issue-approved-native-writer-b:
+    if: >-
+      vars.ZGMINI_CI_NATIVE_WRITER_B_ENABLED == 'true' &&
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.id == 1442936296 &&
+      github.event.repository.private == true &&
+      github.ref == 'refs/heads/main' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.id == 1442936296
+    permissions:
+      contents: read
+      actions: write
+    concurrency:
+      group: zgmini-native-publish-writer-b
+      cancel-in-progress: false
+      queue: max
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 8
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify approved native Writer B source then submit one workflow dispatch
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ZGMINI_CI_NATIVE_RECEIPT_ROOT: ${{ vars.ZGMINI_CI_NATIVE_RECEIPT_ROOT }}
+          ZGMINI_CI_NATIVE_EFFECT: B_WRITER_SOURCE
+        run: node ci-approval/native-publisher-entry.mjs
