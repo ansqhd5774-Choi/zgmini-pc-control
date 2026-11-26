@@ -222,3 +222,24 @@
 3. 수신기의 실제 PC A 작업·Writer B 설치 실행 인계에는 독립 인증/효과 claim/Engine 안전 계약을 구현한다. 검증 Workflow가 깨어나는 것을 기능 종단 성공으로 세지 않는다.
 4. Controller B는 기존 CI 자동 발행 정책·인증 신뢰근거의 정확한 미구성을 분리해 정상 경로로 해결한다. 종결한 #4038 수동 댓글 요구는 복원하지 않는다.
 5. A / Controller B / Writer B **무인 종단 완료율 0/3 확인 상태 유지**, 새 결과 확인 시 유형별로 실제 영수증이 있는 항목만 반영한다.
+
+## 10. 여섯 번째 실행 기록 — 2026-11-27 KST
+
+### 기존 완료 검증
+
+- [PR #4070](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4070), 정확 HEAD `831a2c0ef8f65ae1291a1f37ae0dd05f5253da94`: C996 [#45881264817](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45881264817), Controller Maintenance Source [#45881264798](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45881264798), Secret Scan [#45881264858](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45881264858) **3/3 SUCCESS**, `main` 병합 SHA **`dea24f5a3b91dc088a1273c25f6e9d25ace2fe8c`** 및 main의 4파일 Git blob readback 완료.
+- A·Writer B `workflow_dispatch` 수신기와 실제 source run·Workflow·고정 로컬 승인 원본 조회 진입점을 정규 등록했다. 해당 결과의 `CONTRACT_MATCH_ONLY`는 PC 실행/설치 허가가 아니다.
+
+### 새 발행 코드 연결
+
+- 당초 4050 전송 모듈과 4070 수신 Workflow 사이의 **운영 CI 발행 진입점 부재**를 확인했다. 신규 소스 브랜치 `codex/ci-native-publisher-runtime-20261127` 기준 당시 main `47d9a2c2c151e9bfde589ebff59cc22b6d472ba1`.
+- [PR #4077](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4077): `.github/workflows/ci-native-auto-publish.yml`에서 승인된 소스 CI `workflow_run.completed` 이벤트를 A/Writer B effect별로 독립 받아, **기존 `dispatchApprovedCiEffect`에 실제 GitHub REST 발행 포트·독립 설치 결과 대조·영구 효과 receipt**를 연결한다.
+- 정책·Scope는 이벤트나 생성된 PR에서 받지 않는다. 기존 B 설치 결과를 CI native 승인 근거로 사용할 때에는 **정확 효과와 정책 SHA가 포함된 명시적 결과 증거**가 필요하다. 과거 수동 설치 #4036의 성공만으로 새로운 Bot 권한이 생기지 않는다.
+- 기존 `GITHUB_TOKEN`은 발행 Workflow job의 `actions:write`에만 한정, 실제 flag·정규 설치 정책이 없으면 호출 불가. 외부 Runner·새 Controller·예약·PC Task/DB/D1 효과 없음.
+- 테스트 `tests/ci-native-publisher-entry.test.mjs`, 기존 Windows Source CI 단계 연결. HEAD `d5b2df2d8902a2ee899bef8580c58680c3f45f78`. 세 CI는 **검증 중**으로 아직 병합/운영 적용 아님.
+
+### 다음 필수 실행
+
+1. #4077 정확 HEAD의 C996/Secret/Windows Source CI를 끝까지 확인하고 실패 시 구분 증거로 최소 수정 후 3/3 확인·병합/원장 readback을 진행한다.
+2. **새 운영 권한·신뢰 설치 증거가 실제로 존재하는지** 정규 B 결과와 현재 호스트 설정을 대조한다. 필요한 파일·변수·B 정책을 임의 생성하거나 사용자를 수동 댓글 Gate로 돌려보내지 않는다.
+3. A·Writer B 각 지원 유형의 실제 PC 실행 어댑터/사후검사/JSON/TXT 영수증은 별도 미완료. Controller B 자동 발행 정책도 미입증으로 남긴다. 종단 완료는 여전히 **0/3**.
