@@ -261,7 +261,7 @@ export function assessR4StandbyRuntimeSnapshot(snapshot,{
  const controllerTargetMatch=host?.controllerSourceSha===
   'b91340d5047daf753e1c17a5c966e4d2aecea586'||
   (host?.controllerSourceSha==='182bb46f2838306ba40d8b4ec32bac40ab75b69a'&&
-   host.controllerFiles&&typeof host.controllerFiles==='object'&&
+   !!host.controllerFiles&&typeof host.controllerFiles==='object'&&
    !Array.isArray(host.controllerFiles)&&
    Object.entries(w06ControllerFiles).every(([name,digest])=>
     host.controllerFiles[name]===digest));
