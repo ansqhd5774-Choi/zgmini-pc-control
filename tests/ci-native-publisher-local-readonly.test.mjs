@@ -122,7 +122,7 @@ test('standard candidate probe uses only fixed Windows lstat metadata, never fil
  assert.equal(v.executionAuthorized,false);
  assert.equal(v.operationalWrites,0);
  assert.equal(observed.length,9); // five ancestor directories + four fixed files
- assert.ok(observed.every(p=>p.startsWith('E:\\\\')));
+ assert.ok(observed.every(p=>p.startsWith('E:\\')));
  assert.equal(observed.filter(p=>files.has(path.win32.basename(p))).length,4);
  assert.doesNotMatch(JSON.stringify(v),/E:\\\\|ci-native-a-approved|ci-native-writer-b-approved/);
 });
