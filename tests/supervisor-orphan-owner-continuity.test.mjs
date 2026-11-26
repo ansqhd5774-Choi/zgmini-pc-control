@@ -58,6 +58,7 @@ test('observed old owner, current boot, source and heartbeat must all agree',()=
   x=>{x.oldSupervisorIdentityProven=false;},
   x=>{x.oldOwner.pid=0;},
   x=>{x.oldOwner.nonce='not-a-uuid';},
+  x=>{x.oldOwner.nonce='------------------------------------';},
   x=>{x.oldOwner.bootAt+=15000;},
   x=>{x.oldHeartbeat.pid=4243;},
   x=>{x.oldHeartbeat.mode='DRAIN';},
