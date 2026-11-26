@@ -5,7 +5,7 @@ import path from 'node:path';
 import {createW06RecoveryOperatingPort} from './recovery-windows.mjs';
 import {createOperatingTaskCreateBPort} from './windows-adapter.mjs';
 import {ORIGIN} from './recovery-contract.mjs';
-import {RECOVERY_ID,ENABLED_XML_SHA} from './finalize-contract.mjs';
+import {RECOVERY_ID} from './finalize-contract.mjs';
 import {TASK} from './contract.mjs';
 const HOME='E:\\ZGmini\\data\\pc-writer';
 const ROOT=path.win32.join(HOME,'task-create-b',ORIGIN);
