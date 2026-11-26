@@ -5,7 +5,9 @@ import {performance} from 'node:perf_hooks';
 import {inspectSidecarBResourceFlagsReadonly} from './operating-probe.mjs';
 
 const STOP=code=>{throw Object.assign(new Error(code),{code});};
-const WINDOW_MS=240_000;
+// W06: 4-minute window missed the verified quiet interval of a 5-minute Core cycle.
+// Passive/read-only only; source, Task, lock, receiver and B approval unchanged.
+const WINDOW_MS=420_000;
 const STEP_MS=5_000;
 
 export async function awaitNaturalSidecarIdle({
