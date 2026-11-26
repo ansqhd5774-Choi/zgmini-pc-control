@@ -28,7 +28,7 @@
       "change": "M",
       "beforeSha256": "1648a62e26157868e9d4ed43ab9d36436068e08973ba56d495b7c1751e02c62e",
       "afterSha256": "6a750c854b18e419a5a44e6805c409a19efe9c6a9f8a416d76ea59ffa4dbdf43",
-      "candidateSha256": "e7ea297d9da916d825ae2c942e026c7277787502b88fafbed679840e59",
+      "candidateSha256": "e7ea297d9da916d825ae2c942e026c7271fe7277787502b88fafbed679840e59",
       "insertions": [
         {
           "anchor": "  const jobArg=process.argv.find(arg=>arg.startsWith('--job='));",
