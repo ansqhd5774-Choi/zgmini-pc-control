@@ -16,7 +16,7 @@ jobs:
       github.actor == 'ansqhd5774-Choi' &&
       github.event.sender.login == 'ansqhd5774-Choi' &&
       github.event.issue.user.login == 'ansqhd5774-Choi' &&
-      (github.event.issue.title == 'pc-writer-source-install' || github.event.issue.title == 'pc-writer-task-create-once' || github.event.issue.title == 'r181-protected-route-install' || github.event.issue.title == 'r181-source-shape-readonly' || github.event.issue.title == 'r181-saved-ledger-readonly' || github.event.issue.title == 'w03-r179-stored-handoff-readonly' || github.event.issue.title == 'w03-r179-guard-shape-readonly' || github.event.issue.title == 'w03-r179-readback-guard-install' || github.event.issue.title == 'w03-gmh-seven-history-manual-once' || github.event.issue.title == 'w03-gmh-seven-private-score-once' || github.event.issue.title == 'w03-gmh-seven-public-compat-readonly' || github.event.issue.title == 'w03-gmh-seven-d1-seed-readonly' || github.event.issue.title == 'w03-gmh-seven-collection-time-readonly' || github.event.issue.title == 'r181-primary-route-install' || github.event.issue.title == 'r181-existing-task-run-once' || github.event.issue.title == 'r47-existing-task-run-once' || github.event.issue.title == 'marketparquet-exact-task-retire-once' || github.event.issue.title == 'w03-r47-private-readback-once' || github.event.issue.title == 'w03-r48-private-readback-once' || github.event.issue.title == 'w03-r51-stored-date-readback-once' || github.event.issue.title == 'w01-census-m3-api-once') &&
+      (github.event.issue.title == 'pc-writer-source-install' || github.event.issue.title == 'pc-writer-task-create-once' || github.event.issue.title == 'pc-writer-task-recover-once' || github.event.issue.title == 'r181-protected-route-install' || github.event.issue.title == 'r181-source-shape-readonly' || github.event.issue.title == 'r181-saved-ledger-readonly' || github.event.issue.title == 'w03-r179-stored-handoff-readonly' || github.event.issue.title == 'w03-r179-guard-shape-readonly' || github.event.issue.title == 'w03-r179-readback-guard-install' || github.event.issue.title == 'w03-gmh-seven-history-manual-once' || github.event.issue.title == 'w03-gmh-seven-private-score-once' || github.event.issue.title == 'w03-gmh-seven-public-compat-readonly' || github.event.issue.title == 'w03-gmh-seven-d1-seed-readonly' || github.event.issue.title == 'w03-gmh-seven-collection-time-readonly' || github.event.issue.title == 'r181-primary-route-install' || github.event.issue.title == 'r181-existing-task-run-once' || github.event.issue.title == 'r47-existing-task-run-once' || github.event.issue.title == 'marketparquet-exact-task-retire-once' || github.event.issue.title == 'w03-r47-private-readback-once' || github.event.issue.title == 'w03-r48-private-readback-once' || github.event.issue.title == 'w03-r51-stored-date-readback-once' || github.event.issue.title == 'w01-census-m3-api-once') &&
       contains(github.event.issue.labels.*.name, 'pc-writer-b-install') &&
       github.run_attempt == 1
     concurrency:
@@ -96,6 +96,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\task-create-b\report.mjs"'
+      - name: W06 approved exact original-owner Task recovery once
+        if: github.event.issue.title == 'pc-writer-task-recover-once'
+        id: w06recover
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\task-create-b\recovery-entry.mjs"'
+      - name: W06 create-only redacted owner recovery result pair and Issue readback
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'pc-writer-task-recover-once'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\task-create-b\recovery-report.mjs"'
       - name: R181 exact protected source B (independent immutable manifest)
         if: github.event.issue.title == 'r181-protected-route-install'
         id: r181
