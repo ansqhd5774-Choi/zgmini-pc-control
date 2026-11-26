@@ -2833,10 +2833,10 @@ export function inspectS6ApprovalPreimageReadonly({
   ...(code?{code}: {})});
  let stage='MAINTENANCE_STATUS';
  try{
-  const rd=p=>{
+  const rd=(p,maxBytes=131072)=>{
    const st=io.lstatSync(p);
    if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1||
-      st.size<=0||st.size>131072)throw Error('S6_A_FILE_UNVERIFIED');
+      st.size<=0||st.size>maxBytes)throw Error('S6_A_FILE_UNVERIFIED');
    return io.readFileSync(p);
   };
   const get=p=>JSON.parse(rd(p).toString('utf8'));
@@ -2862,7 +2862,10 @@ export function inspectS6ApprovalPreimageReadonly({
   if(localFiles.length!==7||localFiles.some(([rel,hash])=>
     !/^tools\/[a-z0-9.-]+$/.test(rel)||
     !/^[a-f0-9]{64}$/.test(hash)||
-    createHash('sha256').update(rd(path.join(maintRoot,rel))).digest('hex')!==hash))
+    // Existing 7-file maintainer contract admits source modules up to 2 MB;
+    // update.mjs was 213203 bytes at approved source 05ef3bd, larger
+    // than the 128 KiB bound intended only for small status JSON.
+    createHash('sha256').update(rd(path.join(maintRoot,rel),2_000_000)).digest('hex')!==hash))
    return unknown('S6_A_MAINTAINER_FILES_UNVERIFIED');
   const sha=x=>createHash('sha256').update(x).digest('hex');
   stage='WATCHDOG_BYTES';
