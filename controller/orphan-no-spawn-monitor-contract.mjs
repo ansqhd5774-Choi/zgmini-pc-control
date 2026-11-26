@@ -19,7 +19,7 @@ const base={
 const deny=code=>Object.freeze({...base,status:'BLOCKED',code,
  monitoringCandidate:false,exactSeatIdentityCount:0});
 export function assessNoSpawnMonitorSnapshot({
- now=Date.now(),observedAt,preimage,installed,oldOwner,newOwner,
+ now=Date.now(),observedAt,preimage,approvedPreimage,installed,oldOwner,newOwner,
  watcher,privateLineage,controllerSeatPins,liveWmi,
  gitHubRoster,lease,relatedLeases,installation,
  activeControllerWorkers
@@ -35,22 +35,32 @@ export function assessNoSpawnMonitorSnapshot({
     preimage.stableAtRead!==true||
     installed.controllerFilesVerified!==true)
   return deny('NO_SPAWN_MONITOR_ORIGINAL_CAS_UNVERIFIED');
+ if(approvedPreimage?.scope!=='SEPARATELY_APPROVED_ORPHAN_RECOVERY_B'||
+    approvedPreimage.approvalVerified!==true||
+    approvedPreimage.ownerRecordSha256!==preimage.ownerRecordSha256||
+    approvedPreimage.hostManifestSha256!==preimage.hostManifestSha256||
+    approvedPreimage.heartbeatSha256!==preimage.heartbeatSha256)
+  return deny('NO_SPAWN_MONITOR_APPROVED_PREIMAGE_CAS_UNVERIFIED');
  if(oldOwner?.deadVerified!==true||
     oldOwner?.sameBootVerified!==true||
     oldOwner?.historicalSixSeatsVerified!==true||
     !pid(oldOwner.pid)||
-    !iso(oldOwner?.lastHeartbeatAt))
+    !iso(oldOwner?.lastHeartbeatAt)||
+    Date.parse(oldOwner.lastHeartbeatAt)>Date.parse(observedAt))
   return deny('NO_SPAWN_MONITOR_OLD_OWNER_UNVERIFIED');
  if(!pid(newOwner?.pid)||newOwner.pid===oldOwner.pid||
     newOwner.aliveVerified!==true||
     newOwner.sameBootVerified!==true||
     newOwner.recoveryMode!=='ADOPT_EXISTING_SIX_NO_SPAWN'||
     !iso(newOwner.startedAtUtc)||
-    Date.parse(newOwner.startedAtUtc)>Date.parse(observedAt))
+    Date.parse(newOwner.startedAtUtc)>Date.parse(observedAt)||
+    Date.parse(newOwner.startedAtUtc)<=Date.parse(oldOwner.lastHeartbeatAt)||
+    newOwner.noRunnerLaunchObserved!==true)
   return deny('NO_SPAWN_MONITOR_NEW_OWNER_IDENTITY_UNVERIFIED');
  if(watcher?.watchdogOwnerVerified!==true||
     watcher?.installedR6SourceVerified!==true||
     watcher?.singleWatchdogOwnerVerified!==true||
+    watcher?.noStandbyPromotionPendingVerified!==true||
     installation?.independentMaintainerVerified!==true||
     installation?.controllerSourceUnchanged!==true)
   return deny('NO_SPAWN_MONITOR_WATCHDOG_OR_MAINTAINER_UNVERIFIED');
@@ -99,7 +109,8 @@ export function assessNoSpawnMonitorSnapshot({
   if(!pin||row.pid!==pin.pid||
      row.startedAtUtc!==pin.startedAtUtc||
      row.canonicalPathSha256!==pin.canonicalPathSha256||
-     Date.parse(row.startedAtUtc)>=ownerStart-1000)
+     Date.parse(row.startedAtUtc)>=ownerStart-1000||
+     Date.parse(row.startedAtUtc)>Date.parse(oldOwner.lastHeartbeatAt))
    return deny('NO_SPAWN_MONITOR_LISTENER_REPLACED_OR_SPAWNED');
   seen.add(row.seat);seenPid.add(row.pid);
  }
