@@ -266,3 +266,22 @@
 2. 이미 승인된 A 업무의 **실제 설치 정책/어댑터/호스트 원본 및 신뢰 실행 주체**를 기존 정규 B 계약으로 확인하고, 가능한 실제 A Runner 실증을 진행한다. 부재 시 해당 효과에만 차단 상태를 표시한다.
 3. Writer B는 검증·전송과 실제 기존 Writer CAS 설치 연결 미완료, Controller B는 자동 발행 정책/신뢰 원본 활성화 미입증. 독립 작업 중단 금지.
 4. **A/Controller B/Writer B 실제 무인 종단 완료율 0/3 유지**, 코드를 병합했다고 완료로 계상하지 않는다.
+
+## 12. 여덟 번째 실행 기록 — 2026-11-27 KST
+
+### Writer B 기존 설치기 연결 구현
+
+- 기준: `main@c118db43f553dd62c6735b238e61c5d8df0d939c`의 A급 실행 소스와 별도 미연결 Writer B workflow를 확인했다. 새 코드 브랜치는 `codex/ci-native-writer-b-execute-20261127`.
+- [PR #4083](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4083): 기존 Owner-only Issue 신원을 위조하지 않고 Writer B 원래 manifest validator와 독립 CI 수신 증거를 함께 검사한 후 인프로세스 B 인증 seal을 발급하도록 분리. `native-writer-b-execute.mjs`의 실제 GitHub 원본 조회 → 설치된 정확 승인/요청 원문 → native adapter SHA 및 **하위 설치기 전체 control commit SHA** 확인 → 후보 SHA checkout → 기존 `performWriterBInstall` / `makeWindowsBAdapter` 공유 lease·CAS·복귀 계약에 연결.
+- `ci-approved-writer-b-once.yml`에 별도 `ZGMINI_CI_NATIVE_WRITER_B_EXEC_ENABLED` 조건을 추가. 기존 독립 설치 정책의 `nativeWriterBExecutionEnabled`와 `nativeWriterBAdapterSha256`, `nativeWriterBControlSha`까지 일치해야만 설치 진입. 실제 GitHub 변수·운영 PC 파일은 **변경하지 않음**.
+- 초기 범위는 기본 Writer 소스 오버레이이며 `coreMaintenance` 연장 대기·Task 변경·DB/D1/Provider/Controller 변경은 포함하지 않음. 기존 Owner-only Workflow와 중복/lease/CAS/복귀 원장은 그대로 보존. 표준 CI 새 Workflow/Runner/예약 생성 없음.
+- 회귀시험 `tests/ci-native-writer-b-execute.test.mjs` 13개(정상 합성 인가 및 가짜 객체/Source drift/Runner 오류/재실행/명세 변조/연장 승인 거부)와 기존 Windows Source CI 연결. **정확 소스 HEAD `4a392e1c7c8335e041da72e9950156d0b636be00`, GitHub CI 3종은 최초 확인 시 QUEUED 또는 IN_PROGRESS.** CI 결과는 완료 확인 전 성공으로 기록하지 않음.
+- 현행 아티팩트는 bounded JSON/TXT 단기 전달이며 실제 PC 영구 readback과 원본 effect 영수증의 대조는 미완료. 코드 경로 존재, CI, 병합, 운영 설치, PC 성공을 분리한다.
+
+### 남은 실행 순서
+
+1. PR #4083 최신 HEAD C996·Windows Source·Secret Scan **3/3 정확 결과**를 직접 회수하고 실제 실패 시 해당 조건만 수정하여 재검증한다. 안전하게 통합 가능한 경우만 병합 후 source/Workflow readback한다.
+2. 기존 승인 자료의 PC 설치/정확 manifest와 native policy 원본, 운영 Runner/CI 수신 실제 상태를 대조한다. 신뢰된 설치와 새 승인 Scope가 없는 효과는 **임의로 활성화하지 않는다**.
+3. A/Writer B 각각 실제 승인된 자연 CI 이벤트 → 수신 → PC 단회 실행 → 영구 결과 JSON/TXT 및 실행 SHA readback 검증. B의 source-only 병합은 설치로 오인하지 않는다.
+4. Controller B 기존 승인 자동 발행/제출/Windows 설치의 독립 파일럿을 같은 식으로 완료. 새 운영 권한·정책 효과가 필요한 경우 정확한 대상만 분리해 확인한다.
+5. 세 유형의 실제 무인 종단 완료 증거가 생길 때만 0/3을 갱신한다. **현재 운영 완료율 0/3 유형.**
