@@ -642,3 +642,26 @@
 - Native A/Writer B의 격리 Root 미설정과 **다른 효과**인 Controller B 자동 발행 상태를 구분하기 위해 기존 고정 Owner A `role=handoff`, `probe=ci-controller-b-activation-readonly` 단회 [Issue #4117](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4117)를 requestId `b0d6a8ce-c503-4651-b21c-7c830ce38c51`로 1회 접수.
 - 등록된 [Run 45899164961](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45899164961)의 `handoff-process-snapshot`은 마지막 확인 시 `queued`/미배정, 원격 결과 댓글 0. 기존 #4029의 과거 `CI_CONTROLLER_B_AUTO_POLICY_NOT_CONFIGURED`를 **현재 설정의 직접 증거로 재사용하지 않음**.
 - 이 Job이 실제 PC에서 완료되면 같은 Issue의 고유 JSON/TXT와 실제 상태코드를 읽고, Controller B의 현재 변수/업무 정책 상태만 판정한다. 같은 진단 이슈 반복 발행·CI 강제 재시도·활성화 변수 임의 설정 금지.
+
+## 25. 스물한 번째 실행 기록 — Controller B 격리 변수 현재 로그 및 A ref 충돌 (2026-11-27 KST)
+
+### 정확한 현장 관측 — #4117
+
+- [Issue #4117](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4117) 고유 requestId `b0d6a8ce-c503-4651-b21c-7c830ce38c51`, `role=handoff`, `probe=ci-controller-b-activation-readonly`; 기존 단회 A read-only 요청 1회만 등록. [Run 45899164961](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45899164961), Job `140180412269`, checkout/setup-node 성공 후 **`completed/failure`**.
+- GitHub Actions 실제 해당 격리 Job 로그: `ZGMINI_CI_CONTROLLER_B_ENABLED=false`, `ZGMINI_CI_CONTROLLER_B_POLICY` 값은 **빈 문자열**. 과거 #4029 결과를 소급 재사용하지 않고 실제 현재 실행의 설정 제공값을 확인. 값 자체에 비밀 원문/승인 데이터는 없음. 현재 정책 검사 `tools/ci-controller-b-activation-readonly.mjs` 기준 예상 진단은 `CI_CONTROLLER_B_AUTO_POLICY_NOT_CONFIGURED`이나, **정규 결과 JSON/TXT 미확보로 A 읽기 PASS 판정하지 않음**.
+- 원격 결과 실패는 `RESULT_PAIR_REF_CONFLICT_UNTOUCHED`, 종료코드 1. 코드 `writer-config-b/result-pair-atomic.mjs`의 비강제 main ref/CAS, 변경 HEAD·목적지 비존재를 검사한 bounded 1회 조건부 새 커밋 경로에서도 성공 확인되지 않아 fail-closed. **두 대상 경로 `results/pc-process-inventory-45899164961-1-handoff.json/.txt` 모두 GitHub contents 404**. 댓글 인증 영수증도 0.
+- 해당 오류는 Controller B 비즈니스 승인이 거부된 코드가 아니라, **업로드 CAS/영수증 생성 실패**. 정확 경쟁 시각 및 어떤 CAS 분기 실패인지는 미입증. 뒤이어 같은 요청의 새 Issue/Run을 만들거나 Writer 안전 검사를 제거하지 않는다. 기존 정상 #4100 설치 정책 CAS와도 별개.
+- 원인/미완료 범위를 [#4117 실행 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4117#issuecomment-7203943021)에 기록. #4117은 원격 2/2 영수증이 없는 동안 열린 상태 유지; 실제 진단 완료로 잘못 종료하지 않는다.
+
+### Native A·Writer B와 Controller B의 남은 운영 경계
+
+- [#4113 Native A/Writer 격리 A](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4113) 원본 readback 2/2 `CI_NATIVE_LOCAL_ROOTS_NOT_CONFIGURED`: 읽기 전용 Owner-B 설치 scope root, 영구 claim receipt root 변수 미설정, A/Writer 두 Publisher/Executor flag 모두 `UNSET_OR_INVALID`. 정책/증명 내용 자체는 **미관측**.
+- Controller B는 **별도 설정이 명시적으로 비활성 `false`, business policy 변수 빈 값**. 기존 설치된 유지보수기 정책 #4100의 CAS/Workflow blob PASS는 유지하고, 자동 Publisher grant 또는 사용자의 실제 Owner 업무 승인과 구분. 소스 CI/병합을 정책 활성화 증거로 대체 불가.
+- GitHub repository Actions variables의 직접 현재 관리자 조회는 연결된 GitHub 도구가 API `actions/variables`를 거부. 주어진 도구에서 현재 실제 설정을 변경할 정규 GitHub Actions 변수 API도 제공되지 않음. 별도 인증된 B 설치 proof/Owner grant 및 승인된 설정 경로 확인 전 `enabled=true`/임의 정책 파일 쓰기/보안 해제/자동 승인 생성 금지.
+- 실제 무인 종단 **A·Writer B·Controller B = 0/3** 그대로. 금회 PC 운영 파일/DB/Task/보안 값 변경·추가 업무 실행 효과 0. 공통 Runner와 Native 소스 재개선 불필요.
+
+### 다음 필요한 실제 행동
+
+1. A/Writer: 기설치 B-native Owner scope/proof 원본·영수증의 존재/업무 승인 범위를 확인하고, **신규 권한 생성 없이** 독립 루트 설정을 기존 승인된 운영 경로로 연결할 수 있는지 판정. 현재 원본은 미관측이므로 실효과 없는 경로 플래그만 설정하는 작업 금지.
+2. Controller B: 기존 승인 업무 grant의 정확한 정책 JSON 및 Installed Receiver pin과 현재 GitHub 자동 발행 Policy 변수의 **빈 값**을 구분. 실효과와 업무 원본이 명확한 경우에만 정규 설정 경로로 정확 등록; 비슷한 서류/CI PASS로 grant 허위 생성 금지.
+3. 세 효과 중 승인·실제 설치·정규 CI 권한이 완전히 입증된 것부터 실제 workflow_run → 단회 dispatch → 운영 PC 수신·효과 적용 → 결과 JSON/TXT 및 설치 SHA readback으로 효과별 DONE을 판정. #4117은 업로드 실패의 고유 증거를 보존하고 **확실한 환경 변화 없이 동일 PC A를 재발행하지 않음**.
