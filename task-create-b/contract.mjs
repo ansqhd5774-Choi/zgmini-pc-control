@@ -3,7 +3,7 @@
 import {createHash} from 'node:crypto';
 
 export const ISSUE_TITLE='pc-writer-task-create-once';
-export const ISSUE_LABEL='pc-writer-task-create-b';
+export const ISSUE_LABEL='pc-writer-b-install';
 export const REQUEST_SCHEMA='ZGMINI_PC_TASK_CREATE_B_REQUEST_V1';
 export const APPROVAL_SCHEMA='ZGMINI_PC_TASK_CREATE_B_APPROVAL_V1';
 export const RESULT_SCHEMA='ZGMINI_PC_TASK_CREATE_B_RESULT_V1';
