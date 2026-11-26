@@ -35,7 +35,7 @@ export function classifyW06NextTickGate(rows,{nextRunUtc,observedAtMs}={}){
  try{
   for(const row of rows){
    if(!row||!['output','attempt'].includes(row.kind)||seen.has(row.kind)||
-    !stamp(row.stored_at)||row.stored_at>observedAtMs+300000)
+    !stamp(row.stored_at)||row.stored_at>observedAtMs+5000)
     throw Error('BAD_ROW');
    seen.add(row.kind);
    if(row.kind==='output')output=row.stored_at;
@@ -67,7 +67,7 @@ export function classifyW06NextTickGate(rows,{nextRunUtc,observedAtMs}={}){
   millisecondsUntilEligible:until};
 }
 export function inspectW06NextTickGateReadonly(nextRunUtc,{
- filesystem=fs,connect=p=>new DatabaseSync(p,{readOnly:true,timeout:1000}),
+ filesystem=fs,connect=(p,options)=>new DatabaseSync(p,options),
  clock=Date.now
 }={}){
  const unread=code=>({...gateBase(code),sqliteOpened:false});
@@ -76,7 +76,7 @@ export function inspectW06NextTickGateReadonly(nextRunUtc,{
   const stat=filesystem.lstatSync(DB);
   if(!stat.isFile()||stat.isSymbolicLink()||stat.size<1)
    return unread('CNN_MINUTE_DB_UNSAFE');
-  db=connect(DB);
+  db=connect(DB,{readOnly:true,timeout:1000});
   db.exec('PRAGMA query_only=ON');
   const rows=db.prepare(SQL).all();
   const projected=classifyW06NextTickGate(rows,{
