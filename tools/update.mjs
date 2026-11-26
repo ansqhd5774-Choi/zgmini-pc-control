@@ -3119,6 +3119,10 @@ export function readS6OnceCurrentPreimage(requestId){
  const wdInstall=json(path.join(wdHome,'INSTALL.json'));
  const wdStatus=json(path.join(wdHome,'STATUS.json'));
  const wdReceiver=json(path.join(wdHome,'receiver/owner.json'));
+ // Rehash the actual deployed Watchdog bytes; INSTALL.json's expected SHA
+ // alone cannot prove that the file was not replaced after process startup.
+ need(sha256(fs.readFileSync(path.join(wdHome,'runner-watchdog.mjs')))===wdInstall.sha256,
+  'S6_ONCE_WATCHDOG_SOURCE_DRIFT');
  need(wdInstall.standby?.approved===true&&
   wdInstall.standby?.mode==='ACTIVE_1_STANDBY_2'&&
   /^[a-f0-9]{64}$/.test(wdInstall.sha256??'')&&
