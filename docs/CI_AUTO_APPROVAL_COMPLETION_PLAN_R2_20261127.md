@@ -890,3 +890,10 @@
 
 **이번 종료 증거:** Source Draft PR #4152 exact HEAD CI 3/3, 후보 blob·고정 source SHA 도출, 위험한 단순 설치 target 재사용을 차단. 실제 무인 A·Writer B·Controller B 종단 **0/3 (0%)** 변동 없음. 신규 PC A/B 요청·운영 설치·DB/D1·수집/게시·Runner 변경·기존 B 반복 실행 **0건**.
 
+### §34 보충 — 정책-only 7→7 별도 설치 source 후보 정확 검증 (이번 실행에 이어 확인)
+
+- `main` GitHub commit 목록에서 기존 격리 인계 정책 설치 SHA `5a85f803fd9cb280561395f88a3544ee8e7d4660`의 후속 **`5f085175e674b47f6c386ac5ab819875bc43242f`**(후속 Source 1 commit)를 찾아 실제 `compare_commits` 재조회. `status=ahead,ahead_by=1,behind_by=0`, 변경 파일은 오직 `results/pc-process-inventory-45865149029-1-operating.json` 및 `.txt` 2개로 **유지보수기 승인 source 9개 파일 불변**. 이어 `compare_commits(5f085...,fcbbf12...)`는 `ahead_by=244,behind_by=0`로 `#4147 main` 계보에도 속한다. 반대로 `fcbbf12`는 설치 기반 `5a85` 대비 보호 maintainer source 3개 이상 변경돼 정책-only target으로 사용 금지.
+- **B 운영 정책-only target 후보 `5f085175e674b47f6c386ac5ab819875bc43242f`**와 **CI publisher 고정 checkout SHA `fcbbf12cd662544ee308295c13076d4ca2f4aeba`**를 명확히 분리. 후보 target용 기존 `approvals/maintenance-handoffs/5f085...json`은 GitHub main에 **없음**을 확인. 따라서 아직 Owner의 이번 정확 효과 승인/신규 manifest/원본 CAS/실행 권한이 존재하는 것으로 간주하지 않는다.
+- 현재 운영 PC 설치 source SHA가 이전 [#4100](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4100)의 `5a85` 상태 그대로인지 **신규 live readback은 수행하지 않음**. 운영 B 실행 직전 현재 source/manifest/9파일 CAS 검증은 필수. 안전 후보라 해도 Owner 이번 새 policy blob `a31972...` 승인, 새 정확 7→7 manifest·lease·backup/rollback, Windows 설치/readback 없이 [Draft PR #4152](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4152) 병합 금지.
+- 본 보충 내용을 Draft PR #4152에도 원본 commit 비교·후보 SHA와 함께 반영하여 원격 저장을 확인. 실제 무인 0/3은 그대로, 기존 PC/Controller/Writer/승인 파일/활성화 변수 변경 **0건**.
+
