@@ -175,3 +175,25 @@
 2. 실질적인 CI A/Writer B receiver workflow·PC측 독립 인증·업무 승인·파일 원본 CAS·실제 실행 계약을 기존 권한 범위에서 구현/검증. 테스트용 transport 신호만으로 운영 완료 처리 금지.
 3. Controller B 기존 인증·정본 정책의 미구성과 겹치는 인증 변경은 효과별로 분리하며, 기존 승인된 실제 신규 업무가 확인된 경우에만 자연 CI 이벤트·단회 요청·PC 결과로 실증.
 4. 세 지원 유형 **운영 종단 0/3 확인 상태 유지**, 정확한 다음 미완료 구간 이외에 새 Gate나 예약을 추가하지 않는다.
+
+## 8. 네 번째 실행 기록 — 2026-11-27 KST
+
+### 검증 및 정규 통합
+
+- [PR #4050](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4050) 정확 HEAD `dee4fa414b94777156817a28dd9a95872b2bd00a`: C996 [#45878463061](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45878463061), Controller Maintenance Source [#45878463073](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45878463073), Secret Scan [#45878463236](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45878463236) **3/3 SUCCESS**.
+- `main` 병합 SHA: **`df779b037b5847574385104a9015c8eb33714edf`**. 병합 후 `main` 재조회 및 모듈 blob `122a048dcd9f3f730abfb5d3384881db27cea3e2`, 회귀시험 blob `e7c0f91eb324e482ee027fbbca167093ff57bb40` 일치 확인. 운영 실행 권한을 추가하지 않은 **자동 전송 소스 통합 완료**.
+
+### 다음 실제 수신 측 코드 연결
+
+- 신규 최소 소스 브랜치 `codex/ci-native-receiver-contract-20261127`: 실제로 발행할 때 기존 Owner-only Workflow를 호출하는 방식을 사용하지 않고, **CI 전용 수신기의 별도 독립 검사**를 구현한다.
+- [PR #4065](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4065): `ci-approval/native-receiver-contract.mjs` + `tests/ci-native-receiver-contract.test.mjs` + 기존 Controller source-only CI 시험 연결(3파일). `workflow_dispatch` 입력·Bot ID·private 저장소·main/attempt, source CI Run과 raw Git blob, 현재 receiver workflow raw Git blob, 독립 설치된 승인 원문·요청 원문의 해시, A 읽기 전용 operation 및 Writer B 승인 manifest 기존 계약을 **독립 대조**. C급/위조·범위 밖 입력은 거부한다.
+- 수신 측 검사 결과는 **`CONTRACT_MATCH_ONLY`, `canExecute=false`**로 고정. 독립 승인 주체 신원·설치 상태·PC 작업 효과를 자가 발급하지 않는다.
+- PR #4065 신규 20개 사례를 정확 source-only CI에 연결했다. HEAD `9a82695e1683c62549a22758b2a8457fffe93a66`; 3개 GitHub CI는 완료 전이므로 아직 PASS/병합으로 계산하지 않는다.
+- 기존 Owner-only A/Writer workflow, Controller 설치기, Worker/Runner, 운영 PC 설정, GitHub 변수, 공급자/DB/D1, 예약 **변경 0**.
+
+### 지금 남은 종단 필수 작업
+
+1. #4065 정확 HEAD CI·오류·병합 상태를 검증하고 적합하면 안전하게 통합한다.
+2. **실제 수신 Workflow와 인증된 호스트의 설치·정규 실행 진입점을 연결한다.** 이벤트·읽기 전용 검증 PASS만으로 PC 실행 권한이 되지 않도록 수신기 독립 policy/CAS/claim/backup/postcheck를 유지한다.
+3. CI 발행자 인증의 독립 증거 및 기존 승인 원본 공급과 실제 운영 정책 활성화는 기존 승인 범위와 추가 권한 효과를 분리해 진행한다. #4038 사용자 댓글 재요구나 Owner 위조는 금지한다.
+4. A / Controller B / Writer B **실제 무인 CI 실행 종단 완료 0/3**을 유지한다. PR 병합은 운영 완료와 구분한다.
