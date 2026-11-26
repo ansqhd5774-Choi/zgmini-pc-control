@@ -1208,3 +1208,19 @@ test('S6 old Runner and Watchdog pause proof waits only read-only before owned r
  assert.equal(calls.includes('releaseOwnedInstallLease'),false);
  assert.equal(journal.at(-1).phase,'RECOVERY_REQUIRED');
 });
+
+
+test('S6 readonly PC preflight checks deployed Watchdog bytes, not just INSTALL pin or stale process status',()=>{
+ const src=fs.readFileSync(new URL('../tools/update.mjs',import.meta.url),'utf8');
+ const start=src.indexOf('export function readS6OnceCurrentPreimage(');
+ const end=src.indexOf('export async function command(',start);
+ assert.ok(start>=0&&end>start);
+ const body=src.slice(start,end);
+ assert.match(body,/sha256\(fs\.readFileSync\(path\.join\(wdHome,'runner-watchdog\.mjs'\)\)\)===wdInstall\.sha256/);
+ assert.match(body,/wdStatus\.standbyReadyCount===2/);
+ assert.match(body,/verifyIndependent\(owner\.pid\)/);
+ assert.match(body,/requireCompleteRunnerInventory/);
+ assert.match(body,/maintenanceLockStatus\(maintenanceRoot,'controller-install'\)/);
+ assert.match(body,/protectedSnapshot\(\)/);
+ assert.doesNotMatch(body,/taskkill|fs\.unlinkSync|fs\.renameSync|spawn\(|\.release\(/);
+});
