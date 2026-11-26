@@ -3274,8 +3274,11 @@ export async function readS6OncePhaseReadback({phase,baseline,
  const wdRoot='E:/ZGmini/automation/pc-watchdog';
  const wdSource=path.join(wdRoot,'runner-watchdog.mjs');
  const wdInstall=json(path.join(wdRoot,'INSTALL.json'));
+ // Hold the exact hashed bytes for the pure read-only scanner import.
+ // Never import a path that could change between digest check and evaluation.
+ const verifiedWatchdogBytes=fs.readFileSync(wdSource);
  need(/^[a-f0-9]{64}$/.test(wdInstall.sha256??'')&&
-  sha256(fs.readFileSync(wdSource))===wdInstall.sha256&&
+  sha256(verifiedWatchdogBytes)===wdInstall.sha256&&
   wdInstall.standby?.approved===true&&
   wdInstall.standby?.mode==='ACTIVE_1_STANDBY_2',
   'S6_READBACK_WATCHDOG_SOURCE_UNVERIFIED');
@@ -3324,7 +3327,8 @@ export async function readS6OncePhaseReadback({phase,baseline,
  const seats=requireCompleteRunnerInventory(github('actions/runners?per_page=100'));
  // Pinned deployed Watchdog provides the ONE existing WMI scanner.
  // It has a process.argv main guard; importing it from updater never starts tick.
- const wdModule=await import(pathToFileURL(wdSource).href);
+ const wdModule=await import('data:text/javascript;base64,'+
+  verifiedWatchdogBytes.toString('base64'));
  need(typeof wdModule.scanControllerRunnersReadOnly==='function',
   'S6_READBACK_WMI_SCANNER_UNVERIFIED');
  const runnerExecutableProof=wdModule.scanControllerRunnersReadOnly();
