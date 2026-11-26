@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import {test} from "node:test";
 
-import {createMaintenanceAgent,failedUpdaterResult,normalizedResult} from "../tools/maintenance-agent.mjs";
+import {createMaintenanceAgent,failedUpdaterResult,normalizedResult,attachApprovedNativeBReceipt} from "../tools/maintenance-agent.mjs";
 import {prepareMaintenanceIssue} from '../tools/maintenance-request.mjs';
 
 test('pre-install child rejection retains exact safe code and current installed SHA',()=>{
@@ -20,7 +20,7 @@ test('unknown stage never claims untouched install and never copies arbitrary st
  const exact=failedUpdaterResult({requestId:'fixture'},{stdout:JSON.stringify({status:'AUTOMATION_BLOCKED',code:'SUPERVISOR_NOT_HEALTHY'})},{ledger:null,installLock:{held:false}});
  assert.equal(exact.status,'UNKNOWN');assert.equal(exact.code,'SUPERVISOR_NOT_HEALTHY');
 });
-import {manifestFingerprint,R54_B_SOURCE_FILES,R54_B_OPERATION,R54_B_ISSUE_TITLE} from "../tools/maintenance-contract.mjs";
+import {manifestFingerprint,validateUpdateRequest,R54_B_SOURCE_FILES,R54_B_OPERATION,R54_B_ISSUE_TITLE} from "../tools/maintenance-contract.mjs";
 
 const REPO="ansqhd5774-Choi/zgmini-pc-control";
 const ACTOR="ansqhd5774-Choi";
@@ -985,4 +985,52 @@ test('S6 bot, missing exact approval or unreadable operating snapshot never reac
   assert.equal(f.stats.applies,0);
   assert.equal(f.calls.some(row=>row.args.includes('s6-once-apply')),false);
  }
+});
+
+
+test('only Owner-pinned B manifest plus verified updater success emits native effect in durable JSON',async t=>{
+ const manifest=sampleRequest().manifest;
+ const nativePolicySha256='e'.repeat(64);
+ const selectiveSource={schema:'ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1',
+  branch:'codex/ci-native-proof-20261127',mainSha:'b'.repeat(40),
+  customPaths:['controller/operations.mjs']};
+ const ciNativeApproval={schema:'ZGMINI_CI_NATIVE_B_POLICY_APPROVAL_V1',
+  effect:'A_READONLY',nativePolicySha256};
+ const f=fixture(t,{manifestPatch:{controllerOnlyInstall:true,selectiveSource,ciNativeApproval}});
+ const current=await f.agent.pollOnce();
+ assert.equal(current[0].status,'SUCCEEDED');
+ const output=JSON.parse(f.remote.get(
+  `repos/${REPO}/contents/results/maintenance-${REQUEST_ID}.json`).toString('utf8'));
+ assert.equal(output.ciNativeEffect,'A_READONLY');
+ assert.equal(output.ciNativePolicySha256,nativePolicySha256);
+ assert.equal(f.stats.applies,1);
+ await f.agent.pollOnce();
+ assert.equal(f.stats.applies,1);
+ const trusted=validateUpdateRequest(f.request,f.rawManifest,{actor:ACTOR,
+  allowedActors:[ACTOR],controlRepository:REPO,installedSha:INSTALLED});
+ const ok=normalizedResult(f.request,{status:'SUCCEEDED',code:'UPDATE_COMMITTED',
+  actualControllerSha:TARGET,protectedStateUnchanged:true},'UPDATE_COMMITTED');
+ assert.equal(attachApprovedNativeBReceipt(ok,trusted,ACTOR).ciNativeEffect,'A_READONLY');
+ for(const [kind,value,actor] of [
+  ['protected state drift',{...ok,protectedStateUnchanged:false},ACTOR],
+  ['other controller SHA',{...ok,actualControllerSha:'c'.repeat(40)},ACTOR],
+  ['unverified state',{...ok,status:'UNKNOWN'},ACTOR],
+  ['forged actor',ok,'github-actions[bot]'],
+  ['other request ID',{...ok,requestId:'pc-other-0000'},ACTOR],
+ ]){
+  const denied=attachApprovedNativeBReceipt(value,trusted,actor);
+  assert.equal(denied.ciNativeEffect,undefined,kind);
+ }
+});
+
+test('ordinary B result never gains CI-native permission from updater stdout',async t=>{
+ const f=fixture(t,{applyResult:{status:'SUCCEEDED',code:'UPDATE_COMMITTED',
+  actualControllerSha:TARGET,protectedStateUnchanged:true,
+  ciNativeEffect:'A_READONLY',ciNativePolicySha256:'e'.repeat(64)}});
+ await f.agent.pollOnce();
+ const output=JSON.parse(f.remote.get(
+  `repos/${REPO}/contents/results/maintenance-${REQUEST_ID}.json`).toString('utf8'));
+ assert.equal(output.status,'SUCCEEDED');
+ assert.equal(output.ciNativeEffect,undefined);
+ assert.equal(output.ciNativePolicySha256,undefined);
 });
