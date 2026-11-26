@@ -68,6 +68,9 @@ const S6_NEXT_PREIMAGE_PROBE='controller-s6-next-preimage-readonly';
 const S6_PREDRAIN_INPUTS_PROBE='controller-s6-predrain-inputs-readonly';
 const S6_JOURNAL_PROBE='controller-s6-once-journal-readonly';
 const S6_RECEIVER_LEDGER_PROBE='controller-s6-once-receiver-ledger-readonly';
+const S6_ACTIVE_INTAKE_PROBE='controller-s6-active-receiver-intake-readonly';
+const S6_ACTIVE_INTAKE_REQUEST='pc-s6-63afb126-72dc-4ec5-a721-4819771fa9ee';
+const S6_ACTIVE_INTAKE_ISSUE=4069;
 const S6_JOURNAL_REQUEST='pc-s6-d7c0a971-5219-4a3a-9dce-30b0543b0e72';
 const S6_JOURNAL_APPROVAL_SHA='b8fed5bebec6a473730ed0b09ede5b5dc173db53af5cfc1e619e34a45bb8aefd';
 const S6_INSTALLED_MAINTAINER='05ef3bd6b5dc753c5abfbecccacc09375eb18d10';
@@ -651,6 +654,7 @@ export function authenticateProcess(event,env,role){
  const isS6Predrain=withW05&&raw.probe===S6_PREDRAIN_INPUTS_PROBE;
  const isS6Journal=withW05&&raw.probe===S6_JOURNAL_PROBE;
  const isS6ReceiverLedger=withW05&&raw.probe===S6_RECEIVER_LEDGER_PROBE;
+  const isS6ActiveIntake=withW05&&raw.probe===S6_ACTIVE_INTAKE_PROBE;
  const isR4GuardianOrigin=withW05&&raw.probe===R4_GUARDIAN_ORIGIN_PROBE;
  const isCiReceiptRoot=withW05&&raw.probe===CI_RECEIPT_ROOT_PROBE;
  const isCiActivation=withW05&&raw.probe===CI_CONTROLLER_B_ACTIVATION_PROBE;
@@ -658,7 +662,7 @@ export function authenticateProcess(event,env,role){
  const allowedOperatingProbe=isOperator||is2960||is3409||isEr1Postcheck||is3516||
   isD05Writer||isD05PrivateReceipt||isD05Theme||isD05Registration||is3160||
   isCnnStaticGuard||isCnnGitPredicates||isCnnBPins||isCnnBResources||
-  isCnnBCore||isW06Task||isR3Watchdog||isR3Wmi||isR4Runtime||isR5Runtime||isS6Preimage||isS6NextPreimage||isS6Predrain||isS6Journal||isS6ReceiverLedger||isR4GuardianOrigin||isCiPolicyCas;
+  isCnnBCore||isW06Task||isR3Watchdog||isR3Wmi||isR4Runtime||isR5Runtime||isS6Preimage||isS6NextPreimage||isS6Predrain||isS6Journal||isS6ReceiverLedger||isS6ActiveIntake||isR4GuardianOrigin||isCiPolicyCas;
  const acceptedProbe=(role==='operating'&&allowedOperatingProbe)||
   (role==='handoff'&&(isCiReceiptRoot||isCiActivation));
  if(!raw||(!basic&&!withJobs&&!withW05)||
@@ -699,6 +703,7 @@ export function authenticateProcess(event,env,role){
    ...(isS6Predrain?{s6PredrainInputs:true}:{}),
    ...(isS6Journal?{s6OnceJournal:true}:{}),
    ...(isS6ReceiverLedger?{s6ReceiverLedger:true}:{}),
+    ...(isS6ActiveIntake?{s6ActiveIntake:true}:{}),
   ...(isR4GuardianOrigin?{watchdogR4GuardianOrigin:true}:{}),
   ...(isCiReceiptRoot?{ciControllerBReceiptRoot:true}:{}),
   ...(isCiActivation?{ciControllerBActivation:true}:{}),
@@ -3222,6 +3227,102 @@ export function inspectS6ReceiverLedgerReadonly({
 }
 
 /**
+ * Exact #4069 receiver preclaim diagnosis for the already-approved S6 B request.
+ * The independent Windows maintainer writes fixed, bounded result codes to
+ * RECEIVER_STATUS.json even when a PRECLAIM guard returns before Issue ACK.
+ * Only A observation is performed: no claim, lease, pause, retry or stop.
+ * No raw input strings, paths, PIDs, nonce, command or environment are returned.
+ */
+export function projectS6ActiveReceiverIntakeReadonly({
+ receiver=null,owner=null,ownerAlive=false,ledger=null,ledgerPresent=false
+}={},now=Date.now()){
+ const base={schema:'ZGMINI_S6_ACTIVE_RECEIVER_INTAKE_A_V1',
+  requestId:S6_ACTIVE_INTAKE_REQUEST,issueNumber:S6_ACTIVE_INTAKE_ISSUE,
+  status:'STATE_UNKNOWN',code:'S6_INTAKE_RECEIVER_UNVERIFIED',
+  receiverFresh:false,receiverOwnerVerified:false,receiverPollState:null,
+  targetInLatestPoll:false,preclaimStatus:null,preclaimCode:null,
+  receiverClaimPresent:null,receiverClaimStatus:null,
+  operationalEffectProven:false,replayAuthorized:false,
+  operationalWrites:0,providerCalls:0,d1Writes:0};
+ const fail=(code,extra={})=>({...base,...extra,code});
+ const correctPid=Number.isSafeInteger(receiver?.pid)&&receiver.pid>0&&
+  receiver.pid===owner?.pid&&ownerAlive===true&&
+  typeof owner?.nonce==='string'&&/^[a-f0-9-]{36}$/.test(owner.nonce);
+ if(!correctPid)return fail('S6_INTAKE_RECEIVER_OWNER_UNVERIFIED');
+ const time=receiver.at;
+ const validTime=typeof time==='string'&&
+  /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(time)&&
+  Number.isFinite(Date.parse(time))&&new Date(Date.parse(time)).toISOString()===time;
+ const fresh=validTime&&Number.isFinite(now)&&
+  now-Date.parse(time)>=0&&now-Date.parse(time)<180000;
+ const verified={receiverOwnerVerified:true,receiverFresh:fresh};
+ if(!fresh)return fail('S6_INTAKE_RECEIVER_POLL_STALE_OR_UNVERIFIED',verified);
+ if(receiver.status!=='LISTENING')return fail('S6_INTAKE_RECEIVER_NOT_LISTENING',{
+  ...verified,receiverPollState:'OTHER'});
+ if(!Array.isArray(receiver.results)||receiver.results.length>1000)
+  return fail('S6_INTAKE_POLL_RESULTS_UNVERIFIED',{...verified,receiverPollState:'LISTENING'});
+ let claimPresent=false,claimStatus=null;
+ if(ledgerPresent){
+  if(!ledger||ledger.schema!=='ZGMINI_PC_MAINTENANCE_LEDGER_V1'||
+     ledger.requestId!==S6_ACTIVE_INTAKE_REQUEST||
+     ledger.issueNumber!==S6_ACTIVE_INTAKE_ISSUE)
+   return fail('S6_INTAKE_RECEIVER_CLAIM_IDENTITY_UNVERIFIED',verified);
+  claimPresent=true;
+  claimStatus=['QUEUED','RUNNING','BLOCKED','STATE_UNKNOWN','UNKNOWN',
+   'POSTCHECK_PENDING','RECOVERY_REQUIRED','SUCCEEDED','FAILED'].includes(ledger.status)
+   ?ledger.status:'UNVERIFIED';
+ }
+ const info={...verified,receiverPollState:'LISTENING',
+  receiverClaimPresent:claimPresent,receiverClaimStatus:claimStatus};
+ const entries=receiver.results.filter(x=>x?.requestId===S6_ACTIVE_INTAKE_REQUEST);
+ if(entries.length===0)return {...base,...info,status:'READ_ONLY_OBSERVED',
+  code:'S6_INTAKE_NOT_FOUND_IN_LAST_POLL'};
+ if(entries.length!==1)return fail('S6_INTAKE_RESULT_DUPLICATED',info);
+ const entry=entries[0];
+ if(!['BLOCKED','STATE_UNKNOWN','UNKNOWN','RUNNING','POSTCHECK_PENDING',
+   'RECOVERY_REQUIRED','SUCCEEDED','FAILED'].includes(entry.status)||
+   typeof entry.code!=='string'||
+   !/^(?:S6_[A-Z0-9_]{1,88}|DUPLICATE_REQUEST_SUPPRESSED|REQUEST_ID_REUSE_CONFLICT)$/.test(entry.code))
+  return fail('S6_INTAKE_RESULT_UNVERIFIED',info);
+ return {...base,...info,status:'READ_ONLY_OBSERVED',
+  code:'S6_INTAKE_RECEIVER_CODE_OBSERVED',
+  targetInLatestPoll:true,preclaimStatus:entry.status,preclaimCode:entry.code};
+}
+export function inspectS6ActiveReceiverIntakeReadonly({
+ io=fs,maintenanceHome='E:/ZGmini/automation/pc-maintenance',
+ now=Date.now(),isAlive=pid=>{try{process.kill(pid,0);return true;}catch{return false;}}
+}={}){
+ const unknown=code=>({...projectS6ActiveReceiverIntakeReadonly(),code});
+ try{
+  const read=(file,max)=>{
+   const st=io.lstatSync(file);
+   if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1||
+      st.size<1||st.size>max)throw Error('FILE_UNVERIFIED');
+   const bytes=io.readFileSync(file);
+   if(!Buffer.isBuffer(bytes)||bytes.length!==st.size)
+    throw Error('BYTES_UNVERIFIED');
+   return JSON.parse(bytes.toString('utf8'));
+  };
+  const status=read(path.join(maintenanceHome,'RECEIVER_STATUS.json'),262144);
+  const owner=read(path.join(maintenanceHome,'leases/receiver/owner.json'),4096);
+  const dir=path.join(maintenanceHome,'requests');
+  const st=io.lstatSync(dir);
+  if(!st.isDirectory()||st.isSymbolicLink())
+   return unknown('S6_INTAKE_RECEIVER_LEDGER_DIR_UNVERIFIED');
+  const hash=createHash('sha256').update(S6_ACTIVE_INTAKE_REQUEST).digest('hex');
+  const fp=path.join(dir,hash+'.json');
+  let ledger=null,ledgerPresent=false;
+  try{ledger=read(fp,65536);ledgerPresent=true;}
+  catch(error){if(error?.code!=='ENOENT')
+   return unknown('S6_INTAKE_RECEIVER_LEDGER_READ_UNVERIFIED');}
+  return projectS6ActiveReceiverIntakeReadonly({
+   receiver:status,owner,ownerAlive:isAlive(owner.pid),
+   ledger,ledgerPresent
+  },now);
+ }catch{return unknown('S6_INTAKE_RECEIVER_FILE_READ_UNVERIFIED');}
+}
+
+/**
  * A-only bounded PRE_DRAIN input observation. Reuses precisely the maintainer
  * filter and pc-job state counters without importing the B coordinator.
  * Current counts are not historical evidence or permission to retry a B.
@@ -3335,7 +3436,11 @@ export function collect(role,ctx,env=process.env){
   const proof=inspectR4GuardianOriginReadonly();
   return {...base,status:proof.status,code:proof.code,watchdogR4GuardianOrigin:proof};
  }
- if(ctx.s6ReceiverLedger===true){
+ if(ctx.s6ActiveIntake===true){
+   const evidence=inspectS6ActiveReceiverIntakeReadonly();
+   return {...base,status:evidence.status,code:evidence.code,s6ActiveIntake:evidence};
+  }
+  if(ctx.s6ReceiverLedger===true){
   const evidence=inspectS6ReceiverLedgerReadonly();
   return {...base,status:evidence.status,code:evidence.code,
    s6ReceiverLedger:evidence};
