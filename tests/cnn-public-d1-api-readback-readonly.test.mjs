@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import fs from 'node:fs';
 import {
- compareCnnPublicReadback,inspectCnnPublicReadback,CNN_PUBLIC_OPERATION
+ compareCnnPublicReadback,inspectCnnPublicReadback,CNN_PUBLIC_OPERATION,
+ classifyCnnD1ReadFailure
 } from '../controller/cnn-public-d1-api-readback-readonly.mjs';
 
 const DAY='2026-11-24', AT1=DAY+'T09:42:01.000Z', AT2=DAY+'T10:02:16.000Z';
@@ -141,4 +142,37 @@ test('invalid root and D1 errors retain evidence boundaries and no network',asyn
  });
  assert.equal(result.code,'CNN_APPROVED_D1_READ_UNVERIFIED');
  assert.equal(result.status,'STATE_UNKNOWN');assert.equal(result.d1Writes,0);
+ assert.equal(result.failurePhase,'UNCLASSIFIED');
+ assert.equal(result.safeError,undefined);
+});
+
+test('D1 failure phases and safe codes are finite; exception secrets never leave PC',()=>{
+ const hidden=Object.assign(new Error('Bearer confidential-credential'),{cnnPhase:'D1_SELECT'});
+ assert.deepEqual(classifyCnnD1ReadFailure(hidden),{failurePhase:'D1_SELECT'});
+ const safe=Object.assign(new Error('D1_AUTH_RESOLUTION_FAILED'),{
+  cnnPhase:'D1_SELECT',cnnSafeCode:'D1_AUTH_RESOLUTION_FAILED'
+ });
+ assert.deepEqual(classifyCnnD1ReadFailure(safe),{
+  failurePhase:'D1_SELECT',safeError:'D1_AUTH_RESOLUTION_FAILED'
+ });
+ const invalid=Object.assign(new Error('https://example.test/?token=private'),{
+  cnnPhase:'UNTRUSTED_PHASE',cnnSafeCode:'token=private'
+ });
+ assert.deepEqual(classifyCnnD1ReadFailure(invalid),{failurePhase:'UNCLASSIFIED'});
+});
+
+test('fixed D1 read failure retains safe stage in final result but no raw message',async()=>{
+ const f=fixture();
+ const result=await inspectCnnPublicReadback(root,{
+  localProbe:()=>f.local,
+  queryFixed:async()=>{throw Object.assign(new Error('D1_HTTP_403'),{cnnPhase:'D1_SELECT'});},
+  clock:()=>Date.parse(DAY+'T10:40:00.000Z')
+ });
+ assert.equal(result.status,'STATE_UNKNOWN');
+ assert.equal(result.code,'CNN_APPROVED_D1_READ_UNVERIFIED');
+ assert.equal(result.failurePhase,'D1_SELECT');
+ assert.equal(result.safeError,'D1_HTTP_403');
+ assert.equal(result.sqliteOpened,true);
+ assert.equal(result.providerCalls,0);
+ assert.equal(result.d1Writes,0);
 });

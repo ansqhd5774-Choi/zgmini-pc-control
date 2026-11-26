@@ -112,15 +112,40 @@ export function compareCnnPublicReadback(local,rows,replies,{day}={}){
   d1,api,sameDayMatched:localMatched,publicPeriodsMatched:publicMatched,
   sqliteOpened:true};
 }
+const CNN_D1_PHASES=new Set([
+ 'CONFIG_READ','CONFIG_PARSE','CONFIG_VALIDATE','CHECKOUT_RESOLVE','GIT_BINARY',
+ 'GIT_HEAD','GIT_FILE_INTEGRITY','CLIENT_IMPORT','CLIENT_INIT','D1_SELECT'
+]);
+const CNN_D1_SAFE_ERRORS=new Set([
+ 'WRANGLER_LOGIN_REQUIRED','WRANGLER_AUTH_REFRESH_TIMEOUT',
+ 'D1_AUTH_RESOLUTION_FAILED','D1_OUTCOME_UNKNOWN','D1_BATCH_FAILED',
+ 'D1_HTTP_401','D1_HTTP_403','D1_HTTP_429','D1_HTTP_500',
+ 'D1_HTTP_502','D1_HTTP_503','D1_HTTP_504'
+]);
+// Only finite, predefined phases/errors may leave the PC. Never emit raw
+// Git stderr, SQL, API body, file paths, credential text or exception messages.
+export function classifyCnnD1ReadFailure(error){
+ const failurePhase=CNN_D1_PHASES.has(error?.cnnPhase)?
+  error.cnnPhase:'UNCLASSIFIED';
+ const code=typeof error?.cnnSafeCode==='string'?error.cnnSafeCode:error?.message;
+ const safeError=CNN_D1_SAFE_ERRORS.has(code)?code:null;
+ return {failurePhase,...(safeError?{safeError}:{})};
+}
 async function readD1(dataRoot,fileSystem,day){
+ let phase='CONFIG_READ';
+ try{
  const cfg=readFixedReadonlyBytes(path.join(dataRoot,'pc-writer','config.json'),
   {fileSystem,verifiedRoot:dataRoot,minBytes:2,maxBytes:131072});
  if(!cfg.ok)throw Error('CNN_CONFIG_MISSING');
+ phase='CONFIG_PARSE';
  const c=JSON.parse(cfg.bytes.toString('utf8'));
+ phase='CONFIG_VALIDATE';
  if(!SHA40.test(c?.source??'')||!/^[a-f0-9]{32}$/.test(c?.account??'')||
   !/^[a-f0-9-]{36}$/.test(c?.core??''))throw Error('CNN_CONFIG_INVALID');
+ phase='CHECKOUT_RESOLVE';
  const checkout=path.resolve(dataRoot,'..','projects','zgmini-earnings-history-pc-release');
  const root=(fileSystem.realpathSync.native??fileSystem.realpathSync)(checkout);
+ phase='GIT_BINARY';
  const gitBin=selectR6GitBinary({exists:fileSystem.existsSync});
  if(!gitBin)throw Error('CNN_GIT_MISSING');
  const git=args=>execFileSync(gitBin,
@@ -128,18 +153,29 @@ async function readD1(dataRoot,fileSystem,day){
   {encoding:'utf8',windowsHide:true,timeout:10000,maxBuffer:65536,
    env:{...process.env,GIT_OPTIONAL_LOCKS:'0',GIT_TERMINAL_PROMPT:'0'},
    stdio:['ignore','pipe','ignore']}).trim();
+ phase='GIT_HEAD';
  if(git(['rev-parse','HEAD'])!==c.source)throw Error('CNN_SOURCE_MISMATCH');
+ phase='GIT_FILE_INTEGRITY';
  for(const p of ['scripts/pc-writer/d1.mjs','scripts/pc-writer/d1-transient.mjs',
   'scripts/pc-writer/d1-diagnostics.mjs']){
   git(['ls-files','--error-unmatch','--',p]);git(['diff','--quiet','HEAD','--',p]);
   const f=path.join(root,...p.split('/')),s=fileSystem.lstatSync(f);
   if(!s.isFile()||s.isSymbolicLink())throw Error('CNN_SOURCE_FILE_INVALID');
  }
+ phase='CLIENT_IMPORT';
  const {client,credential}=await import(pathToFileURL(path.join(root,'scripts','pc-writer','d1.mjs')).href);
+ phase='CLIENT_INIT';
  const remote=client(c,()=>credential(root)),result={};
+ phase='D1_SELECT';
  for(const [kind,feed] of FEEDS)
   result[kind]=(await remote.query(c.core,SQL,[feed,day])).results?.[0]??null;
  return result;
+ }catch(error){
+  const failure=new Error('CNN_APPROVED_D1_READ_UNVERIFIED');
+  failure.cnnPhase=phase;
+  if(CNN_D1_SAFE_ERRORS.has(error?.message))failure.cnnSafeCode=error.message;
+  throw failure;
+ }
 }
 async function readApi(period,fetcher=fetch){
  const response=await fetcher(URLS[period],{method:'GET',redirect:'error',
@@ -175,8 +211,8 @@ export async function inspectCnnPublicReadback(dataRoot,{
   return {...out,code:'CNN_CURRENT_STALE_FOR_1D',local:{status:'STALE',date:day}};
  let rows;
  try{rows=queryFixed?await queryFixed(day):await readD1(dataRoot,fileSystem,day);}
- catch{return {...out,code:'CNN_APPROVED_D1_READ_UNVERIFIED',
-  sqliteOpened:local?.sqliteOpened===true};}
+ catch(error){return {...out,code:'CNN_APPROVED_D1_READ_UNVERIFIED',
+  ...classifyCnnD1ReadFailure(error),sqliteOpened:local?.sqliteOpened===true};}
  const replies={};
  for(const period of PERIODS){
   try{replies[period]=fetchFixed?await fetchFixed(period):await readApi(period);}
