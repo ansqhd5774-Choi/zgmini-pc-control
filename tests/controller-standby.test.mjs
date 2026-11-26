@@ -7,7 +7,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {decideStandbyPromotion as decide,watchdogIdentityMatches,
  verifyStandbySource} from '../controller/standby.mjs';
 import {assertSupervisorOwner} from '../controller/common.mjs';
-import {provenOldRunnerExit,classifyRunnerExecutableProof,verifiedColdStandbyStart} from '../tools/runner-watchdog.mjs';
+import {provenOldRunnerExit,classifyRunnerExecutableProof,verifiedColdStandbyStart,selectStandbyCandidate} from '../tools/runner-watchdog.mjs';
 
 const eligible=()=>({
  sourceVerified:true,watchdogBound:true,supervisorLeasePresent:false,
@@ -277,4 +277,34 @@ test('Standby Watchdog service lineage WMI source is strict read-only and bounde
  assert.match(source,/row\.sessionId===0/);
  assert.match(source,/serviceExceptions>1/);
  assert.match(source,/scanControllerRunnersReadOnly\(\)!=='NO_CONTROLLER_RUNNER_PROCESS'/);
+});
+
+test('dual passive candidates have one deterministic Watchdog promotion selection',()=>{
+ const a={child:{pid:32001},ready:true,promoting:false,slot:1};
+ const b={child:{pid:32002},ready:true,promoting:false,slot:2};
+ assert.equal(selectStandbyCandidate(a,b,{dual:true}),a);
+ assert.equal(selectStandbyCandidate(a,b,{dual:false}),a);
+ assert.equal(selectStandbyCandidate(null,b,{dual:false}),null);
+ assert.equal(selectStandbyCandidate(null,b,{dual:true}),b);
+ assert.equal(selectStandbyCandidate({...a,ready:false},b,{dual:true}),b);
+ assert.equal(selectStandbyCandidate({...a,promoting:true},b,{dual:true}),b);
+ assert.equal(selectStandbyCandidate({...a,child:{pid:0}},b,{dual:true}),b);
+ assert.equal(selectStandbyCandidate({...a,child:null},b,{dual:true}),b);
+ assert.equal(selectStandbyCandidate({...a,ready:null},{...b,ready:null},{dual:true}),null);
+ assert.equal(selectStandbyCandidate(a,b,{dual:true,promotionPending:a}),null);
+ assert.equal(selectStandbyCandidate(a,b,{dual:true,promotionPending:b}),null);
+ assert.equal(selectStandbyCandidate(null,null,{dual:true}),null);
+});
+test('dual mode is separately approved; legacy R4 does not start second candidate',()=>{
+ const src=fs.readFileSync(new URL('../tools/runner-watchdog.mjs',import.meta.url),'utf8');
+ assert.match(src,/installed\.standby\?\.mode==='ACTIVE_1_STANDBY_2'/);
+ assert.match(src,/installed\.standby\?\.mode==='ACTIVE_1_STANDBY_1'/);
+ assert.match(src,/standby2Mode\?\[1,2\]:\[1\]/);
+ assert.match(src,/if\(!standbyMode\|\|promotionPending\)return/);
+ assert.match(src,/selectStandbyCandidate\(standby,secondStandby/);
+ assert.match(src,/if\(standbyMode&&promotionPending\)/);
+ assert.match(src,/BLOCKED_STANDBY_PROMOTION_OUTCOME_UNKNOWN/);
+ assert.match(src,/if\(promotionPending\.child\.pid!==owner\.pid\)/);
+ assert.match(src,/standbyReadyCount:/);
+ assert.doesNotMatch(src,/taskkill\.exe/);
 });
