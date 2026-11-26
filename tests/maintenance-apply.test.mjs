@@ -1369,6 +1369,15 @@ test('S6 live operating-port entry is not available to CI or Runner and has no d
  assert.match(body,/validateS6OnceIssueEnvelope/);
  assert.match(body,/validateS6OnceBManifest/);
  assert.match(body,/verifyIndependent/);
+ assert.match(body,/assertRemoteBPin/);
+ for(const [start,end] of [['pauseIntake:async','waitForDrain:async'],
+  ['stopOwnTree:async','waitForStoppedHeld:async'],
+  ['releaseOwnedInstallLease:async','waitForPromotion:async']]){
+  const from=body.indexOf(start),to=body.indexOf(end,from);
+  assert.ok(from>=0&&to>from);
+  assert.match(body.slice(from,to),/assertRemoteBPin\(\)/);
+ }
+
  assert.match(body,/acquireMaintenanceLock\(maintenanceRoot,'controller-install'\)/);
  assert.match(body,/taskkill\.exe/);
  assert.match(body,/s6OwnedLeaseReleaseReadback\(snap,baseline\)/);
