@@ -1078,6 +1078,9 @@ function s6Fixture(options={}){
    return s6Observe(phase,options);
   },
   claimOnce:async()=>{add('claimOnce');return options.claim!==false;},
+  acquireOwnedInstallLease:async()=>{add('acquireOwnedInstallLease');
+   if(options.failAcquire)throw Object.assign(Error('S6_TEST_INSTALL_LEASE_UNKNOWN'),{code:'S6_TEST_INSTALL_LEASE_UNKNOWN'});
+  },
   persist:async entry=>{journal.push(entry);add('persist:'+entry.phase);
    if(options.failPersist===entry.phase)throw Object.assign(Error('S6_TEST_JOURNAL_FAIL'),{code:'S6_TEST_JOURNAL_FAIL'});
   },
@@ -1104,6 +1107,7 @@ test('S6 coordinator keeps exact one-shot owner transitions and never marks the 
  assert.equal(r.leaseReleaseAcknowledged,true);
  assert.equal(calls.filter(x=>x==='stopOwnTree').length,1);
  assert.equal(calls.filter(x=>x==='releaseOwnedInstallLease').length,1);
+ assert.ok(calls.indexOf('acquireOwnedInstallLease')<calls.indexOf('pauseIntake'));
  assert.ok(calls.indexOf('pauseIntake')<calls.indexOf('waitForDrain'));
  assert.ok(calls.indexOf('waitForDrain')<calls.indexOf('verifyStopGuard'));
  assert.ok(calls.indexOf('verifyStopGuard')<calls.indexOf('stopOwnTree'));
@@ -1134,7 +1138,7 @@ test('S6 coordinator refuses duplicate, wrong operation, unverifiable approval o
 });
 test('S6 coordinator never releases install lease after uncertain pause, stop, WMI or release guard',async()=>{
  for(const opts of [
-  {failPause:true},{stopGuard:false},{failStop:true},
+  {failAcquire:true},{failPause:true},{stopGuard:false},{failStop:true},
   {failHeld:true},{releaseGuard:false}
  ]){
   const {port,calls,journal}=s6Fixture(opts);
@@ -1172,4 +1176,18 @@ test('S6 coordinator reports uncertain promotion and does not stop another tree'
  assert.equal(calls.filter(x=>x==='releaseOwnedInstallLease').length,1);
  assert.equal(journal.at(-1).phase,'RECOVERY_REQUIRED');
  assert.equal(r.failoverTested,false);
+});
+
+
+test('S6 does not open intake-pause or old process stop before owned install lease is attested',async()=>{
+ const {port,calls,journal}=s6Fixture({failAcquire:true});
+ const result=await runApprovedS6FailoverOnce(s6Request(),port);
+ assert.equal(result.status,'RECOVERY_REQUIRED');
+ assert.equal(result.failoverTested,false);
+ assert.equal(result.leaseReleaseAcknowledged,false);
+ assert.equal(calls.filter(x=>x==='acquireOwnedInstallLease').length,1);
+ assert.equal(calls.includes('pauseIntake'),false);
+ assert.equal(calls.includes('stopOwnTree'),false);
+ assert.equal(calls.includes('releaseOwnedInstallLease'),false);
+ assert.equal(journal.at(-1).phase,'RECOVERY_REQUIRED');
 });
