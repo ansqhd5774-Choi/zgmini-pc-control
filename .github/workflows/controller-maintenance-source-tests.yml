@@ -16,6 +16,7 @@ on:
       - '.github/workflows/ci-approved-writer-b-once.yml'
       - '.github/workflows/ci-native-auto-publish.yml'
       - 'tests/ci-native-publisher-entry.test.mjs'
+      - 'tests/ci-native-a-execute.test.mjs'
       - 'tests/ci-native-receiver-observe.test.mjs'
       - 'tests/ci-approval-shadow-decision.test.mjs'
       - 'tests/ci-native-dispatch.test.mjs'
@@ -327,6 +328,11 @@ jobs:
         run: |
           node --check ci-approval/native-publisher-entry.mjs
           node --test --test-concurrency=1 tests/ci-native-publisher-entry.test.mjs
+      - name: Verify pinned fixed A operational execution adapter without PC effects
+        if: hashFiles('ci-approval/native-a-execute.mjs') != '' && hashFiles('tests/ci-native-a-execute.test.mjs') != ''
+        run: |
+          node --check ci-approval/native-a-execute.mjs
+          node --test --test-concurrency=1 tests/ci-native-a-execute.test.mjs
       - name: Verify deterministic scoped request previews without submission
         if: hashFiles('ci-approval/request-preview.mjs', 'tests/ci-approval-request-preview.test.mjs') != ''
         run: node --test --test-concurrency=1 tests/ci-approval-request-preview.test.mjs
