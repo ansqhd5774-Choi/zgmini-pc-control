@@ -435,8 +435,10 @@ export async function main(){
     // lease and fresh heartbeat before either standby slot can rearm.
     if(standbyMode&&promotionPending){
      if(promotionPending.child.pid!==owner.pid){
-      status('BLOCKED_STANDBY_PROMOTION_OWNER_UNVERIFIED',{
-       supervisorPid:owner.pid,heartbeatAt:hb.at});return;
+      // Existing Active is objectively healthy. Never degrade its public
+      // Watchdog health just because our passive promotion remains uncertain.
+      status(state,{supervisorPid:owner.pid,heartbeatAt:hb.at,
+       standbyPromotionStatus:'UNVERIFIED_OWNER_MISMATCH'});return;
      }
      if(promotionPending.slot===2)secondStandby=null;
      else standby=null;
