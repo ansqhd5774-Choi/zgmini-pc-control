@@ -106,3 +106,25 @@
 3. 조건이 충족된 효과는 P2/P3/P4를 독립 병렬 진행한다. 신규 권한 변경만 해당 효과에 한정해 대기한다.
 4. 현재 작업 완료율은 **P0~P6 7패키지 가운데 확정 종단 PASS 건수 기준**으로만 계산하며, 미확인 항목은 UNKNOWN으로 표시한다. 실행할 때마다 `관측/수정/검증/미완료/다음 행동`을 간단히 원장에 기록한다.
 5. **최종 종료 조건은 세 A/B 유형의 실제 CI 무인 운영**이며, Controller B 1건 실증만으로 종료하지 않는다.
+
+## 5. 첫 실행 기록 — 2026-11-27 KST
+
+### 실제 확인한 첫 차단 조건
+
+- **A급:** `.github/workflows/pc-job.yml`의 `approved-pc-job`는 `github.actor`와 `github.event.issue.user.login`이 모두 `ansqhd5774-Choi`인지 검사한다. 일반 `github-actions[bot]`이 생성한 Issue는 기존 Owner-only 경로에 직접 진입하지 못한다.
+- **Writer B급:** `.github/workflows/pc-writer-b-source-once.yml`도 `github.actor`, `github.event.sender.login`, `github.event.issue.user.login`이 Owner여야 한다. CI 봇 Issue를 기존 Writer 소유자 요청처럼 취급하는 방식은 승인 범위 외 인증 변경이다.
+- **Controller B급:** 고정 CI 수신 영수증 경로가 별도로 개발되어 있으나 운영 자동 발행 정책은 #4029 시점에 미구성이었으며, CI 코드를 병합한 사실만으로 Windows 설치 성공을 주장할 수 없다.
+- **공통 오판:** 기존 `ci-approval/shadow-decision.mjs`의 합성 PASS는 **수신기가 실제 CI 발행자를 인증하는지** 확인하지 않고 `WOULD_MATCH_EXISTING_AUTHORITY`를 낼 수 있었다. 이 상태를 자동 발행 준비 완료로 해석해서는 안 된다.
+
+### 직접 수정한 범위
+
+- 실제 소스 브랜치: `codex/ci-auto-approval-receiver-admission-failclosed-20261127` (최신 main `0560970d0bcca0d223ef12a61a9ee1fd36290e1d` 기반).
+- [PR #4044](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4044): 합성 판정의 수신기 인증 증거 누락 시 `EVIDENCE_MISSING/CI_RECEIVER_ADMISSION_NOT_PROVEN`으로 반환. A / Writer B / Controller B 음성 회귀 4건 추가.
+- 코드 HEAD `85066e3ca47864229a81e38fb457e2b8e8d047e6`, 변경 파일 2개. 해당 PR의 격리 실제 CI 결과·병합 여부는 **별도 확인 전 미입증**.
+- 실제 Owner-only Workflow, Writer 수신기, A 허용목록, CI 인증 정책, GitHub 변수, PC Runtime **변경 0**. PR #4044의 모의 판정 개선을 실제 무인 실행 완료로 세지 않는다.
+
+### 다음 필수 코드 작업
+
+1. A·Writer B 각각의 기존 Owner 인증과 신규 CI 제출 주체를 **동일한 신원으로 가장하지 않고** 분리할 실제 허용 수신·서명/영수증 계약을 특정한다.
+2. 독립 검증·계정 범위·단회 요청/기존 영수증·재생 방지를 만족하는 공식 경로만 최소 변경한다. 인증/관리자 권한 변경이 필요한 범위는 별도 근거로 분리한다.
+3. PR #4044 정확 HEAD 격리 CI 완료 시 기존 증거와 통합 여부를 확인한다. 그 결과와 무관하게 실제 A·Writer 종단 실증은 아직 0건으로 보존한다.
