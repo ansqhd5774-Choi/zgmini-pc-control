@@ -2465,3 +2465,54 @@ test('R3 WMI fixed ancestry code invokes only read-only process/service CIM in W
  }
  assert.equal(result.promotionApproved,false);
 });
+
+
+import {inspectCiControllerBReceiptRootReadonly}
+ from '../tools/ci-controller-b-receipt-root-readonly.mjs';
+
+test('CI B receipt root probe authenticates only the existing isolated handoff role',()=>{
+ const e=event('handoff'),raw=JSON.parse(e.issue.body),probe='ci-controller-b-receipt-root-readonly';
+ const scoped={...e,issue:{...e.issue,body:JSON.stringify({...raw,probe})}};
+ assert.equal(authenticateProcess(scoped,env,'handoff').ciControllerBReceiptRoot,true);
+ assert.throws(()=>authenticateProcess(scoped,env,'operating'));
+ assert.throws(()=>authenticateProcess({
+  ...event('operating'),issue:{...event('operating').issue,
+   body:JSON.stringify({...JSON.parse(event('operating').issue.body),probe})}},env,'operating'));
+ for(const invalid of [probe+';cmd','ci-controller-b-receipt-root-write']){
+  assert.throws(()=>authenticateProcess({...e,issue:{...e.issue,
+   body:JSON.stringify({...raw,probe:invalid})}},env,'handoff'));
+ }
+ assert.throws(()=>authenticateProcess({...e,issue:{...e.issue,
+  body:JSON.stringify({...raw,probe,path:'E:\\private'})}},env,'handoff'));
+});
+
+test('CI B receipt-root A inspector never reports directory paths or write authority',()=>{
+ const root='E:\\ZGmini\\ci-controller-b-receipts';
+ const io={lstatSync:()=>({isDirectory:()=>true,isSymbolicLink:()=>false}),
+  realpathSync:{native:x=>x},readdirSync:()=>[]};
+ const inspect=(args={})=>inspectCiControllerBReceiptRootReadonly({
+  platform:'win32',filesystem:io,root,...args});
+ const present=inspect();
+ assert.equal(present.status,'PARTIAL');
+ assert.equal(present.code,'CI_RECEIPT_ROOT_DIRECTORY_PRESENT_READONLY');
+ assert.equal(present.configured,true);
+ assert.equal(present.directoryPresent,true);
+ assert.equal(present.readable,true);
+ assert.equal(present.writableVerified,false);
+ assert.equal(present.durableAcrossRunsVerified,false);
+ assert.equal(present.executionAuthorized,false);
+ assert.equal(present.operationalWrites,0);
+ assert.equal(JSON.stringify(present).includes(root),false);
+ assert.equal(inspect({root:''}).code,'CI_RECEIPT_ROOT_NOT_CONFIGURED');
+ assert.equal(inspect({root:'relative'}).code,'CI_RECEIPT_ROOT_PATH_UNSAFE');
+ assert.equal(inspect({root:'E:\\'}).code,'CI_RECEIPT_ROOT_PATH_UNSAFE');
+ assert.equal(inspect({volatileRoots:['E:\\ZGmini']}).code,'CI_RECEIPT_ROOT_VOLATILE');
+ assert.equal(inspect({platform:'linux'}).code,'CI_RECEIPT_WINDOWS_REQUIRED');
+ const aliased={...io,lstatSync:p=>({
+  isDirectory:()=>true,isSymbolicLink:()=>p==='E:\\ZGmini'})};
+ assert.equal(inspect({filesystem:aliased}).code,'CI_RECEIPT_ROOT_PATH_ALIAS');
+ const missing={...io,lstatSync:()=>{const e=Error('missing');e.code='ENOENT';throw e;}};
+ assert.equal(inspect({filesystem:missing}).code,'CI_RECEIPT_ROOT_DIRECTORY_ABSENT');
+ const unreadable={...io,readdirSync:()=>{throw Error('permission')}};
+ assert.equal(inspect({filesystem:unreadable}).code,'CI_RECEIPT_ROOT_READ_UNVERIFIED');
+});

@@ -6,6 +6,7 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - 'tools/pc-process-inventory-readonly.mjs'
+      - 'tools/ci-controller-b-receipt-root-readonly.mjs'
       - 'tools/w03-paid-private-readonly.mjs'
       - 'tools/w03-paid-source-coverage-readonly.mjs'
       - 'tests/w03-paid-source-coverage-readonly.test.mjs'
@@ -19,15 +20,14 @@ on:
       - 'writer-config-b/result-pair-atomic.mjs'
       - 'writer-config-b/result-pair-atomic.test.mjs'
       - '.github/workflows/pc-process-inventory-readonly.yml'
-permissions:
-  actions: read
-  contents: write
-  issues: write
+permissions: {}
 concurrency:
   group: pc-process-inventory-${{ github.event.issue.number }}
   cancel-in-progress: false
 jobs:
   process-source-tests:
+    permissions:
+      contents: read
     if: >-
       github.event_name == 'pull_request' &&
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
@@ -48,6 +48,9 @@ jobs:
       - name: Verify process discovery excludes commands and secrets
         run: node --test tests/pc-process-inventory-readonly.test.mjs tests/runner-job-history-readonly.test.mjs tests/w03-paid-private-readonly.test.mjs tests/w03-paid-source-coverage-readonly.test.mjs tests/cnn-r10-guard-replay-readonly.test.mjs writer-config-b/result-pair-atomic.test.mjs
   operating-process-snapshot:
+    permissions:
+      contents: write
+      issues: write
     if: >-
       github.event_name == 'issues' &&
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
@@ -71,6 +74,9 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: '"E:\ZGmini\runtime\node.exe" tools/pc-process-inventory-readonly.mjs operating'
   handoff-process-snapshot:
+    permissions:
+      contents: write
+      issues: write
     if: >-
       github.event_name == 'issues' &&
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
@@ -95,4 +101,5 @@ jobs:
       - name: Collect read-only runtime process snapshot on isolated handoff PC
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          ZGMINI_CI_CONTROLLER_B_RECEIPT_ROOT: ${{ vars.ZGMINI_CI_CONTROLLER_B_RECEIPT_ROOT }}
         run: node tools/pc-process-inventory-readonly.mjs handoff
