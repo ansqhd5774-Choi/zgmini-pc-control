@@ -126,6 +126,9 @@ export function verifyTaskCreateBCandidate(proof,candidate){
   xml.includes('run-local-cnn-minute.vbs')&&
   wrapper.includes('local-cycle.mjs')&&
   wrapper.includes('--cnn-minute --publish')&&
+  wrapper.includes('shell.Environment("PROCESS")')&&
+  wrapper.includes('taskEnvironment("ZGMINI_PC_HOME") = "E:\\ZGmini\\data\\pc-writer"')&&
+  (wrapper.match(/taskEnvironment\(/g)??[]).length===1&&
   !wrapper.includes('schtasks')&&
   !wrapper.includes('--korea'),
   'TASK_CREATE_B_CANDIDATE_SCOPE_STOP');
