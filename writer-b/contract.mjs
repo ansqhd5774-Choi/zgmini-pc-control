@@ -21,6 +21,11 @@ const SHA64=/^[0-9a-f]{64}$/i;
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MANIFEST_PATH=/^approvals\/writer-updates\/[a-z0-9][a-z0-9._-]{0,95}\.json$/;
 const RELATIVE=/^(?:scripts\/pc-writer|lib|worker)\/(?:[a-z0-9][a-z0-9._-]*\/)*[a-z0-9][a-z0-9._-]*\.mjs$/i;
+// Exactly two W06 TypeScript source dependencies. No generic .ts grant.
+const CNN_TS_DEPENDENCIES=new Set([
+ 'worker/feed-collectors/fear-greed.ts',
+ 'worker/public-feed-collectors.ts',
+]);
 const FORBIDDEN_SEGMENTS=new Set(['.','..']);
 // Process-local provenance seal: the transaction must not accept fabricated
 // {registeredB:true,exactOneShot:true} flags from arbitrary caller JSON.
@@ -63,7 +68,7 @@ export const approvedCoreDrainWindowMs=mode=>
   RESERVED_CORE_DRAIN_WINDOWS_MS[mode]:null;
 
 export function isScopedWriterPath(file){
- if(typeof file!=='string'||file.length>180||!RELATIVE.test(file)||
+ if(typeof file!=='string'||file.length>180||!(RELATIVE.test(file)||CNN_TS_DEPENDENCIES.has(file))||
     file.includes('\\')||file.includes('//'))return false;
  return file.split('/').every(seg=>!FORBIDDEN_SEGMENTS.has(seg)&&!seg.startsWith('.'));
 }
