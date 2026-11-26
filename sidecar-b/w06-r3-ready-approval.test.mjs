@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {validateManifest,verifyCandidateBytes,R3_AFTER,SUCCESSOR_SCHEMA,sha256} from './contract.mjs';
+const read=path=>JSON.parse(fs.readFileSync(new URL('../'+path,import.meta.url),'utf8'));
+const old=read('approvals/sidecar-b/w06-cnn-r3-installed-writer-v2-20261126.json'),next=read('approvals/sidecar-b/w06-cnn-r3-installed-writer-v2-ready-20261126.json');
+const before=read('results/cnn-sidecar-b-89db2120-3cb8-4fa5-b347-987c4d73c520.json');
+const ready=read('results/pc-process-inventory-45804999599-1-operating.json');
+test('W06 distinct post-diagnostic V2 one-shot changes request identity only',()=>{
+ assert.equal(validateManifest(old),old);assert.equal(validateManifest(next),next);
+ assert.equal(next.schema,SUCCESSOR_SCHEMA);assert.equal(next.beforeSha256,R3_AFTER);
+ assert.notEqual(old.requestId,next.requestId);
+ assert.deepEqual({...next,requestId:old.requestId},old);
+ assert.equal(next.requestId,'4b28c137-b01e-4dd0-907c-6e9f7b99e04a');
+ assert.equal(next.installedHead,'393cee0da46515ff056543173fcd1253a858b3d7');
+ const oldR3=fs.readFileSync(new URL('./approved/archive-run.mjs',import.meta.url));
+ const pin=Buffer.from(oldR3.toString('utf8').replace("const APPROVED='e4b768530335182f422ebd51d163a6f5b754361c';","const APPROVED='393cee0da46515ff056543173fcd1253a858b3d7';"));
+ assert.equal(verifyCandidateBytes(next,pin),pin);assert.equal(sha256(pin),next.afterSha256);
+ for(const key of ['allowProviderCalls','allowDbChanges','allowD1Writes','allowTaskChanges'])assert.equal(next[key],false);
+});
+test('previous exact B failed before mutation, independently later resource probe is now complete but not lasting authorization',()=>{
+ assert.equal(before.status,'SIDECAR_B_PREFLIGHT_OR_RUNTIME_STOP');
+ assert.equal(before.code,'SIDECAR_B_IDLE_WINDOW_OBSERVATION_STOP');
+ assert.equal(before.applied,false);assert.equal(before.changedFileCount,0);
+ assert.equal(ready.requestId,'d71e90b2-caae-4251-8bd3-508f5e5cf111');
+ assert.equal(ready.status,'PASS');assert.equal(ready.code,'CNN_B_RESOURCE_SNAPSHOT_COLLECTED');
+ const flags=ready.cnnSidecarBResources;
+ assert.deepEqual([flags.coreQuiet,flags.sidecarActive,flags.controllerInstallBusy,flags.sharedWriterLockPresent],[true,false,false,false]);
+ assert.equal(flags.currentPreflightReadyIgnoringLease,true);
+ assert.equal(ready.operationalWrites,0);assert.equal(ready.providerCalls,0);assert.equal(ready.d1Writes,0);
+});
