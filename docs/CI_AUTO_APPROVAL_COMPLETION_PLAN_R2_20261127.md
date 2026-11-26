@@ -428,3 +428,12 @@
 - 기존 운영 PC A Run 45883221676 `queued`, runner_id 0; A/Writer B/Controller B 실제 무인 작업 증거 **0/3** 유지. 변경은 소스·시험·Plan만이며 PC install/승인 flag/정책 원본 운영 효과 0.
 
 다음 필수 실행: #4088 최종 CI 3/3 결과 → 성공 시 정확 SHA로 병합/main blob readback, 아니면 실패한 테스트만 최소 수정 → 실제 PC 승인 Scope 확인 및 효과별 자연 무인 종단 증거 회수.
+
+### #4088 검증 원장 갱신 — 최종 소스 HEAD의 실행 증거
+
+- 최종 PR HEAD `535f38c3584ec81d4f4eddfd33ecdd6599a62ff5`의 [Windows Source Run 45888855283](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45888855283) Job 140146244434, **completed/success**, 전체 source-only 단계 및 native publisher/dispatch/receiver 회귀시험 PASS.
+- [Secret Scan Run 45888855329](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45888855329) **completed/success**.
+- [C996 Run 45888855342](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45888855342) 마지막 관측 `queued`, runner 아직 미배정. 따라서 **2/3 성공, #4088 병합 전**. 다른 SHA의 C996 결과 재사용 금지.
+- 별도 S6 소스 main 변경 `d2e8fece77c8aa01cf54669800e0a36154e8e2d1`은 4개 maintenance 파일이고 native PR 변경 8파일과 분리 확인; 변경 보존.
+- 기존 PC 운영 A [Run 45883221676](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45883221676) Job 140127435932도 `queued`/runner_id 0으로 실제 Native 설치·활성 Scope readback 불가; 무인 운영 완료 **0/3** 유지.
+- 다음 필수 실행: 같은 C996 정확 HEAD 종료 확인 → 3/3 성공 시 #4088 squash merge 및 main blob 재조회 → 유효 기존 승인 정책과 실제 Runtime에서의 각 효과 종단 실증. `queued` 상태에서 수동 검사 완화나 중복 작업 생성 금지.
