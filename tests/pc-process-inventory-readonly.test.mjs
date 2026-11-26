@@ -2687,3 +2687,103 @@ test('CI source test queue isolates separate PRs from Issue A requests',()=>{
  assert.match(workflow,/cancel-in-progress: false/);
  assert.ok(!workflow.includes('group: pc-process-inventory-${{ github.event.issue.number }}'));
 });
+
+
+import {classifyR4GuardianOrigin,inspectR4GuardianOriginReadonly}
+ from '../tools/pc-process-inventory-readonly.mjs';
+
+const GUARDIAN_PROOF_KEYS=['WATCH_PRESENT','NODE_PATH','COMMAND_EXACT',
+ 'COMMAND_CONTAINS','PARENT_PRESENT','PARENT_WSCRIPT','PARENT_STARTUP',
+ 'OWNER_SID','SESSION','PARENT_BEFORE','AGE_600'];
+const guardianProof=(changed={})=>'PROOF|'+GUARDIAN_PROOF_KEYS.map(k=>
+ k+'='+(Object.hasOwn(changed,k)?changed[k]:1)).join('|');
+const r4Pending=()=>({
+ installedMatch:true,controllerTargetMatch:true,naturalRestartObserved:false
+});
+test('R4 Guardian WMI PROBE classifies known lineage without issuing activation',()=>{
+ const p=classifyR4GuardianOrigin({
+  runtime:r4Pending(),probeOutput:'WATCHDOG_ROTATION_VERIFIED',
+  originOutput:guardianProof()});
+ assert.equal(p.status,'READ_ONLY_OBSERVED');
+ assert.equal(p.code,'WATCHDOG_R4_GUARDIAN_WMI_PROBE_VERIFIED');
+ assert.equal(p.guardianProbePassed,true);
+ assert.equal(p.activationExecuted,false);
+ assert.equal(p.activationApproved,false);
+ assert.equal(p.promotionApproved,false);
+ assert.equal(p.operationalWrites,0);
+ const quoting=classifyR4GuardianOrigin({runtime:r4Pending(),
+  probeOutput:'WATCHDOG_ROTATION_VERIFIED',
+  originOutput:guardianProof({COMMAND_EXACT:0})});
+ assert.equal(quoting.guardianProbePassed,true);
+ assert.deepEqual(quoting.originMismatches,['COMMAND_EXACT']);
+});
+test('R4 Guardian cannot treat an unverified source, mismatch or malformed proof as eligible',()=>{
+ for(const runtime of [null,
+  {...r4Pending(),installedMatch:false},
+  {...r4Pending(),controllerTargetMatch:false}]){
+  const r=classifyR4GuardianOrigin({runtime,probeOutput:'WATCHDOG_ROTATION_VERIFIED',
+   originOutput:guardianProof()});
+  assert.equal(r.status,'STATE_UNKNOWN');
+  assert.equal(r.guardianProbePassed,false);
+ }
+ const restarted=classifyR4GuardianOrigin({
+  runtime:{...r4Pending(),naturalRestartObserved:true}});
+ assert.equal(restarted.code,'WATCHDOG_R4_ALREADY_RESTARTED');
+ assert.equal(restarted.guardianProbePassed,false);
+ const denied=classifyR4GuardianOrigin({runtime:r4Pending(),
+  probeOutput:'WATCHDOG_ROTATION_DENIED',originOutput:guardianProof({OWNER_SID:0})});
+ assert.equal(denied.guardianProbePassed,false);
+ assert.deepEqual(denied.originMismatches,['OWNER_SID']);
+ const conflicting=classifyR4GuardianOrigin({runtime:r4Pending(),
+  probeOutput:'WATCHDOG_ROTATION_VERIFIED',originOutput:guardianProof({PARENT_WSCRIPT:0})});
+ assert.equal(conflicting.status,'STATE_UNKNOWN');
+ assert.equal(conflicting.code,'WATCHDOG_R4_GUARDIAN_PROOFS_CONFLICT');
+ assert.equal(classifyR4GuardianOrigin({runtime:r4Pending(),
+  probeOutput:'WATCHDOG_ROTATION_VERIFIED',originOutput:'UNSAFE'}).status,'STATE_UNKNOWN');
+});
+test('R4 Guardian A admits one fixed operating probe but no path, command or handoff',()=>{
+ const e=event(),body=JSON.parse(e.issue.body);
+ const withProbe={...body,probe:'controller-standby-r4-guardian-origin-readonly'};
+ const scoped={...e,issue:{...e.issue,body:JSON.stringify(withProbe)}};
+ assert.equal(authenticateProcess(scoped,env,'operating').watchdogR4GuardianOrigin,true);
+ assert.throws(()=>authenticateProcess(scoped,env,'handoff'));
+ for(const patch of [
+  {probe:'controller-standby-r4-guardian-origin-readonly;cmd'},
+  {probe:'controller-standby-r4-guardian-origin-write'},
+  {path:'E:/ZGmini/data'},
+  {command:'ACTIVATE'}]){
+  const attempt={...scoped,issue:{...scoped.issue,
+   body:JSON.stringify({...withProbe,...patch})}};
+  assert.throws(()=>authenticateProcess(attempt,env,'operating'));
+ }
+});
+test('R4 Guardian inspector runs ONLY the pinned historical helper PROBE, never ACTIVATE',()=>{
+ const helper=fs.readFileSync(new URL('../watchdog-b/guardian-rotate.vbs',import.meta.url));
+ assert.equal(createHash('sha256').update(helper).digest('hex'),
+  'ba4890ca8c8dd7ba4d885d88aff000443a58d1a8b1c9d01f386e10b3e0aa3bbe');
+ const paths=[],calls=[];
+ const fakefs={
+  lstatSync(p){assert.match(p,/owner\.json$/);
+   return {isFile:()=>true,isSymbolicLink:()=>false,nlink:1,size:120};},
+  readFileSync(p,encoding){
+   if(p.endsWith('owner.json'))return JSON.stringify({pid:12345});
+   return fs.readFileSync(p,encoding);
+  }
+ };
+ const run=(binary,args,opts)=>{
+  calls.push({binary,args,opts});
+  assert.equal(binary,'C:/Windows/System32/cscript.exe');
+  return {status:0,stdout:args[1].includes('guardian-origin-readonly.vbs')?
+   guardianProof():'WATCHDOG_ROTATION_VERIFIED'};
+ };
+ const result=inspectR4GuardianOriginReadonly({
+  runtime:r4Pending(),filesystem:fakefs,run});
+ assert.equal(result.guardianProbePassed,true);
+ assert.equal(calls.length,2);
+ assert.equal(calls[0].args[0],'//NoLogo');
+ assert.equal(calls[0].args[2],'12345');
+ assert.equal(calls[1].args[2],'PROBE');
+ assert.equal(calls[1].args[3],'12345');
+ assert.equal(calls.every(c=>!c.args.includes('ACTIVATE')),true);
+ assert.equal(calls.every(c=>c.opts.windowsHide===true&&c.opts.timeout===15000),true);
+});
