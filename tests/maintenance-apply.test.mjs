@@ -1144,6 +1144,41 @@ test('S6 uncertain backlog POST is never repeated, and never claims A postcheck'
  assert.equal(calls.includes('resumeIntake'),true);
 });
 
+test('S6 returned failure boundary survives RECOVERY_REQUIRED journal write and reports exact phase',async()=>{
+ for(const [opts,failedAt,expectedCode] of [
+  [{failAcquire:true},'INSTALL_LEASE_ACQUIRE_ATTEMPT','S6_TEST_INSTALL_LEASE_UNKNOWN'],
+  [{failPause:true},'INTAKE_PAUSE_ATTEMPT','S6_TEST_PAUSE_UNKNOWN'],
+  [{failStop:true},'OLD_TREE_STOP_ATTEMPT','S6_TEST_STOP_UNKNOWN'],
+  [{failRelease:true},'OWNED_LEASE_RELEASE_ATTEMPT','S6_TEST_RELEASE_UNKNOWN'],
+  [{failBacklog:true},'BACKLOG_RECONCILE_ATTEMPT','BACKLOG_REPLAY_OUTCOME_UNKNOWN']
+ ]){
+  const {port,calls,journal}=s6Fixture(opts);
+  const result=await runApprovedS6FailoverOnce(s6Request(),port);
+  assert.equal(result.status,'RECOVERY_REQUIRED');
+  assert.equal(result.code,'S6_ONCE_RUNTIME_OUTCOME_RECONCILE');
+  assert.equal(result.failedAt,failedAt,JSON.stringify(opts));
+  assert.equal(result.failedCode,expectedCode,JSON.stringify(opts));
+  assert.equal(journal.at(-1).phase,'RECOVERY_REQUIRED');
+  assert.equal(journal.at(-1).failedAt,failedAt);
+  assert.equal(journal.at(-1).code,expectedCode);
+  assert.equal(calls.filter(x=>x==='stopOwnTree').length<=1,true);
+ }
+});
+test('S6 recovery marker persistence failure never rewrites the originally failed boundary',async()=>{
+ const {port,calls,journal}=s6Fixture({failStop:true});
+ const original=port.persist;
+ port.persist=async entry=>{
+  if(entry.phase==='RECOVERY_REQUIRED')throw Error('PRIVATE_RECOVERY_LEDGER_WRITE_FAILURE');
+  return original(entry);
+ };
+ const result=await runApprovedS6FailoverOnce(s6Request(),port);
+ assert.equal(result.status,'RECOVERY_REQUIRED');
+ assert.equal(result.failedAt,'OLD_TREE_STOP_ATTEMPT');
+ assert.equal(result.failedCode,'S6_TEST_STOP_UNKNOWN');
+ assert.equal(calls.filter(x=>x==='stopOwnTree').length,1);
+ assert.equal(calls.some(x=>x==='releaseOwnedInstallLease'),false);
+ assert.equal(journal.some(x=>x.phase==='RECOVERY_REQUIRED'),false);
+});
 test('S6 coordinator refuses duplicate, wrong operation, unverifiable approval or busy seats without effect',async()=>{
  for(const [request,opts,code] of [
   [{...s6Request(),operation:'controller-update'}, {}, 'S6_ONCE_REQUEST_INVALID'],

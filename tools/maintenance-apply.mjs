@@ -523,14 +523,16 @@ export async function runApprovedS6FailoverOnce(request,port){
   return result('POSTCHECK_PENDING','S6_ONCE_PROMOTION_OBSERVED_A_JOB_PENDING',{
    lastPhase:'PROMOTED_READBACK_VERIFIED',leaseReleaseAcknowledged:true});
  }catch(error){
-  const code=maintenanceFailureCode(error,phase);
+  // journal() changes phase before persisting it. Capture the actual failed
+  // boundary first: the RECOVERY_REQUIRED marker is not where the effect failed.
+  const failedAt=phase,code=maintenanceFailureCode(error,failedAt);
   // No automatic rollback/retry, no lease deletion, no forced fallback.
   // Intake or stop may already have happened, even if the port timed out.
   const status=mutationAttempted?'RECOVERY_REQUIRED':'STATE_UNKNOWN';
-  try{await journal('RECOVERY_REQUIRED',{status,code,failedAt:phase,
+  try{await journal('RECOVERY_REQUIRED',{status,code,failedAt,
    leaseReleaseAcknowledged,mutationAttempted});}catch{/* original ledger may be uncertain */}
   return result(status,mutationAttempted?'S6_ONCE_RUNTIME_OUTCOME_RECONCILE':
    'S6_ONCE_JOURNAL_UNVERIFIED',{
-   failedCode:code,failedAt:phase,leaseReleaseAcknowledged,mutationAttempted});
+   failedCode:code,failedAt,leaseReleaseAcknowledged,mutationAttempted});
  }
 }
