@@ -58,6 +58,7 @@ const MAX_BYTES=32768;
 const R3_WATCHDOG_PREIMAGE_PROBE='controller-standby-watchdog-preimage-readonly';
 const R3_WMI_PROBE='controller-standby-runner-wmi-readonly';
 const R4_RUNTIME_PROBE='controller-standby-r4-runtime-readonly';
+const R5_RUNTIME_PROBE='controller-standby-r5-runtime-readonly';
 const R4_GUARDIAN_ORIGIN_PROBE='controller-standby-r4-guardian-origin-readonly';
 const CI_RECEIPT_ROOT_PROBE='ci-controller-b-receipt-root-readonly';
 // Existing A only: observe whether the same fixed WMI process-path query
@@ -334,7 +335,128 @@ export function inspectR4StandbyRuntimeReadonly({
    sourceSha256:createHash('sha256').update(source).digest('hex'),
    install,owner,status,controllerHost
   },{now,...(pidAlive?{pidAlive}:{})});
- }catch{return unknown('WATCHDOG_R4_RUNTIME_READ_UNVERIFIED');}
+ }c/** R5 two-passive runtime: fixed read-only bytes and live IPC proof. */
+export function assessR5StandbyRuntimeSnapshot(snapshot,{
+ now=Date.now(),pidAlive=pid=>{
+  try{process.kill(pid,0);return true;}catch(e){return e?.code==='ESRCH'?false:null;}
+ }
+}={}){
+ const proof={schema:'ZGMINI_R5_STANDBY_RUNTIME_A_V1',status:'STATE_UNKNOWN',
+  code:'WATCHDOG_R5_RUNTIME_UNVERIFIED',installedMatch:false,
+  controllerTargetMatch:false,naturalRestartObserved:false,
+  statusFresh:false,watchdogOwnerVerified:false,firstStandbyIpcReady:false,
+  secondStandbyIpcReady:false,standbyReadyCount:0,
+  activeSupervisorVerified:false,failoverTested:false,promotionApproved:false,
+  operationalWrites:0,providerCalls:0,d1Writes:0};
+ const result=(code,patch={})=>({...proof,...patch,code});
+ const x=snapshot??{},manifest=x.install,host=x.controllerHost,status=x.status,owner=x.owner;
+ const installedMatch=manifest?.standby?.mode==='ACTIVE_1_STANDBY_2'&&
+  manifest.standby.approved===true&&
+  manifest.approvedTargetSourceSha==='45807c661ee7f5f11a20b5780e6fd31116b24f84'&&
+  manifest.sha256==='9137447231d354d9999cdadbbb5b2a6dee7f0bf869df61881742902ac445128f'&&
+  x.sourceSha256===manifest.sha256&&
+  manifest.scope==='RUNNER_RECOVERY_AND_MAINTENANCE_HANDOFF_V1';
+ // The W06 selective Controller B #3788 changed only the preimage
+ // approval helper, leaving the R5 standby/ownership executable set intact.
+ // Accept that one attested successor, but never an arbitrary newer SHA.
+ const w06ControllerFiles={
+  'controller/common.mjs':'91e4ceb5d26412893cc047670a420338aa8ef293e95498f852ac0a2f5edd6cc6',
+  'controller/engine.mjs':'6112b5a357d6ecba2ffb299857c2649ee51ca97e1e7755162efd69337976769f',
+  'controller/operations.mjs':'d4a76910806cba861b3253f5fd24eccc8968fcbaa66133999483034b2f661cd3',
+  'controller/entry.mjs':'407ea8693ab48a03b04ec77fe63f86d05537a37661b42c9ddcd55f5b36aa01d7',
+  'controller/supervisor.mjs':'5ec0952872adcaa16eb14adec614f024bac7264deb5b59fb68b9080f0edb0344',
+  'controller/standby.mjs':'e18c09b7e9b90fc483d5200e1e0c4741d2e4f93e049328566d710e37c21be7e7',
+  'controller/preimage-manifest-contract.mjs':'c59d5d36f0024b7a4b1781ea6eef9351f6275db33c8799bec05bf99abebbfcc1'
+ };
+ const controllerTargetMatch=(host?.controllerSourceSha===
+  'b91340d5047daf753e1c17a5c966e4d2aecea586'||
+  (host?.controllerSourceSha==='182bb46f2838306ba40d8b4ec32bac40ab75b69a'&&
+   !!host.controllerFiles&&typeof host.controllerFiles==='object'&&
+   !Array.isArray(host.controllerFiles)&&
+   Object.entries(w06ControllerFiles).every(([name,digest])=>
+    host.controllerFiles[name]===digest))&&
+  host?.controllerSourceSha==='182bb46f2838306ba40d8b4ec32bac40ab75b69a';
+ if(!installedMatch||!controllerTargetMatch)
+  return result('WATCHDOG_R5_STAGE_OR_CONTROLLER_SOURCE_UNVERIFIED',{
+   installedMatch,controllerTargetMatch});
+ const stageAt=Date.parse(manifest.upgradedAt),ownerAt=Date.parse(owner?.at),
+  statusAt=Date.parse(status?.at);
+ const validTime=Number.isFinite(now)&&Number.isFinite(stageAt)&&
+  Number.isFinite(ownerAt)&&Number.isFinite(statusAt)&&
+  stageAt<=now&&ownerAt<=now&&statusAt<=now&&statusAt>=ownerAt;
+ const restarted=validTime&&ownerAt>=stageAt;
+ const statusFresh=validTime&&now-statusAt>=0&&now-statusAt<=60000;
+ const base={installedMatch:true,controllerTargetMatch:true,
+  naturalRestartObserved:restarted,statusFresh};
+ if(!restarted)return result('WATCHDOG_R5_NATURAL_RESTART_PENDING',base);
+ if(!Number.isSafeInteger(owner?.pid)||owner.pid<=0||
+   typeof owner.nonce!=='string'||owner.nonce.length<16||
+   status?.pid!==owner.pid||pidAlive(owner.pid)!==true)
+  return result('WATCHDOG_R5_PROCESS_OWNER_UNVERIFIED',base);
+ const own={...base,watchdogOwnerVerified:true};
+ if(!statusFresh||status.state!=='HEALTHY')
+  return result('WATCHDOG_R5_HEALTH_STATUS_UNVERIFIED',own);
+ if(!Number.isSafeInteger(status.supervisorPid)||status.supervisorPid<=0||
+  status.supervisorPid===owner.pid||pidAlive(status.supervisorPid)!==true)
+  return result('WATCHDOG_R5_ACTIVE_SUPERVISOR_UNVERIFIED',own);
+ const active={...own,activeSupervisorVerified:true};
+ if(status.standbyRole!=='READY'||!Number.isSafeInteger(status.standbyPid)||
+  status.standbyPid<=0||status.standbyPid===owner.pid||
+  status.standbyPid===status.supervisorPid||
+  pidAlive(status.standbyPid)!==true)
+  return result('WATCHDOG_R5_STANDBY_IPC_UNVERIFIED',active);
+ const first={...active,firstStandbyIpcReady:true,standbyReadyCount:1};
+ if(status.secondStandbyRole!=='READY'||!Number.isSafeInteger(status.secondStandbyPid)||
+   status.secondStandbyPid<=0||status.standbyReadyCount!==2||
+   new Set([owner.pid,status.supervisorPid,status.standbyPid,
+     status.secondStandbyPid]).size!==4||
+   pidAlive(status.secondStandbyPid)!==true)
+  return result('WATCHDOG_R5_SECOND_STANDBY_IPC_UNVERIFIED',first);
+ return {...proof,...first,status:'PASS',
+  code:'WATCHDOG_R5_ACTIVE_HEALTHY_TWO_STANDBY_IPC_READY',
+  secondStandbyIpcReady:true,standbyReadyCount:2,
+  failoverTested:false,promotionApproved:false};
+}
+export function inspectR5StandbyRuntimeReadonly({
+ filesystem=fs,watchdogHome='E:/ZGmini/automation/pc-watchdog',
+ controllerHome='E:/ZGmini/automation/pc-control',
+ now=Date.now(),pidAlive
+}={}){
+ const unknown=code=>({schema:'ZGMINI_R5_STANDBY_RUNTIME_A_V1',
+  status:'STATE_UNKNOWN',code,installedMatch:false,
+  controllerTargetMatch:false,naturalRestartObserved:false,statusFresh:false,
+  watchdogOwnerVerified:false,firstStandbyIpcReady:false,
+  secondStandbyIpcReady:false,standbyReadyCount:0,
+  activeSupervisorVerified:false,failoverTested:false,promotionApproved:false,
+  operationalWrites:0,providerCalls:0,d1Writes:0});
+ try{
+  const readFixed=(root,name,max)=>{
+   const directory=path.resolve(root),dir=filesystem.lstatSync(directory);
+   if(!dir.isDirectory()||dir.isSymbolicLink())throw Error('ROOT');
+   const filename=path.join(directory,name),st=filesystem.lstatSync(filename);
+   if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1||
+    st.size<10||st.size>max)throw Error('FILE');
+   const bytes=filesystem.readFileSync(filename);
+   if(!Buffer.isBuffer(bytes)||bytes.length!==st.size)throw Error('CHANGED');
+   const after=filesystem.lstatSync(filename);
+   if(after.ino!==st.ino||after.mtimeMs!==st.mtimeMs||
+    after.size!==st.size)throw Error('CHANGED');
+   return bytes;
+  };
+  const source=readFixed(watchdogHome,'runner-watchdog.mjs',262144),
+   install=JSON.parse(readFixed(watchdogHome,'INSTALL.json',16384).toString('utf8')),
+   owner=JSON.parse(readFixed(watchdogHome,'receiver/owner.json',16384).toString('utf8')),
+   status=JSON.parse(readFixed(watchdogHome,'STATUS.json',16384).toString('utf8')),
+   controllerHost=JSON.parse(readFixed(controllerHome,'host.json',32768).toString('utf8'));
+  return assessR5StandbyRuntimeSnapshot({
+   sourceSha256:createHash('sha256').update(source).digest('hex'),
+   install,owner,status,controllerHost
+  },{now,...(pidAlive?{pidAlive}:{})});
+ }catch{return unknown('WATCHDOG_R5_RUNTIME_READ_UNVERIFIED');}
+}
+
+
+atch{return unknown('WATCHDOG_R4_RUNTIME_READ_UNVERIFIED');}
 }
 
 
@@ -479,12 +601,13 @@ export function authenticateProcess(event,env,role){
   const isR3Watchdog=withW05&&raw.probe===R3_WATCHDOG_PREIMAGE_PROBE;
  const isR3Wmi=withW05&&raw.probe===R3_WMI_PROBE;
  const isR4Runtime=withW05&&raw.probe===R4_RUNTIME_PROBE;
+ const isR5Runtime=withW05&&raw.probe===R5_RUNTIME_PROBE;
  const isR4GuardianOrigin=withW05&&raw.probe===R4_GUARDIAN_ORIGIN_PROBE;
  const isCiReceiptRoot=withW05&&raw.probe===CI_RECEIPT_ROOT_PROBE;
  const allowedOperatingProbe=isOperator||is2960||is3409||isEr1Postcheck||is3516||
   isD05Writer||isD05PrivateReceipt||isD05Theme||isD05Registration||is3160||
   isCnnStaticGuard||isCnnGitPredicates||isCnnBPins||isCnnBResources||
-  isCnnBCore||isR3Watchdog||isR3Wmi||isR4Runtime||isR4GuardianOrigin;
+  isCnnBCore||isR3Watchdog||isR3Wmi||isR4Runtime||isR5Runtime||isR4GuardianOrigin;
  const acceptedProbe=(role==='operating'&&allowedOperatingProbe)||
   (role==='handoff'&&isCiReceiptRoot);
  if(!raw||(!basic&&!withJobs&&!withW05)||
@@ -518,6 +641,7 @@ export function authenticateProcess(event,env,role){
    ...(isR3Watchdog?{watchdogR3Preimage:true}:{}),
   ...(isR3Wmi?{standbyRunnerWmi:true}:{}),
   ...(isR4Runtime?{watchdogR4Runtime:true}:{}),
+  ...(isR5Runtime?{watchdogR5Runtime:true}:{}),
   ...(isR4GuardianOrigin?{watchdogR4GuardianOrigin:true}:{}),
   ...(isCiReceiptRoot?{ciControllerBReceiptRoot:true}:{})};
 }
@@ -2657,6 +2781,10 @@ export function collect(role,ctx,env=process.env){
   const proof=inspectR4GuardianOriginReadonly();
   return {...base,status:proof.status,code:proof.code,watchdogR4GuardianOrigin:proof};
  }
+ if(ctx.watchdogR5Runtime===true){
+  const proof=inspectR5StandbyRuntimeReadonly();
+  return {...base,status:proof.status,code:proof.code,watchdogR5Runtime:proof};
+ }
  if(ctx.watchdogR4Runtime===true){
   const proof=inspectR4StandbyRuntimeReadonly();
   return {...base,status:proof.status,code:proof.code,watchdogR4Runtime:proof};
@@ -2861,6 +2989,13 @@ export function toText(r){
    'guardianProbePassed='+r.watchdogR4GuardianOrigin.guardianProbePassed,
    'guardianOriginMismatchCodes='+r.watchdogR4GuardianOrigin.originMismatches.join(','),
    'guardianActivationExecuted=false']:[]),
+  ...(r.watchdogR5Runtime?[
+   'watchdogR5Runtime='+r.watchdogR5Runtime.code,
+   'watchdogR5InstalledMatch='+r.watchdogR5Runtime.installedMatch,
+   'watchdogR5NaturalRestart='+r.watchdogR5Runtime.naturalRestartObserved,
+   'watchdogR5StatusFresh='+r.watchdogR5Runtime.statusFresh,
+   'watchdogR5StandbyReadyCount='+r.watchdogR5Runtime.standbyReadyCount,
+   'watchdogR5FailoverTested=false']:[]),
   ...(r.watchdogR4Runtime?[
    'watchdogR4Runtime='+r.watchdogR4Runtime.code,
    'watchdogR4InstalledMatch='+r.watchdogR4Runtime.installedMatch,
