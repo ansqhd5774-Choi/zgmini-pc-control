@@ -1,0 +1,64 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "10be1e52138d5a59b9464e9b04f39d5bdcdcfb32",
+  "baseHead": "c8ed53a3991212dd1778742cda8a86ac133e0796",
+  "baseConfigSourceSha": "c8ed53a3991212dd1778742cda8a86ac133e0796",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/local-cycle.mjs",
+      "change": "M",
+      "beforeSha256": "f69fb3cc1a6fdb85af34054f016b10dcbc7b1dcbf76e51c32b617121fe22d05d",
+      "afterSha256": "365a29ccabb34cf42b4c2eee83b2c63e703d6cdf18e7eff836fc3515113e3998"
+    },
+    {
+      "path": "scripts/pc-writer/marketparquet-paid-store.mjs",
+      "change": "M",
+      "beforeSha256": "4ba0a487868a2a028f080c06bdde75f41ffef5c8018541a0a43e7bd15acdfc23",
+      "afterSha256": "40165c909392c9dd69fa5df49c2793e5361c2016a72ca6da8b0067d497e2c1c4"
+    },
+    {
+      "path": "scripts/pc-writer/us-breadth-paid-r2-cycle.mjs",
+      "change": "M",
+      "beforeSha256": "c350c8cf90bc989abef62c6764fa4c864d8fb64d72a8c3712ab06785ef1c1a88",
+      "afterSha256": "e238cc56ae9c8f4068a033f3e549fef0daf29ed2617c29b5014ef3fd700c22cd"
+    },
+    {
+      "path": "scripts/pc-writer/us-breadth-paid-r2-stored.mjs",
+      "change": "M",
+      "beforeSha256": "21209308df4d2704faa38481d3ee81e2a25ab255a0c9d8ec5049b460c357097e",
+      "afterSha256": "be18875730948bbdcc0fca49f9de95a6c6e84022d3ba255cdb155c5ad51f7dae"
+    }
+  ],
+  "protectedFiles": [],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": [
+      {
+        "id": "existing-core-launcher",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+        "dependsOn": [
+          "scripts/pc-writer/local-cycle.mjs",
+          "scripts/pc-writer/marketparquet-paid-store.mjs",
+          "scripts/pc-writer/us-breadth-paid-r2-cycle.mjs",
+          "scripts/pc-writer/us-breadth-paid-r2-stored.mjs"
+        ]
+      }
+    ]
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false,
+  "coreMaintenance": "PAUSE_NEW_STARTS_DRAIN_360S_V1"
+}
