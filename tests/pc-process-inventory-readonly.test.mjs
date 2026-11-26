@@ -2973,3 +2973,52 @@ test('S6 private A candidate does not approve B, attest independent maintainer o
  assert.equal(inspectS6ApprovalPreimageReadonly({
   io:{lstatSync(){throw Error('unavailable');}},now:at}).status,'STATE_UNKNOWN');
 });
+
+test('S6 A file reader reuses real nested controller integrity signal and exact seven source digests',()=>{
+ const base='E:/ZGmini/automation/pc-maintenance',wd='E:/ZGmini/automation/pc-watchdog',
+  ctl='E:/ZGmini/automation/pc-control',now=Date.parse('2026-11-27T00:00:00Z');
+ const f=new Map(),write=(p,b)=>f.set(p,Buffer.from(b));
+ const sha=x=>createHash('sha256').update(x).digest('hex');
+ const files=['maintenance-contract.mjs','maintenance-apply.mjs','maintenance-agent.mjs',
+  'maintenance-lock.mjs','update.mjs','maintenance-ancestry.vbs','source-bundle-register.mjs'];
+ const source={};
+ for(const [i,name]of files.entries()){
+  const rel='tools/'+name,contents='s6-test-source-'+i+'\n';
+  source[rel]=sha(contents);write(path.join(base,rel),contents);
+ }
+ const target='05ef3bd6b5dc753c5abfbecccacc09375eb18d10',
+  ctlSha='1'.repeat(40),nonce='abcdef01-1234-4567-890a-0123456789ab';
+ write(path.join(base,'MAINTENANCE_INSTALL.json'),
+  JSON.stringify({sourceSha:target,files:source}));
+ const watchBytes=Buffer.from('s6-watchdog-test-file\n');
+ write(path.join(wd,'runner-watchdog.mjs'),watchBytes);
+ write(path.join(wd,'INSTALL.json'),JSON.stringify({sha256:sha(watchBytes),
+  standby:{mode:'ACTIVE_1_STANDBY_2',approved:true}}));
+ write(path.join(wd,'STATUS.json'),JSON.stringify({
+  at:new Date(now-1000).toISOString(),state:'HEALTHY',standbyRole:'READY',
+  secondStandbyRole:'READY',standbyReadyCount:2,pid:2001,standbyPid:2002,
+  secondStandbyPid:2003}));
+ write(path.join(wd,'receiver/owner.json'),JSON.stringify({pid:2001}));
+ write(path.join(ctl,'leases/supervisor/owner.json'),JSON.stringify({pid:2004,nonce}));
+ write(path.join(ctl,'SUPERVISOR_STATUS.json'),JSON.stringify({pid:2004,
+  mode:'LISTENING',sourceSha:ctlSha,children:new Array(6).fill({alive:true})}));
+ const io={lstatSync(p){
+  const contents=f.get(p);
+  if(!contents)throw Error('MISSING');
+  return {size:contents.length,nlink:1,isFile:()=>true,isSymbolicLink:()=>false};
+ },readFileSync(p){if(!f.has(p))throw Error('MISSING');return f.get(p);}};
+ const maintenance=()=>({maintenanceFilesVerified:true,
+  // top level controllerFilesVerified was historically null; nested truth is authoritative.
+  controllerFilesVerified:null,runtimeSignals:{controllerFilesVerified:true},
+  actualControllerSha:ctlSha,installLockReadbackVerified:true,installLockHeld:false});
+ const inspect=()=>inspectS6ApprovalPreimageReadonly({io,maintenance,now,
+  protect:()=>({files:{},tasks:{}})});
+ const result=inspect();
+ assert.equal(result.code,'S6_APPROVAL_PREIMAGE_CANDIDATE_ONLY');
+ assert.equal(result.s6Live.installedMaintainerSha,target);
+ assert.equal(result.s6Live.watchdogSourceSha256,sha(watchBytes));
+ assert.equal(result.s6Live.protectedSha256,sha(JSON.stringify({files:{},tasks:{}})));
+ assert.equal(result.independentOperatorAttested,false);
+ write(path.join(base,'tools/update.mjs'),'tampered');
+ assert.equal(inspect().status,'STATE_UNKNOWN');
+});
