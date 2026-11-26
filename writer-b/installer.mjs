@@ -183,9 +183,26 @@ export async function performWriterBInstall(auth,io){
   // pause check. The wait never disables Core or bypasses the last CAS.
   if(!reservedWindow)await io.waitForCoreIdleWindow('POST_PREPARE');
 
-  // Mark mutation intent before any call that may partially apply its effects.
-  taskMayHaveChanged=true;
-  await io.pauseCore(before);
+  // The last Core pre-pause CAS can race with a legitimate Scheduler start
+  // even after the second bounded idle sample. Do not weaken that guard.
+  // A single further natural-idle observation is allowed ONLY when the
+  // adapter independently proves that the original source/config/Task remain
+  // unchanged. A persistent race, uncertain Task mutation or any other error
+  // still enters the original rollback path. The consumed Issue is never
+  // replayed; this is one bounded reconciliation inside its sole transaction.
+  for(let pauseAttempt=0;pauseAttempt<2;pauseAttempt++){
+   taskMayHaveChanged=true;
+   try{await io.pauseCore(before);break;}
+   catch(error){
+    if(reservedWindow||pauseAttempt!==0||
+       error?.code!=='WRITER_B_CORE_PREPAUSE_RACE_DEFERRED')throw error;
+    // Never infer a harmless refusal solely from an exception code. This
+    // readback must succeed before marking the potential Task mutation false.
+    await io.verifyOriginalState(before,manifest);
+    taskMayHaveChanged=false;
+    await io.waitForCoreIdleWindow('POST_PREPARE');
+   }
+  }
   await io.waitForCoreDrain(before);
   await io.assertCoreQuiet();
 

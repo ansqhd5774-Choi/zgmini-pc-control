@@ -564,6 +564,121 @@ test('Task XML drift at final pause has distinct bounded failure code and no sou
  assert.equal(state.retained,false);assert.equal(state.coreEnabled,true);
 });
 
+test('one transient Core pre-pause race re-proves exact original before one bounded natural idle retry',async()=>{
+ const {io,state}=mockIO();const pause=io.pauseCore,verify=io.verifyOriginalState;
+ let attempts=0,proofs=0;
+ io.pauseCore=async(...args)=>{
+  if(++attempts===1){
+   state.steps.push('pause-race');
+   throw Object.assign(new Error('natural Core start'),
+    {code:'WRITER_B_CORE_PREPAUSE_RACE_DEFERRED'});
+  }
+  return pause(...args);
+ };
+ io.verifyOriginalState=async(...args)=>{proofs++;return verify(...args)};
+ const out=await performWriterBInstall(auth(),io);
+ assert.equal(out.status,'WRITER_B_INSTALLED_VERIFIED');
+ assert.equal(attempts,2);assert.equal(proofs,1);
+ assert.equal(state.steps.filter(x=>x==='window-final').length,2);
+ assert.ok(state.steps.indexOf('pause-race')<state.steps.indexOf('original-verify'));
+ assert.ok(state.steps.indexOf('original-verify')<state.steps.lastIndexOf('window-final'));
+ assert.ok(state.steps.lastIndexOf('window-final')<state.steps.lastIndexOf('pause'));
+ assert.equal(state.retained,false);assert.equal(state.coreEnabled,true);
+ assert.equal(state.head,NEXT);assert.equal(state.config,NEXT);
+});
+
+test('pre-pause race with unverified original cannot reach another pause',async()=>{
+ const {io,state}=mockIO();let attempts=0,checks=0;
+ const initial=io.verifyOriginalState;
+ io.pauseCore=async()=>{
+  attempts++;state.steps.push('pause-race');
+  throw Object.assign(new Error('race'),
+   {code:'WRITER_B_CORE_PREPAUSE_RACE_DEFERRED'});
+ };
+ io.verifyOriginalState=async(...args)=>{
+  checks++;
+  if(checks===1)throw Object.assign(new Error('owner changed'),
+   {code:'WRITER_B_ORIGINAL_STATE_STOP'});
+  return initial(...args);
+ };
+ const out=await performWriterBInstall(auth(),io);
+ assert.equal(out.status,'WRITER_B_INSTALL_STOP_RESTORED');
+ assert.equal(out.code,'WRITER_B_ORIGINAL_STATE_STOP');
+ assert.equal(attempts,1);
+ assert.equal(state.steps.filter(x=>x==='window-final').length,1);
+ assert.equal(state.steps.includes('switch'),false);
+ assert.equal(state.retained,false);assert.equal(state.coreEnabled,true);
+ assert.equal(state.head,manifest().baseHead);
+});
+
+test('second safe idle observation may defer, without a third try or source switch',async()=>{
+ const {io,state}=mockIO();let attempts=0,finals=0;
+ const prevWait=io.waitForCoreIdleWindow;
+ io.pauseCore=async()=>{
+  attempts++;state.steps.push('pause-race');
+  throw Object.assign(new Error('Core re-entered'),
+   {code:'WRITER_B_CORE_PREPAUSE_RACE_DEFERRED'});
+ };
+ io.waitForCoreIdleWindow=async phase=>{
+  if(phase==='POST_PREPARE'&&++finals===2)
+   throw Object.assign(new Error('Core active after race'),
+    {code:'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED'});
+  return prevWait(phase);
+ };
+ const out=await performWriterBInstall(auth(),io);
+ assert.equal(out.status,'WRITER_B_INSTALL_STOP_RESTORED');
+ assert.equal(out.code,'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED');
+ assert.equal(attempts,1);
+ assert.equal(state.steps.includes('switch'),false);
+ assert.equal(state.coreEnabled,true);assert.equal(state.retained,false);
+});
+
+test('pre-pause race code cannot authorize retry after partial Task disable',async()=>{
+ const {io,state}=mockIO();let attempts=0;
+ const verify=io.verifyOriginalState;
+ io.pauseCore=async()=>{
+  attempts++;state.steps.push('pause-partial');
+  state.coreEnabled=false;
+  throw Object.assign(new Error('Task changed despite race indication'),
+   {code:'WRITER_B_CORE_PREPAUSE_RACE_DEFERRED'});
+ };
+ let firstVerification=true;
+ io.verifyOriginalState=async(...args)=>{
+  if(firstVerification){
+   firstVerification=false;
+   state.steps.push('original-changed');
+   assert.equal(state.coreEnabled,false);
+   throw Object.assign(new Error('Task no longer enabled'),
+    {code:'WRITER_B_ORIGINAL_STATE_STOP'});
+  }
+  return verify(...args);
+ };
+ const out=await performWriterBInstall(auth(),io);
+ assert.equal(out.status,'WRITER_B_INSTALL_STOP_RESTORED');
+ assert.equal(out.code,'WRITER_B_ORIGINAL_STATE_STOP');
+ assert.equal(out.recovery,'ORIGINAL_VERIFIED');
+ assert.equal(attempts,1);
+ assert.equal(state.steps.includes('original-changed'),true);
+ assert.equal(state.steps.filter(x=>x==='window-final').length,1);
+ assert.equal(state.steps.includes('switch'),false);
+ assert.equal(state.coreEnabled,true);
+ assert.equal(state.retained,false);
+});
+
+test('reserved Core maintenance never extends its separately approved hold',async()=>{
+ const {io,state}=mockIO();let attempts=0;
+ io.pauseCore=async()=>{
+  attempts++;state.steps.push('pause-race');
+  throw Object.assign(new Error('reserved race'),
+   {code:'WRITER_B_CORE_PREPAUSE_RACE_DEFERRED'});
+ };
+ const out=await performWriterBInstall(maintenanceAuth(),io);
+ assert.equal(out.status,'WRITER_B_INSTALL_STOP_RESTORED');
+ assert.equal(out.code,'WRITER_B_CORE_PREPAUSE_RACE_DEFERRED');
+ assert.equal(attempts,1);assert.equal(state.steps.includes('window-final'),false);
+ assert.equal(state.head,manifest().baseHead);assert.equal(state.coreEnabled,true);
+});
+
 test('Core restarts after the second idle window: final instant safety check still rejects',async()=>{
  const {io,state}=mockIO();
  io.pauseCore=async()=>{
