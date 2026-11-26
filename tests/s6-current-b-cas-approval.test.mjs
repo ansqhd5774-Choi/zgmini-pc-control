@@ -49,3 +49,74 @@ test('S6 prior #4016 B exact manifest is no longer eligible for current Controll
   actor:'ansqhd5774-Choi',live:p.s6Live
  }),/S6_ONCE_LIVE_CAS_UNVERIFIED/);
 });
+
+const REQUEST_ID='pc-s6-63afb126-72dc-4ec5-a721-4819771fa9ee';
+const CURRENT_PIN='1fceeba061f7f8731811220b27cac245bd91d44e87d68935cd8475117f094141';
+const CURRENT_APPROVAL=new URL('../approvals/controller-s6/'+CURRENT_PIN+'.json',import.meta.url);
+const current=()=>readFileSync(CURRENT_APPROVAL);
+const envelope=(pin=CURRENT_PIN)=>({
+ schema:'ZGMINI_PC_MAINTENANCE_REQUEST_V1',
+ requestId:REQUEST_ID,
+ chatId:'chat-zgmini-s6-b3-20261127',
+ operation:'controller-s6-failover-once',
+ controlRepository:'ansqhd5774-Choi/zgmini-pc-control',
+ targetControllerSha:candidate().s6Live.installedControllerSha,
+ approvalManifestSha256:pin
+});
+
+test('S6 #4063 distinct immutable approval exactly matches new live CAS, still authorizes no operation',()=>{
+ const raw=current(),live=candidate().s6Live,approved=JSON.parse(raw.toString('utf8'));
+ assert.equal(digest(raw),CURRENT_PIN);
+ assert.equal(approved.schema,'ZGMINI_PC_S6_ONCE_B_APPROVAL_V1');
+ assert.equal(approved.operation,'controller-s6-failover-once');
+ assert.equal(approved.requestId,REQUEST_ID);
+ assert.notEqual(approved.requestId,JSON.parse(readFileSync(PREVIOUS_APPROVAL,'utf8')).requestId);
+ for(const key of ['installedControllerSha','installedMaintainerSha','watchdogSourceSha256',
+  'protectedSha256','ownerSha256','watchdogPid'])
+  assert.equal(approved[key],live[key]);
+ assert.deepEqual(approved.standbyPids,live.standbyPids);
+ assert.deepEqual(approved.approval,{
+  approved:true,grade:'B',
+  ref:'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4063',
+  scope:'EXACT_ONE_SUPERVISOR_TREE_STOP_WITH_WATCHDOG_AUTO_PROMOTION'
+ });
+ assert.equal(approved.effect.stop,'OLD_OWNED_SUPERVISOR_TREE_ONLY');
+ assert.equal(approved.effect.noAutomaticRetry,true);
+ assert.equal(approved.effect.noForcedRollback,true);
+ assert.equal(approved.effect.preserveWorkersAndLedger,true);
+ assert.equal(approved.effect.preserveProtectedSourceAndDb,true);
+ const result=validateS6OnceBManifest(envelope(),raw,{
+  actor:'ansqhd5774-Choi',live
+ });
+ assert.equal(result.authorization,false);
+ assert.equal(result.operationalEffectExecuted,false);
+});
+
+test('S6 #4063 approval rejects byte, actor, current operating origin and protected CAS drift',()=>{
+ const raw=current(),live=candidate().s6Live;
+ const ctx={actor:'ansqhd5774-Choi',live};
+ assert.throws(()=>validateS6OnceBManifest({...envelope(),
+  requestId:'pc-s6-2a9bae01-bb3d-435c-b952-996cef65950a'},raw,ctx),
+  /S6_ONCE_MANIFEST_PREIMAGE_INVALID/);
+ assert.throws(()=>validateS6OnceBManifest(envelope(),raw,{
+  ...ctx,actor:'github-actions[bot]'}),/S6_ONCE_ACTOR_OR_REPOSITORY_DENIED/);
+ assert.throws(()=>validateS6OnceBManifest(envelope(),Buffer.concat([raw,Buffer.from(' ')]),ctx),
+  /S6_ONCE_MANIFEST_BYTES_DRIFT/);
+ for(const change of [
+  {installedControllerSha:'0'.repeat(40)},
+  {installedMaintainerSha:'0'.repeat(40)},
+  {watchdogSourceSha256:'0'.repeat(64)},
+  {protectedSha256:'0'.repeat(64)},
+  {ownerSha256:'0'.repeat(64)},
+  {watchdogPid:12345},
+  {standbyPids:[20068,12345]}
+ ]){
+  assert.throws(()=>validateS6OnceBManifest(envelope(),raw,{
+   ...ctx,live:{...live,...change}}),/S6_ONCE_LIVE_CAS_UNVERIFIED/);
+ }
+ const approved=JSON.parse(raw.toString('utf8'));
+ const canceled=Buffer.from(JSON.stringify({...approved,
+  approval:{...approved.approval,approved:false}})+'\n');
+ assert.throws(()=>validateS6OnceBManifest(envelope(digest(canceled)),canceled,ctx),
+  /S6_ONCE_NEW_B_APPROVAL_REQUIRED/);
+});
