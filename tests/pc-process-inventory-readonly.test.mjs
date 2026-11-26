@@ -18,6 +18,7 @@ import {projectCnnSidecarStaticGuard} from '../tools/pc-process-inventory-readon
 import {inspectR3WatchdogPreimageReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 import {classifyR3RunnerWmiRows,inspectR3RunnerWmiReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 import {assessR4StandbyRuntimeSnapshot,inspectR4StandbyRuntimeReadonly} from '../tools/pc-process-inventory-readonly.mjs';
+import {assessR5StandbyRuntimeSnapshot,inspectR5StandbyRuntimeReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
  const request={schema:SCHEMA,operation:ROLE_OPERATION,role,
@@ -2803,4 +2804,84 @@ test('R4 Guardian inspector runs ONLY the pinned historical helper PROBE, never 
  assert.equal(calls[1].args[3],'12345');
  assert.equal(calls.every(c=>!c.args.includes('ACTIVATE')),true);
  assert.equal(calls.every(c=>c.opts.windowsHide===true&&c.opts.timeout===15000),true);
+});
+
+const r5RuntimeFixture=()=>{
+ const x=r4RuntimeFixture(),h=x.controllerHost;
+ x.sourceSha256='9137447231d354d9999cdadbbb5b2a6dee7f0bf869df61881742902ac445128f';
+ x.install.approvedTargetSourceSha='45807c661ee7f5f11a20b5780e6fd31116b24f84';
+ x.install.sha256=x.sourceSha256;
+ x.install.standby.mode='ACTIVE_1_STANDBY_2';
+ x.controllerHost={
+  controllerSourceSha:'182bb46f2838306ba40d8b4ec32bac40ab75b69a',
+  controllerFiles:{
+   'controller/common.mjs':'91e4ceb5d26412893cc047670a420338aa8ef293e95498f852ac0a2f5edd6cc6',
+   'controller/engine.mjs':'6112b5a357d6ecba2ffb299857c2649ee51ca97e1e7755162efd69337976769f',
+   'controller/operations.mjs':'d4a76910806cba861b3253f5fd24eccc8968fcbaa66133999483034b2f661cd3',
+   'controller/entry.mjs':'407ea8693ab48a03b04ec77fe63f86d05537a37661b42c9ddcd55f5b36aa01d7',
+   'controller/supervisor.mjs':'5ec0952872adcaa16eb14adec614f024bac7264deb5b59fb68b9080f0edb0344',
+   'controller/standby.mjs':'e18c09b7e9b90fc483d5200e1e0c4741d2e4f93e049328566d710e37c21be7e7',
+   'controller/preimage-manifest-contract.mjs':'c59d5d36f0024b7a4b1781ea6eef9351f6275db33c8799bec05bf99abebbfcc1'
+  }
+ };
+ x.status.secondStandbyRole='READY';
+ x.status.secondStandbyPid=5344;
+ x.status.standbyReadyCount=2;
+ return x;
+};
+const r5Assess=x=>assessR5StandbyRuntimeSnapshot(x,{now:r4Now,pidAlive:()=>true});
+test('R5 dual Standby A only admits exact fixed operating read-only probe',()=>{
+ const e=event(),body=JSON.parse(e.issue.body);
+ const scoped={...e,issue:{...e.issue,body:JSON.stringify({
+  ...body,probe:'controller-standby-r5-runtime-readonly'})}};
+ assert.equal(authenticateProcess(scoped,env,'operating').watchdogR5Runtime,true);
+ assert.throws(()=>authenticateProcess(scoped,env,'handoff'));
+ for(const patch of [
+  {probe:'controller-standby-r5-runtime-readonly;stop'},
+  {probe:'controller-standby-r5-runtime-write'},
+  {command:'taskkill'},
+  {path:'E:/ZGmini/operating'}]){
+  const bad={...e,issue:{...e.issue,body:JSON.stringify({
+   ...body,probe:'controller-standby-r5-runtime-readonly',...patch})}};
+  assert.throws(()=>authenticateProcess(bad,env,'operating'));
+ }
+});
+test('R5 dual Standby A verifies one Active and TWO distinct live passive READY slots',()=>{
+ const x=r5RuntimeFixture();
+ const r=r5Assess(x);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.code,'WATCHDOG_R5_ACTIVE_HEALTHY_TWO_STANDBY_IPC_READY');
+ for(const key of ['installedMatch','controllerTargetMatch','naturalRestartObserved',
+  'watchdogOwnerVerified','activeSupervisorVerified','firstStandbyIpcReady',
+  'secondStandbyIpcReady','statusFresh'])assert.equal(r[key],true);
+ assert.equal(r.standbyReadyCount,2);
+ assert.equal(r.failoverTested,false);
+ assert.equal(r.promotionApproved,false);
+ assert.equal(r.operationalWrites,0);
+ assert.doesNotMatch(JSON.stringify(r),/5311|5322|5333|5344|nonce|commandLine/i);
+});
+test('R5 A fails closed on missing second slot, stale status, source or controller drift',()=>{
+ const changes=[
+  [x=>{x.status.secondStandbyRole='STARTING';},'WATCHDOG_R5_SECOND_STANDBY_IPC_UNVERIFIED'],
+  [x=>{x.status.secondStandbyPid=x.status.standbyPid;},'WATCHDOG_R5_SECOND_STANDBY_IPC_UNVERIFIED'],
+  [x=>{x.status.standbyReadyCount=1;},'WATCHDOG_R5_SECOND_STANDBY_IPC_UNVERIFIED'],
+  [x=>{x.status.standbyRole='STARTING';},'WATCHDOG_R5_STANDBY_IPC_UNVERIFIED'],
+  [x=>{x.status.supervisorPid=x.owner.pid;},'WATCHDOG_R5_ACTIVE_SUPERVISOR_UNVERIFIED'],
+  [x=>{x.status.state='BLOCKED';},'WATCHDOG_R5_HEALTH_STATUS_UNVERIFIED'],
+  [x=>{x.owner.at='2026-11-26T01:09:00Z';},'WATCHDOG_R5_NATURAL_RESTART_PENDING'],
+  [x=>{x.sourceSha256='0'.repeat(64);},'WATCHDOG_R5_STAGE_OR_CONTROLLER_SOURCE_UNVERIFIED'],
+  [x=>{x.install.standby.mode='ACTIVE_1_STANDBY_1';},'WATCHDOG_R5_STAGE_OR_CONTROLLER_SOURCE_UNVERIFIED'],
+  [x=>{x.controllerHost.controllerSourceSha='b91340d5047daf753e1c17a5c966e4d2aecea586';},
+   'WATCHDOG_R5_STAGE_OR_CONTROLLER_SOURCE_UNVERIFIED'],
+  [x=>{delete x.controllerHost.controllerFiles['controller/standby.mjs'];},
+   'WATCHDOG_R5_STAGE_OR_CONTROLLER_SOURCE_UNVERIFIED']
+ ];
+ for(const [change,expected] of changes){
+  const x=r5RuntimeFixture();change(x);
+  const r=r5Assess(x);assert.equal(r.status,'STATE_UNKNOWN');
+  assert.equal(r.code,expected);assert.equal(r.promotionApproved,false);
+ }
+ const x=r5RuntimeFixture(),r=assessR5StandbyRuntimeSnapshot(x,{
+  now:r4Now,pidAlive:pid=>pid!==5344});
+ assert.equal(r.code,'WATCHDOG_R5_SECOND_STANDBY_IPC_UNVERIFIED');
 });
