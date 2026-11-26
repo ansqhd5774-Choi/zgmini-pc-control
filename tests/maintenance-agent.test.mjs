@@ -1003,6 +1003,10 @@ test('only Owner-pinned B manifest plus verified updater success emits native ef
   `repos/${REPO}/contents/results/maintenance-${REQUEST_ID}.json`).toString('utf8'));
  assert.equal(output.ciNativeEffect,'A_READONLY');
  assert.equal(output.ciNativePolicySha256,nativePolicySha256);
+ const txt=f.remote.get(`repos/${REPO}/contents/results/maintenance-${REQUEST_ID}.txt`).toString('utf8');
+ assert.match(txt,/CI_NATIVE_EFFECT: A_READONLY/);
+ assert.match(txt,new RegExp('CI_NATIVE_POLICY_SHA256: '+nativePolicySha256));
+ assert.equal(f.agent.loadLedger(REQUEST_ID).reportUploadStatus,'VERIFIED');
  assert.equal(f.stats.applies,1);
  await f.agent.pollOnce();
  assert.equal(f.stats.applies,1);
