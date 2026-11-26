@@ -735,3 +735,15 @@
 
 **현행 실제 무인 CI→발행→PC 효과→원격 영수증: A/Writer B/Controller B 0/3 (0%).** 이번 실행은 소스 경로 판별과 원장 정정이며 운영 변수·보안 설정·업무 파일/DB/D1/Task·요청 중복 생성 0건.
 
+## 29. 스물다섯 번째 실행 기록 — 기존 Owner 병합 Controller B 진단 범위 최소 수정 (2026-11-27 KST)
+
+- 직접 소스 재확인: `.github/workflows/ci-approval-controller-b.yml`에서 기존 Owner-merged 승인 `push` 이벤트는 `ENABLED=true`를 요구하지만 별도 `ZGMINI_CI_CONTROLLER_B_POLICY` 내용은 필수 조건이 아님. 그 변수는 `workflow_run` 자동 생성 승인 PR 경로에서 별도로 검사한다. `ci-approval/completed-run-intake.mjs`는 `push`의 기존 승인 readback 분기를 갖고 `tools/maintenance-request.mjs`는 `ownerMerged` 출처와 bot-merged 출처를 분리한다. 따라서 §27의 무차별 `delegationPin` 차단 판단을 §28에서 바로잡았다.
+- 실제 표시 결함: 기존 고정 A `ci-controller-b-activation-readonly`가 `CI_CONTROLLER_B_AUTO_POLICY_NOT_CONFIGURED`만 보고할 때 `push` 기존 Owner 승인 효과의 POLICY 비필수성을 표현하지 못해 외부 의사결정이 불필요한 수동 댓글/새 정책을 요구할 수 있다.
+- 기준 main `4ecf6e51c1d81f4c63dbf00c912f751aa9ac4da0`에서 별도 전용 소스 브랜치 `codex/pc-automation-process-improvement-20261119-b-push-policy-20261127`를 생성하고 [PR #4136](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4136), HEAD `a220a19de81cb60b87518d90866fe14f4d4ed861`을 발행. 수정 **2파일**: `tools/ci-controller-b-activation-readonly.mjs`, `tests/ci-controller-b-activation-readonly.test.mjs`.
+- 읽기 결과에 고정 비민감 필드 `ownerMergedExistingApprovalPolicyRequired=false`, `ciGeneratedApprovalPolicyRequired=true`, `ownerMergedExistingSubmissionVerified=false`를 추가하고, 실제 Workflow 이벤트 분기와 Owner 승인 제출 소스에 묶인 회귀를 등록. 기존 `status/code`·보안 검증·root/flag·읽기 전용/미승인 필드 불변, PC 실행·운영 설정 변경 0.
+- PR의 첫 Actions 조회 시 `ZGMINI PC Secret Scan` Run `45902012331` 및 `ZGMINI Two-PC Process Inventory Readonly` Run `45902012288` 둘 다 `queued`; **source CI PASS/병합·실PC 검증 미주장**. 정확 HEAD와 해당 파일을 실제 검사하는 CI의 완료 결과를 확인한 뒤 소스 병합 여부를 판단한다.
+- 다른 효과: Native A/Writer B #4113 root 미설정과 Controller B #4117 ENABLED=false·empty 정책, #4100 Receiver CAS PASS는 각각 유지. `#4036`은 기존 완료된 B, `#4130`은 Writer B 명세 병합이고 새 자동 종단 영수증이 아니다. #4117 원본 0/2 및 #4125 소스 수정 구분 유지.
+- **운영 자동 승인 실제 종단 0/3 (0%)**, CI 변수/권한/로그인/운영 PC·DB·D1/Task/승인 원본·기존 Issue 재실행 0.
+
+**다음 필수 단계:** #4136의 정확 HEAD 검사 완료 → 안전한 소스 PR 병합(가능한 경우) → 기존 독립 설치 증명과 정확 Owner 승인 대상이 갖춰진 효과만 정규 발행 검토. 활성화는 이 PR의 자동 효과가 아니다.
+
