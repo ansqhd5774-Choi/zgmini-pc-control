@@ -14,6 +14,10 @@ import {hasOnlyApprovedMinuteTrigger,hasOnlyApprovedSingleExec} from '../task-cr
 // Scheduler success. No provider calls, schema writes or raw payload output.
 const CNN_HTTP_DB=String.raw`E:\ZGmini\data\pc-writer\storage\core.sqlite`;
 const CNN_ACTIVATED_UTC=Date.parse('2026-11-26T15:04:00.000Z');
+// The first read-only operating PC check after exact Writer B #3985 succeeded.
+// Bound post-install cadence to this verified timestamp instead of mixing the
+// pre-install HTTP calls into a misleading whole-activation median.
+const CNN_INSTALLED_READBACK_UTC=Date.parse('2026-11-26T17:02:17.109Z');
 const CNN_HTTP_SQL="SELECT snapshot_key,body FROM public_feed_snapshots_v1 WHERE kind='input' AND feed_key='fear-greed-http-checks' AND snapshot_key IN (?,?) ORDER BY snapshot_key ASC LIMIT 2";
 const isoMs=n=>Number.isSafeInteger(n)&&n>0&&n<=8.64e15?
  new Date(n).toISOString():null;
@@ -27,6 +31,12 @@ export function projectW06HttpChecksReadonly(rows,{observedAtMs}={}){
   afterActivationLastRequestAt:null,requestGapSampleCount:null,
   minRequestGapSeconds:null,medianRequestGapSeconds:null,maxRequestGapSeconds:null,
   gapsOver90Seconds:null,recentRequestIntervalsSeconds:null,
+  installedReadbackAt:'2026-11-26T17:02:17.109Z',
+  sinceInstallReadbackCount:null,sinceInstallReadbackVerifiedCount:null,
+  sinceInstallReadbackFirstRequestAt:null,sinceInstallReadbackLastRequestAt:null,
+  sinceInstallReadbackGapSampleCount:null,sinceInstallReadbackMedianGapSeconds:null,
+  sinceInstallReadbackMaxGapSeconds:null,sinceInstallReadbackGapsOver90Seconds:null,
+  sinceInstallReadbackRecentIntervalsSeconds:null,
   providerCalls:0,sqliteWrites:0,d1Writes:0};
  if(!Number.isSafeInteger(observedAtMs)||observedAtMs<=CNN_ACTIVATED_UTC||
   !Array.isArray(rows)||rows.length>2)return empty;
@@ -66,6 +76,14 @@ export function projectW06HttpChecksReadonly(rows,{observedAtMs}={}){
  const median=sortedGaps.length?
   sortedGaps.length%2===1?sortedGaps[(sortedGaps.length-1)/2]:
   (sortedGaps[sortedGaps.length/2-1]+sortedGaps[sortedGaps.length/2])/2:null;
+ const installed=post.filter(x=>x.requestedAt>=CNN_INSTALLED_READBACK_UTC);
+ const installGaps=installed.slice(1).map((x,i)=>
+  Math.round((x.requestedAt-installed[i].requestedAt)/1000));
+ const sortedInstallGaps=[...installGaps].sort((a,b)=>a-b);
+ const installMedian=sortedInstallGaps.length?
+  sortedInstallGaps.length%2?sortedInstallGaps[(sortedInstallGaps.length-1)/2]:
+  (sortedInstallGaps[sortedInstallGaps.length/2-1]+
+   sortedInstallGaps[sortedInstallGaps.length/2])/2:null;
  return {...empty,status:'READ',code:'CNN_HTTP_LOCAL_2DAY_READ',
   twoDayCount:checks.length,
   afterActivationCount:checks.filter(x=>x.checkedAt>=CNN_ACTIVATED_UTC).length,
@@ -85,7 +103,16 @@ export function projectW06HttpChecksReadonly(rows,{observedAtMs}={}){
   medianRequestGapSeconds:median,
   maxRequestGapSeconds:sortedGaps.at(-1)??null,
   gapsOver90Seconds:gaps.filter(x=>x>90).length,
-  recentRequestIntervalsSeconds:gaps.slice(-12)};
+  recentRequestIntervalsSeconds:gaps.slice(-12),
+  sinceInstallReadbackCount:installed.length,
+  sinceInstallReadbackVerifiedCount:installed.filter(x=>x.outcome==='VERIFIED').length,
+  sinceInstallReadbackFirstRequestAt:isoMs(installed[0]?.requestedAt),
+  sinceInstallReadbackLastRequestAt:isoMs(installed.at(-1)?.requestedAt),
+  sinceInstallReadbackGapSampleCount:installGaps.length,
+  sinceInstallReadbackMedianGapSeconds:installMedian,
+  sinceInstallReadbackMaxGapSeconds:sortedInstallGaps.at(-1)??null,
+  sinceInstallReadbackGapsOver90Seconds:installGaps.filter(x=>x>90).length,
+  sinceInstallReadbackRecentIntervalsSeconds:installGaps.slice(-12)};
 }
 export function inspectW06HttpChecksReadonly({filesystem=fs,connect=p=>
  new DatabaseSync(p,{readOnly:true,timeout:1000}),clock=Date.now}={}){
