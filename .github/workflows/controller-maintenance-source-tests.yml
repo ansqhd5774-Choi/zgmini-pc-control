@@ -281,6 +281,7 @@ jobs:
         if: hashFiles('tests/ci-approval-shadow-decision.test.mjs', 'tests/ci-approval-contract-adapter.test.mjs') != ''
         run: node --test --test-concurrency=1 tests/ci-approval-shadow-decision.test.mjs tests/ci-approval-contract-adapter.test.mjs
       - name: Verify isolated C-grade receipt root source without running operator
+        if: hashFiles('tests/ci-controller-b-receipt-root-c.test.mjs') != ''
         run: node --test --test-concurrency=1 tests/ci-controller-b-receipt-root-c.test.mjs
       - name: Verify completed CI run intake without issuance
         run: node --test --test-concurrency=1 tests/ci-approval-completed-run-intake.test.mjs tests/ci-approval-execution-identity.test.mjs
