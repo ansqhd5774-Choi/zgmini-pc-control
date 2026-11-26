@@ -24,3 +24,8 @@
 PASS/PROCESS_INVENTORY_COLLECTED는 **한 시점에 프로세스 정보를 수집**했다는 증거다. Windows Service 관리/전체 프로세스 인과관계/실제 복구 성공/부팅 후 자동 시작을 증명하지 않는다. 해당 도메인의 부분 실패는 결과의 serviceStatus,taskStatus,startupStatus로 별도 기록한다.
 
 본 도구는 #996의 C급 NO-GO, ISO_ONLY_PASS, Controller 설정, WIM/ISO, Core 및 Writer 운영을 변경하지 않는다.
+## W06 고정 Task 트리거/액션/최근 실행 읽기 — 별도 선택형 probe
+
+운영 PC의 기존 `pc-process-inventory-readonly` Issue 계약에 `"probe":"w06-cnn-task-cadence-readonly"` 하나만 추가한 별도 단회 A를 사용한다. `role=operating`만 허용하고 Task 이름·경로·명령어를 요청에서 입력받지 않는다. 기존 Workflow와 Runner만 사용하며 Windows Task/주기/액션을 변경하지 않는다.
+
+`Get-ScheduledTask`와 `Get-ScheduledTaskInfo`로 이름이 ZGMINI로 시작하는 최대 48개 Task의 Enabled/State, trigger 개수와 반복 초, 실행 파일의 범주, 액션 인수에 `local-cycle.mjs --cnn-minute` 두 리터럴이 존재하는지, 최근/다음 실행시각 및 종료 코드를 조회한다. 전체 인수·경로·XML·환경변수·계정·공급자 정보는 출력하지 않는다. 간접 VBS/CMD 호출의 내부 실행 경로는 이 조회로 확정되지 않는다. 간격 60초와 인수 리터럴 확인은 **실제 60초 자연 실행, 성공적인 HTTP·SQLite·D1 게시 증거가 아니다**. 불명확한 trigger/Task 정보는 PARTIAL/STATE_UNKNOWN으로 유지한다. 승인 없는 신규 Task·기존 Task 변경·공급자 호출·DB/D1 쓰기는 0건.
