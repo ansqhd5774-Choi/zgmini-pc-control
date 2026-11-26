@@ -455,3 +455,134 @@ test('R5 projected Watchdog B stages only two existing files and target mode',()
  assert.match(updater,/result\.standby\?\.mode!=='ACTIVE_1_STANDBY_2'/);
  assert.doesNotMatch(updater,/taskkill\.exe/);
 });
+
+import {
+ R6_TARGET,R6_SOURCE_SHA256,R6_PREIMAGE_SHA256,R6_INSTALL_PREIMAGE_SHA256,
+ R6_MANIFEST_SCHEMA,R6_SCOPE,R6_BASIS,R6_CONTROLLER_SHA,R6_CONTROLLER_FILES,
+ validateR6Request,verifyR6ControllerHost,verifyR6TwoStandbysReady,
+ projectR6InstalledManifest
+} from '../watchdog-b/standby-r6-contract.mjs';
+function fixtureR6(){
+ const x=fixtureR5();
+ const bytes=fs.readFileSync(new URL(
+  '../approvals/watchdog-upgrades/'+R6_TARGET+'.json',import.meta.url));
+ const original=JSON.parse(bytes);
+ x.body.targetSha=R6_TARGET;
+ x.body.approvalManifestSha256=shaR5(bytes);
+ x.approval=original;
+ x.approvalDigest=shaR5(bytes);
+ x.installed={...x.installed,sha256:R6_PREIMAGE_SHA256,
+  approvedTargetSourceSha:R5_TARGET,
+  standby:{mode:'ACTIVE_1_STANDBY_2',approved:true},
+  upgradedAt:'2026-11-26T10:00:00.000Z'};
+ x.sourceDigest=R6_SOURCE_SHA256;
+ x.installedManifestDigest=R6_INSTALL_PREIMAGE_SHA256;
+ return x;
+}
+const admitR6=x=>validateR6Request(x.event,x.body,x.approval,x.installed,
+ x.sourceDigest,x.approvalDigest,x.installedManifestDigest);
+test('R6 exact safety-only R5 source transition pins live installed A and immutable merged source',()=>{
+ const x=fixtureR6(),p=admitR6(x);
+ assert.equal(R6_TARGET,'73f517b10422d79968c3e2726b942ffbf8076902');
+ assert.equal(R6_PREIMAGE_SHA256,R5_SOURCE_SHA256);
+ assert.equal(R6_INSTALL_PREIMAGE_SHA256,
+  '5cc8fa6f8b146054d68c003c4738f0dd4b961ccd9bbe0833913537303a78cc61');
+ assert.equal(shaR5(fs.readFileSync(new URL('../tools/runner-watchdog.mjs',import.meta.url))),
+  R6_SOURCE_SHA256);
+ const historicalR5=execFileSync('git',['show',R5_TARGET+':tools/runner-watchdog.mjs'],
+  {cwd:fileURLToPath(new URL('../',import.meta.url)),encoding:null,
+   timeout:15000,maxBuffer:1000000});
+ assert.equal(shaR5(historicalR5),R6_PREIMAGE_SHA256);
+ assert.equal(x.approval.schema,R6_MANIFEST_SCHEMA);
+ assert.equal(x.approval.revision,6);
+ assert.equal(x.approval.scope,R6_SCOPE);
+ assert.equal(x.approval.approvalBasis,R6_BASIS);
+ assert.deepEqual(x.approval.standby,R5_STANDBY);
+ assert.equal(x.approval.targetSha256,R6_SOURCE_SHA256);
+ assert.equal(x.approval.installedManifestSha256,R6_INSTALL_PREIMAGE_SHA256);
+ assert.deepEqual(x.approval.expectedControllerFiles,R6_CONTROLLER_FILES);
+ assert.deepEqual(p,{requestId:x.body.requestId,issueNumber:x.event.issue.number,
+  targetSha:R6_TARGET,oldSha:R6_PREIMAGE_SHA256,newSha:R6_SOURCE_SHA256,
+  oldManifestSha:R6_INSTALL_PREIMAGE_SHA256,expectedControllerSha:R6_CONTROLLER_SHA});
+ const host={controllerSourceSha:R6_CONTROLLER_SHA,controllerFiles:{...R6_CONTROLLER_FILES}};
+ assert.equal(verifyR6ControllerHost(host),true);
+ assert.throws(()=>verifyR6ControllerHost({...host,controllerFiles:{
+  ...host.controllerFiles,'controller/standby.mjs':'f'.repeat(64)
+ }}),/WATCHDOG_R5_CONTROLLER_SOURCE_NOT_ATTESTED/);
+});
+test('R6 rejects changed approval/preimage, invalid actor and old mode, before any B write',()=>{
+ const mutations=[
+  x=>{x.event.sender.login='other';},
+  x=>{x.event.issue.labels=[];},
+  x=>{x.body.targetSha=R5_TARGET;},
+  x=>{x.approval.approved=false;},
+  x=>{x.approval.scope='OTHER';},
+  x=>{x.approval.targetSha256='f'.repeat(64);},
+  x=>{x.approval.revision=5;},
+  x=>{x.approval.allowedFiles.push('controller/supervisor.mjs');},
+  x=>{x.sourceDigest='f'.repeat(64);},
+  x=>{x.approvalDigest='f'.repeat(64);},
+  x=>{x.installedManifestDigest='f'.repeat(64);},
+  x=>{x.installed.sha256='f'.repeat(64);},
+  x=>{x.installed.approvedTargetSourceSha=R6_TARGET;},
+  x=>{x.installed.standby.mode='ACTIVE_1_STANDBY_1';}
+ ];
+ for(const mutate of mutations){
+  const x=fixtureR6();mutate(x);
+  assert.throws(()=>admitR6(x),/WATCHDOG_R6_/);
+ }
+});
+test('R6 stages with two live READY standby identities and denies stale or unknown ownership',()=>{
+ const installed=fixtureR6().installed;
+ const owner={pid:601,nonce:'a'.repeat(36),at:'2026-11-26T12:00:00.000Z'};
+ const status={pid:601,state:'HEALTHY',supervisorPid:602,standbyPid:603,
+  secondStandbyPid:604,standbyRole:'READY',secondStandbyRole:'READY',
+  standbyReadyCount:2,at:'2026-11-26T12:00:12.000Z'};
+ const options={now:Date.parse('2026-11-26T12:00:30.000Z'),pidAlive:x=>
+  [601,602,603,604].includes(x)};
+ assert.equal(verifyR6TwoStandbysReady(installed,owner,status,options),true);
+ const mutations=[
+  a=>{a.status.secondStandbyRole='UNVERIFIED';},
+  a=>{a.status.standbyReadyCount=1;},
+  a=>{a.status.supervisorPid=601;},
+  a=>{a.status.state='BLOCKED';},
+  a=>{a.status.pid=605;},
+  a=>{a.status.at='2026-11-26T11:00:00.000Z';},
+  a=>{a.owner.nonce='short';},
+  a=>{a.installed.sha256='f'.repeat(64);},
+  a=>{a.installed.standby.approved=false;},
+  a=>{a.options.pidAlive=()=>null;},
+  a=>{a.options.pidAlive=x=>x!==604;}
+ ];
+ for(const mutate of mutations){
+  const a={installed:structuredClone(installed),owner:structuredClone(owner),
+   status:structuredClone(status),options:{...options}};
+  mutate(a);
+  assert.throws(()=>verifyR6TwoStandbysReady(
+   a.installed,a.owner,a.status,a.options),/WATCHDOG_R6_/);
+ }
+});
+test('R6 only stages existing two-file Watchdog upgrade and preserves active dual standby mode',()=>{
+ const x=fixtureR6(),p=admitR6(x);
+ const original=structuredClone(x.installed),at='2026-11-26T12:01:00.000Z';
+ assert.deepEqual(projectR6InstalledManifest(original,p,at),{
+  ...original,sha256:R6_SOURCE_SHA256,scope:FINAL_SCOPE,
+  approvedTargetSourceSha:R6_TARGET,
+  standby:{mode:'ACTIVE_1_STANDBY_2',approved:true},upgradedAt:at
+ });
+ assert.deepEqual(original,x.installed);
+ assert.throws(()=>projectR6InstalledManifest(original,{
+  ...p,oldSha:'f'.repeat(64)},at),/WATCHDOG_R6_INSTALL_PROJECTION_INVALID/);
+ const src=fs.readFileSync(new URL('../watchdog-b/upgrade.mjs',import.meta.url),'utf8');
+ assert.match(src,/if\(r6\)verifyR6TwoStandbysReady\(/);
+ assert.match(src,/if\(r6\)verifyR6ControllerHost\(/);
+ assert.match(src,/projectR6InstalledManifest\(/);
+ assert.match(src,/result\.approvedTargetSourceSha!==R6_TARGET/);
+ assert.match(src,/return publish\('STAGED','WATCHDOG_B_APPROVED_SOURCE_STAGED_AWAITING_NATURAL_RESTART',2\)/);
+ assert.doesNotMatch(src,/taskkill\.exe|Stop-Process/i);
+ // Existing process.kill(pid,0) is a liveness probe, not a termination.
+ // Reject any extra or non-zero kill invocation in this B installer.
+ const killArgs=[...src.matchAll(/process\.kill\(([^)]*)\)/g)]
+  .map(x=>x[1].replace(/\s+/g,''));
+ assert.deepEqual(killArgs,['pid,0']);
+});

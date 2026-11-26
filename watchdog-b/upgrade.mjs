@@ -16,12 +16,16 @@ import {R4_TARGET,R4_PREIMAGE_SHA256,R4_SOURCE_SHA256,
 import {R5_TARGET,R5_PREIMAGE_SHA256,R5_SOURCE_SHA256,
  validateR5Request,verifyR5ControllerHost,verifyR5FirstStandbyReady,
  projectR5InstalledManifest} from './standby-r5-contract.mjs';
+import {R6_TARGET,R6_PREIMAGE_SHA256,R6_SOURCE_SHA256,
+ validateR6Request,verifyR6ControllerHost,verifyR6TwoStandbysReady,
+ projectR6InstalledManifest} from './standby-r6-contract.mjs';
 
 const repoRoot=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const home='E:/ZGmini/automation/pc-watchdog';
 const maintenance='E:/ZGmini/automation/pc-maintenance';
 const controller='E:/ZGmini/automation/pc-control';
 const manifestFor=body=>path.join(repoRoot,'approvals/watchdog-upgrades',
+ body.targetSha===R6_TARGET?R6_TARGET+'.json':
  body.targetSha===R5_TARGET?R5_TARGET+'.json':
  body.targetSha===R4_TARGET?R4_TARGET+'.json':
  body.targetSha===NEXT_TARGET?NEXT_TARGET+'.json':TARGET+'-r2.json');
@@ -148,15 +152,18 @@ export async function execute(){
  const oldBytes=fs.readFileSync(installedFile);
  const oldManifestBytes=fs.readFileSync(installedManifest);
  const installed=JSON.parse(oldManifestBytes);
+ const r6=body.targetSha===R6_TARGET;
  const r5=body.targetSha===R5_TARGET;
  const r4=body.targetSha===R4_TARGET;
  const r3=body.targetSha===NEXT_TARGET;
- const oldSha=r5?R5_PREIMAGE_SHA256:r4?R4_PREIMAGE_SHA256:r3?REPLACEMENT:ORIGINAL;
- const nextSha=r5?R5_SOURCE_SHA256:r4?R4_SOURCE_SHA256:r3?NEXT_SOURCE_SHA:REPLACEMENT;
- const targetSha=r5?R5_TARGET:r4?R4_TARGET:r3?NEXT_TARGET:TARGET;
- const oldScope=r3||r4||r5?FINAL_SCOPE:INITIAL_SCOPE;
- const request=r5
-  ?validateR5Request(event,body,approval,installed,digest(newBytes),
+ const oldSha=r6?R6_PREIMAGE_SHA256:r5?R5_PREIMAGE_SHA256:r4?R4_PREIMAGE_SHA256:r3?REPLACEMENT:ORIGINAL;
+ const nextSha=r6?R6_SOURCE_SHA256:r5?R5_SOURCE_SHA256:r4?R4_SOURCE_SHA256:r3?NEXT_SOURCE_SHA:REPLACEMENT;
+ const targetSha=r6?R6_TARGET:r5?R5_TARGET:r4?R4_TARGET:r3?NEXT_TARGET:TARGET;
+ const oldScope=r3||r4||r5||r6?FINAL_SCOPE:INITIAL_SCOPE;
+ const request=r6
+  ?validateR6Request(event,body,approval,installed,digest(newBytes),
+    digest(approvalBytes),digest(oldManifestBytes))
+  :r5?validateR5Request(event,body,approval,installed,digest(newBytes),
     digest(approvalBytes),digest(oldManifestBytes))
   :r4?validateR4Request(event,body,approval,installed,digest(newBytes),
     digest(approvalBytes),digest(oldManifestBytes))
@@ -179,14 +186,16 @@ export async function execute(){
  requireCurrentProtection({historical:historicalProtection,current:protectionBefore});
  const controllerHost=readJSON(path.join(controller,'host.json'));
  verifyApprovedControllerHost(controllerHost,
-  (r4||r5)?request.expectedControllerSha:APPROVED_CONTROLLER_SHA);
+  (r4||r5||r6)?request.expectedControllerSha:APPROVED_CONTROLLER_SHA);
  if(r4)verifyR4ControllerHost(controllerHost,request.expectedControllerSha);
  if(r5)verifyR5ControllerHost(controllerHost);
+ if(r6)verifyR6ControllerHost(controllerHost);
  const owner=readJSON(path.join(home,'receiver/owner.json'));
  const status=readJSON(path.join(home,'STATUS.json'));
  // Before any B claim, backup or installation write, prove the R4
  // process actually restarted naturally and is running a READY Standby.
  if(r5)verifyR5FirstStandbyReady(installed,owner,status,{pidAlive:alive});
+ if(r6)verifyR6TwoStandbysReady(installed,owner,status,{pidAlive:alive});
  const requests=path.join(home,'upgrades');
  if(fs.existsSync(requests))requireDirectory(requests);
  const claim=path.join(requests,request.requestId+'.json');
@@ -231,8 +240,9 @@ export async function execute(){
     ||localAcl(stagedManifest)!==originalManifestAcl)
     throw error('WATCHDOG_B_STAGED_ACL_MISMATCH');
   fs.writeFileSync(stagedScript,newBytes);
-  const updated=r5
-   ?projectR5InstalledManifest(installed,request,new Date().toISOString())
+  const updated=r6
+   ?projectR6InstalledManifest(installed,request,new Date().toISOString())
+   :r5?projectR5InstalledManifest(installed,request,new Date().toISOString())
    :r4?projectR4InstalledManifest(installed,request,new Date().toISOString())
    :{...installed,sha256:nextSha,scope:FINAL_SCOPE,
      approvedTargetSourceSha:targetSha,upgradedAt:new Date().toISOString()};
@@ -262,6 +272,9 @@ export async function execute(){
     ||(r5&&(result.standby?.mode!=='ACTIVE_1_STANDBY_2'||
        result.standby?.approved!==true||
        result.approvedTargetSourceSha!==R5_TARGET))
+    ||(r6&&(result.standby?.mode!=='ACTIVE_1_STANDBY_2'||
+       result.standby?.approved!==true||
+       result.approvedTargetSourceSha!==R6_TARGET))
     ||localAcl(installedFile)!==originalSourceAcl
     ||localAcl(installedManifest)!==originalManifestAcl
     ||digest(fs.readFileSync(startup))!==installed.startupSha256
