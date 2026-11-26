@@ -41,7 +41,7 @@ export function sanitizedIdleObservation(x){
  const names=['samples','coreActiveSamples','sidecarActiveSamples',
   'controllerBusySamples','writerBusySamples'];
  const windowMs=x.windowMs;
- if(!Number.isSafeInteger(windowMs)||windowMs<0||windowMs>240000||
+ if(!Number.isSafeInteger(windowMs)||windowMs<0||windowMs>420000||
   names.some(k=>!Number.isSafeInteger(x[k])||x[k]<0||x[k]>1000)||
   x.samples<1||names.slice(1).some(k=>x[k]>x.samples))return null;
  return {windowMs,...Object.fromEntries(names.map(k=>[k,x[k]]))};
