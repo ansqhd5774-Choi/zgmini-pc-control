@@ -67,3 +67,19 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           ZGMINI_CI_NATIVE_EFFECT: A_READONLY
         run: '"E:\ZGmini\runtime\node.exe" ci-approval\native-receiver-observe.mjs'
+      # Separate operational opt-in: receiving CI evidence is not PC execution.
+      - name: Execute approved fixed A operation via attested installed Controller
+        if: vars.ZGMINI_CI_NATIVE_A_EXEC_ENABLED == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" ci-approval\native-a-execute.mjs'
+      - name: Upload only sanitized A result JSON and TXT
+        if: always() && vars.ZGMINI_CI_NATIVE_A_EXEC_ENABLED == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: zgmini-ci-native-a-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/zgmini-ci-native-a-${{ github.run_id }}-*.json
+            ${{ runner.temp }}/zgmini-ci-native-a-${{ github.run_id }}-*.txt
+          retention-days: 7
+          if-no-files-found: error
