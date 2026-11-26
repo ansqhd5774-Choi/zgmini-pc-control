@@ -1,0 +1,14 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "baseHead": "d8ac245003e7b8e006c2345382d5c639c6d5f18b",
+  "filePath": "scripts/pc-writer/local-cycle.mjs",
+  "beforeSha256": "41912f24c2bdc13a9de52d2ee2b504fe90b733656a0d66827c617a5e2c6c0f4a",
+  "insertions": [
+    {
+      "anchor": "const file=path.join(base,'local-cycle.lock');",
+      "position": "before",
+      "text": "// Explicit CNN scope uses the existing collection and publication entries.\n// No new scheduler, global Core lock, provider loop or Core checkpoint writes.\nif(process.argv.includes('--cnn-minute')){\n if(process.argv.slice(2).length!==2||!process.argv.includes('--publish'))\n  throw Error('CNN_MINUTE_CYCLE_SCOPE_STOP');\n const runChild=(name,args)=>{\n  const child=spawnSync(process.execPath,[path.join(here,name),...args],\n   {windowsHide:true,stdio:['ignore','pipe','pipe'],encoding:'utf8',timeout:5*60000});\n  if(child.error||child.signal||!Number.isInteger(child.status))throw Error('CNN_MINUTE_CHILD_OUTCOME_UNKNOWN');\n  let receipt;try{receipt=JSON.parse(child.stdout.trim().split(/\\r?\\n/).at(-1));}catch{throw Error('CNN_MINUTE_CHILD_RECEIPT_UNKNOWN');}\n  if(child.status!==0&&receipt?.status!=='FAILED'&&receipt?.status!=='PARTIAL')\n   throw Error('CNN_MINUTE_CHILD_OUTCOME_UNKNOWN');\n  return receipt;\n };\n const {runCnnMinuteCycle}=await import('./collection-publication-policy.mjs');\n const report=await runCnnMinuteCycle({\n  collect:()=>runChild('collect-local.mjs',['--cnn-minute']),\n  publish:()=>runChild('run-local.mjs',['--cnn-minute','--publish']),\n });\n fs.writeSync(1,JSON.stringify(report)+'\\n');\n process.exit(['COMPLETE','COMPLETE_WITH_COLLECTION_GAPS','SKIPPED_ACTIVE_COLLECTION'].includes(report.status)?0:1);\n}\n"
+    }
+  ]
+}
