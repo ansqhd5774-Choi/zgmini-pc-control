@@ -1,6 +1,5 @@
 // Source-only contract: finish the already ENABLED W06 Task recovery.
 // This operation never calls schtasks /Change, /Create, /Delete or providers.
-import {createHash} from 'node:crypto';
 import {authorizeTaskRecoveryB,RECOVERY_SCHEMA,ORIGIN,
  APPROVAL_PATH,APPROVAL_SHA} from './recovery-contract.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control',OWNER='ansqhd5774-Choi';
