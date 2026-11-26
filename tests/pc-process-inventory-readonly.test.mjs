@@ -2368,3 +2368,36 @@ test('R3 WMI Windows source uses fixed no-shell CIM executable and fails closed'
  }
  assert.equal(script.promotionApproved,false);
 });
+
+test('R3 WMI exact unknown process type and cause remain safe aggregate counts',()=>{
+ const rows=[
+  {pid:7501,name:'Runner.Listener.exe',
+   executablePath:'E:\\ZGmini\\automation\\pc-control\\runners\\seat-1\\Runner.Listener.exe'},
+  {pid:7502,name:'Runner.Worker.exe',executablePath:''},
+  {pid:7503,name:'Runner.Worker.exe',
+   executablePath:'E:\\ZGmini\\automation\\pc-control\\runners\\seat-3\\Runner.Worker.exe'},
+  {pid:7504,name:'Runner.Worker.exe',executablePath:'relative.exe'}];
+ const result=classifyR3RunnerWmiRows({rows},{canonicalize:p=>{
+  if(p.includes('seat-3'))throw Error('REDACTED_EXAMPLE_ACCESS_DENIED');
+  return p;}});
+ assert.equal(result.status,'STATE_UNKNOWN');
+ assert.equal(result.code,'STANDBY_WMI_EXECUTABLE_PATH_UNVERIFIED');
+ assert.equal(result.controllerListenerCount,1);
+ assert.equal(result.unknownPathCount,3);
+ assert.equal(result.unknownListenerCount,0);
+ assert.equal(result.unknownWorkerCount,3);
+ assert.equal(result.missingWmiPathCount,1);
+ assert.equal(result.nonAbsoluteWmiPathCount,1);
+ assert.equal(result.canonicalizationFailedCount,1);
+ assert.equal(result.promotionApproved,false);
+ assert.equal(result.operationalWrites,0);
+ assert.doesNotMatch(JSON.stringify(result),/7501|7502|7503|7504|relative\.exe|seat-3|ACCESS_DENIED|executablePath/i);
+ const text=toText({schema:'ZGMINI_PC_PROCESS_INVENTORY_RESULT_V1',
+  requestId:'fixed',role:'operating',runId:1,attempt:1,host:'PC',
+  runnerName:'zgmini-pc-01',status:result.status,code:result.code,
+  observedAtUtc:'2026-11-26T00:00:00.000Z',standbyRunnerWmi:result});
+ assert.match(text,/wmiUnknownWorkerCount=3/);
+ assert.match(text,/wmiMissingPathCount=1/);
+ assert.match(text,/wmiCanonicalizationFailedCount=1/);
+ assert.doesNotMatch(text,/7501|7502|7503|7504|relative\.exe|seat-3|ACCESS_DENIED/);
+});
