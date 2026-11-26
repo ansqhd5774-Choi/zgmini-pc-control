@@ -2937,6 +2937,18 @@ test('S6 A fixed preimage admission: owner-only existing operating probe, no com
    body:JSON.stringify(tampered)}},env,'operating'));
  }
 });
+test('S6 current maintainer A requires operating-only fixed probe and no source injection',()=>{
+ const e=event(),b=JSON.parse(e.issue.body),probe='controller-s6-next-preimage-readonly';
+ const exact={...e,issue:{...e.issue,body:JSON.stringify({...b,probe})}};
+ assert.equal(authenticateProcess(exact,env,'operating').s6NextPreimage,true);
+ assert.throws(()=>authenticateProcess(exact,env,'handoff'));
+ for(const extra of [{sourceSha:'f'.repeat(40)},{path:'E:/private'},{probe:probe+';STOP'}]){
+  const bad={...b,probe,...extra};
+  assert.throws(()=>authenticateProcess({...e,issue:{...e.issue,
+   body:JSON.stringify(bad)}},env,'operating'));
+ }
+});
+
 test('S6 private A candidate does not approve B, attest independent maintainer or leak into TXT',()=>{
  const at=Date.parse('2026-11-27T00:00:00.000Z'),digest='d'.repeat(64);
  const raw={maintainerSourceSha:'05ef3bd6b5dc753c5abfbecccacc09375eb18d10',
@@ -2950,6 +2962,17 @@ test('S6 private A candidate does not approve B, attest independent maintainer o
   supervisor:{pid:14004,mode:'LISTENING',sourceSha:'c'.repeat(40),
    children:[{seat:1},{seat:2},{seat:3},{seat:4},{seat:5},{seat:6}]},
   ownerSha256:digest,protectedSha256:digest};
+ const current={...raw,maintainerSourceSha:'20a2939d419675ede3e8ab38a3ea3b70756981ac'};
+ const currentProof=projectS6ApprovalPreimageReadonly(current,{now:at,sourceVersion:'CURRENT'});
+ assert.equal(currentProof.status,'PASS');
+ assert.equal(currentProof.s6Live.installedMaintainerSha,
+  '20a2939d419675ede3e8ab38a3ea3b70756981ac');
+ assert.equal(currentProof.bAuthorization,false);
+ assert.equal(currentProof.promotionApproved,false);
+ assert.equal(projectS6ApprovalPreimageReadonly(current,{now:at}).code,
+  'S6_A_MAINTAINER_SOURCE_UNVERIFIED');
+ assert.equal(projectS6ApprovalPreimageReadonly(raw,
+  {now:at,sourceVersion:'CURRENT'}).code,'S6_A_MAINTAINER_SOURCE_UNVERIFIED');
  const proof=projectS6ApprovalPreimageReadonly(raw,{now:at});
  assert.equal(proof.status,'PASS');assert.equal(proof.independentOperatorAttested,false);
  assert.equal(proof.bAuthorization,false);assert.equal(proof.failoverTested,false);
