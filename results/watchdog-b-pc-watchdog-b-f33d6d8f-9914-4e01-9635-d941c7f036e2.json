@@ -1,0 +1,11 @@
+{
+  "schema": "ZGMINI_PC_WATCHDOG_B_RESULT_V1",
+  "requestId": "pc-watchdog-b-f33d6d8f-9914-4e01-9635-d941c7f036e2",
+  "issueNumber": 4122,
+  "status": "BLOCKED",
+  "code": "WATCHDOG_B_APPROVED_CONTROLLER_SHA_DRIFT",
+  "writes": 0,
+  "targetSha": "73f517b10422d79968c3e2726b942ffbf8076902",
+  "runId": "45899853579",
+  "attempt": "1"
+}
