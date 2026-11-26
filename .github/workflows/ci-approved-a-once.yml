@@ -1,0 +1,69 @@
+# Native workflow-dispatch receiver admission only. No PC operation, no install.
+# The existing owner-only issue workflows remain unchanged.
+name: ZGMINI CI Native A Receiver Admission
+on:
+  workflow_dispatch:
+    inputs:
+      effect:
+        description: Fixed approved effect
+        type: string
+        required: true
+      source_run_id:
+        description: Immutable source CI run ID
+        type: string
+        required: true
+      source_attempt:
+        description: Original source CI run attempt
+        type: string
+        required: true
+      approval_sha256:
+        description: Pinned business approval hash
+        type: string
+        required: true
+      request_sha256:
+        description: Pinned request bytes hash
+        type: string
+        required: true
+      effect_key:
+        description: Durable effect identity hash
+        type: string
+        required: true
+permissions: {}
+jobs:
+  verify-native-receiver:
+    # Only the authenticated CI bot and independently opted-in effect scope.
+    # Without the installed scope on the operating PC, preflight fails closed.
+    if: >-
+      vars.ZGMINI_CI_NATIVE_A_ENABLED == 'true' &&
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.id == 1442936296 &&
+      github.event.repository.private == true &&
+      github.event.sender.id == 41898282 &&
+      github.event.sender.login == 'github-actions[bot]' &&
+      github.actor == 'github-actions[bot]' &&
+      github.ref == 'refs/heads/main' &&
+      github.run_attempt == 1 &&
+      inputs.effect == 'A_READONLY'
+    permissions:
+      contents: read
+      actions: read
+    concurrency:
+      group: zgmini-native-a_readonly-${{ inputs.effect_key }}
+      cancel-in-progress: false
+      queue: max
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Pin control source at this main revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Independently verify CI receiver scope without PC execution
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ZGMINI_CI_NATIVE_EFFECT: A_READONLY
+        run: '"E:\ZGmini\runtime\node.exe" ci-approval\native-receiver-observe.mjs'
