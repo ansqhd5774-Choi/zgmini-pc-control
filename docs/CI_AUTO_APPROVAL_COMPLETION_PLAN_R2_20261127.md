@@ -843,7 +843,7 @@
 ### 실제 코드 실패 조건
 
 - `ci-approval/completed-run-intake.mjs::observePublishedControllerApprovals`의 기존 `main push`는 manifest가 추가된 시점에 **해당 PR 소스 CI SUCCESS**가 있어야 `submitExistingControllerApprovalFromCi`를 호출한다. Owner가 PR을 병합했을 때 source CI가 아직 진행 중이면 `SOURCE_CI_UNVERIFIED` → `NOT_SUBMITTED`로 종료된다.
-- 해당 CI가 나중에 SUCCESS로 끝나도 기존 `workflow_run` job은 `ZGMINI_CI_CONTROLLER_B_POLICY != ''`를 추가 요구하고, 고정 실행기 `main({publish:true})`은 `workflow_run`을 오직 독립 자동 생성 정책 경로로 처리했다. **기존 Owner-merged 명세에는 별도 생성 정책이 필수 아님**(이전 #4136), 따라서 push/CI 완료 이벤트 순서가 바뀌면 승인 효과를 놓치는 구조적 공백. 이 오류는 현재 ENABED=false/Owner 신규 효과 미확보 등 운영 차단과 독립된 **소스 경로 문제**로 분류한다.
+- 해당 CI가 나중에 SUCCESS로 끝나도 기존 `workflow_run` job은 `ZGMINI_CI_CONTROLLER_B_POLICY != ''`를 추가 요구하고, 고정 실행기 `main({publish:true})`은 `workflow_run`을 오직 독립 자동 생성 정책 경로로 처리했다. **기존 Owner-merged 명세에는 별도 생성 정책이 필수 아님**(이전 #4136), 따라서 push/CI 완료 이벤트 순서가 바뀌면 승인 효과를 놓치는 구조적 공백. 이 오류는 현재 ENABLED=false/Owner 신규 효과 미확보 등 운영 차단과 독립된 **소스 경로 문제**로 분류한다.
 - 이 수정은 [#3925/#3926](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3926)의 영수증 root CROSS_RUN PASS를 재사용하고, 기존 운영 설치에 관한 새 재진단·A 재요청/Owner 명세 재발행을 요구하지 않는다.
 
 ### 최소 소스 수정 및 HEAD CI
