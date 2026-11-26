@@ -197,3 +197,28 @@
 2. **실제 수신 Workflow와 인증된 호스트의 설치·정규 실행 진입점을 연결한다.** 이벤트·읽기 전용 검증 PASS만으로 PC 실행 권한이 되지 않도록 수신기 독립 policy/CAS/claim/backup/postcheck를 유지한다.
 3. CI 발행자 인증의 독립 증거 및 기존 승인 원본 공급과 실제 운영 정책 활성화는 기존 승인 범위와 추가 권한 효과를 분리해 진행한다. #4038 사용자 댓글 재요구나 Owner 위조는 금지한다.
 4. A / Controller B / Writer B **실제 무인 CI 실행 종단 완료 0/3**을 유지한다. PR 병합은 운영 완료와 구분한다.
+
+## 9. 다섯 번째 실행 기록 — 2026-11-27 KST
+
+### 실제 연결 지점 발견
+
+- Controller B 기존 운영 B 설치 #4036은 성공, A/Writer B 무인 종단 인증은 아직 미완료인 상태를 보존한다.
+- [PR #4050](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4050) 전송 모듈과 [PR #4065](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4065) 독립 수신 검증 모듈은 CI 3/3 성공 후 각각 병합됐다.
+- 하지만 두 모듈이 지칭한 `.github/workflows/ci-approved-a-once.yml`, `.github/workflows/ci-approved-writer-b-once.yml`은 실제 `main`에 없고, 실 GitHub 이벤트·REST evidence·PC 설치 Scope를 읽는 실행 진입점도 없어 전송→수신이 동작하지 않는 **직접 미연결 코드 조건**을 확인했다.
+
+### 실제 변경
+
+- 최신 당시 `main@42436298d20d8828bf5dcd4900a8b14fff791849`에서 새 소스 브랜치 `codex/ci-native-receiver-runtime-20261127` 생성.
+- [PR #4070](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4070): 수신 Workflow 2개를 각각 **`workflow_dispatch` 전용, 실제 Bot ID/repo private/main 확인, 효과별 기본 비활성**으로 등록.
+- `ci-approval/native-receiver-observe.mjs`: 실제 이벤트 바이트와 독립 설치된 **고정 경로**의 로컬 읽기 전용 Scope, 과거 Source Run, 원본 Workflow 및 현재 Receiver Workflow Git blob을 읽어 기존 `inspectNativeReceiver`에 전달. 응답은 `CONTRACT_MATCH_ONLY` 또는 실패 상태일 뿐 PC 실행·설치·추가 Github POST 권한이 아니다.
+- `tests/ci-native-receiver-observe.test.mjs`와 기존 Windows Source CI 단계 연결. 위조 Bot, Source/Receiver 경로 변조, 설치 Scope 누락, symlink, CRLF Workflow 검증을 포함한다.
+- 최초 HEAD `d5b91b5b4210ec953ee2b64cd9e533f667b56b6b`의 C996는 Windows CRLF 줄바꿈을 고려하지 않은 **시험 코드 오판**으로 실패했다. 소스/권한 완화 없이 정적시험의 CRLF 정규화만 수정해 새 HEAD `831a2c0ef8f65ae1291a1f37ae0dd05f5253da94`로 교체. 최초 실패 증거는 보존한다.
+- 신규 HEAD의 GitHub CI: C996 [#45881264817](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45881264817) **SUCCESS**, Source Tests [#45881264798](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45881264798) **미완료**, Secret Scan [#45881264858](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45881264858) **미완료** (본 원장 기록 시점). 최종 CI와 병합은 증거 후 업데이트한다.
+
+### 정확한 이후 작업
+
+1. #4070 정확 HEAD의 Windows Source + Secret 결과를 확인하고, 실패 항목은 원인 수정·동일 변경 검증 후 안전하게 병합한다.
+2. 기존 인증된 운영 PC에 정확한 설치/원본 권한/CAS가 실제 존재하는지를 확인한다. **새 Scope 파일 생성·GitHub 변수 활성화·PC 실행은 별도 정규 승인 범위와 실제 해시/영수증 확인 전까지 하지 않는다.**
+3. 수신기의 실제 PC A 작업·Writer B 설치 실행 인계에는 독립 인증/효과 claim/Engine 안전 계약을 구현한다. 검증 Workflow가 깨어나는 것을 기능 종단 성공으로 세지 않는다.
+4. Controller B는 기존 CI 자동 발행 정책·인증 신뢰근거의 정확한 미구성을 분리해 정상 경로로 해결한다. 종결한 #4038 수동 댓글 요구는 복원하지 않는다.
+5. A / Controller B / Writer B **무인 종단 완료율 0/3 확인 상태 유지**, 새 결과 확인 시 유형별로 실제 영수증이 있는 항목만 반영한다.
