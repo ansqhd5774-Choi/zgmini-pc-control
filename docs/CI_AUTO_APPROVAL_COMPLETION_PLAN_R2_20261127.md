@@ -243,3 +243,26 @@
 1. #4077 정확 HEAD의 C996/Secret/Windows Source CI를 끝까지 확인하고 실패 시 구분 증거로 최소 수정 후 3/3 확인·병합/원장 readback을 진행한다.
 2. **새 운영 권한·신뢰 설치 증거가 실제로 존재하는지** 정규 B 결과와 현재 호스트 설정을 대조한다. 필요한 파일·변수·B 정책을 임의 생성하거나 사용자를 수동 댓글 Gate로 돌려보내지 않는다.
 3. A·Writer B 각 지원 유형의 실제 PC 실행 어댑터/사후검사/JSON/TXT 영수증은 별도 미완료. Controller B 자동 발행 정책도 미입증으로 남긴다. 종단 완료는 여전히 **0/3**.
+
+## 11. 일곱 번째 실행 기록 — 2026-11-27 KST
+
+### 기존 전송 경로 통합
+
+- [PR #4077](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4077)의 소스 HEAD `cd43e06c0f174d73fba6f28060d332792a1fc0c9`에서 C996 [45882290310](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45882290310), Windows Source [45882290338](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45882290338), Secret Scan [45882290376](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45882290376) **3/3 SUCCESS** 후 `main` 병합 SHA **`323f672335b799f830333230589042ea837733b8`**.
+- `main` readback: 발행 모듈 `8feb9c369c619a3e87d51e4e794e8beb160990c9`, 발행 Workflow `9d6f5eadfb5c362a30b6bc3fe1fab584eb194c6c`, 회귀시험 `de3759e1e66bc4ed277cdcd4b41a8eaa769d7336`. **기존 CI 완료 이벤트→고정 A/Writer 수신 Workflow 전송 소스 통합은 완료**, 운영 자동 승인 실증 아님.
+
+### 실제 PC A급 실행 연결
+
+- 확인한 다음 원인: 신규 `ci-approved-a-once.yml`은 검증기를 실행하고 종료하며, PC에서 기존 A 엔진을 호출하지 않으므로 **무인 PC 실행 경로가 없었다**.
+- [PR #4081](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4081), 소스 브랜치 `codex/ci-native-a-execute-readonly-20261127`: `ci-approval/native-a-execute.mjs`와 회귀시험 `tests/ci-native-a-execute.test.mjs`; A 수신 Workflow에 별도 명시적인 `ZGMINI_CI_NATIVE_A_EXEC_ENABLED` 활성화 조건 및 bounded JSON/TXT artifact를 연결.
+- 범위: 기존 `observeNativeReceiver`의 실제 Workflow/발행/정책/원문 검증을 재수행한 다음, **독립 설치된 A 실행 허용+어댑터 SHA256+설치 Controller SHA**, 실제 9개 필수 파일 및 모든 설치 파일 원문 SHA, 로컬 `config/operations.json`과 승인 바이트를 대조한다. 기존 `controller/engine.mjs`를 설치 파일에서만 불러 `runner-smoke`, `core-status` 읽기 전용 고정 A 두 operation만 수행한다.
+- 기존 엔진의 requestId 중복 원장·Supervisor 소유·lease·보호상태·Worker 실행 안전 계약을 그대로 유지한다. 결과가 PASS여도 providerCalls/d1Writes/operationalWrites가 **0이 아니면 성공으로 인정하지 않는다**. artifact는 allowlist에 든 상태·code·requestId·실행 SHA 등 요약만 담고 원자료/키/Worker raw는 포함하지 않는다.
+- Owner-only `pc-job.yml`, 설치 Controller·Writer, DB·D1·수집·예약 **변경 0**. **새 GH 실행 flag·정규 B 설치 Scope·Controller SHA를 실제 확인하지 않은 상태로 운영 실행하지 않는다.**
+- 개발 HEAD `07466ae3212e2109523012297463836323257287`, Windows Source [45883703273](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45883703273)의 **새 A 실행 회귀 단계 SUCCESS**, C996 [45883703340](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45883703340) 및 Secret Scan [45883703261](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45883703261) 아직 완료 전(원장 작성 시점). 전체 CI·병합·실PC 실행을 아직 합격 처리하지 않는다.
+
+### 미완료 및 다음 실제 실행
+
+1. #4081 정확 HEAD CI 3/3과 mergeability를 회수하고, 실패한 정확 단계만 고쳐 관련 회귀 후 병합한다.
+2. 이미 승인된 A 업무의 **실제 설치 정책/어댑터/호스트 원본 및 신뢰 실행 주체**를 기존 정규 B 계약으로 확인하고, 가능한 실제 A Runner 실증을 진행한다. 부재 시 해당 효과에만 차단 상태를 표시한다.
+3. Writer B는 검증·전송과 실제 기존 Writer CAS 설치 연결 미완료, Controller B는 자동 발행 정책/신뢰 원본 활성화 미입증. 독립 작업 중단 금지.
+4. **A/Controller B/Writer B 실제 무인 종단 완료율 0/3 유지**, 코드를 병합했다고 완료로 계상하지 않는다.
