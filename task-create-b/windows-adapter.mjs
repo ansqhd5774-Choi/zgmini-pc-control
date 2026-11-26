@@ -35,6 +35,20 @@ const run=(exe,args,{cwd=SOURCE_ROOT,timeout=20000}={})=>{
  return p.stdout;
 };
 const digest=b=>createHash('sha256').update(b).digest('hex');
+// Persist exact one-shot B recovery material before changing the Task.  Any
+// uncertain/partial creation is reconciled under the retained shared lease.
+function writeDurableOnce(file,bytes){
+ need(Buffer.isBuffer(bytes)&&bytes.length>0&&bytes.length<=131072,
+  'TASK_CREATE_B_DURABLE_INPUT_STOP');
+ let fd;
+ try{
+  fd=fs.openSync(file,'wx');
+  fs.writeFileSync(fd,bytes);
+  fs.fsyncSync(fd);
+ }finally{if(fd!==undefined)fs.closeSync(fd);}
+ need(fs.readFileSync(file).equals(bytes),
+  'TASK_CREATE_B_DURABLE_READBACK_STOP');
+}
 const nativeTaskRaw=name=>run(BIN.schtasks,['/Query','/TN',name,'/XML']);
 const nativeTask=name=>decodeTaskXmlBytes(nativeTaskRaw(name));
 function taskPresent(name){
@@ -173,14 +187,13 @@ export function createOperatingTaskCreateBPort(proof){
    // The backup is local to the previously claimed private data root.
    for(const [name,obj] of Object.entries(original)){
     const p=path.win32.join(backing,name+'.xml');
-    fs.writeFileSync(p,obj.bytes,{flag:'wx'});
-    need(fs.readFileSync(p).equals(obj.bytes),'TASK_CREATE_B_BACKUP_READBACK_STOP');
+    writeDurableOnce(p,obj.bytes);
    }
   },
   async createLauncherExclusive(dest,bytes){
    need(dest===WRAPPER&&Buffer.isBuffer(bytes),
     'TASK_CREATE_B_LAUNCHER_SCOPE_STOP');
-   fs.writeFileSync(dest,bytes,{flag:'wx'});
+   writeDurableOnce(dest,bytes);
   },
   async launcherReadback(dest,digestApproved){
    return dest===WRAPPER&&digest(scopedFile(dest,8192))===digestApproved;
@@ -190,7 +203,7 @@ export function createOperatingTaskCreateBPort(proof){
     'TASK_CREATE_B_TASK_SCOPE_STOP');
    taskDefinition=bytes;
    const file=path.win32.join(backing,'candidate-task-disabled.xml');
-   fs.writeFileSync(file,Buffer.concat([Buffer.from([0xff,0xfe]),bytes]),{flag:'wx'});
+   writeDurableOnce(file,Buffer.concat([Buffer.from([0xff,0xfe]),bytes]));
    run(BIN.schtasks,['/Create','/TN',TASK,'/XML',file]);
   },
   async taskReadback({name,enabled,definitionTemplateSha256}){
