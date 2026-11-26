@@ -335,7 +335,11 @@ export function inspectR4StandbyRuntimeReadonly({
    sourceSha256:createHash('sha256').update(source).digest('hex'),
    install,owner,status,controllerHost
   },{now,...(pidAlive?{pidAlive}:{})});
- }c/** R5 two-passive runtime: fixed read-only bytes and live IPC proof. */
+ }catch{return unknown('WATCHDOG_R4_RUNTIME_READ_UNVERIFIED');}
+}
+
+
+/** R5 two-passive runtime: fixed read-only bytes and live IPC proof. */
 export function assessR5StandbyRuntimeSnapshot(snapshot,{
  now=Date.now(),pidAlive=pid=>{
   try{process.kill(pid,0);return true;}catch(e){return e?.code==='ESRCH'?false:null;}
@@ -453,10 +457,6 @@ export function inspectR5StandbyRuntimeReadonly({
    install,owner,status,controllerHost
   },{now,...(pidAlive?{pidAlive}:{})});
  }catch{return unknown('WATCHDOG_R5_RUNTIME_READ_UNVERIFIED');}
-}
-
-
-atch{return unknown('WATCHDOG_R4_RUNTIME_READ_UNVERIFIED');}
 }
 
 
