@@ -59,7 +59,7 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
   uploadFailure=null,uploadAfterCommitError=null,installLock={held:false},
   verifyInstalledSource=()=>{},statusFaults={},preexistingLedger=null,
   extraIssueSummaries=[],extraIssueDetails=[],progressError=null,
-  s6RawManifest=null,s6Status=null}={}){
+  s6RawManifest=null,s6Status=null,s6ApplyResult=null,s6ApplyError=null}={}){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),"zgmini-maintainer-agent-test-"));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const leaseRoot=path.join(root,"leases");fs.mkdirSync(leaseRoot);
@@ -158,6 +158,28 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
       stats.statusQueries++;
       return {stdout:JSON.stringify({status:"STATUS",actualControllerSha:INSTALLED,
         ledger:stats.applies?afterTimeout:preexistingLedger,installLock,...statusFaults})};
+    }
+    if(args[1]==='s6-once-apply'){
+      stats.applies++;
+      const approvedFile=args[args.indexOf('--manifest-file')+1];
+      assert.equal(args[args.indexOf('--request-id')+1],
+        JSON.parse(issue.body).requestId);
+      assert.equal(approvedFile,path.join(root,'approved',
+        JSON.parse(issue.body).requestId+'.json'));
+      const pkg=JSON.parse(fs.readFileSync(approvedFile,'utf8'));
+      assert.deepEqual(pkg.issue,JSON.parse(issue.body));
+      assert.equal(pkg.actor,ACTOR);
+      assert.equal(pkg.issueNumber,issue.number);
+      assert.equal(pkg.manifestRawBase64,Buffer.from(s6RawManifest).toString('base64'));
+      assert.deepEqual(pkg.manifest,JSON.parse(Buffer.from(s6RawManifest).toString('utf8')));
+      if(s6ApplyError)throw s6ApplyError;
+      return {stdout:JSON.stringify(s6ApplyResult??{
+        schema:'ZGMINI_S6_ONCE_RESULT_V1',status:'POSTCHECK_PENDING',
+        code:'S6_ONCE_PROMOTION_OBSERVED_A_JOB_PENDING',
+        requestId:JSON.parse(issue.body).requestId,
+        failoverTested:false,promotionApproved:false,
+        leaseReleaseAcknowledged:true,lastPhase:'PROMOTED_READBACK_VERIFIED'
+      })};
     }
     if(args[1]==="apply"){
       stats.applies++;
@@ -844,22 +866,55 @@ function s6AgentCase(){
   installAttempted:false,operationalWrites:0,installLock:{held:false},s6Live:live};
  return {request,raw,status};
 }
-test('S6 exact owner Issue routes only through readonly live CAS and blocks uninstalled execution',async t=>{
+test('S6 exact Owner B Issue executes pinned standalone updater once and retains A postcheck pending',async t=>{
  const s6=s6AgentCase();
  const f=fixture(t,{title:'pc-controller-s6-once',
   issuePatch:{body:JSON.stringify(s6.request)},s6RawManifest:s6.raw,s6Status:s6.status});
- const result=(await f.agent.pollOnce())[0];
- assert.deepEqual(result,{
-  status:'BLOCKED',code:'S6_ONCE_EXECUTION_PORT_NOT_CONNECTED',
-  requestId:s6.request.requestId,preflight:'EXACT_B_SOURCE_AND_LIVE_CAS_MATCHED',
-  executionStarted:false,operationalWrites:0
- });
- assert.equal(f.stats.applies,0);
+ const row=(await f.agent.pollOnce())[0];
+ assert.equal(row.status,'UNKNOWN'); // Actual A postcheck has not run.
+ assert.equal(row.code,'S6_ONCE_PROMOTION_OBSERVED_A_JOB_PENDING');
+ assert.equal(row.s6ExecutionStatus,'POSTCHECK_PENDING');
+ assert.equal(f.stats.applies,1);
  assert.equal(f.stats.statusQueries,1);
  assert.equal(f.stats.manifestReads,1);
- assert.equal(f.agent.loadLedger(s6.request.requestId),null);
- assert.equal(f.calls.some(row=>row.args.includes('apply')||
-   row.args.includes('s6-once-apply')),false);
+ const saved=f.agent.loadLedger(s6.request.requestId);
+ assert.equal(saved.status,'UNKNOWN');
+ assert.equal(saved.result.s6ExecutionStatus,'POSTCHECK_PENDING');
+ assert.equal(saved.result.s6LeaseReleaseAcknowledged,true);
+ assert.equal(saved.result.s6LastPhase,'PROMOTED_READBACK_VERIFIED');
+ assert.equal(saved.result.status,'UNKNOWN');
+ assert.equal(saved.result.code,'S6_ONCE_PROMOTION_OBSERVED_A_JOB_PENDING');
+ const duplicate=await f.agent.processIssue(f.issue);
+ assert.equal(duplicate.code,'DUPLICATE_REQUEST_SUPPRESSED');
+ assert.equal(f.stats.applies,1);
+ assert.equal(f.calls.filter(x=>x.args.includes('s6-once-apply')).length,1);
+});
+test('S6 recovery-required outcome is durable and cannot stop twice',async t=>{
+ const s6=s6AgentCase();
+ const f=fixture(t,{title:'pc-controller-s6-once',
+  issuePatch:{body:JSON.stringify(s6.request)},s6RawManifest:s6.raw,s6Status:s6.status,
+  s6ApplyResult:{schema:'ZGMINI_S6_ONCE_RESULT_V1',status:'RECOVERY_REQUIRED',
+   code:'S6_ONCE_RUNTIME_OUTCOME_RECONCILE',requestId:s6.request.requestId,
+   failoverTested:false,promotionApproved:false,failedCode:'BACKLOG_REPLAY_OUTCOME_UNKNOWN',
+   failedAt:'BACKLOG_RECONCILE_ATTEMPT',leaseReleaseAcknowledged:true}});
+ const result=await f.agent.processIssue(f.issue);
+ assert.equal(result.status,'UNKNOWN');
+ assert.equal(result.s6ExecutionStatus,'RECOVERY_REQUIRED');
+ assert.equal(f.agent.loadLedger(s6.request.requestId).result.firstFail,
+  'BACKLOG_REPLAY_OUTCOME_UNKNOWN');
+ assert.equal((await f.agent.processIssue(f.issue)).code,'DUPLICATE_REQUEST_SUPPRESSED');
+ assert.equal(f.stats.applies,1);
+});
+test('S6 lost updater response remains unknown without automatic retry',async t=>{
+ const s6=s6AgentCase();
+ const f=fixture(t,{title:'pc-controller-s6-once',
+  issuePatch:{body:JSON.stringify(s6.request)},s6RawManifest:s6.raw,s6Status:s6.status,
+  s6ApplyError:Error('uncertain after possible supervisor stop')});
+ const result=await f.agent.processIssue(f.issue);
+ assert.equal(result.status,'UNKNOWN');
+ assert.equal(result.code,'S6_ONCE_OUTCOME_UNKNOWN');
+ assert.equal((await f.agent.processIssue(f.issue)).code,'DUPLICATE_REQUEST_SUPPRESSED');
+ assert.equal(f.stats.applies,1);
 });
 test('S6 rejects stale standby owner and does not execute or claim an effect',async t=>{
  const s6=s6AgentCase();
