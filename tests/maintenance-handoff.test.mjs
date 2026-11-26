@@ -4,12 +4,58 @@ import {createHash} from 'node:crypto';
 import {execFileSync}from'node:child_process';
 import {requireHandoffCheckoutScope,requireStopped,requireNoReplacement,requireReceiverOrigin,requireNewReceiverOrigin,requireCurrentReceiverIdentity,reserveReceiverSlot,reservationFailureStatus,rollbackStatus,
   priorRuntimeFiles,nextRuntimeFiles,requireSixToSevenContract,requireSevenToSevenContract,
-  requireHandoffApproval,approvedRuntimeChanges,approvedPolicyOnlyHandoff,handoffFilePlan,
+  requireHandoffApproval,approvedRuntimeChanges,approvedHandoffCiPolicy,approvedPolicyOnlyHandoff,handoffFilePlan,
   requireDirectInstalledFiles,requireNoUnfinishedHandoff,requireOwnedInstallGuard,requireRollbackWindow,
   requireOriginalStartupBytes,preserveRollbackReservation}from'../tools/handoff-maintenance.mjs';
 import {sourceFiles as bootstrapFiles}from'../tools/bootstrap-maintenance.mjs';
 import {maintenanceOriginFiles}from'../tools/update.mjs';
 import {acquireMaintenanceLock}from'../tools/maintenance-lock.mjs';
+test('integrated 3-file CI policy handoff candidate is exact and refuses unapproved execution',()=>{
+ const previous=JSON.parse(fs.readFileSync(new URL(
+  '../approvals/maintenance-handoffs/05ef3bd6b5dc753c5abfbecccacc09375eb18d10.json',
+  import.meta.url),'utf8'));
+ const candidate=JSON.parse(fs.readFileSync(new URL(
+  '../approvals/maintenance-handoffs/6975aff74d294625a0ee438dc3e9f78041949227.json',
+  import.meta.url),'utf8'));
+ const before={schema:'ZGMINI_PC_MAINTENANCE_INSTALL_V1',
+  sourceSha:previous.targetSha,startupSha256:'f'.repeat(64),
+  files:Object.fromEntries(nextRuntimeFiles.map(rel=>[rel,previous.files[rel]]))};
+ assert.equal(candidate.installedSha,before.sourceSha);
+ assert.equal(candidate.targetSha,'6975aff74d294625a0ee438dc3e9f78041949227');
+ assert.equal(candidate.schema,'ZGMINI_MAINTENANCE_HANDOFF_V2');
+ assert.equal(candidate.transition,'SEVEN_TO_SEVEN');
+ assert.equal(candidate.approved,false);
+ assert.equal(candidate.checks.ownerNativeEffectApproved,false);
+ assert.equal(candidate.checks.windowsHandoffExecuted,false);
+ assert.equal(candidate.checks.ciControllerBEnabled,false);
+ assert.throws(()=>requireHandoffApproval(candidate,candidate.targetSha,before.sourceSha),
+  /HANDOFF_APPROVAL_REQUIRED/);
+ requireSevenToSevenContract(before.files,candidate.files);
+ const source=[...nextRuntimeFiles,
+  'tools/bootstrap-maintenance.mjs','tools/handoff-maintenance.mjs'];
+ assert.deepEqual(Object.keys(candidate.files).sort(),source.sort());
+ for(const rel of source){
+  const fileBytes=fs.readFileSync(new URL('../'+rel,import.meta.url));
+  assert.equal(createHash('sha256').update(fileBytes).digest('hex'),
+   candidate.files[rel],'source byte SHA-256: '+rel);
+ }
+ const expected=['tools/maintenance-apply.mjs','tools/maintenance-agent.mjs','tools/update.mjs'];
+ const changes=nextRuntimeFiles.filter(rel=>candidate.files[rel]!==previous.files[rel]);
+ assert.deepEqual(changes,expected);
+ assert.deepEqual(candidate.runtimeChangedFiles,expected);
+ const hypothetical={...candidate,approved:true};
+ assert.equal(requireHandoffApproval(hypothetical,candidate.targetSha,before.sourceSha),
+  'SEVEN_TO_SEVEN');
+ const plan=handoffFilePlan('SEVEN_TO_SEVEN',before.files,candidate.files,{
+  before,approval:hypothetical,target:candidate.targetSha});
+ assert.deepEqual(plan.writes,expected);
+ const after={...before,sourceSha:candidate.targetSha,files:Object.fromEntries(
+  nextRuntimeFiles.map(rel=>[rel,candidate.files[rel]]))};
+ const policy=approvedHandoffCiPolicy(before,hypothetical,after);
+ assert.deepEqual(policy,candidate.ciControllerBPolicy);
+ assert.equal(policy.workflowBlobSha,'27e48ecde81bdf6f15cccffcffd9b3e70482a5f3');
+ // The hypothetical allowed schema branch is NOT an actual Owner authorization.
+});
 test('handoff ignores unrelated checkout edits, still denies executable and approval edits',t=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-handoff-scope-'));
  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
