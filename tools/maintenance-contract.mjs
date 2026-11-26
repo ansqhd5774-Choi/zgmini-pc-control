@@ -1255,7 +1255,7 @@ export function assessS6ControllerTransition({phase,baseline,observed,now=Date.n
   observed.runnerSeats.length===6&&
   observed.runnerSeats.every((row,i)=>record(row)&&
    row.seat===i+1&&row.name==='zgmini-pc-0'+(i+1)&&
-   row.status==='online'&&(!requireIdle||typeof row.busy==='boolean'));
+   row.status==='online'&&(requireIdle?row.busy===false:typeof row.busy==='boolean'));
  if(phase==='PRE_DRAIN'){
   if(observed.workflowState!=='active'||observed.maintenanceLeaseHeld!==false||
      observed.watchdogPaused!==false||observed.controllerDraining!==false)
