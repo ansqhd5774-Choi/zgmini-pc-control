@@ -71,7 +71,12 @@ const S6_RECEIVER_LEDGER_PROBE='controller-s6-once-receiver-ledger-readonly';
 const S6_JOURNAL_REQUEST='pc-s6-d7c0a971-5219-4a3a-9dce-30b0543b0e72';
 const S6_JOURNAL_APPROVAL_SHA='b8fed5bebec6a473730ed0b09ede5b5dc173db53af5cfc1e619e34a45bb8aefd';
 const S6_INSTALLED_MAINTAINER='05ef3bd6b5dc753c5abfbecccacc09375eb18d10';
-const S6_CURRENT_MAINTAINER='20a2939d419675ede3e8ab38a3ea3b70756981ac';
+// Both source IDs have identical authorized 7 runtime file bytes; the later
+// 7-to-7 handoff changed CI B policy only. Never accept an arbitrary SHA.
+const S6_CURRENT_MAINTAINER_SOURCES=new Set([
+ '20a2939d419675ede3e8ab38a3ea3b70756981ac',
+ '5a85f803fd9cb280561395f88a3544ee8e7d4660'
+]);
 const R4_GUARDIAN_ORIGIN_PROBE='controller-standby-r4-guardian-origin-readonly';
 const CI_RECEIPT_ROOT_PROBE='ci-controller-b-receipt-root-readonly';
 const CI_CONTROLLER_B_ACTIVATION_PROBE='ci-controller-b-activation-readonly';
@@ -2836,10 +2841,10 @@ export function projectS6ApprovalPreimageReadonly(raw,{now=Date.now(),sourceVers
  if(!obj(raw)||!obj(wd)||!obj(owner)||!obj(sup))
   return unknown('S6_A_ROSTER_UNAVAILABLE');
  // The source version is selected only by the authenticated fixed A probe.
- const expectedMaintainer=sourceVersion==='CURRENT'?S6_CURRENT_MAINTAINER:
-  S6_INSTALLED_MAINTAINER;
- if(raw.maintainerSourceSha!==expectedMaintainer||
-    raw.maintainerFilesVerified!==true)
+ const maintainerAllowed=sourceVersion==='CURRENT'?
+  S6_CURRENT_MAINTAINER_SOURCES.has(raw.maintainerSourceSha):
+  raw.maintainerSourceSha===S6_INSTALLED_MAINTAINER;
+ if(!maintainerAllowed||raw.maintainerFilesVerified!==true)
   return unknown('S6_A_MAINTAINER_SOURCE_UNVERIFIED');
  if(raw.controllerFilesVerified!==true||!sha40(raw.controllerSha)||
     raw.installLockHeld!==false)
