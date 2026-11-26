@@ -12,6 +12,11 @@ import {protection} from '../tools/install-runner-watchdog.mjs';
 import {requireCurrentProtection,verifyApprovedControllerHost} from './upgrade.mjs';
 import {NEXT_TARGET as TARGET,NEXT_SOURCE_SHA as REPLACEMENT,
  FINAL_SCOPE,APPROVED_CONTROLLER_SHA} from './contract.mjs';
+import {verifyR5ControllerHost} from './standby-r5-contract.mjs';
+import {R4_GUARDIAN_TARGET,R4_GUARDIAN_SOURCE_SHA256,
+ R4_GUARDIAN_STAGE_REQUEST_ID,validateR4GuardianRequest,
+ verifyR4GuardianPrecheck,verifyR4GuardianPostcheck}
+ from './guardian-r4-contract.mjs';
 
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const home='E:/ZGmini/automation/pc-watchdog';
@@ -22,7 +27,9 @@ const name='pc-watchdog-guardian-activate';
 const schema='ZGMINI_PC_WATCHDOG_ACTIVATION_B_REQUEST_V1';
 const idRe=/^pc-watchdog-activate-[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 const APPROVED_REQUEST_ID='pc-watchdog-activate-31390a2f-c503-4ff1-9858-a960bbc07a0d';
-const approvalFile=path.join(root,'approvals/watchdog-activations',TARGET+'-r3.json');
+const approvalFileR3=path.join(root,'approvals/watchdog-activations',TARGET+'-r3.json');
+const approvalFileR4=path.join(root,'approvals/watchdog-activations',
+ R4_GUARDIAN_TARGET+'-r4.json');
 const helper=path.join(root,'watchdog-b/guardian-rotate.vbs');
 const stageRequestId='pc-watchdog-b-6935cd13-6579-45b6-9d60-264ac879946b';
 const digest=b=>createHash('sha256').update(b).digest('hex');
@@ -112,17 +119,26 @@ export async function execute(){
  catch{fail('WATCHDOG_ACTIVATION_BODY_INVALID');}
  if(event.issue.body.trim()!==JSON.stringify(body))
   fail('WATCHDOG_ACTIVATION_BODY_NONCANONICAL');
- const apBytes=fs.readFileSync(approvalFile),approval=JSON.parse(apBytes);
- const helperBytes=fs.readFileSync(helper);
- const request=validateActivation(event,body,approval,
-   digest(apBytes),digest(helperBytes));
+ const isR4=body.targetSha===R4_GUARDIAN_TARGET;
+ const selectedSource=isR4?R4_GUARDIAN_SOURCE_SHA256:REPLACEMENT;
+ const selectedTarget=isR4?R4_GUARDIAN_TARGET:TARGET;
+ const selectedStage=isR4?R4_GUARDIAN_STAGE_REQUEST_ID:stageRequestId;
+ const apBytes=fs.readFileSync(isR4?approvalFileR4:approvalFileR3);
+ const approval=JSON.parse(apBytes),helperBytes=fs.readFileSync(helper);
+ const request=isR4
+  ?validateR4GuardianRequest(event,body,approval,{
+    approvalDigest:digest(apBytes),helperDigest:digest(helperBytes),
+    activationScriptDigest:digest(fs.readFileSync(fileURLToPath(import.meta.url)))})
+  :validateActivation(event,body,approval,digest(apBytes),digest(helperBytes));
  const script=path.join(home,'runner-watchdog.mjs');
  const install=load(path.join(home,'INSTALL.json'));
  const source=digest(fs.readFileSync(script));
- const stage=load(path.join(home,'upgrades',stageRequestId+'.json'));
+ const stage=load(path.join(home,'upgrades',selectedStage+'.json'));
  const owner=load(path.join(home,'receiver/owner.json'));
  const status=load(path.join(home,'STATUS.json'));
- statusReady({owner,status,source,manifest:install,stage});
+ if(isR4)verifyR4GuardianPrecheck({install,sourceDigest:source,
+   stage,owner,status,pidAlive:active});
+ else statusReady({owner,status,source,manifest:install,stage});
  if(active(owner.pid)!==true)fail('WATCHDOG_ACTIVATION_OLD_PID_NOT_RUNNING');
  const startup=path.join(process.env.APPDATA||'',
   'Microsoft/Windows/Start Menu/Programs/Startup/ZGMINI_PC_CONTROL.vbs');
@@ -137,7 +153,8 @@ export async function execute(){
  const historical=load(path.join(home,'PROTECTION_BEFORE.json'));
  const pre=protection();
  requireCurrentProtection({historical,current:pre});
- verifyApprovedControllerHost(load(path.join(control,'host.json')));
+ if(isR4)verifyR5ControllerHost(load(path.join(control,'host.json')));
+ else verifyApprovedControllerHost(load(path.join(control,'host.json')));
  // An elevated Runner cannot be allowed to bypass the exact medium-user
  // Guardian identity contract for a B action.
  let groups;
@@ -160,7 +177,7 @@ export async function execute(){
  if(fs.existsSync(ledger))fail('WATCHDOG_ACTIVATION_DUPLICATE_REQUEST');
  const initial={schema:'ZGMINI_PC_WATCHDOG_ACTIVATION_B_RESULT_V1',
   requestId:request.requestId,issueNumber:request.issueNumber,
-  targetSha:TARGET,oldPid:owner.pid,oldNonce:owner.nonce,
+  targetSha:selectedTarget,oldPid:owner.pid,oldNonce:owner.nonce,
   status:'RUNNING',code:'WATCHDOG_ACTIVATION_CLAIMED',watchdogFileWrites:0,
   at:new Date().toISOString()};
  persist(ledger,initial,true);
@@ -171,7 +188,7 @@ export async function execute(){
  try{
   if(active(owner.pid)!==true
    ||load(path.join(home,'receiver/owner.json')).nonce!==owner.nonce
-   ||digest(fs.readFileSync(script))!==REPLACEMENT
+   ||digest(fs.readFileSync(script))!==selectedSource
    ||JSON.stringify(protection())!==JSON.stringify(pre))
    return record('BLOCKED','WATCHDOG_ACTIVATION_PRESTOP_CAS_FAILED');
   // Exactly ONE identity-attested old Watchdog PID is terminated; the
@@ -190,10 +207,17 @@ export async function execute(){
     continue;
    try{witness('ATTEST',current.pid);}
    catch{return record('RECOVERY_REQUIRED','WATCHDOG_ACTIVATION_NEW_ORIGIN_UNVERIFIED');}
-   if(digest(fs.readFileSync(script))!==REPLACEMENT
-     ||load(path.join(home,'INSTALL.json')).sha256!==REPLACEMENT
+   if(digest(fs.readFileSync(script))!==selectedSource
+     ||load(path.join(home,'INSTALL.json')).sha256!==selectedSource
      ||JSON.stringify(protection())!==JSON.stringify(pre))
     return record('RECOVERY_REQUIRED','WATCHDOG_ACTIVATION_POST_SOURCE_OR_PROTECTION_DRIFT');
+   if(isR4){
+    try{
+     verifyR4GuardianPostcheck({install:load(path.join(home,'INSTALL.json')),
+      sourceDigest:digest(fs.readFileSync(script)),oldOwner:owner,
+      newOwner:current,status:live,signalledAt:initial.at,pidAlive:active});
+    }catch{continue;} // Keep the bounded window for IPC READY; never retry ACTIVATE.
+   }
    return record('PASS','WATCHDOG_GUARDIAN_NEW_RUNTIME_ATTESTED',current.pid);
   }
   return record('STATE_UNKNOWN','WATCHDOG_ACTIVATION_NEW_PROCESS_NOT_CONFIRMED');
