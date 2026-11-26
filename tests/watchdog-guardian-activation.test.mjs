@@ -124,6 +124,7 @@ test('WMI Guardian helper uses exact argv token parser and never broad flag acce
 
 import {
  R4_GUARDIAN_TARGET,R4_GUARDIAN_SOURCE_SHA256,R4_GUARDIAN_REQUEST_ID,
+ R4_GUARDIAN_INSTALL_RAW_SHA256,
  R4_GUARDIAN_STAGE_REQUEST_ID,R4_GUARDIAN_STAGE_ISSUE,
  R4_GUARDIAN_SCHEMA,R4_GUARDIAN_SCOPE,R4_GUARDIAN_EFFECT,
  R4_GUARDIAN_BASIS,R4_GUARDIAN_CONTROLLER_SHA,R4_GUARDIAN_HELPER_SHA256,
@@ -137,6 +138,7 @@ function fixtureR4(){
  x.approval={
   schema:R4_GUARDIAN_SCHEMA,approved:true,scope:R4_GUARDIAN_SCOPE,
   targetSha:R4_GUARDIAN_TARGET,installedSha256:R4_GUARDIAN_SOURCE_SHA256,
+  installedManifestSha256:R4_GUARDIAN_INSTALL_RAW_SHA256,
   installedScope:'RUNNER_RECOVERY_AND_MAINTENANCE_HANDOFF_V1',
   guardianHelperSha256:R4_GUARDIAN_HELPER_SHA256,
   activationScriptSha256:scriptDigest,
@@ -164,7 +166,8 @@ function r4Stage(){
   requestId:R4_GUARDIAN_STAGE_REQUEST_ID,issueNumber:R4_GUARDIAN_STAGE_ISSUE,
   targetSha:R4_GUARDIAN_TARGET,targetSourceSha256:R4_GUARDIAN_SOURCE_SHA256,
   status:'STAGED',writes:2};
- return {install,sourceDigest:R4_GUARDIAN_SOURCE_SHA256,owner,status,stage,
+ return {install,sourceDigest:R4_GUARDIAN_SOURCE_SHA256,
+  installedManifestDigest:R4_GUARDIAN_INSTALL_RAW_SHA256,owner,status,stage,
   now:Date.parse('2026-11-26T10:02:00.000Z'),pidAlive:()=>true};
 }
 test('R4 exact Guardian same-purpose B admission is inert without exact authorization',()=>{
@@ -179,6 +182,7 @@ test('R4 exact Guardian same-purpose B admission is inert without exact authoriz
   x=>{x.approval.approved=false;},
   x=>{x.approval.targetSha=target;},
   x=>{x.approval.installedSha256='0'.repeat(64);},
+  x=>{x.approval.installedManifestSha256='0'.repeat(64);},
   x=>{x.approval.stageRequestId='fake';},
   x=>{x.approval.oldStageIssueNumber=1393;},
   x=>{x.approval.expectedControllerSha='0'.repeat(40);},
@@ -199,6 +203,7 @@ test('R4 Guardian old process must be healthy, pre-stage and WMI-identity attrib
  for(const mutate of [
   x=>{x.install.standby.mode='ACTIVE_1_STANDBY_2';},
   x=>{x.install.sha256='0'.repeat(64);},
+  x=>{x.installedManifestDigest='0'.repeat(64);},
   x=>{x.stage.status='BLOCKED';},
   x=>{x.stage.issueNumber=1393;},
   x=>{x.stage.writes=1;},
@@ -210,14 +215,16 @@ test('R4 Guardian old process must be healthy, pre-stage and WMI-identity attrib
   x=>{x.pidAlive=()=>false;}
  ]){const y={install:structuredClone(x.install),stage:structuredClone(x.stage),
    status:structuredClone(x.status),owner:structuredClone(x.owner),
-   sourceDigest:x.sourceDigest,now:x.now,pidAlive:x.pidAlive};
+   sourceDigest:x.sourceDigest,installedManifestDigest:x.installedManifestDigest,
+   now:x.now,pidAlive:x.pidAlive};
   mutate(y);
   assert.throws(()=>verifyR4GuardianPrecheck(y),/WATCHDOG_R4_GUARDIAN_/);
  }
 });
 test('R4 Guardian attestation requires new exact PID, owner nonce and READY IPC',()=>{
  const x=r4Stage();
- const valid={install:x.install,sourceDigest:x.sourceDigest,oldOwner:x.owner,
+ const valid={install:x.install,sourceDigest:x.sourceDigest,
+  installedManifestDigest:x.installedManifestDigest,oldOwner:x.owner,
   newOwner:{pid:6201,nonce:'ba6e3d6b-e2b6-48d6-9cb2-7828a65bd87d',
    at:'2026-11-26T10:02:00.000Z'},
   status:{pid:6201,state:'HEALTHY',at:'2026-11-26T10:02:10.000Z',
@@ -227,6 +234,8 @@ test('R4 Guardian attestation requires new exact PID, owner nonce and READY IPC'
  assert.equal(verifyR4GuardianPostcheck(valid),true);
  for(const mutate of [
   x=>{x.newOwner.pid=x.oldOwner.pid;},
+  x=>{x.installedManifestDigest='0'.repeat(64);},
+  x=>{x.install.standby.mode='ACTIVE_1_STANDBY_2';},
   x=>{x.newOwner.nonce=x.oldOwner.nonce;},
   x=>{x.status.standbyRole='STARTING';},
   x=>{x.status.standbyPid=x.status.supervisorPid;},
@@ -248,6 +257,8 @@ test('R4 Guardian adapter retains one original ACTIVATE call and exact source gu
  assert.match(src,/verifyR4GuardianPostcheck\(/);
  assert.match(src,/verifyR5ControllerHost\(/);
  assert.match(src,/selectedSource/);
+ assert.match(src,/R4_GUARDIAN_INSTALL_RAW_SHA256/);
+ assert.match(src,/installedManifestDigest/);
  const reporter=fs.readFileSync(path.join(root,'watchdog-b/guardian-result.mjs'),'utf8');
  assert.match(reporter,/R4_GUARDIAN_REQUEST_ID/);
  assert.match(reporter,/R4_GUARDIAN_TARGET/);
