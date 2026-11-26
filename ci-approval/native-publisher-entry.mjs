@@ -51,6 +51,41 @@ export function readNativeInstalledProof(effect,{root='E:\\ZGmini\\data\\pc-writ
  if(actual!==v.nativePolicySha256)fail('CI_NATIVE_PROOF_POLICY_SHA_UNVERIFIED');
  return Object.freeze(v);
 }
+// The publisher runs on the isolated handoff host, not the operating PC.
+// Policy/installed B proof MUST be independently provisioned in a read-only
+// location separated from the writable one-shot receipt store. No path is
+// taken from an event, PR, Issue, or repository checkout.
+export function createNativePublisherLocalPolicyPorts({scopeRoot,receiptRoot,volatileRoots=[]}={}){
+ const checkedRoot=root=>{
+  if(typeof root!=='string'||!path.isAbsolute(root)||root.includes('\\0'))
+   fail('CI_NATIVE_PUBLISH_LOCAL_ROOT_DENIED');
+  const full=path.resolve(root);
+  for(let cur=full;;){
+   const st=fs.lstatSync(cur);
+   if(!st.isDirectory()||st.isSymbolicLink())
+    fail('CI_NATIVE_PUBLISH_LOCAL_ROOT_UNVERIFIED');
+   const parent=path.dirname(cur);if(parent===cur)break;cur=parent;
+  }
+  const real=fs.realpathSync(full);
+  const comparable=v=>process.platform==='win32'?path.normalize(v).toLowerCase():path.normalize(v);
+  if(comparable(real)!==comparable(full))
+   fail('CI_NATIVE_PUBLISH_LOCAL_ROOT_UNVERIFIED');
+  return full;
+ };
+ const policy=checkedRoot(scopeRoot),receipts=checkedRoot(receiptRoot);
+ const inside=(parent,child)=>{
+  const rel=path.relative(parent,child);
+  return rel===''||(rel!=='..'&&!rel.startsWith('..'+path.sep)&&!path.isAbsolute(rel));
+ };
+ if(inside(policy,receipts)||inside(receipts,policy)||
+    !Array.isArray(volatileRoots)||volatileRoots.some(p=>
+      typeof p==='string'&&path.isAbsolute(p)&&inside(path.resolve(p),policy)))
+  fail('CI_NATIVE_PUBLISH_POLICY_ROOT_NOT_INDEPENDENT');
+ return Object.freeze({
+  readNativeScope:effect=>readNativeScope(effect,{root:policy}),
+  readNativeInstalledProof:effect=>readNativeInstalledProof(effect,{root:policy})
+ });
+}
 function decodeContents(f,pathValue){
  if(f?.type!=='file'||f.path!==pathValue||f.encoding!=='base64'||
     typeof f.content!=='string'||f.content.length>140000)
@@ -145,12 +180,17 @@ async function main(){
   const raw=await res.text();if(raw.length>150000)fail('CI_NATIVE_PUBLISH_GITHUB_READ_LIMIT');
   return JSON.parse(raw);
  };
- const root=env.ZGMINI_CI_NATIVE_RECEIPT_ROOT;
- let store;
- // The receipt root must already exist and be outside TEMP; no auto-create.
- try{store=createCiNativeReceiptStore(root,{volatileRoots:[
-  env.RUNNER_TEMP,env.TEMP,env.TMP].filter(x=>typeof x==='string'&&path.isAbsolute(x))})}
- catch{console.log(JSON.stringify(out('EVIDENCE_MISSING','CI_NATIVE_PUBLISH_RECEIPT_ROOT_UNVERIFIED')));return 1}
+ const receiptRoot=env.ZGMINI_CI_NATIVE_RECEIPT_ROOT;
+ const scopeRoot=env.ZGMINI_CI_NATIVE_SCOPE_ROOT;
+ const volatileRoots=[env.RUNNER_TEMP,env.TEMP,env.TMP,env.GITHUB_WORKSPACE]
+  .filter(x=>typeof x==='string'&&path.isAbsolute(x));
+ let store,local;
+ // Both roots must already exist on the isolated host; no auto-create,
+ // TEMP/checkout policy files, or writable-receipt-root authority.
+ try{
+  local=createNativePublisherLocalPolicyPorts({scopeRoot,receiptRoot,volatileRoots});
+  store=createCiNativeReceiptStore(receiptRoot,{volatileRoots});
+ }catch{console.log(JSON.stringify(out('EVIDENCE_MISSING','CI_NATIVE_PUBLISH_LOCAL_ROOTS_UNVERIFIED')));return 1}
  const dispatchWorkflow=async (workflow,{ref,inputs})=>{
   if(!Object.values(RECEIVERS).includes(workflow)||ref!=='main')fail('CI_NATIVE_PUBLISH_ROUTE_DENIED');
   const name=workflow.split('/').at(-1);
@@ -164,12 +204,12 @@ async function main(){
   const raw=await res.text();if(raw.length>8192)fail('CI_NATIVE_PUBLISH_DISPATCH_RESPONSE_INVALID');
   return {status:200,...JSON.parse(raw)};
  };
- const ports={readNativeScope,
+ const ports={readNativeScope:local.readNativeScope,
   readSourceRun:(id,attempt)=>getJson('actions/runs/'+id+'/attempts/'+attempt),
   readSourceWorkflow:(workflow,ref)=>getJson('contents/'+workflow+'?ref='+ref),
   readReceiverWorkflow:workflow=>getJson('contents/'+workflow+'?ref=main'),
   readInstalledReceiver:async effect=>{
-   const proof=readNativeInstalledProof(effect);
+   const proof=local.readNativeInstalledProof(effect);
    return verifyNativeInstalledProof(effect,proof,{getJson});
   },
   loadReceipt:store.loadReceipt,saveReceipt:store.saveReceipt,dispatchWorkflow};
