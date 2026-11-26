@@ -1,0 +1,29 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_RESULT_V1",
+  "requestId": "c4e4be53-32d3-4eaf-9510-4a243a5f4d32",
+  "chatId": "8c83c47c-8117-4b44-9bc8-d53f340197b3",
+  "issueNumber": 3804,
+  "status": "PASS_READONLY",
+  "code": "WRITER_B_INSERT_PREVIEW_VERIFIED",
+  "pcSourceWrites": 0,
+  "taskWrites": 0,
+  "dbWrites": 0,
+  "d1Writes": 0,
+  "providerCalls": 0,
+  "beforeSha256": "a96c0c7c3513fda6f9d51b35caee7d634e2a05c69ff3575d3b99c37072a60ec6",
+  "afterSha256": "92d98c3cbc115ddef3773e19c3cd200653d35c2f6d16caee495fe08e68d8a13f",
+  "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+  "baseHead": "d8ac245003e7b8e006c2345382d5c639c6d5f18b",
+  "filePath": "scripts/pc-writer/run-local.mjs",
+  "insertions": 2,
+  "coreDrain": {
+    "status": "SNAPSHOT",
+    "enabled": true,
+    "state": 4,
+    "instances": 0,
+    "relatedProcesses": 1,
+    "unknownProcessLines": 0,
+    "cycleLockPresent": true,
+    "drainReadyIfDisabled": false
+  }
+}
