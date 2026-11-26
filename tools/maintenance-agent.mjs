@@ -172,6 +172,50 @@ function parseJsonOutput(value,code){
   try{return JSON.parse(output);}catch{throw coded(code);}
 }
 
+// The independent S6 updater deliberately exits 2 on RECOVERY_REQUIRED
+// (tools/update.mjs CLI). node:child_process.execFile rejects that exit even
+// when the coordinator successfully emits its structured phase result.
+// Recover ONLY this exact, already-failed signal, never a successful effect;
+// arbitrary child stderr/stdout or other exit codes remain outcome UNKNOWN.
+const S6_RECOVERY_FAILED_PHASES=new Set([
+ "CLAIMED","INSTALL_LEASE_ACQUIRE_ATTEMPT","INSTALL_LEASE_ACQUIRED",
+ "INTAKE_PAUSE_ATTEMPT","INTAKE_PAUSED","DRAINED",
+ "OLD_TREE_STOP_ATTEMPT","OLD_TREE_STOP_SUBMITTED","OLD_TREE_STOP_VERIFIED",
+ "INTAKE_RESUME_ATTEMPT","INTAKE_RESUMED",
+ "OWNED_LEASE_RELEASE_ATTEMPT","OWNED_LEASE_RELEASED",
+ "WATCHDOG_RELEASE_OBSERVED","FAST_PROMOTION_OBSERVED",
+ "WATCHDOG_RELEASE_OUTCOME_UNVERIFIED","BACKLOG_RECONCILE_ATTEMPT",
+ "BACKLOG_RECONCILED"
+]);
+export function parseS6NonzeroRecoveryReport(error,requestId){
+ if(error?.code!==2||error?.killed===true||error?.signal!=null||
+   typeof error?.stdout!=="string"||
+   Buffer.byteLength(error.stdout)>MAX_RESULT_BYTES)return null;
+ let raw;try{raw=JSON.parse(error.stdout);}catch{return null;}
+ if(!raw||typeof raw!=="object"||Array.isArray(raw)||
+   raw.schema!=="ZGMINI_S6_ONCE_RESULT_V1"||
+   raw.requestId!==requestId||
+   raw.status!=="RECOVERY_REQUIRED"||
+   raw.code!=="S6_ONCE_RUNTIME_OUTCOME_RECONCILE"||
+   raw.operationalEffectUnverified!==true||
+   raw.failoverTested!==false||raw.promotionApproved!==false||
+   raw.mutationAttempted!==true||
+   typeof raw.leaseReleaseAcknowledged!=="boolean"||
+   !S6_RECOVERY_FAILED_PHASES.has(raw.failedAt)||
+   typeof raw.failedCode!=="string"||
+   raw.failedCode!==safeCode(raw.failedCode)||
+   raw.failedCode==="UNSPECIFIED_FAILURE")return null;
+ // Never propagate raw child output, host paths, claim details, or process IDs.
+ return Object.freeze({
+  schema:"ZGMINI_S6_ONCE_RESULT_V1",requestId,status:"RECOVERY_REQUIRED",
+  code:"S6_ONCE_RUNTIME_OUTCOME_RECONCILE",
+  operationalEffectUnverified:true,failoverTested:false,
+  promotionApproved:false,mutationAttempted:true,
+  failedAt:raw.failedAt,failedCode:raw.failedCode,
+  leaseReleaseAcknowledged:raw.leaseReleaseAcknowledged
+ });
+}
+
 function parseIssueBody(body){
   // The seven-key Issue envelope permits no JSON key aliases or duplicates.
   // Require literal canonical names so JSON.parse's last-key-wins behavior
@@ -960,8 +1004,16 @@ export function createMaintenanceAgent({
     held.entry=await acknowledgeAcceptedRequest(held.entry);
     let result;
     try{
-      const executed=parseJsonOutput(await updater(['s6-once-apply','--request-id',
-        request.requestId,'--manifest-file',packageFile]),'S6_ONCE_OUTPUT_INVALID');
+      // Exit 2 with a pinned RECOVERY_REQUIRED JSON is an observed failure
+      // phase, not a missing child response. Do not retry this one-shot B.
+      let executed;
+      try{
+        executed=parseJsonOutput(await updater(['s6-once-apply','--request-id',
+          request.requestId,'--manifest-file',packageFile]),'S6_ONCE_OUTPUT_INVALID');
+      }catch(error){
+        executed=parseS6NonzeroRecoveryReport(error,request.requestId);
+        if(executed===null)throw error;
+      }
       if(executed?.schema!=='ZGMINI_S6_ONCE_RESULT_V1'||
          executed.requestId!==request.requestId||
          !['POSTCHECK_PENDING','RECOVERY_REQUIRED','STATE_UNKNOWN','BLOCKED'].includes(executed.status)||
@@ -975,6 +1027,9 @@ export function createMaintenanceAgent({
       // The once-only claim survives an uncertain upload or execution response.
       result=normalizedResult(request,{...executed,
         actualControllerSha:request.targetControllerSha,
+        // This is the failure boundary (not a verified completed phase).
+        lastPhase:executed.status==='RECOVERY_REQUIRED'?
+          (executed.failedAt??null):executed.lastPhase,
         lastPass:executed.status==='POSTCHECK_PENDING'?
           'PROMOTED_READBACK_VERIFIED':'NONE',
         firstFail:executed.status==='RECOVERY_REQUIRED'?
