@@ -3171,6 +3171,26 @@ export function readS6OnceCurrentPreimage(requestId){
 
 
 
+
+/** Same immutable request ledger bytes must remain after S6. Never follow
+ * symlinks, omit a missing entry, or count newly added A receipts as damage.
+ * The caller supplies a securely pinned baseline; this is read-only. */
+export function s6PriorRequestLedgerPreserved(pinned,{root=path.join(controlRoot,'ledger'),io=fs}={}){
+ if(!pinned||typeof pinned!=='object'||Array.isArray(pinned)||
+    Object.keys(pinned).length>10000)return false;
+ try{
+  for(const [name,expected] of Object.entries(pinned)){
+   if(!/^[a-z0-9-]{8,80}\.json$/.test(name)||!/^[a-f0-9]{64}$/.test(expected))
+    return false;
+   const file=path.join(root,name);
+   const stat=io.lstatSync(file);
+   if(!stat.isFile()||stat.isSymbolicLink()||
+      sha256(io.readFileSync(file))!==expected)return false;
+  }
+  return true;
+ }catch{return false;}
+}
+
 /**
  * Preserve the *exact* S6 old owner, six children and earlier request ledger
  * hashes before any operational effect. A candidate manifest only becomes
@@ -3316,12 +3336,7 @@ export async function readS6OncePhaseReadback({phase,baseline,
  const newNonce=owner?.nonce??null;
  // Compare hashes of all prior local request ledgers; subsequent A jobs can add
  // entries but may never overwrite a previous receipt.
- const prior=baseline.ledgerHashes;
- const existingRequestLedgerPreserved=prior!==null&&typeof prior==='object'&&
-  !Array.isArray(prior)&&Object.entries(prior).every(([name,digest])=>
-   /^[a-z0-9-]{8,80}\.json$/.test(name)&&/^[a-f0-9]{64}$/.test(digest)&&
-   fs.existsSync(path.join(controlRoot,'ledger',name))&&
-   sha256(fs.readFileSync(path.join(controlRoot,'ledger',name)))===digest);
+ const existingRequestLedgerPreserved=s6PriorRequestLedgerPreserved(baseline.ledgerHashes);
  return {
   requestId:baseline.requestId,controllerSha:installed.installedSha,
   protectedSha256,watchdogPid:wd.pid,
