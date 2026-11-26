@@ -3686,7 +3686,7 @@ test('R6 read-only refuses SHA drift, malformed Owner, stale heartbeat or partia
   [x=>x.status.at='2026-11-26T01:10:35Z','WATCHDOG_R6_HEALTH_STATUS_UNVERIFIED'],
   [x=>x.status.supervisorPid=x.owner.pid,'WATCHDOG_R6_ACTIVE_SUPERVISOR_UNVERIFIED'],
   [x=>x.status.standbyRole='STARTING','WATCHDOG_R6_STANDBY_IPC_UNVERIFIED'],
-  [x=>x.status.secondStandbyPid=x.status.standbyPid,'WATCHDOG_R6_ACTIVE_SUPERVISOR_UNVERIFIED'],
+  [x=>x.status.secondStandbyPid=x.status.standbyPid,'WATCHDOG_R6_SECOND_STANDBY_IPC_UNVERIFIED'],
   [x=>x.status.secondStandbyRole='UNVERIFIED','WATCHDOG_R6_SECOND_STANDBY_IPC_UNVERIFIED']
  ];
  for(const [edit,code] of cases){
