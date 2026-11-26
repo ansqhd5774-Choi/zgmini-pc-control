@@ -8,6 +8,12 @@ const branch=x=>typeof x==='string'&&/^codex\/[a-z0-9][a-z0-9-]{3,94}$/.test(x);
 const report=(status,code,extra={})=>Object.freeze({
  schema:'ZGMINI_CI_CONTROLLER_B_ACTIVATION_READONLY_V1',status,code,
  variableEnabledVerified:false,policyConfigured:false,policyShapeVerified:false,
+ // Existing Owner-merged B manifests use the pinned push path without an
+ // auto-generated approval policy. Newly CI-generated approval PRs need it.
+ // These are source-contract facts, not active rights or runtime proof.
+ ownerMergedExistingApprovalPolicyRequired:false,
+ ciGeneratedApprovalPolicyRequired:true,
+ ownerMergedExistingSubmissionVerified:false,
  independentOwnerGrantVerified:false,installedReceiverPolicyVerified:false,
  actualBusinessApprovalVerified:false,activationAuthorized:false,
  controllerBPublished:false,operationalWrites:0,providerCalls:0,d1Writes:0,
