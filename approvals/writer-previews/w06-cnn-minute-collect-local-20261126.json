@@ -1,0 +1,14 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "baseHead": "d8ac245003e7b8e006c2345382d5c639c6d5f18b",
+  "filePath": "scripts/pc-writer/collect-local.mjs",
+  "beforeSha256": "1648a62e26157868e9d4ed43ab9d36436068e08973ba56d495b7c1751e02c62e",
+  "insertions": [
+    {
+      "anchor": "  const jobArg=process.argv.find(arg=>arg.startsWith('--job='));",
+      "position": "before",
+      "text": "  // Explicit W06 CLI lane: leave legacy Core/BLS/SEC code and reports intact.\n  if(process.argv.includes('--cnn-minute')){\n   const {writeSync,existsSync}=await import('node:fs');\n   const receipt={at:new Date().toISOString(),lane:'cnn-minute',status:'FAILED'};\n   let core,hooks;\n   const originalFetch=globalThis.fetch;\n   try{\n    if(process.argv.slice(2).length!==1)throw Error('CNN_MINUTE_SCOPE_STOP');\n    const base=process.env.ZGMINI_PC_HOME??path.join(os.homedir(),'.zgmini','pc-writer');\n    const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');\n    const config=read(path.join(base,'config.json'));\n    const source=execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8',windowsHide:true}).trim();\n    if(config.enabled!==true||config.collectionTarget!=='pc'||!/^[0-9a-f]{40}$/.test(source)||config.source!==source)\n     throw Error('CNN_MINUTE_SOURCE_NOT_APPROVED');\n    if(execFileSync('git',['status','--porcelain','--untracked-files=all','--','lib','worker','scripts/pc-writer'],{cwd:root,encoding:'utf8',windowsHide:true}).trim())\n     throw Error('CNN_MINUTE_SOURCE_NOT_APPROVED');\n    const dbFile=path.join(base,'storage','core.sqlite');\n    if(!existsSync(dbFile))throw Error('CNN_MINUTE_CORE_DB_MISSING');\n    core=localDatabase(dbFile);\n    const env={DB:core,DB_CORE:core,ZGMINI_COMPUTE_TARGET:'pc'};\n    hooks=installLocalRuntime(env);\n    const quota=createQuotaFetch({base,originalFetch});\n    globalThis.fetch=quota.fetch;\n    const {collect}=await import('../../worker/feed-collectors/fear-greed.ts');\n    const {refreshPublicFeeds,observeCnnCollector}=await import('../../worker/public-feed-refresh.mjs');\n    const result=await refreshPublicFeeds({env,maxFeedsPerRun:1,cnnMinuteOnly:true,collectors:{'fear-greed':observeCnnCollector(collect)}});\n    Object.assign(receipt,{status:result.status,attempted:result.attempted??0,feeds:result.feeds?.map(({key,status})=>({key,status}))});\n   }catch(error){\n    receipt.reason=/^CNN_MINUTE_[A-Z_]+$/.test(error?.message??'')?error.message:'CNN_MINUTE_COLLECTION_FAILED';\n   }finally{\n    globalThis.fetch=originalFetch;\n    try{hooks?.deregister();}finally{core?.close();}\n   }\n   writeSync(1,JSON.stringify(receipt)+'\\n');\n   process.exit(['COMPLETE','PARTIAL','ALREADY_RUNNING'].includes(receipt.status)?0:1);\n  }\n"
+    }
+  ]
+}
