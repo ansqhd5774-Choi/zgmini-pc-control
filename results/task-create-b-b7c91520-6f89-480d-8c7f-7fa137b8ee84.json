@@ -1,0 +1,15 @@
+{
+  "schema": "ZGMINI_PC_TASK_CREATE_B_RESULT_V1",
+  "requestId": "b7c91520-6f89-480d-8c7f-7fa137b8ee84",
+  "taskName": "ZGMINI-PC-CNN-Minute",
+  "status": "TASK_CREATE_B_STATE_UNKNOWN",
+  "code": "TASK_CREATE_B_RESULT_UNVERIFIED_STOP",
+  "installed": null,
+  "taskChanges": null,
+  "otherTaskChanges": 0,
+  "installerProviderCalls": 0,
+  "installerSqliteWrites": 0,
+  "installerD1Writes": 0,
+  "scheduledRuntimeEffects": "UNVERIFIED_UNTIL_NATURAL_TICKS",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE"
+}
