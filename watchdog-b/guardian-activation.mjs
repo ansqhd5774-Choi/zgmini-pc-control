@@ -18,6 +18,10 @@ import {R4_GUARDIAN_TARGET,R4_GUARDIAN_SOURCE_SHA256,
  R4_GUARDIAN_STAGE_REQUEST_ID,validateR4GuardianRequest,
  verifyR4GuardianPrecheck,verifyR4GuardianPostcheck}
  from './guardian-r4-contract.mjs';
+import {R5_GUARDIAN_TARGET,R5_GUARDIAN_SOURCE_SHA256,
+ R5_GUARDIAN_INSTALL_RAW_SHA256,R5_GUARDIAN_STAGE_REQUEST_ID,
+ validateR5GuardianRequest,verifyR5GuardianPrecheck,verifyR5GuardianPostcheck}
+ from './guardian-r5-contract.mjs';
 
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const home='E:/ZGmini/automation/pc-watchdog';
@@ -31,6 +35,8 @@ const APPROVED_REQUEST_ID='pc-watchdog-activate-31390a2f-c503-4ff1-9858-a960bbc0
 const approvalFileR3=path.join(root,'approvals/watchdog-activations',TARGET+'-r3.json');
 const approvalFileR4=path.join(root,'approvals/watchdog-activations',
  R4_GUARDIAN_TARGET+'-r4.json');
+const approvalFileR5=path.join(root,'approvals/watchdog-activations',
+ R5_GUARDIAN_TARGET+'-r5.json');
 const helper=path.join(root,'watchdog-b/guardian-rotate.vbs');
 const stageRequestId='pc-watchdog-b-6935cd13-6579-45b6-9d60-264ac879946b';
 const digest=b=>createHash('sha256').update(b).digest('hex');
@@ -120,16 +126,21 @@ export async function execute(){
  catch{fail('WATCHDOG_ACTIVATION_BODY_INVALID');}
  if(event.issue.body.trim()!==JSON.stringify(body))
   fail('WATCHDOG_ACTIVATION_BODY_NONCANONICAL');
+ const isR5=body.targetSha===R5_GUARDIAN_TARGET;
  const isR4=body.targetSha===R4_GUARDIAN_TARGET;
- const selectedSource=isR4?R4_GUARDIAN_SOURCE_SHA256:REPLACEMENT;
- const selectedTarget=isR4?R4_GUARDIAN_TARGET:TARGET;
- const selectedStage=isR4?R4_GUARDIAN_STAGE_REQUEST_ID:stageRequestId;
- const apBytes=fs.readFileSync(isR4?approvalFileR4:approvalFileR3);
+ const selectedSource=isR5?R5_GUARDIAN_SOURCE_SHA256:
+  isR4?R4_GUARDIAN_SOURCE_SHA256:REPLACEMENT;
+ const selectedTarget=isR5?R5_GUARDIAN_TARGET:isR4?R4_GUARDIAN_TARGET:TARGET;
+ const selectedStage=isR5?R5_GUARDIAN_STAGE_REQUEST_ID:
+  isR4?R4_GUARDIAN_STAGE_REQUEST_ID:stageRequestId;
+ const apBytes=fs.readFileSync(isR5?approvalFileR5:
+  isR4?approvalFileR4:approvalFileR3);
  const approval=JSON.parse(apBytes),helperBytes=fs.readFileSync(helper);
- const request=isR4
-  ?validateR4GuardianRequest(event,body,approval,{
-    approvalDigest:digest(apBytes),helperDigest:digest(helperBytes),
-    activationScriptDigest:digest(fs.readFileSync(fileURLToPath(import.meta.url)))})
+ const scriptDigest=digest(fs.readFileSync(fileURLToPath(import.meta.url)));
+ const approvalProof={approvalDigest:digest(apBytes),
+  helperDigest:digest(helperBytes),activationScriptDigest:scriptDigest};
+ const request=isR5?validateR5GuardianRequest(event,body,approval,approvalProof)
+  :isR4?validateR4GuardianRequest(event,body,approval,approvalProof)
   :validateActivation(event,body,approval,digest(apBytes),digest(helperBytes));
  const script=path.join(home,'runner-watchdog.mjs');
  const manifestFile=path.join(home,'INSTALL.json');
@@ -139,7 +150,9 @@ export async function execute(){
  const stage=load(path.join(home,'upgrades',selectedStage+'.json'));
  const owner=load(path.join(home,'receiver/owner.json'));
  const status=load(path.join(home,'STATUS.json'));
- if(isR4)verifyR4GuardianPrecheck({install,sourceDigest:source,
+ if(isR5)verifyR5GuardianPrecheck({install,sourceDigest:source,
+   installedManifestDigest,stage,owner,status,pidAlive:active});
+ else if(isR4)verifyR4GuardianPrecheck({install,sourceDigest:source,
    installedManifestDigest,stage,owner,status,pidAlive:active});
  else statusReady({owner,status,source,manifest:install,stage});
  if(active(owner.pid)!==true)fail('WATCHDOG_ACTIVATION_OLD_PID_NOT_RUNNING');
@@ -156,7 +169,7 @@ export async function execute(){
  const historical=load(path.join(home,'PROTECTION_BEFORE.json'));
  const pre=protection();
  requireCurrentProtection({historical,current:pre});
- if(isR4)verifyR5ControllerHost(load(path.join(control,'host.json')));
+ if(isR4||isR5)verifyR5ControllerHost(load(path.join(control,'host.json')));
  else verifyApprovedControllerHost(load(path.join(control,'host.json')));
  // An elevated Runner cannot be allowed to bypass the exact medium-user
  // Guardian identity contract for a B action.
@@ -193,6 +206,7 @@ export async function execute(){
    ||load(path.join(home,'receiver/owner.json')).nonce!==owner.nonce
    ||digest(fs.readFileSync(script))!==selectedSource
    ||(isR4&&digest(fs.readFileSync(manifestFile))!==R4_GUARDIAN_INSTALL_RAW_SHA256)
+   ||(isR5&&digest(fs.readFileSync(manifestFile))!==R5_GUARDIAN_INSTALL_RAW_SHA256)
    ||JSON.stringify(protection())!==JSON.stringify(pre))
    return record('BLOCKED','WATCHDOG_ACTIVATION_PRESTOP_CAS_FAILED');
   // Exactly ONE identity-attested old Watchdog PID is terminated; the
@@ -214,8 +228,18 @@ export async function execute(){
    if(digest(fs.readFileSync(script))!==selectedSource
      ||load(manifestFile).sha256!==selectedSource
      ||(isR4&&digest(fs.readFileSync(manifestFile))!==R4_GUARDIAN_INSTALL_RAW_SHA256)
+   ||(isR5&&digest(fs.readFileSync(manifestFile))!==R5_GUARDIAN_INSTALL_RAW_SHA256)
      ||JSON.stringify(protection())!==JSON.stringify(pre))
     return record('RECOVERY_REQUIRED','WATCHDOG_ACTIVATION_POST_SOURCE_OR_PROTECTION_DRIFT');
+   if(isR5){
+    try{
+     verifyR5GuardianPostcheck({install:load(manifestFile),
+      sourceDigest:digest(fs.readFileSync(script)),
+      installedManifestDigest:digest(fs.readFileSync(manifestFile)),
+      oldOwner:owner,newOwner:current,status:live,oldStatus:status,
+      signalledAt:initial.at,pidAlive:active});
+    }catch{continue;} // Never retry ACTIVATE for either slot.
+   }
    if(isR4){
     try{
      verifyR4GuardianPostcheck({install:load(manifestFile),
