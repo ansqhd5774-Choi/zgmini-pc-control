@@ -413,7 +413,7 @@ export async function runApprovedS6FailoverOnce(request,port){
   'persist','acquireOwnedInstallLease','pauseIntake','waitForDrain','verifyStopGuard','stopOwnTree',
   'waitForStoppedHeld',
   'resumeIntake','verifyReleaseGuard','releaseOwnedInstallLease',
-  'waitForPromotion','now'];
+  'waitForPromotion','reconcileBacklog','now'];
  if(!port||required.some(name=>typeof port[name]!=='function'))
   return result('BLOCKED','S6_ONCE_PORTS_UNVERIFIED');
  // No attempt is replayed, even when its last result is inconclusive.
@@ -497,6 +497,12 @@ export async function runApprovedS6FailoverOnce(request,port){
    fastPromoted?'FAST_PROMOTION_OBSERVED':'WATCHDOG_RELEASE_OUTCOME_UNVERIFIED');
   if(!fastPromoted)await port.waitForPromotion(request,baseline);
   await observe('PROMOTED');
+  // A GitHub Issue opened while pc-job.yml was disabled is not replayed
+  // automatically on re-enable. Reconcile the exact paused Owner Issues
+  // from the durable shared backlog before any A postcheck.
+  await journal('BACKLOG_RECONCILE_ATTEMPT');
+  await port.reconcileBacklog(request,baseline);
+  await journal('BACKLOG_RECONCILED');
   await journal('PROMOTED_READBACK_VERIFIED',{status:'POSTCHECK_PENDING'});
   // Existing A job and backlog readback must be performed separately; do not
   // counterfeit an A result or claim complete failover here.

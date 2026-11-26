@@ -13,7 +13,7 @@ import {applyApprovedUpdate,maintenanceFailureCode,reconcileInterruptedRollback,
 import {isolatedControllerStage,recoveryOperatorProofStatus,waitForSupervisorStopIdle,
  s6PriorRequestLedgerPreserved,normalizeS6OldChildren,
  s6WatchdogPinMatches,s6OwnedLeaseReleaseReadback,
- makeS6OnceOwnedOperatingPort} from '../tools/update.mjs';
+ makeS6OnceOwnedOperatingPort,reconcileMaintenanceBacklog} from '../tools/update.mjs';
 
 test('independent recovery proof keeps strict identity and returns exact sanitized failure categories',()=>{
  assert.deepEqual(recoveryOperatorProofStatus({exitCode:0,stdout:'INDEPENDENT_OPERATOR\r\n'}),{verified:true,code:'RECOVERY_OPERATOR_VERIFIED'});
@@ -1097,7 +1097,9 @@ function s6Fixture(options={}){
   releaseOwnedInstallLease:async()=>{add('releaseOwnedInstallLease');
    if(options.failRelease)throw Object.assign(Error('S6_TEST_RELEASE_UNKNOWN'),{code:'S6_TEST_RELEASE_UNKNOWN'});
   },
-  waitForPromotion:async()=>{add('waitForPromotion');}
+  waitForPromotion:async()=>{add('waitForPromotion');},
+  reconcileBacklog:async()=>{add('reconcileBacklog');if(options.failBacklog)
+   throw Object.assign(Error('BACKLOG_REPLAY_OUTCOME_UNKNOWN'),{code:'BACKLOG_REPLAY_OUTCOME_UNKNOWN'});}
  };
  return {port,calls,journal};
 }
@@ -1121,9 +1123,26 @@ test('S6 coordinator keeps exact one-shot owner transitions and never marks the 
  assert.ok(calls.indexOf('resumeIntake')<calls.indexOf('verifyReleaseGuard'));
  assert.ok(calls.indexOf('verifyReleaseGuard')<calls.indexOf('releaseOwnedInstallLease'));
  assert.ok(calls.indexOf('releaseOwnedInstallLease')<calls.indexOf('waitForPromotion'));
+ assert.ok(calls.indexOf('observe:PROMOTED')<calls.indexOf('reconcileBacklog'));
+ assert.equal(calls.filter(x=>x==='reconcileBacklog').length,1);
+ assert.equal(journal.some(x=>x.phase==='BACKLOG_RECONCILED'),true);
  assert.deepEqual(journal.at(-1).phase,'PROMOTED_READBACK_VERIFIED');
  assert.equal(journal.at(-1).status,'POSTCHECK_PENDING');
 });
+test('S6 uncertain backlog POST is never repeated, and never claims A postcheck',async()=>{
+ const {port,calls,journal}=s6Fixture({failBacklog:true});
+ const r=await runApprovedS6FailoverOnce(s6Request(),port);
+ assert.equal(r.status,'RECOVERY_REQUIRED');
+ assert.equal(r.failoverTested,false);
+ assert.equal(r.leaseReleaseAcknowledged,true);
+ assert.equal(calls.filter(x=>x==='reconcileBacklog').length,1);
+ assert.equal(calls.filter(x=>x==='stopOwnTree').length,1);
+ assert.equal(journal.some(x=>x.phase==='BACKLOG_RECONCILE_ATTEMPT'),true);
+ assert.equal(journal.some(x=>x.phase==='BACKLOG_RECONCILED'),false);
+ assert.equal(journal.at(-1).phase,'RECOVERY_REQUIRED');
+ assert.equal(calls.includes('resumeIntake'),true);
+});
+
 test('S6 coordinator refuses duplicate, wrong operation, unverifiable approval or busy seats without effect',async()=>{
  for(const [request,opts,code] of [
   [{...s6Request(),operation:'controller-update'}, {}, 'S6_ONCE_REQUEST_INVALID'],
@@ -1388,4 +1407,78 @@ test('S6 live operating-port entry is not available to CI or Runner and has no d
  assert.match(body,/s6OwnedLeaseReleaseReadback\(snap,baseline\)/);
  assert.match(body,/case.*claim|claimOnce:/);
  assert.doesNotMatch(src.slice(e),/if\(cmd==='s6-once-apply'\)/);
+});
+
+
+test('shared Controller/S6 backlog recovers the exact original Issue once and preserves requestId',t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-s6-backlog-'));
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const requestId='pc-s6-12345678-abcd-4def-8123-123456789abc';
+ const from='2026-11-26T12:00:00Z',to='2026-11-26T12:01:00Z';
+ const backlogFile=path.join(dir,'backlog.json');
+ fs.writeFileSync(backlogFile,JSON.stringify({schema:'ZGMINI_PC_BACKLOG_V1',
+  requestId,pausedAt:from,resumedAt:to,windows:[{pausedAt:from,resumedAt:to}],
+  replays:{}}));
+ const body=JSON.stringify({schema:'ZGMINI_PC_JOB_V1',
+  requestId:'pc-a-job-during-s6-12345678',chatId:'chat-approved-s6',
+  operation:'pc-status-readonly',sourceRepository:'ansqhd5774-Choi/zgmini',
+  sourceBranch:'main',sourceSha:'a'.repeat(40)});
+ const original={number:77,title:'PC Owner A job',body,
+  created_at:'2026-11-26T12:00:30Z',user:{login:'ansqhd5774-Choi'},
+  labels:[{name:'pc-job'}]};
+ let posts=0,comments=0;
+ const callGithub=(route,method='GET',input)=>{
+  if(method==='GET'&&route.startsWith('issues?'))return [original];
+  if(method==='GET'&&route.startsWith('issues/77/comments?'))return [];
+  if(method==='POST'&&route==='issues'){
+   posts++;
+   const payload=JSON.parse(fs.readFileSync(input,'utf8'));
+   assert.equal(payload.body,body);
+   assert.match(payload.title,/^Maintenance replay pc-s6-.* original #77$/);
+   assert.deepEqual(payload.labels,['pc-job']);
+   return {number:780};
+  }
+  if(method==='POST'&&route==='issues/77/comments'){
+   comments++;return {id:100};
+  }
+  throw Error('UNEXPECTED_BACKLOG_ROUTE');
+ };
+ const args={backlogFile,requestId,approvedRoot:dir,callGithub};
+ reconcileMaintenanceBacklog(args);
+ assert.equal(posts,1);
+ assert.equal(comments,1);
+ const after=JSON.parse(fs.readFileSync(backlogFile,'utf8'));
+ assert.deepEqual(after.replays['77'],{
+  status:'DONE',originalRequestId:'pc-a-job-during-s6-12345678',
+  replayIssueNumber:780
+ });
+ reconcileMaintenanceBacklog(args);
+ assert.equal(posts,1);
+});
+test('S6 uncertain GitHub Issue POST remains durable POSTING and never retries',t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-s6-replay-unknown-'));
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const requestId='pc-s6-12345678-abcd-4def-8123-123456789abc';
+ const pause='2026-11-26T12:00:00Z',resume='2026-11-26T12:01:00Z';
+ const backlogFile=path.join(dir,'backlog.json');
+ fs.writeFileSync(backlogFile,JSON.stringify({schema:'ZGMINI_PC_BACKLOG_V1',
+  requestId,pausedAt:pause,resumedAt:resume,windows:[{pausedAt:pause,resumedAt:resume}],replays:{}}));
+ const original={number:78,title:'Owner original',created_at:'2026-11-26T12:00:30Z',
+  user:{login:'ansqhd5774-Choi'},labels:[{name:'pc-job'}],
+  body:JSON.stringify({schema:'ZGMINI_PC_JOB_V1',requestId:'pc-unique-a-12345678',
+   chatId:'chat-s6',operation:'pc-status-readonly',
+   sourceRepository:'ansqhd5774-Choi/zgmini',sourceBranch:'main',sourceSha:'f'.repeat(40)})};
+ let posts=0;
+ const callGithub=(route,method='GET')=>{
+  if(method==='GET'&&route.startsWith('issues?'))return [original];
+  if(method==='GET'&&route.startsWith('issues/78/comments?'))return [];
+  if(method==='POST'&&route==='issues'){posts++;throw Error('HTTP_TIMEOUT_UNCERTAIN');}
+  throw Error('UNEXPECTED_BACKLOG_ROUTE');
+ };
+ const args={backlogFile,requestId,approvedRoot:dir,callGithub};
+ assert.throws(()=>reconcileMaintenanceBacklog(args),/BACKLOG_REPLAY_OUTCOME_UNKNOWN/);
+ assert.equal(posts,1);
+ assert.equal(JSON.parse(fs.readFileSync(backlogFile,'utf8')).replays['78'].status,'POSTING');
+ assert.throws(()=>reconcileMaintenanceBacklog(args),/BACKLOG_REPLAY_OUTCOME_UNKNOWN/);
+ assert.equal(posts,1);
 });

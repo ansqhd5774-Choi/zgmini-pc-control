@@ -1518,65 +1518,7 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
      writeJson(backlogFile,closeLatestPause(backlog,new Date().toISOString()));
    }
   },
-  reconcileBacklog:async()=>{
-   need(fs.existsSync(backlogFile),'BACKLOG_STATE_MISSING');
-   let state=json(backlogFile);
-   const windows=backlogPauseWindows(state);
-   need(windows.every(w=>w.resumedAt),'BACKLOG_WINDOW_NOT_CLOSED');
-   // A workflow disabled on an Issue `opened` event does not replay it when
-   // enabled again. Find the durable original Issues in that exact window.
-   const candidates=new Map();
-   for(const window of windows){
-     const from=Date.parse(window.pausedAt)-2000,to=Date.parse(window.resumedAt);
-     need(Number.isFinite(from)&&Number.isFinite(to)&&to>=from,'BACKLOG_TIME_INVALID');
-     for(let page=1;page<=20;page++){
-       const list=github(`issues?state=all&since=${encodeURIComponent(new Date(from).toISOString())}&per_page=100&page=${page}`);
-       need(Array.isArray(list),'BACKLOG_LIST_INVALID');
-       for(const entry of list){
-         if(backlogIssueInPause(entry,window))candidates.set(entry.number,entry);
-       }
-       if(list.length<100)break;
-       need(page<20,'BACKLOG_LIST_TRUNCATED');
-     }
-   }
-   for(const original of [...candidates.values()].sort((a,b)=>a.number-b.number)){
-     const key=String(original.number);
-     if(state.replays[key]?.status==='DONE'||state.replays[key]?.status==='SKIPPED_RESULT_PRESENT')continue;
-     if(state.replays[key]?.status==='REJECTED_INVALID_ORIGINAL'){
-       const rejected=classifyBacklogOriginal(original.body);
-       need(!rejected.valid&&rejected.originalBodySha256===state.replays[key].originalBodySha256,
-        'BACKLOG_REJECTED_ORIGINAL_CHANGED');continue;
-     }
-     if(state.replays[key])throw Object.assign(Error('BACKLOG_REPLAY_OUTCOME_UNKNOWN'),{code:'BACKLOG_REPLAY_OUTCOME_UNKNOWN'});
-     const comments=readAllMaintenancePages(page=>github(`issues/${original.number}/comments?per_page=100&page=${page}`));
-     if(comments.some(c=>c.user?.login==='github-actions[bot]'&&c.body?.includes('zgmini-pc-result:'))){
-       state.replays[key]={status:'SKIPPED_RESULT_PRESENT'};writeJson(backlogFile,state);continue;
-     }
-     const decision=classifyBacklogOriginal(original.body);
-     if(!decision.valid){
-       state.replays[key]={status:'REJECTED_INVALID_ORIGINAL',reason:decision.code,
-        originalBodySha256:decision.originalBodySha256,replayed:false};
-       writeJson(backlogFile,state);continue;
-     }
-     const body=decision.body;
-     const marker=`Maintenance replay ${request.requestId} original #${original.number}`;
-     state.replays[key]={status:'POSTING',originalRequestId:body.requestId};writeJson(backlogFile,state);
-     const input=path.join(maintenanceRoot,'approved',request.requestId+'.replay-'+original.number+'.json');
-     writeJson(input,{title:marker,body:original.body,labels:['pc-job']});
-     let repost;
-     try{repost=github('issues','POST',input);}catch{throw Object.assign(Error('BACKLOG_REPLAY_OUTCOME_UNKNOWN'),{code:'BACKLOG_REPLAY_OUTCOME_UNKNOWN'});}
-     need(Number.isSafeInteger(repost.number),'BACKLOG_REPLAY_OUTCOME_UNKNOWN');
-     state.replays[key]={status:'DONE',originalRequestId:body.requestId,replayIssueNumber:repost.number};
-     writeJson(backlogFile,state);
-     // Never change the original Issue body or another chat's request ledger.
-     const notification=`<!-- zgmini-pc-backlog-replay:${request.requestId}:${original.number} -->\n`+
-       `This request arrived during a verified maintenance pause. Equivalent fixed request: #${repost.number}. `+
-       `Use its result JSON and the original requestId to verify actual execution.`;
-     const commentFile=path.join(maintenanceRoot,'approved',request.requestId+'.replay-comment-'+original.number+'.json');
-     writeJson(commentFile,{body:notification});
-     try{github(`issues/${original.number}/comments`,'POST',commentFile);}catch{/* replay ledger remains durable */}
-   }
-  },
+  reconcileBacklog:async()=>reconcileMaintenanceBacklog({backlogFile,requestId:request.requestId}),
   postcheck:async()=>{
    const ledger=json(ledgerFile);postIssueNumber=ledger.postIssueNumber;
    if(!postIssueNumber){
@@ -3414,6 +3356,74 @@ export async function readS6OncePhaseReadback({phase,baseline,
 
 
 
+/** One existing Controller source replay algorithm serves both maintenance
+ * installs and S6 after the unique standby promotion. A POSTING marker is
+ * durable before the GitHub POST; an uncertain result never retries.
+ * Injection is for isolated source tests, not a new operational command. */
+export function reconcileMaintenanceBacklog({backlogFile,requestId,
+ callGithub=github,approvedRoot=path.join(maintenanceRoot,'approved')}={}){
+ safeId(requestId);
+ need(typeof backlogFile==='string'&&path.isAbsolute(backlogFile),
+  'BACKLOG_FILE_ABSOLUTE_REQUIRED');
+   need(fs.existsSync(backlogFile),'BACKLOG_STATE_MISSING');
+   let state=json(backlogFile);
+   const windows=backlogPauseWindows(state);
+   need(windows.every(w=>w.resumedAt),'BACKLOG_WINDOW_NOT_CLOSED');
+   // A workflow disabled on an Issue `opened` event does not replay it when
+   // enabled again. Find the durable original Issues in that exact window.
+   const candidates=new Map();
+   for(const window of windows){
+     const from=Date.parse(window.pausedAt)-2000,to=Date.parse(window.resumedAt);
+     need(Number.isFinite(from)&&Number.isFinite(to)&&to>=from,'BACKLOG_TIME_INVALID');
+     for(let page=1;page<=20;page++){
+       const list=callGithub(`issues?state=all&since=${encodeURIComponent(new Date(from).toISOString())}&per_page=100&page=${page}`);
+       need(Array.isArray(list),'BACKLOG_LIST_INVALID');
+       for(const entry of list){
+         if(backlogIssueInPause(entry,window))candidates.set(entry.number,entry);
+       }
+       if(list.length<100)break;
+       need(page<20,'BACKLOG_LIST_TRUNCATED');
+     }
+   }
+   for(const original of [...candidates.values()].sort((a,b)=>a.number-b.number)){
+     const key=String(original.number);
+     if(state.replays[key]?.status==='DONE'||state.replays[key]?.status==='SKIPPED_RESULT_PRESENT')continue;
+     if(state.replays[key]?.status==='REJECTED_INVALID_ORIGINAL'){
+       const rejected=classifyBacklogOriginal(original.body);
+       need(!rejected.valid&&rejected.originalBodySha256===state.replays[key].originalBodySha256,
+        'BACKLOG_REJECTED_ORIGINAL_CHANGED');continue;
+     }
+     if(state.replays[key])throw Object.assign(Error('BACKLOG_REPLAY_OUTCOME_UNKNOWN'),{code:'BACKLOG_REPLAY_OUTCOME_UNKNOWN'});
+     const comments=readAllMaintenancePages(page=>callGithub(`issues/${original.number}/comments?per_page=100&page=${page}`));
+     if(comments.some(c=>c.user?.login==='github-actions[bot]'&&c.body?.includes('zgmini-pc-result:'))){
+       state.replays[key]={status:'SKIPPED_RESULT_PRESENT'};writeJson(backlogFile,state);continue;
+     }
+     const decision=classifyBacklogOriginal(original.body);
+     if(!decision.valid){
+       state.replays[key]={status:'REJECTED_INVALID_ORIGINAL',reason:decision.code,
+        originalBodySha256:decision.originalBodySha256,replayed:false};
+       writeJson(backlogFile,state);continue;
+     }
+     const body=decision.body;
+     const marker=`Maintenance replay ${requestId} original #${original.number}`;
+     state.replays[key]={status:'POSTING',originalRequestId:body.requestId};writeJson(backlogFile,state);
+     const input=path.join(approvedRoot,requestId+'.replay-'+original.number+'.json');
+     writeJson(input,{title:marker,body:original.body,labels:['pc-job']});
+     let repost;
+     try{repost=callGithub('issues','POST',input);}catch{throw Object.assign(Error('BACKLOG_REPLAY_OUTCOME_UNKNOWN'),{code:'BACKLOG_REPLAY_OUTCOME_UNKNOWN'});}
+     need(Number.isSafeInteger(repost.number),'BACKLOG_REPLAY_OUTCOME_UNKNOWN');
+     state.replays[key]={status:'DONE',originalRequestId:body.requestId,replayIssueNumber:repost.number};
+     writeJson(backlogFile,state);
+     // Never change the original Issue body or another chat's request ledger.
+     const notification=`<!-- zgmini-pc-backlog-replay:${requestId}:${original.number} -->\n`+
+       `This request arrived during a verified maintenance pause. Equivalent fixed request: #${repost.number}. `+
+       `Use its result JSON and the original requestId to verify actual execution.`;
+     const commentFile=path.join(approvedRoot,requestId+'.replay-comment-'+original.number+'.json');
+     writeJson(commentFile,{body:notification});
+     try{callGithub(`issues/${original.number}/comments`,'POST',commentFile);}catch{/* replay ledger remains durable */}
+   }
+}
+
 /** Absolute safety gate for the irreversible S6 owned install-lease release.
  * A successful readback alone does not authorize process mutation or B effect.
  * The new A queue may contain work after intake resumes, but the old six
@@ -3685,6 +3695,18 @@ export function makeS6OnceOwnedOperatingPort({request,approvedBytes,
     await wait(3000);
    }
    need(false,'S6_PORT_PROMOTION_UNVERIFIED');
+  },
+  reconcileBacklog:async()=>{
+   claimOwned();
+   need(installLease===null,'S6_PORT_REPLAY_REQUIRES_RELEASED_INSTALL_LEASE');
+   const snap=await observed('PROMOTED',baseline);
+   need(assessS6ControllerTransition({phase:'PROMOTED',
+    baseline,observed:snap}).status==='OBSERVED',
+    'S6_PORT_REPLAY_REQUIRES_VERIFIED_PROMOTION');
+   // Reuse the same source implementation as Controller update rollback.
+   // Only original Owner pc-job Issues inside the verified pause window;
+   // POSTING is durable and an uncertain result is never replayed twice.
+   return reconcileMaintenanceBacklog({backlogFile,requestId});
   }
  });
 }
