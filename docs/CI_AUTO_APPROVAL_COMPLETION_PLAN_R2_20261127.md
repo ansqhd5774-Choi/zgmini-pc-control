@@ -865,3 +865,28 @@
 
 **종료: 소스 결함 수정·관련 CI/병합 완료. 실제 무인 CI 자동 승인 발행→PC 실행→결과 검증 여전히 A·Writer B·Controller B `0/3 (0%)`이며, 이 기록 자체가 추가 인가·설치·활성화 완료가 아니다.**
 
+## 34. 서른 번째 실행 기록 — #4147 늦은 Owner Source CI 발행기 Production 후보 Draft 완료 (2026-11-27 KST)
+
+### 이번 실제 진전 — Source-only 배포 후보 exact HEAD 3/3
+
+- #4147의 source function `publishLateOwnerMergedControllerApproval`는 병합·source CI 완료 순서 경합을 해결하지만, Production Workflow `.github/workflows/ci-approval-controller-b.yml`의 이전 고정 checkout `cfe57f3d720219613c87eff21338de0d35edbf6b` 및 `workflow_run`의 `ZGMINI_CI_CONTROLLER_B_POLICY != ''` 조건 때문에 실제 호출될 수 없었다. 생성 승인 policy가 없는 기존 Owner-merged approval PR의 지연 CI는 별도 정규 source event가 필요하다는 **배포 계약의 결합**을 확인.
+- 현재 `main` `fcbbf12cd662544ee308295c13076d4ca2f4aeba`에서 신규 **격리 후보** 브랜치 `codex/pc-automation-process-controller-b-late-ci-workflow-20261127`를 생성하고 [Draft PR #4152](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4152)를 등록. **정확 2파일** 수정:
+  1. `.github/workflows/ci-approval-controller-b.yml`에서 `workflow_run`용 추가 generated-policy 선행 Gate만 제거. 기존 `ENABLED == 'true'`, 정확 repo/private/main, CI 성공/원본 PR event/같은 repo, 격리 Windows 고정 host, 리소스/권한/의도된 concurrency 불변. 생성 approval branch의 실제 독립 policy pin/Owner 승인 범위/원본 바이트 검증은 **고정 게시기 내부에서 여전히 필수**.
+  2. 고정 `checkout ref`를 source·CI 검증 완료된 **`fcbbf12cd662544ee308295c13076d4ca2f4aeba`**로 교체. `tests/ci-approval-completed-run-intake.test.mjs`의 동일 fixed pin, workflow gate, 원본 Owner/자동 생성 승인 정책 구별 회귀 추가. `actions/checkout` digest, `persist-credentials:false`, 타 PC/Token/DB/D1/승인 업무 계약 유지.
+- **Draft HEAD `b8756c349043616a8d96de2bc1735537f37ebc46`**. GitHub 원격 파일 readback 후보 새 Workflow blob **`a31972f47badcd35b0ffffa61721a93308d23067`**. 이전 실제 설치 pin과 다른 값이며 아직 운영 승인·설치 정책 아님.
+- 정확 HEAD 소스 CI:
+  - [Controller Maintenance Source Run 45906181531](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45906181531) **completed/success**.
+  - [C996 Run 45906181522](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45906181522) **completed/success**.
+  - [Secret Scan Run 45906181496](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45906181496) **completed/success**.
+- 이 3/3은 *오직* 해당 Draft HEAD 소스 검증이다. **PR #4152는 Draft/open을 유지하며 main 병합·Windows 정책 설치·GitHub 설정 활성화·새 Controller B effect POST를 실행하지 않았다.** 현재 Production blob은 앞선 #4100 정책 원본 `27e48ecde81bdf6f15cccffcffd9b3e70482a5f3`로 남는다.
+
+### 실제 인계용 target SHA 선택의 추가 필수 주의
+
+- 설치된 정책은 [#4100](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4100)의 `workflowId=430972394`, Workflow blob `27e48ecd...`, 설치 유지보수기 source SHA `5a85f803fd9cb280561395f88a3544ee8e7d4660` 및 유지보수기 manifest hash `0e1903fd9052b1e2c72812fde07c6338a79287e673a4cd9e715dedf23883f589`. 기존 [#3925/#3926](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3926) 격리 receipt root 쓰기·cross-run PASS 재사용.
+- GitHub `compare_commits(5a85f803..., fcbbf12c...)`는 **ahead 245, behind 0**, `tools/maintenance-agent.mjs`, `tools/maintenance-apply.mjs`, `tools/maintenance-contract.mjs` 등 보호된 runtime source가 변경됐음을 보여준다. `fcbbf12...`은 **CI publisher checkout pin**이지 자동으로 안전한 정책-only `SEVEN_TO_SEVEN` **유지보수기 설치 target SHA가 아님**. 이를 source target으로 붙이면 원치 않은 유지보수기 실행 파일 교체 범위가 섞인다.
+- 이전 [#4024/#4025](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4025)의 B 승인 명세 `approvals/maintenance-handoffs/5a85...json`은 **기존 `b568...`→`27e48...` 정책 pin 1회 교체만 허가**하고 이번 신규 `a31972...` pin 전환·보안 변수 ON·신규 B 업무 승인을 포함하지 않는다. 그 승인 효과를 임의 재사용하지 않음.
+- 실제 다음 필요 단계는 설치된 **현재** maintainer SHA/manifest+9개 source 파일 CAS를 기준으로, 원본 실행 파일 바이트가 동일한 별도 immutable `targetSha`(installed와는 다른 SHA)를 찾거나 범위 명시한 새 B 변경 승인을 별도로 확보하는 것. `approvedPolicyOnlyHandoff`는 `installedSha !== targetSha`, 기존 root와 정확한 schema/ID/path/authorized policy pin만 교체할 때 `writes=[]`를 허용하며 실행 전 현재 lease·백업/rollback·원본 증거 필수. 후보 임의 Approved flag·과거 PC 성공 재사용 금지.
+- 새 정확 Git workflow blob에 대한 **Owner의 독립 운영 정책 변경 승인 → 기존 정규 B 유지보수기 7→7 인계 원본 승인/설치/readback → 새 Production Workflow Draft PR 머지 → Source event/원격 B 영수증** 순서. 실제 CI B 활성화 `ZGMINI_CI_CONTROLLER_B_ENABLED=false`는 별도 권한 승인 없이는 불변. 타 자동화 A/Writer B의 미설치 root와 Owner Native grant 미확보도 변동 없음.
+
+**이번 종료 증거:** Source Draft PR #4152 exact HEAD CI 3/3, 후보 blob·고정 source SHA 도출, 위험한 단순 설치 target 재사용을 차단. 실제 무인 A·Writer B·Controller B 종단 **0/3 (0%)** 변동 없음. 신규 PC A/B 요청·운영 설치·DB/D1·수집/게시·Runner 변경·기존 B 반복 실행 **0건**.
+
