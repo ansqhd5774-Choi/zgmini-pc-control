@@ -58,7 +58,8 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
   applyError=null,applyResult=null,afterTimeout=null,commentError=null,
   uploadFailure=null,uploadAfterCommitError=null,installLock={held:false},
   verifyInstalledSource=()=>{},statusFaults={},preexistingLedger=null,
-  extraIssueSummaries=[],extraIssueDetails=[],progressError=null}={}){
+  extraIssueSummaries=[],extraIssueDetails=[],progressError=null,
+  s6RawManifest=null,s6Status=null}={}){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),"zgmini-maintainer-agent-test-"));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const leaseRoot=path.join(root,"leases");fs.mkdirSync(leaseRoot);
@@ -91,6 +92,12 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
         return {stdout:JSON.stringify(extraIssueDetails.find(row=>row.number===number)??issue)};
       }
       if(args[0]==="api"){
+        if(args[1].includes("/contents/approvals/controller-s6/")){
+          stats.manifestReads++;
+          if(s6RawManifest===null)throw Error('HTTP_404');
+          return {stdout:JSON.stringify({type:'file',encoding:'base64',
+            content:Buffer.from(s6RawManifest).toString('base64')})};
+        }
         if(args[1].includes("/contents/results/maintenance-")){
           const resource=args[1].split("?")[0];
           stats.uploadReads+=args.includes("--method")?0:1;
@@ -142,6 +149,11 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
     assert.equal(options.env.GITHUB_ACTIONS,undefined);
     assert.equal(options.env.GITHUB_TOKEN,undefined);
     assert.equal(options.env.ZGMINI_PC_MAINTENANCE_MODE,"OUT_OF_BAND");
+    if(args[1]==="s6-once-status"){
+      stats.statusQueries++;
+      if(s6Status===null)throw Error('S6_ONCE_STATUS_NOT_AVAILABLE');
+      return {stdout:JSON.stringify(s6Status)};
+    }
     if(args[1]==="status"){
       stats.statusQueries++;
       return {stdout:JSON.stringify({status:"STATUS",actualControllerSha:INSTALLED,
@@ -796,4 +808,84 @@ test("same-effect simultaneous submission uses existing ledger atomic claim",asy
  assert.equal(outcomes.filter(x=>x.code==="DUPLICATE_EFFECT_SUPPRESSED").length,1);
  assert.equal(outcomes.filter(x=>x.status==="SUCCEEDED").length,1);
  assert.equal(f.stats.applies,1);
+});
+
+
+function s6AgentCase(){
+ const manifest={
+  schema:'ZGMINI_PC_S6_ONCE_B_APPROVAL_V1',operation:'controller-s6-failover-once',
+  requestId:'pc-s6-12345678-abcd-4def-8123-123456789abc',
+  installedControllerSha:INSTALLED,installedMaintainerSha:TARGET,
+  watchdogSourceSha256:'3'.repeat(64),protectedSha256:'4'.repeat(64),
+  ownerSha256:'5'.repeat(64),watchdogPid:23001,standbyPids:[23002,23003],
+  approval:{approved:true,grade:'B',
+   scope:'EXACT_ONE_SUPERVISOR_TREE_STOP_WITH_WATCHDOG_AUTO_PROMOTION',
+   ref:'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4000'},
+  effect:{mode:'SINGLE_S6_FAILOVER',stop:'OLD_OWNED_SUPERVISOR_TREE_ONLY',
+   promotion:'EXISTING_WATCHDOG_ONE_READY_STANDBY',
+   independentMaintainer:true,noArbitraryCommands:true,
+   noAutomaticRetry:true,noForcedRollback:true,
+   preserveWorkersAndLedger:true,preserveProtectedSourceAndDb:true,
+   postcheck:'EXISTING_A_JOB_WITH_READBACK'}
+ };
+ const raw=Buffer.from(JSON.stringify(manifest)+'\n');
+ const request={schema:'ZGMINI_PC_MAINTENANCE_REQUEST_V1',
+  requestId:manifest.requestId,chatId:'chat-s6-once-preflight-test-20261126',
+  operation:manifest.operation,controlRepository:REPO,
+  targetControllerSha:INSTALLED,approvalManifestSha256:digest(raw)};
+ const live={
+  installedControllerSha:INSTALLED,installedMaintainerSha:TARGET,
+  watchdogSourceSha256:manifest.watchdogSourceSha256,
+  protectedSha256:manifest.protectedSha256,ownerSha256:manifest.ownerSha256,
+  watchdogPid:23001,standbyPids:[23002,23003]
+ };
+ const status={status:'READONLY',code:'S6_ONCE_LIVE_PREIMAGE_OBSERVED',
+  requestId:request.requestId,actualControllerSha:INSTALLED,
+  installAttempted:false,operationalWrites:0,installLock:{held:false},s6Live:live};
+ return {request,raw,status};
+}
+test('S6 exact owner Issue routes only through readonly live CAS and blocks uninstalled execution',async t=>{
+ const s6=s6AgentCase();
+ const f=fixture(t,{title:'pc-controller-s6-once',
+  issuePatch:{body:JSON.stringify(s6.request)},s6RawManifest:s6.raw,s6Status:s6.status});
+ const result=(await f.agent.pollOnce())[0];
+ assert.deepEqual(result,{
+  status:'BLOCKED',code:'S6_ONCE_EXECUTION_PORT_NOT_CONNECTED',
+  requestId:s6.request.requestId,preflight:'EXACT_B_SOURCE_AND_LIVE_CAS_MATCHED',
+  executionStarted:false,operationalWrites:0
+ });
+ assert.equal(f.stats.applies,0);
+ assert.equal(f.stats.statusQueries,1);
+ assert.equal(f.stats.manifestReads,1);
+ assert.equal(f.agent.loadLedger(s6.request.requestId),null);
+ assert.equal(f.calls.some(row=>row.args.includes('apply')||
+   row.args.includes('s6-once-apply')),false);
+});
+test('S6 rejects stale standby owner and does not execute or claim an effect',async t=>{
+ const s6=s6AgentCase();
+ const status={...s6.status,s6Live:{...s6.status.s6Live,standbyPids:[23003,23002]}};
+ const f=fixture(t,{title:'pc-controller-s6-once',
+  issuePatch:{body:JSON.stringify(s6.request)},s6RawManifest:s6.raw,s6Status:status});
+ const row=(await f.agent.pollOnce())[0];
+ assert.equal(row.status,'BLOCKED');
+ assert.equal(row.code,'S6_ONCE_LIVE_CAS_UNVERIFIED');
+ assert.equal(row.executionStarted,false);
+ assert.equal(f.stats.applies,0);
+ assert.equal(f.agent.loadLedger(s6.request.requestId),null);
+});
+test('S6 bot, missing exact approval or unreadable operating snapshot never reaches execute path',async t=>{
+ const s6=s6AgentCase();
+ for(const params of [
+  {actor:'github-actions[bot]',s6RawManifest:s6.raw,s6Status:s6.status,expected:'IGNORED'},
+  {s6RawManifest:null,s6Status:s6.status,expected:'BLOCKED'},
+  {s6RawManifest:s6.raw,s6Status:null,expected:'BLOCKED'}
+ ]){
+  const f=fixture(t,{title:'pc-controller-s6-once',
+   issuePatch:{body:JSON.stringify(s6.request)},...params});
+  const rows=await f.agent.pollOnce();
+  assert.equal(rows.length,1);
+  assert.equal(rows[0].status,params.expected);
+  assert.equal(f.stats.applies,0);
+  assert.equal(f.calls.some(row=>row.args.includes('s6-once-apply')),false);
+ }
 });
