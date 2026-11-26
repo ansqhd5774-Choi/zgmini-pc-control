@@ -111,6 +111,8 @@ export function createOperatingTaskCreateBPort(proof){
   return xml.includes('<Interval>PT1M</Interval>')&&
    xml.includes('<MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>')&&
    xml.includes('<ExecutionTimeLimit>PT30M</ExecutionTimeLimit>')&&
+   xml.includes('<LogonType>InteractiveToken</LogonType>')&&
+   xml.includes('<RunLevel>LeastPrivilege</RunLevel>')&&
    (xml.match(/<TimeTrigger\b/gi)??[]).length===1&&
    (xml.match(/<Exec\b/gi)??[]).length===1&&
    commands.length===1&&args.length===1&&working.length===1&&
