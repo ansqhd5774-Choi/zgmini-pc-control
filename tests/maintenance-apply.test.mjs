@@ -13,7 +13,7 @@ import {applyApprovedUpdate,maintenanceFailureCode,reconcileInterruptedRollback,
 import {isolatedControllerStage,recoveryOperatorProofStatus,waitForSupervisorStopIdle,
  s6PriorRequestLedgerPreserved,normalizeS6OldChildren,
  s6WatchdogPinMatches,s6OwnedLeaseReleaseReadback,
- makeS6OnceOwnedOperatingPort} from '../tools/update.mjs';
+ makeS6OnceOwnedOperatingPort,reconcileMaintenanceBacklog} from '../tools/update.mjs';
 
 test('independent recovery proof keeps strict identity and returns exact sanitized failure categories',()=>{
  assert.deepEqual(recoveryOperatorProofStatus({exitCode:0,stdout:'INDEPENDENT_OPERATOR\r\n'}),{verified:true,code:'RECOVERY_OPERATOR_VERIFIED'});
@@ -1407,4 +1407,78 @@ test('S6 live operating-port entry is not available to CI or Runner and has no d
  assert.match(body,/s6OwnedLeaseReleaseReadback\(snap,baseline\)/);
  assert.match(body,/case.*claim|claimOnce:/);
  assert.doesNotMatch(src.slice(e),/if\(cmd==='s6-once-apply'\)/);
+});
+
+
+test('shared Controller/S6 backlog recovers the exact original Issue once and preserves requestId',t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-s6-backlog-'));
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const requestId='pc-s6-12345678-abcd-4def-8123-123456789abc';
+ const from='2026-11-26T12:00:00Z',to='2026-11-26T12:01:00Z';
+ const backlogFile=path.join(dir,'backlog.json');
+ fs.writeFileSync(backlogFile,JSON.stringify({schema:'ZGMINI_PC_BACKLOG_V1',
+  requestId,pausedAt:from,resumedAt:to,windows:[{pausedAt:from,resumedAt:to}],
+  replays:{}}));
+ const body=JSON.stringify({schema:'ZGMINI_PC_JOB_V1',
+  requestId:'pc-a-job-during-s6-12345678',chatId:'chat-approved-s6',
+  operation:'pc-status-readonly',sourceRepository:'ansqhd5774-Choi/zgmini',
+  sourceBranch:'main',sourceSha:'a'.repeat(40)});
+ const original={number:77,title:'PC Owner A job',body,
+  created_at:'2026-11-26T12:00:30Z',user:{login:'ansqhd5774-Choi'},
+  labels:[{name:'pc-job'}]};
+ let posts=0,comments=0;
+ const callGithub=(route,method='GET',input)=>{
+  if(method==='GET'&&route.startsWith('issues?'))return [original];
+  if(method==='GET'&&route.startsWith('issues/77/comments?'))return [];
+  if(method==='POST'&&route==='issues'){
+   posts++;
+   const payload=JSON.parse(fs.readFileSync(input,'utf8'));
+   assert.equal(payload.body,body);
+   assert.match(payload.title,/^Maintenance replay pc-s6-.* original #77$/);
+   assert.deepEqual(payload.labels,['pc-job']);
+   return {number:780};
+  }
+  if(method==='POST'&&route==='issues/77/comments'){
+   comments++;return {id:100};
+  }
+  throw Error('UNEXPECTED_BACKLOG_ROUTE');
+ };
+ const args={backlogFile,requestId,approvedRoot:dir,callGithub};
+ reconcileMaintenanceBacklog(args);
+ assert.equal(posts,1);
+ assert.equal(comments,1);
+ const after=JSON.parse(fs.readFileSync(backlogFile,'utf8'));
+ assert.deepEqual(after.replays['77'],{
+  status:'DONE',originalRequestId:'pc-a-job-during-s6-12345678',
+  replayIssueNumber:780
+ });
+ reconcileMaintenanceBacklog(args);
+ assert.equal(posts,1);
+});
+test('S6 uncertain GitHub Issue POST remains durable POSTING and never retries',t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-s6-replay-unknown-'));
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const requestId='pc-s6-12345678-abcd-4def-8123-123456789abc';
+ const pause='2026-11-26T12:00:00Z',resume='2026-11-26T12:01:00Z';
+ const backlogFile=path.join(dir,'backlog.json');
+ fs.writeFileSync(backlogFile,JSON.stringify({schema:'ZGMINI_PC_BACKLOG_V1',
+  requestId,pausedAt:pause,resumedAt:resume,windows:[{pausedAt:pause,resumedAt:resume}],replays:{}}));
+ const original={number:78,title:'Owner original',created_at:'2026-11-26T12:00:30Z',
+  user:{login:'ansqhd5774-Choi'},labels:[{name:'pc-job'}],
+  body:JSON.stringify({schema:'ZGMINI_PC_JOB_V1',requestId:'pc-unique-a-12345678',
+   chatId:'chat-s6',operation:'pc-status-readonly',
+   sourceRepository:'ansqhd5774-Choi/zgmini',sourceBranch:'main',sourceSha:'f'.repeat(40)})};
+ let posts=0;
+ const callGithub=(route,method='GET')=>{
+  if(method==='GET'&&route.startsWith('issues?'))return [original];
+  if(method==='GET'&&route.startsWith('issues/78/comments?'))return [];
+  if(method==='POST'&&route==='issues'){posts++;throw Error('HTTP_TIMEOUT_UNCERTAIN');}
+  throw Error('UNEXPECTED_BACKLOG_ROUTE');
+ };
+ const args={backlogFile,requestId,approvedRoot:dir,callGithub};
+ assert.throws(()=>reconcileMaintenanceBacklog(args),/BACKLOG_REPLAY_OUTCOME_UNKNOWN/);
+ assert.equal(posts,1);
+ assert.equal(JSON.parse(fs.readFileSync(backlogFile,'utf8')).replays['78'].status,'POSTING');
+ assert.throws(()=>reconcileMaintenanceBacklog(args),/BACKLOG_REPLAY_OUTCOME_UNKNOWN/);
+ assert.equal(posts,1);
 });
