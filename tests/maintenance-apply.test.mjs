@@ -13,7 +13,8 @@ import {applyApprovedUpdate,maintenanceFailureCode,reconcileInterruptedRollback,
 import {isolatedControllerStage,recoveryOperatorProofStatus,waitForSupervisorStopIdle,
  s6PriorRequestLedgerPreserved,normalizeS6OldChildren,
  s6WatchdogPinMatches,s6OwnedLeaseReleaseReadback,
- makeS6OnceOwnedOperatingPort,reconcileMaintenanceBacklog,command} from '../tools/update.mjs';
+ makeS6OnceOwnedOperatingPort,reconcileMaintenanceBacklog,command,
+ s6OncePreclaimFailure} from '../tools/update.mjs';
 
 test('independent recovery proof keeps strict identity and returns exact sanitized failure categories',()=>{
  assert.deepEqual(recoveryOperatorProofStatus({exitCode:0,stdout:'INDEPENDENT_OPERATOR\r\n'}),{verified:true,code:'RECOVERY_OPERATOR_VERIFIED'});
@@ -1160,6 +1161,60 @@ test('S6 coordinator refuses duplicate, wrong operation, unverifiable approval o
   assert.equal(calls.includes('releaseOwnedInstallLease'),false);
  }
 });
+test('S6 fixed CLI preclaim error is bounded and does not mask effect errors',()=>{
+ const id=s6Request().requestId;
+ for(const [error,code] of [
+  [Object.assign(new Error('PRIVATE_SYSTEM_PATH'),{code:'S6_ONCE_PACKAGE_MANIFEST_PIN'}),
+   'S6_ONCE_PACKAGE_MANIFEST_PIN'],
+  [new Error('S6_ONCE_WATCHDOG_R5_NOT_READY'),'S6_ONCE_WATCHDOG_R5_NOT_READY'],
+  [new Error('PRIVATE_SYSTEM_PATH'),'S6_ONCE_PREFLIGHT_UNVERIFIED'],
+  [new Error('S6_PRIVATE_SYSTEM_PATH'),'S6_ONCE_PREFLIGHT_UNVERIFIED']
+ ]){
+  const r=s6OncePreclaimFailure(id,error);
+  assert.equal(r.status,'BLOCKED');assert.equal(r.code,code);
+  assert.equal(r.requestId,id);
+  assert.equal(r.failoverTested,false);
+  assert.equal(r.promotionApproved,false);
+  assert.doesNotMatch(JSON.stringify(r),/PRIVATE_SYSTEM_PATH/);
+ }
+ const src=fs.readFileSync(new URL('../tools/update.mjs',import.meta.url),'utf8');
+ const cli=src.slice(src.indexOf("if(cmd==='s6-once-apply')"),
+  src.indexOf("if(cmd==='source-bundle-status')"));
+ assert.ok(cli.includes('catch(error){return s6OncePreclaimFailure(requestId,error);}'));
+ assert.ok(cli.indexOf('return runApprovedS6FailoverOnce(issue,port)')>
+  cli.indexOf('catch(error){return s6OncePreclaimFailure(requestId,error);}'));
+});
+
+test('S6 preclaim errors preserve bounded stage and never start any effect',async()=>{
+ const failures=[
+  ['read','STATE_UNKNOWN','S6_ONCE_PRECLAIM_LEDGER_READ_UNVERIFIED',null],
+  ['attestApproval','BLOCKED','S6_PORT_ISSUE_CHANGED_OR_CANCELED','S6_PORT_ISSUE_CHANGED_OR_CANCELED'],
+  ['captureBaseline','BLOCKED','S6_BASELINE_SIX_CHILDREN_UNVERIFIED','S6_BASELINE_SIX_CHILDREN_UNVERIFIED'],
+  ['attestApproval','BLOCKED','UPDATE_VALIDATE_FAILED',null],
+  ['captureBaseline','BLOCKED','UPDATE_INSPECT_FAILED',null],
+  ['claimOnce','STATE_UNKNOWN','S6_ONCE_CLAIM_OUTCOME_UNVERIFIED','EACCES']
+ ];
+ for(const [step,status,code,coded] of failures){
+  const {port,calls,journal}=s6Fixture();
+  port[step]=async()=>{
+   calls.push(step);
+   const error=new Error('S6_TEST_PRIVATE_LOCAL_PATH_OR_SECRET');
+   if(coded)error.code=coded;
+   throw error;
+  };
+  const result=await runApprovedS6FailoverOnce(s6Request(),port);
+  assert.equal(result.status,status,step);
+  assert.equal(result.code,code,step);
+  assert.equal(result.failoverTested,false);
+  assert.equal(result.promotionApproved,false);
+  assert.equal(journal.length,0);
+  for(const effect of ['acquireOwnedInstallLease','pauseIntake','stopOwnTree',
+    'releaseOwnedInstallLease','reconcileBacklog'])
+   assert.equal(calls.includes(effect),false,step+' should not '+effect);
+  assert.doesNotMatch(JSON.stringify(result),/S6_TEST_PRIVATE_LOCAL_PATH_OR_SECRET/);
+ }
+});
+
 test('S6 coordinator never releases install lease after uncertain pause, stop, WMI or release guard',async()=>{
  for(const opts of [
   {failAcquire:true},{failPause:true},{stopGuard:false},{failStop:true},

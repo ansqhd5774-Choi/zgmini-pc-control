@@ -416,14 +416,24 @@ export async function runApprovedS6FailoverOnce(request,port){
   'waitForPromotion','reconcileBacklog','now'];
  if(!port||required.some(name=>typeof port[name]!=='function'))
   return result('BLOCKED','S6_ONCE_PORTS_UNVERIFIED');
- // No attempt is replayed, even when its last result is inconclusive.
- const prior=await port.read(id);
+ // A missing readback is not proof of a missing claim. Do not retry.
+ let prior;
+ try{prior=await port.read(id);}
+ catch{return result('STATE_UNKNOWN','S6_ONCE_PRECLAIM_LEDGER_READ_UNVERIFIED');}
  if(prior!==null&&prior!==undefined)
   return result('STATE_UNKNOWN','S6_ONCE_EXISTING_CLAIM_RECONCILE',{
    originalPhase:typeof prior.phase==='string'?prior.phase:null});
- if(await port.attestApproval(request)!==true)
+ // The approved port's attest and baseline methods are strictly read-only.
+ // Preserve fixed preclaim failure codes instead of allowing the receiver to
+ // flatten every exception into S6_ONCE_OUTCOME_UNKNOWN.
+ let attested;
+ try{attested=await port.attestApproval(request);}
+ catch(error){return result('BLOCKED',maintenanceFailureCode(error,'validate'));}
+ if(attested!==true)
   return result('BLOCKED','S6_ONCE_EXACT_APPROVAL_OR_OPERATOR_UNVERIFIED');
- const baseline=await port.captureBaseline(request);
+ let baseline;
+ try{baseline=await port.captureBaseline(request);}
+ catch(error){return result('BLOCKED',maintenanceFailureCode(error,'inspect'));}
  if(baseline?.requestId!==id)
   return result('BLOCKED','S6_ONCE_BASELINE_IDENTITY_MISMATCH');
  const observe=async phase=>{
@@ -437,8 +447,12 @@ export async function runApprovedS6FailoverOnce(request,port){
  };
  try{await observe('PRE_DRAIN');}
  catch(error){return result('BLOCKED',maintenanceFailureCode(error,'preDrain'));}
- // Claim is atomic, unique and durable: an uncertain claim must not run.
- if(await port.claimOnce(request,baseline)!==true)
+ // Claim is atomic, unique and durable: an uncertain write is NEVER
+ // treated as a no-effect failure, even when the exception looks harmless.
+ let claimed;
+ try{claimed=await port.claimOnce(request,baseline);}
+ catch{return result('STATE_UNKNOWN','S6_ONCE_CLAIM_OUTCOME_UNVERIFIED');}
+ if(claimed!==true)
   return result('STATE_UNKNOWN','S6_ONCE_CLAIM_OUTCOME_UNVERIFIED');
  let phase='CLAIMED',mutationAttempted=false,leaseReleaseAcknowledged=false;
  const journal=async(next,extra={})=>{

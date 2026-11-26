@@ -3711,6 +3711,42 @@ export function makeS6OnceOwnedOperatingPort({request,approvedBytes,
  });
 }
 
+// This is a bounded, literal allowlist of source-owned *preclaim* errors.
+// Never echo arbitrary uppercase messages, paths, or data as error codes.
+const S6_PRECLAIM_CODES=new Set([
+ 'S6_ONCE_APPROVAL_FILE_PATH','S6_ONCE_APPROVAL_PACKAGE_UNVERIFIED',
+ 'S6_ONCE_PACKAGE_IDENTITY','S6_ONCE_PACKAGE_MANIFEST_PIN',
+ 'S6_ONCE_PACKAGE_MANIFEST_INVALID','S6_ONCE_PACKAGE_MANIFEST_CHANGED',
+ 'S6_ONCE_REQUEST_ID_INVALID','S6_ONCE_MAINTAINER_SOURCE_UNVERIFIED',
+ 'S6_ONCE_MAINTAINER_BYTES_CHANGED','S6_ONCE_WATCHDOG_SOURCE_DRIFT',
+ 'S6_ONCE_WATCHDOG_R5_NOT_READY','S6_ONCE_PROCESS_LIVENESS_UNVERIFIED',
+ 'S6_ONCE_INSTALL_LEASE_PRESENT','S6_ONCE_RUNNER_BUSY_OR_UNVERIFIED',
+ 'S6_ONCE_INTAKE_NOT_ACTIVE','S6_ONCE_RELATED_LEASE_PRESENT',
+ 'S6_ONCE_OWNER_CAS_CHANGED','S6_ONCE_WATCHDOG_INSTALL_DRIFT',
+ 'S6_ONCE_ACTOR_OR_REPOSITORY_DENIED','S6_ONCE_ISSUE_CONTRACT_DENIED',
+ 'S6_ONCE_ISSUE_FIELDS_INVALID','S6_ONCE_CHAT_ID_INVALID',
+ 'S6_ONCE_TARGET_SHA_INVALID','S6_ONCE_APPROVAL_PIN_INVALID',
+ 'S6_ONCE_MANIFEST_BYTES_INVALID','S6_ONCE_MANIFEST_BYTES_DRIFT',
+ 'S6_ONCE_MANIFEST_JSON_INVALID','S6_ONCE_MANIFEST_PREIMAGE_INVALID',
+ 'S6_ONCE_LIVE_CAS_UNVERIFIED','S6_ONCE_NEW_B_APPROVAL_REQUIRED',
+ 'S6_ONCE_EFFECT_SCOPE_DENIED','S6_BASELINE_WATCHDOG_RECEIVER_CHANGED',
+ 'S6_BASELINE_ADMISSION_NOT_EFFECT_AUTHORITY',
+ 'S6_BASELINE_SIX_CHILDREN_UNVERIFIED','S6_BASELINE_REQUEST_LEDGER_UNAVAILABLE',
+ 'S6_BASELINE_LEDGER_SCOPE_EXCEEDED','S6_BASELINE_UNKNOWN_LEDGER_ENTRY',
+ 'S6_BASELINE_LEDGER_NOT_PLAIN_FILE','S6_BASELINE_OWNER_VANISHED',
+ 'S6_BASELINE_OWNER_CAS_CHANGED'
+]);
+// Only for the fixed S6 command's preclaim package/live readback checks.
+// Never wrap the once-only coordinator, where effects may already exist.
+export function s6OncePreclaimFailure(requestId,error){
+ const candidate=error?.code??error?.message;
+ const code=S6_PRECLAIM_CODES.has(candidate)?candidate:
+  'S6_ONCE_PREFLIGHT_UNVERIFIED';
+ return Object.freeze({schema:'ZGMINI_S6_ONCE_RESULT_V1',
+  status:'BLOCKED',code,requestId,operationalEffectUnverified:true,
+  failoverTested:false,promotionApproved:false});
+}
+
 export async function command(args=process.argv.slice(2)) {
  need(args.length>=1,'MAINTENANCE_SUBCOMMAND_REQUIRED');
  const cmd=args[0],requestId=safeId(args[2]);
@@ -3724,6 +3760,9 @@ export async function command(args=process.argv.slice(2)) {
   // An Actions runner or a Controller child must never invoke the live port.
   need(process.platform==='win32'&&!process.env.GITHUB_ACTIONS&&!process.env.RUNNER_NAME,
    'S6_PORT_INDEPENDENT_WINDOWS_ONLY');
+  // Only preclaim checks are caught. The coordinator effect is never caught here.
+  let issue,port;
+  try{
   const approvedPath=path.join(maintenanceRoot,'approved',requestId+'.json');
   need(path.resolve(args[4])===path.resolve(approvedPath),
    'S6_ONCE_APPROVAL_FILE_PATH');
@@ -3737,7 +3776,7 @@ export async function command(args=process.argv.slice(2)) {
    typeof pkg.manifestRawBase64==='string'&&
    typeof pkg.manifest==='object'&&pkg.manifest!==null,
    'S6_ONCE_PACKAGE_IDENTITY');
-  const issue=validateS6OnceIssueEnvelope(pkg.issue,{
+  issue=validateS6OnceIssueEnvelope(pkg.issue,{
    actor:pkg.actor,controlRepository});
   const raw=Buffer.from(pkg.manifestRawBase64,'base64');
   need(raw.length>0&&raw.length<=32768&&
@@ -3753,8 +3792,9 @@ export async function command(args=process.argv.slice(2)) {
    actor:pkg.actor,controlRepository,live:current.s6Live});
   // The operating port independently reauthenticates the live GitHub B Issue,
   // exact manifest bytes, owner CAS and protected state at every effect boundary.
-  const port=makeS6OnceOwnedOperatingPort({request:issue,approvedBytes:raw,
+  port=makeS6OnceOwnedOperatingPort({request:issue,approvedBytes:raw,
    actor:pkg.actor,issueNumber:pkg.issueNumber});
+  }catch(error){return s6OncePreclaimFailure(requestId,error);}
   return runApprovedS6FailoverOnce(issue,port);
  }
  if(cmd==='source-bundle-status'){
