@@ -281,6 +281,15 @@ export function normalizedResult(request,result,code){
     :["SUCCEEDED","FAILED","BLOCKED","UNKNOWN"].includes(from.status)
       ?from.status:"UNKNOWN";
   const inventory=safeR54SourceInventory(request,from);
+  // Delivery reconstructs the report from the durable, already normalized
+  // request ledger. Preserve only the bounded S6 state across both passes.
+  const s6Stage=from.schema==='ZGMINI_S6_ONCE_RESULT_V1'?from.status:
+    from.schema==='ZGMINI_PC_MAINTENANCE_RESULT_V1'?from.s6ExecutionStatus:null;
+  const s6State=request.operation===S6_ONCE_OPERATION&&
+    from.requestId===request.requestId&&
+    ['POSTCHECK_PENDING','RECOVERY_REQUIRED','STATE_UNKNOWN','BLOCKED'].includes(s6Stage)
+      ?s6Stage:null;
+  const s6Phase=from.s6LastPhase??from.lastPhase;
   return {
     schema:"ZGMINI_PC_MAINTENANCE_RESULT_V1",
     requestId:request.requestId,targetControllerSha:request.targetControllerSha,
@@ -303,6 +312,11 @@ export function normalizedResult(request,result,code){
       isSha(from.recoverySha)&&from.recoverySha===from.actualInstalledSha
        ?'PREVIOUS_VERSION_VERIFIED':'UNVERIFIED'}:{}),
     ...(inventory?{sourceInventory:inventory}:{}),
+    ...(s6State?{s6ExecutionStatus:s6State,
+        s6LeaseReleaseAcknowledged:from.leaseReleaseAcknowledged===true||
+          from.s6LeaseReleaseAcknowledged===true,
+        s6LastPhase:typeof s6Phase==='string'&&
+          /^[A-Z0-9_]{1,64}$/.test(s6Phase)?s6Phase:null}:{}),
     ...((status==='SUCCEEDED'||
        (from.failureOperation==='stopOwnSupervisor'&&
         (from.code==='RUNNERS_NOT_IDLE'||from.originalFailureCode==='RUNNERS_NOT_IDLE')))
@@ -330,6 +344,7 @@ function resultComment(result,uploadStatus=null){
     `ACTUAL_CONTROLLER_SHA: ${result.actualControllerSha??"UNVERIFIED"}`,
     `RECOVERY_SHA: ${result.recoverySha??"NONE"}`,
     ...(result.operationalRecovery?[`OPERATIONAL_RECOVERY: ${result.operationalRecovery}`]:[]),
+    ...(result.s6ExecutionStatus?[`S6_EXECUTION_STATUS: ${result.s6ExecutionStatus}`,`S6_LEASE_RELEASE_ACKNOWLEDGED: ${result.s6LeaseReleaseAcknowledged}`,`S6_LAST_PHASE: ${result.s6LastPhase??'UNVERIFIED'}`]:[]),
     ...(result.originalFailureCode?[`ORIGINAL_FAILURE_CODE: ${result.originalFailureCode}`,
       `ROLLBACK_FAILURE_CODE: ${result.rollbackFailureCode??'NONE'}`]:[]),
     `PROTECTED_STATE_UNCHANGED: ${result.protectedStateUnchanged??'UNVERIFIED'}`,
@@ -891,10 +906,24 @@ export function createMaintenanceAgent({
       request=validateS6OnceIssueEnvelope(parseIssueBody(issue.body),{
         actor:issue.author.login,allowedActors,controlRepository:repo});
     }catch(error){return rejectAdmission(issue,error?.code??error?.message);}
-    if(loadLedger(request.requestId))
-      return {status:'STATE_UNKNOWN',code:'S6_ONCE_PRIOR_LEDGER_RECONCILE_FIRST',
-        requestId:request.requestId,executionStarted:false,operationalWrites:0};
-    let readonly;
+    const bodyDigest=sha256(issue.body),fingerprint=sha256(JSON.stringify(request));
+    const prior=loadLedger(request.requestId);
+    if(prior){
+      if(prior.issueNumber!==issue.number||prior.bodyDigest!==bodyDigest||
+         prior.fingerprint!==fingerprint||prior.actor!==issue.author.login)
+        return {status:'BLOCKED',code:'REQUEST_ID_REUSE_CONFLICT',
+          requestId:request.requestId,executionStarted:false};
+      // Never replay a possibly executed S6 stop, even if only its receiver
+      // progress record remains after a crash. Delivery alone may resume.
+      if(TERMINAL.has(prior.status)&&prior.result){
+        const delivered=await deliverReports(prior,request.operation);
+        await commentOnceAndRecord(delivered);
+        await uploadCompletionCommentOnce(loadLedger(request.requestId));
+      }
+      return {status:prior.status,code:'DUPLICATE_REQUEST_SUPPRESSED',
+        requestId:request.requestId,executionStarted:false};
+    }
+    let readonly,bytes;
     try{
       readonly=parseJsonOutput(await updater(['s6-once-status','--request-id',
         request.requestId]),'S6_ONCE_STATUS_UNVERIFIED');
@@ -905,19 +934,60 @@ export function createMaintenanceAgent({
          readonly.actualControllerSha!==request.targetControllerSha||
          readonly.installLock?.held!==false||!readonly.s6Live)
         throw coded('S6_ONCE_LIVE_PREIMAGE_UNVERIFIED');
-      const bytes=await manifestBytes(request);
+      bytes=await manifestBytes(request);
       validateS6OnceBManifest(request,bytes,{actor:issue.author.login,
         allowedActors,controlRepository:repo,live:readonly.s6Live});
     }catch(error){
       return {status:'BLOCKED',code:safeCode(error?.code??error?.message),
         requestId:request.requestId,executionStarted:false,operationalWrites:0};
     }
-    // The reviewed standalone executable adapter/7-file source update is
-    // deliberately not yet installed. Never interpret source admission as
-    // permission to invoke 'apply', kill a Controller or release a lease.
-    return {status:'BLOCKED',code:'S6_ONCE_EXECUTION_PORT_NOT_CONNECTED',
-      requestId:request.requestId,preflight:'EXACT_B_SOURCE_AND_LIVE_CAS_MATCHED',
-      executionStarted:false,operationalWrites:0};
+    // Only an exact B Issue and pinned raw manifest may reach the independent
+    // Windows maintainer. Its own command rechecks all pins and active CAS.
+    const packageFile=path.join(approvedDir,request.requestId+'.json');
+    try{
+      writeOnce(packageFile,JSON.stringify({issue:request,
+        manifest:JSON.parse(bytes.toString('utf8')),
+        manifestRawBase64:bytes.toString('base64'),
+        issueNumber:issue.number,actor:issue.author.login},null,2)+'\n');
+    }catch{
+      return {status:'STATE_UNKNOWN',code:'S6_ONCE_PACKAGE_WRITE_UNVERIFIED',
+        requestId:request.requestId,executionStarted:false};
+    }
+    const held=claim(request,issue,fingerprint,bodyDigest);
+    if(!held.created)return {status:'STATE_UNKNOWN',
+      code:'S6_ONCE_CLAIM_OUTCOME_UNVERIFIED',requestId:request.requestId,
+      executionStarted:false};
+    held.entry=await acknowledgeAcceptedRequest(held.entry);
+    let result;
+    try{
+      const executed=parseJsonOutput(await updater(['s6-once-apply','--request-id',
+        request.requestId,'--manifest-file',packageFile]),'S6_ONCE_OUTPUT_INVALID');
+      if(executed?.schema!=='ZGMINI_S6_ONCE_RESULT_V1'||
+         executed.requestId!==request.requestId||
+         !['POSTCHECK_PENDING','RECOVERY_REQUIRED','STATE_UNKNOWN','BLOCKED'].includes(executed.status)||
+         executed.failoverTested!==false||executed.promotionApproved!==false||
+         (executed.status==='POSTCHECK_PENDING'&&
+          (executed.code!=='S6_ONCE_PROMOTION_OBSERVED_A_JOB_PENDING'||
+           executed.leaseReleaseAcknowledged!==true||
+           executed.lastPhase!=='PROMOTED_READBACK_VERIFIED')))
+        throw coded('S6_ONCE_RESULT_UNVERIFIED');
+      // Promotion observation without an independent A job is never SUCCESS.
+      // The once-only claim survives an uncertain upload or execution response.
+      result=normalizedResult(request,{...executed,
+        actualControllerSha:request.targetControllerSha,
+        lastPass:executed.status==='POSTCHECK_PENDING'?
+          'PROMOTED_READBACK_VERIFIED':'NONE',
+        firstFail:executed.status==='RECOVERY_REQUIRED'?
+          (executed.failedCode??executed.code):'NONE'},executed.code);
+    }catch{
+      result=normalizedResult(request,{status:'UNKNOWN',
+        firstFail:'S6_ONCE_OUTCOME_UNKNOWN'},'S6_ONCE_OUTCOME_UNKNOWN');
+    }
+    const stored=await deliverReports(persistResult(held.entry,result),request.operation);
+    await commentOnceAndRecord(stored);
+    return {status:result.status,code:result.code,requestId:request.requestId,
+      s6ExecutionStatus:result.s6ExecutionStatus??null,
+      reportUploadStatus:stored.reportUploadStatus};
   }
   async function processIssue(issue){
     if(issue?.title===S6_ONCE_ISSUE_TITLE)return processS6OnceIssue(issue);
