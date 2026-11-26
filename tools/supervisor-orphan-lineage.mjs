@@ -7,9 +7,9 @@ export function assessOrphanSeatLineage({owner,ownerAlive,heartbeat,processes,co
    ||owner.nonce.length<16)return blocked('ORPHAN_OLD_OWNER_IDENTITY_UNVERIFIED');
  if(heartbeat?.pid!==owner.pid||!Array.isArray(heartbeat.children)
    ||heartbeat.children.length!==6)return blocked('ORPHAN_SIX_SEAT_HEARTBEAT_UNVERIFIED');
- if(!Array.isArray(processes)||processes.length>4096||typeof controllerRoot!=='string'
+ if(!Array.isArray(processes)||processes.length>4096||typeof controllerRoot!=='string'||!(controllerRoot.length>3&&/^[A-Za-z]$/.test(controllerRoot[0])&&controllerRoot[1]===':'&&controllerRoot[2]===String.fromCharCode(92)))return blocked('ORPHAN_PROCESS_SNAPSHOT_UNVERIFIED');
    ||!/^[a-z]:\\\\/i.test(controllerRoot))return blocked('ORPHAN_PROCESS_SNAPSHOT_UNVERIFIED');
- const normalizedRoot=controllerRoot.toLowerCase().replace(/\\\\+$/,'');
+ const normalizedRoot=(controllerRoot.endsWith(String.fromCharCode(92))?controllerRoot.slice(0,-1):controllerRoot).toLowerCase();
  const processByPid=new Map(),seats=new Set(),wrappers=new Set();
  for(const row of processes){
   if(!validPid(row?.pid)||!Number.isSafeInteger(row?.ppid)||row.ppid<0
