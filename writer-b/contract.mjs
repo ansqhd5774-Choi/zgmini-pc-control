@@ -216,8 +216,83 @@ export function authorizeWriterBIssue({event,env,manifestBytes}){
  return authorization;
 }
 
+// Independently attested CI-native Writer B grant. This is NOT an Owner Issue,
+// and never grants Controller B, provider calls, DB writes or new task changes.
+// The caller must obtain observation from observeNativeReceiver, and scope
+// from readNativeScope on the PC in the SAME process before invoking this.
+const VERIFIED_NATIVE=new WeakSet();
+export function authorizeWriterBNative({
+ observation,scope,env,controlHead,adapterBytes
+}={}){
+ const p=scope?.policy;
+ need(observation?.state==='CONTRACT_MATCH_ONLY'&&
+   observation.code==='CI_NATIVE_RECEIVER_INDEPENDENT_EVIDENCE_MATCH'&&
+   observation.effectKey===sha256(Buffer.from(JSON.stringify([
+    'B_WRITER_SOURCE',p?.businessApprovalSha256,p?.approvedRequestSha256
+   ])))&&p?.effect==='B_WRITER_SOURCE'&&
+   p.schema==='ZGMINI_CI_NATIVE_DISPATCH_V1'&&p.enabled===true&&
+   p.nativeWriterBExecutionEnabled===true&&
+   SHA64.test(p.nativeWriterBAdapterSha256??'')&&
+   SHA64.test(p.businessApprovalSha256??'')&&
+   SHA64.test(p.approvedRequestSha256??''),
+   'WRITER_B_NATIVE_INDEPENDENT_GRANT_STOP');
+ need(env?.GITHUB_REPOSITORY===CONTROL_REPO&&
+   env.GITHUB_EVENT_NAME==='workflow_dispatch'&&
+   env.GITHUB_ACTOR==='github-actions[bot]'&&
+   env.GITHUB_REF==='refs/heads/main'&&
+   env.GITHUB_RUN_ATTEMPT==='1'&&
+   /^zgmini-pc-0[1-6]$/.test(env.RUNNER_NAME??'')&&
+   /^[1-9][0-9]{0,18}$/.test(env.GITHUB_RUN_ID??'')&&
+   SHA40.test(controlHead??'')&&env.GITHUB_SHA===controlHead&&
+   Buffer.isBuffer(adapterBytes)&&sha256(adapterBytes)===p.nativeWriterBAdapterSha256,
+   'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP');
+ need(Buffer.isBuffer(scope.requestBytes)&&
+   Buffer.isBuffer(scope.approvalBytes)&&
+   sha256(scope.requestBytes)===p.approvedRequestSha256&&
+   sha256(scope.approvalBytes)===p.businessApprovalSha256,
+   'WRITER_B_NATIVE_APPROVAL_BYTES_STOP');
+ const raw=scope.requestBytes.toString('utf8');
+ const parsed=JSON.parse(scope.approvalBytes.toString('utf8'));
+ const labels=[{name:ISSUE_LABEL}];
+ if(parsed.coreMaintenance==='PAUSE_NEW_STARTS_DRAIN_2400S_V1')
+  labels.push({name:EXTENDED_DRAIN_LABEL});
+ if(parsed.coreMaintenance==='PAUSE_NEW_STARTS_DRAIN_1200S_V1')
+  labels.push({name:DRAIN_1200_LABEL});
+ const {request,manifest}=validateWriterBRequestManifest({
+  body:raw,labels,manifestBytes:scope.approvalBytes
+ });
+ // This first CI-native execution intentionally supports only default
+ // short-window B; extended pause/Task changes need their own exact scope.
+ need(!Object.hasOwn(manifest,'coreMaintenance'),
+   'WRITER_B_NATIVE_MAINTENANCE_SCOPE_STOP');
+ for(const f of manifest.files){
+  if(Object.hasOwn(f,'insertions')){
+   for(const x of f.insertions)Object.freeze(x);
+   Object.freeze(f.insertions);
+  }
+  Object.freeze(f);
+ }
+ for(const f of manifest.protectedFiles)Object.freeze(f);
+ for(const c of manifest.runtimeDependencies.consumers){
+  Object.freeze(c.dependsOn);Object.freeze(c);
+ }
+ Object.freeze(manifest.files);Object.freeze(manifest.protectedFiles);
+ Object.freeze(manifest.runtimeDependencies.consumers);
+ Object.freeze(manifest.runtimeDependencies);
+ Object.freeze(manifest);
+ const authorization=Object.freeze({
+  requestId:request.requestId,chatId:request.chatId,
+  manifest,manifestSha256:request.approvalManifestSha256,
+  manifestPath:request.approvalManifestPath,
+  controlSha:controlHead,issueNumber:null
+ });
+ VERIFIED_NATIVE.add(authorization);
+ return authorization;
+}
+
 export function assertAuthenticatedWriterBIssue(authorization){
- need(object(authorization)&&VERIFIED_ISSUES.has(authorization),
+ need(object(authorization)&&
+   (VERIFIED_ISSUES.has(authorization)||VERIFIED_NATIVE.has(authorization)),
    'WRITER_B_UNVERIFIED_ISSUE_STOP');
  return authorization;
 }
