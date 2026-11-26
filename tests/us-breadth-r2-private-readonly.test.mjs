@@ -20,6 +20,7 @@ function saveReceipt(base,type,date,{valid=true}={}){
  const stem=path.join(dir,date+'.parquet');
  const receipt={schema:'ZGMINI_MP_PAID_FILE_V1',plan:valid?'full':'free',
   assetType:type,date,bytes:bytes.length,rows:2,
+  priceMode:'SPLIT_ADJUSTED_DAILY_CLOSE',rawPublished:false,
   sha256:hash(bytes),projectionSha256:'a'.repeat(64)};
  fs.writeFileSync(stem,bytes);
  fs.writeFileSync(stem+'.rows.json','{"rows":[]}');
@@ -44,11 +45,14 @@ test('fixed stock and ETF receipt inventory and immutable private hash without s
  saveReceipt(base,'stock_daily','2026-11-25');
  saveReceipt(base,'etf_daily','2026-11-25');
  const privateRecord={schema:'ZGMINI_US_PAID_BREADTH_R2_PRIVATE_V1',
+  source:'MARKETPARQUET_PAID_SPLIT_ADJUSTED_DAILY',
+  priceMode:'SPLIT_ADJUSTED_DAILY_CLOSE',phase:'CONFIRMED',
+  publicationAllowed:false,sourceLatestProviderDateVerified:false,
   firstDate:'2026-11-25',lastDate:'2026-11-25',comparedSessions:1,
   fullYearHistory:false,points:[{date:'2026-11-25',
    risingPct:50,unchangedPct:20,fallingPct:30}],
-  sourceReceipts:[{date:'2026-11-24',sha256:'secret'},
-   {date:'2026-11-25',sha256:'secret2'}],
+  sourceReceipts:[{date:'2026-11-24',sha256:'a'.repeat(64),projectionSha256:'b'.repeat(64)},
+   {date:'2026-11-25',sha256:'c'.repeat(64),projectionSha256:'d'.repeat(64)}],
   credential:'NOT_FOR_PUBLIC'};
  savePrivate(base,privateRecord);
  const r=inspectUsBreadthR2PrivateReadonly(root);
@@ -63,7 +67,7 @@ test('fixed stock and ETF receipt inventory and immutable private hash without s
  assert.equal(r.privateOutput.state,'PRIVATE_FILE_SHA_READBACK_VERIFIED');
  assert.equal(r.privateOutput.comparedSessions,1);
  assert.equal(r.privateOutput.publicD1Verified,false);
- assert.doesNotMatch(JSON.stringify(r),/NOT_FOR_PUBLIC|secret2|credential|marketparquet-paid/);
+ assert.doesNotMatch(JSON.stringify(r),/NOT_FOR_PUBLIC|credential|marketparquet-paid/);
  assert.equal(r.providerCalls,0);assert.equal(r.operationalWrites,0);
 });
 test('corrupt private output cannot be represented as verified',t=>{
