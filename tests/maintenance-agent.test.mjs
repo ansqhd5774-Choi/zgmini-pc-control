@@ -884,6 +884,17 @@ test('S6 exact Owner B Issue executes pinned standalone updater once and retains
  assert.equal(saved.result.s6LastPhase,'PROMOTED_READBACK_VERIFIED');
  assert.equal(saved.result.status,'UNKNOWN');
  assert.equal(saved.result.code,'S6_ONCE_PROMOTION_OBSERVED_A_JOB_PENDING');
+ // The durable ledger is normalized a second time before GitHub JSON/TXT
+ // upload: that round trip must not erase the pending-A safety meaning.
+ const remoteKey=`repos/${REPO}/contents/results/maintenance-${s6.request.requestId}.json`;
+ const uploaded=f.remote.get(remoteKey);
+ assert.ok(Buffer.isBuffer(uploaded));
+ const receipt=JSON.parse(uploaded.toString('utf8'));
+ assert.equal(receipt.status,'UNKNOWN');
+ assert.equal(receipt.s6ExecutionStatus,'POSTCHECK_PENDING');
+ assert.equal(receipt.s6LeaseReleaseAcknowledged,true);
+ assert.equal(receipt.s6LastPhase,'PROMOTED_READBACK_VERIFIED');
+ assert.equal(f.issue.comments.some(c=>c.body?.includes('S6_EXECUTION_STATUS: POSTCHECK_PENDING')),true);
  const duplicate=await f.agent.processIssue(f.issue);
  assert.equal(duplicate.code,'DUPLICATE_REQUEST_SUPPRESSED');
  assert.equal(f.stats.applies,1);
