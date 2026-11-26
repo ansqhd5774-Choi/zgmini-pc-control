@@ -2807,13 +2807,16 @@ export function projectS6ApprovalPreimageReadonly(raw,{now=Date.now()}={}){
     raw.watchdogActualSha256!==raw.watchdogSourceSha256||
     raw.watchdogMode!=='ACTIVE_1_STANDBY_2'||raw.watchdogApproved!==true)
   return unknown('S6_A_WATCHDOG_SOURCE_UNVERIFIED');
+ // Keep every original S6 safety condition; split only A error categories.
  if(wd.state!=='HEALTHY'||wd.standbyRole!=='READY'||
-    wd.secondStandbyRole!=='READY'||wd.standbyReadyCount!==2||
-    !pid(wd.pid)||!pid(wd.standbyPid)||!pid(wd.secondStandbyPid)||
+    wd.secondStandbyRole!=='READY'||wd.standbyReadyCount!==2)
+  return unknown('S6_A_WATCHDOG_STANDBY_STATE_UNVERIFIED');
+ if(!pid(wd.pid)||!pid(wd.standbyPid)||!pid(wd.secondStandbyPid)||
     !pid(raw.receiverPid)||wd.pid!==raw.receiverPid||
-    new Set([wd.pid,wd.standbyPid,wd.secondStandbyPid]).size!==3||
-    !Number.isFinite(now)||!Number.isFinite(at)||now-at<0||now-at>=45000)
-  return unknown('S6_A_WATCHDOG_RUNTIME_UNVERIFIED');
+    new Set([wd.pid,wd.standbyPid,wd.secondStandbyPid]).size!==3)
+  return unknown('S6_A_WATCHDOG_OWNER_IDENTITY_UNVERIFIED');
+ if(!Number.isFinite(now)||!Number.isFinite(at)||now-at<0||now-at>=45000)
+  return unknown('S6_A_WATCHDOG_HEARTBEAT_UNVERIFIED');
  if(!pid(owner.pid)||owner.pid!==sup.pid||
     !/^[a-f0-9-]{36}$/.test(owner.nonce??'')||
     sup.mode!=='LISTENING'||sup.sourceSha!==raw.controllerSha||

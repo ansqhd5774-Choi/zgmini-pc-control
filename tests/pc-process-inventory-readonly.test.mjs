@@ -2964,8 +2964,24 @@ test('S6 private A candidate does not approve B, attest independent maintainer o
   {now:at}).status,'STATE_UNKNOWN');
  assert.equal(projectS6ApprovalPreimageReadonly({...raw,installLockHeld:true},
   {now:at}).status,'STATE_UNKNOWN');
+ const stale=projectS6ApprovalPreimageReadonly({...raw,wd:{...raw.wd,
+  at:new Date(at-50000).toISOString()}},{now:at});
+ assert.equal(stale.status,'STATE_UNKNOWN');
+ assert.equal(stale.code,'S6_A_WATCHDOG_HEARTBEAT_UNVERIFIED');
  assert.equal(projectS6ApprovalPreimageReadonly({...raw,wd:{...raw.wd,
-  at:new Date(at-50000).toISOString()}},{now:at}).status,'STATE_UNKNOWN');
+  at:new Date(at+1000).toISOString()}},{now:at}).code,
+  'S6_A_WATCHDOG_HEARTBEAT_UNVERIFIED');
+ assert.equal(projectS6ApprovalPreimageReadonly({...raw,wd:{...raw.wd,
+  standbyReadyCount:1}},{now:at}).code,
+  'S6_A_WATCHDOG_STANDBY_STATE_UNVERIFIED');
+ assert.equal(projectS6ApprovalPreimageReadonly({...raw,wd:{...raw.wd,
+  standbyPid:14001}},{now:at}).code,
+  'S6_A_WATCHDOG_OWNER_IDENTITY_UNVERIFIED');
+ const publicErrors=JSON.stringify({stale,
+  standby:projectS6ApprovalPreimageReadonly({...raw,wd:{...raw.wd,
+   secondStandbyRole:'STARTING'}},{now:at}),
+  owner:projectS6ApprovalPreimageReadonly({...raw,receiverPid:14003},{now:at})});
+ assert.doesNotMatch(publicErrors,/14001|14002|14003|abcdef01|ownerSha256|protectedSha256|nonce/i);
  assert.equal(projectS6ApprovalPreimageReadonly({...raw,watchdogActualSha256:'a'.repeat(64)},
   {now:at}).status,'STATE_UNKNOWN');
  assert.equal(projectS6ApprovalPreimageReadonly({...raw,maintainerFilesVerified:false},
