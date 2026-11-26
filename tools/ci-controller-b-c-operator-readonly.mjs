@@ -62,7 +62,7 @@ const cPathReport=(states,code,status='PARTIAL')=>({
  schema:'ZGMINI_CI_RECEIPT_C_FIXED_PATHS_READONLY_V1',
  status,code,volume:states[0],programData:states[1],
  parent:states[2],receiptRoot:states[3],
- originalCOperatorMayRunUnchanged:states[0]==='DIRECTORY'&&
+ fixedTargetVacantObserved:states[0]==='DIRECTORY'&&
    states[1]==='DIRECTORY'&&states[2]==='ABSENT'&&states[3]==='ABSENT',
  actualRunnerWriteVerified:false,cOperatorApplied:false,
  githubVariableConfiguredVerified:false,cAdminPrivilegeVerified:false,
