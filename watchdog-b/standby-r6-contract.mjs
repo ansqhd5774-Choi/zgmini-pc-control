@@ -2,19 +2,26 @@
 // Reuses the existing two-file, single-use Watchdog B stage; never kills,
 // restarts, promotes or directly touches a Controller/Runner process.
 import {REPO,ISSUE_TITLE,OP,REQUEST_SCHEMA,FINAL_SCOPE,PROTECTION_POLICY,error,exact} from './contract.mjs';
-import {R5_TARGET,R5_SOURCE_SHA256,R5_SCOPE,R5_STANDBY,R5_CONTROLLER_SHA,
- R5_CONTROLLER_FILES,verifyR5ControllerHost} from './standby-r5-contract.mjs';
+import {R5_TARGET,R5_SOURCE_SHA256,R5_SCOPE,R5_STANDBY,R5_CONTROLLER_FILES} from './standby-r5-contract.mjs';
 
-export const R6_TARGET='73f517b10422d79968c3e2726b942ffbf8076902';
+// The original #4122 manifest is immutable. This exact already-merged commit
+// contains the same Watchdog safety bytes but pins the approved Controller R2.
+export const R6_TARGET='8bdeca9b55457fc9c9d35585aacd7eea14af63f0';
 export const R6_SOURCE_SHA256='8d98b99b24eef14d0577a93457832e7e7ba3459f00b65dbfa6df349efd958891';
 export const R6_PREIMAGE_SHA256=R5_SOURCE_SHA256;
 export const R6_INSTALL_PREIMAGE_SHA256='5cc8fa6f8b146054d68c003c4738f0dd4b961ccd9bbe0833913537303a78cc61';
 export const R6_MANIFEST_SCHEMA='ZGMINI_PC_WATCHDOG_B_MANIFEST_V6';
 export const R6_SCOPE=R5_SCOPE;
 export const R6_BASIS='2026-11-27_OWNER_POST_S6_SAFETY_REPAIR_SAME_SCOPE';
-export const R6_CONTROLLER_SHA=R5_CONTROLLER_SHA;
+export const R6_CONTROLLER_SHA='3c7d4cfefacf072fd35cb19706b352c64c5e4fd2';
 export const R6_STANDBY=R5_STANDBY;
-export const R6_CONTROLLER_FILES=R5_CONTROLLER_FILES;
+// Approved #4036 Controller R2 successor: exactly one changed operations file
+// and one additional private read-only module. Never accept an arbitrary SHA.
+export const R6_CONTROLLER_FILES=Object.freeze({
+ ...R5_CONTROLLER_FILES,
+ 'controller/operations.mjs':'bac7412c51c156d31b68f725f2532011cccf38359fe18e66a4d3851aa3a2b803',
+ 'controller/us-breadth-r2-private-readonly.mjs':'e5f1d87626c0fb192831f4fc76fc9e13931af6105a38e503f90f7e656d180fb1'
+});
 const sha64=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
 const requestId=x=>typeof x==='string'&&
  /^pc-watchdog-b-[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(x);
@@ -45,7 +52,14 @@ export function verifyR6TwoStandbysReady(installed,owner,status,{now=Date.now(),
   throw error('WATCHDOG_R6_ACTIVE_1_TWO_STANDBYS_NOT_READY');
  return true;
 }
-export function verifyR6ControllerHost(host){return verifyR5ControllerHost(host);}
+export function verifyR6ControllerHost(host){
+ if(host?.controllerSourceSha!==R6_CONTROLLER_SHA||
+    !host.controllerFiles||typeof host.controllerFiles!=='object'||
+    Array.isArray(host.controllerFiles)||
+    Object.entries(R6_CONTROLLER_FILES).some(([p,sha])=>host.controllerFiles[p]!==sha))
+  throw error('WATCHDOG_R6_APPROVED_CONTROLLER_R2_MISMATCH');
+ return true;
+}
 
 export function validateR6Request(event,body,approval,installed,sourceDigest,approvalDigest,installedManifestDigest){
  if(event?.action!=='opened'||event?.repository?.full_name!==REPO||
