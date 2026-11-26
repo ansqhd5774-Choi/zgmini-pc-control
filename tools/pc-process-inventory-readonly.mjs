@@ -65,6 +65,7 @@ const R4_RUNTIME_PROBE='controller-standby-r4-runtime-readonly';
 const R5_RUNTIME_PROBE='controller-standby-r5-runtime-readonly';
 const S6_PREIMAGE_PROBE='controller-s6-once-approval-preimage-readonly';
 const S6_NEXT_PREIMAGE_PROBE='controller-s6-next-preimage-readonly';
+const S6_PREDRAIN_INPUTS_PROBE='controller-s6-predrain-inputs-readonly';
 const S6_JOURNAL_PROBE='controller-s6-once-journal-readonly';
 const S6_RECEIVER_LEDGER_PROBE='controller-s6-once-receiver-ledger-readonly';
 const S6_JOURNAL_REQUEST='pc-s6-d7c0a971-5219-4a3a-9dce-30b0543b0e72';
@@ -615,6 +616,7 @@ export function authenticateProcess(event,env,role){
  const isR5Runtime=withW05&&raw.probe===R5_RUNTIME_PROBE;
  const isS6Preimage=withW05&&raw.probe===S6_PREIMAGE_PROBE;
  const isS6NextPreimage=withW05&&raw.probe===S6_NEXT_PREIMAGE_PROBE;
+ const isS6Predrain=withW05&&raw.probe===S6_PREDRAIN_INPUTS_PROBE;
  const isS6Journal=withW05&&raw.probe===S6_JOURNAL_PROBE;
  const isS6ReceiverLedger=withW05&&raw.probe===S6_RECEIVER_LEDGER_PROBE;
  const isR4GuardianOrigin=withW05&&raw.probe===R4_GUARDIAN_ORIGIN_PROBE;
@@ -624,7 +626,7 @@ export function authenticateProcess(event,env,role){
  const allowedOperatingProbe=isOperator||is2960||is3409||isEr1Postcheck||is3516||
   isD05Writer||isD05PrivateReceipt||isD05Theme||isD05Registration||is3160||
   isCnnStaticGuard||isCnnGitPredicates||isCnnBPins||isCnnBResources||
-  isCnnBCore||isW06Task||isR3Watchdog||isR3Wmi||isR4Runtime||isR5Runtime||isS6Preimage||isS6NextPreimage||isS6Journal||isS6ReceiverLedger||isR4GuardianOrigin||isCiPolicyCas;
+  isCnnBCore||isW06Task||isR3Watchdog||isR3Wmi||isR4Runtime||isR5Runtime||isS6Preimage||isS6NextPreimage||isS6Predrain||isS6Journal||isS6ReceiverLedger||isR4GuardianOrigin||isCiPolicyCas;
  const acceptedProbe=(role==='operating'&&allowedOperatingProbe)||
   (role==='handoff'&&(isCiReceiptRoot||isCiActivation));
  if(!raw||(!basic&&!withJobs&&!withW05)||
@@ -662,6 +664,7 @@ export function authenticateProcess(event,env,role){
   ...(isR5Runtime?{watchdogR5Runtime:true}:{}),
    ...(isS6Preimage?{s6ApprovalPreimage:true}:{}),
    ...(isS6NextPreimage?{s6NextPreimage:true}:{}),
+   ...(isS6Predrain?{s6PredrainInputs:true}:{}),
    ...(isS6Journal?{s6OnceJournal:true}:{}),
    ...(isS6ReceiverLedger?{s6ReceiverLedger:true}:{}),
   ...(isR4GuardianOrigin?{watchdogR4GuardianOrigin:true}:{}),
@@ -3186,6 +3189,76 @@ export function inspectS6ReceiverLedgerReadonly({
  }
 }
 
+/**
+ * A-only bounded PRE_DRAIN input observation. Reuses precisely the maintainer
+ * filter and pc-job state counters without importing the B coordinator.
+ * Current counts are not historical evidence or permission to retry a B.
+ */
+const S6_PRE_DRAIN_STATUSES=Object.freeze(['in_progress','queued','waiting']);
+export function projectS6PreDrainInputsReadonly({relatedLeaseCount=null,workflowCounts=null}={},now=Date.now()){
+ const valid=n=>Number.isSafeInteger(n)&&n>=0&&n<=100000;
+ const leaseOk=valid(relatedLeaseCount)&&relatedLeaseCount<=10000;
+ const counts=workflowCounts&&typeof workflowCounts==='object'&&!Array.isArray(workflowCounts)
+  ?workflowCounts:{};
+ const observedCounts=Object.fromEntries(S6_PRE_DRAIN_STATUSES.map(k=>[
+  k,valid(counts[k])?counts[k]:null
+ ]));
+ const workflowOk=S6_PRE_DRAIN_STATUSES.every(k=>observedCounts[k]!==null);
+ const count=workflowOk?S6_PRE_DRAIN_STATUSES.reduce((sum,k)=>sum+observedCounts[k],0):null;
+ const known=leaseOk&&workflowOk&&Number.isFinite(now);
+ const status=known?'PASS':'STATE_UNKNOWN';
+ return {schema:'ZGMINI_S6_PRE_DRAIN_INPUTS_A_V1',status,
+  code:known?'S6_PRE_DRAIN_INPUTS_OBSERVED_ONLY':
+   !leaseOk?'S6_PRE_DRAIN_LEASE_COUNT_UNVERIFIED':
+   'S6_PRE_DRAIN_WORKFLOW_COUNT_UNVERIFIED',
+  observedAtUtc:Number.isFinite(now)?new Date(now).toISOString():null,
+  relatedLeaseCount:leaseOk?relatedLeaseCount:null,
+  relatedLeasesAbsent:leaseOk?relatedLeaseCount===0:null,
+  workflowCounts:observedCounts,pendingWorkCount:count,
+  inputClearAtObservation:known?relatedLeaseCount===0&&count===0:null,
+  independentlyAttested:false,historicalBlockerIdentified:false,
+  bAuthorization:false,replayAuthorized:false,failoverTested:false,
+  operationalWrites:0,providerCalls:0,d1Writes:0};
+}
+export function inspectS6PreDrainInputsReadonly({
+ filesystem=fs,run=spawnSync,env=process.env,now=Date.now(),
+ leaseRoot='E:/ZGmini/automation/pc-control/leases'
+}={}){
+ let relatedLeaseCount=null,workflowCounts={};
+ // Exactly the same lease names are excluded in the independent S6 B port.
+ try{
+  const stat=filesystem.lstatSync(leaseRoot);
+  if(stat.isDirectory()&&!stat.isSymbolicLink()){
+   const names=filesystem.readdirSync(leaseRoot);
+   if(Array.isArray(names)&&names.length<=10000&&
+     names.every(name=>typeof name==='string'&&name.length>=1&&name.length<=255))
+    relatedLeaseCount=names.filter(x=>x!=='supervisor'&&
+     !x.startsWith('supervisor.dead-')).length;
+  }
+ }catch{/* unknown is not zero; keep the other observation independent */}
+ const token=env?.GITHUB_TOKEN;
+ if(typeof token==='string'&&token.length>=8){
+  // Only three literal read-only GitHub API GETs. Never accept a URL,
+  // filename or runner command from an Issue and never expose stdout.
+  for(const state of S6_PRE_DRAIN_STATUSES){
+   const endpoint='repos/ansqhd5774-Choi/zgmini-pc-control/actions/workflows/'+
+    'pc-job.yml/runs?status='+state+'&per_page=1';
+   try{
+    const result=run('C:/Program Files/GitHub CLI/gh.exe',
+     ['api','-X','GET',endpoint],{encoding:'utf8',windowsHide:true,
+      timeout:12000,maxBuffer:65536,env:{...env,GH_TOKEN:token}});
+    if(result?.status!==0||result?.error||typeof result.stdout!=='string'||
+      result.stdout.length<2||result.stdout.length>65536)continue;
+    const data=JSON.parse(result.stdout);
+    if(Number.isSafeInteger(data?.total_count)&&data.total_count>=0&&
+       data.total_count<=100000&&Array.isArray(data.workflow_runs)&&
+       data.workflow_runs.length<=1)workflowCounts[state]=data.total_count;
+   }catch{/* workflow count is unknown on auth/host errors, never fabricate 0 */}
+  }
+ }
+ return projectS6PreDrainInputsReadonly({relatedLeaseCount,workflowCounts},now);
+}
+
 export function collect(role,ctx,env=process.env){
  const host=os.hostname().toUpperCase();
  const runnerName=String(env.RUNNER_NAME||'');
@@ -3239,6 +3312,10 @@ export function collect(role,ctx,env=process.env){
   const evidence=inspectS6OnceJournalReadonly();
   return {...base,status:evidence.status,code:evidence.code,
    s6OnceJournal:evidence};
+ }
+ if(ctx.s6PredrainInputs===true){
+  const proof=inspectS6PreDrainInputsReadonly({env});
+  return {...base,status:proof.status,code:proof.code,s6PredrainInputs:proof};
  }
  if(ctx.s6NextPreimage===true){
   const evidence=inspectS6ApprovalPreimageReadonly({sourceVersion:'CURRENT'});
@@ -3378,6 +3455,13 @@ export function toText(r){
   'memoryGroupCoverage='+(r.snapshot?.memoryGroupCoverage??'UNAVAILABLE'),
   'otherSubgroupCoverage='+(r.snapshot?.otherSubgroupCoverage??'UNAVAILABLE'),
   'maintenanceStatus='+(r.maintenance?.status??'NOT_APPLICABLE'),
+  ...(r.s6PredrainInputs?[
+   's6PredrainLeaseCount='+(r.s6PredrainInputs.relatedLeaseCount??'UNKNOWN'),
+   's6PredrainPendingWorkCount='+(r.s6PredrainInputs.pendingWorkCount??'UNKNOWN'),
+   's6PredrainInProgress='+(r.s6PredrainInputs.workflowCounts.in_progress??'UNKNOWN'),
+   's6PredrainQueued='+(r.s6PredrainInputs.workflowCounts.queued??'UNKNOWN'),
+   's6PredrainWaiting='+(r.s6PredrainInputs.workflowCounts.waiting??'UNKNOWN'),
+   's6PredrainClear='+(r.s6PredrainInputs.inputClearAtObservation??'UNKNOWN')]:[]),
   ...(r.w043516MaintenanceStatus?[
    'w043516Status='+r.w043516MaintenanceStatus.status,
    'w043516HistoricalPhase='+(r.w043516MaintenanceStatus.historicalRequest?.phase??'UNKNOWN'),

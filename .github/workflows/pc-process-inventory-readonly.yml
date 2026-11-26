@@ -67,6 +67,7 @@ jobs:
     permissions:
       contents: write
       issues: write
+      actions: read
     if: >-
       github.event_name == 'issues' &&
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
