@@ -98,7 +98,7 @@ export function inspectW06TaskBRecoveryReadonly({
    if(filesystem.existsSync(powershell)){
     const ps="$ErrorActionPreference='Stop';"+
      "$t=@(Get-ScheduledTask -TaskName 'ZGMINI-PC-CNN-Minute' -ErrorAction Stop);"+
-     "if($t.Count -ne 1 -or $t[0].TaskPath -ne '\\\\'){throw 'TASK_SCOPE_STOP'};"+
+     "if($t.Count -ne 1 -or $t[0].TaskPath -ne '\\'){throw 'TASK_SCOPE_STOP'};"+
      "[Console]::Out.Write([string]$t[0].Principal.RunLevel)";
     const level=run(powershell,['-NoProfile','-NonInteractive','-Command',ps],{
      shell:false,windowsHide:true,timeout:15000,maxBuffer:1024,encoding:null});
