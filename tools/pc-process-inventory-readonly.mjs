@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {parseOriginProof} from '../watchdog-b/activation-first-fail-readonly.mjs';
 import {fileURLToPath} from 'node:url';
 import {authenticate,validateSeat} from './pc-host-inventory-readonly.mjs';
 import {uploadResultPairAtomic} from '../writer-config-b/result-pair-atomic.mjs';
@@ -57,6 +58,7 @@ const MAX_BYTES=32768;
 const R3_WATCHDOG_PREIMAGE_PROBE='controller-standby-watchdog-preimage-readonly';
 const R3_WMI_PROBE='controller-standby-runner-wmi-readonly';
 const R4_RUNTIME_PROBE='controller-standby-r4-runtime-readonly';
+const R4_GUARDIAN_ORIGIN_PROBE='controller-standby-r4-guardian-origin-readonly';
 const CI_RECEIPT_ROOT_PROBE='ci-controller-b-receipt-root-readonly';
 // Existing A only: observe whether the same fixed WMI process-path query
 // used by the candidate Watchdog can classify installed Runner executables.
@@ -335,6 +337,72 @@ export function inspectR4StandbyRuntimeReadonly({
  }catch{return unknown('WATCHDOG_R4_RUNTIME_READ_UNVERIFIED');}
 }
 
+
+// Exact read-only prerequisite for a potential *separately authorized* R4
+// Guardian handoff. Reuse the historical WMI helper in PROBE mode only;
+// never call ACTIVATE or release any lease from this A operation.
+const GUARDIAN_R4_HELPER_SHA='ba4890ca8c8dd7ba4d885d88aff000443a58d1a8b1c9d01f386e10b3e0aa3bbe';
+export function classifyR4GuardianOrigin({runtime,probeOutput,originOutput}={}){
+ const base={schema:'ZGMINI_R4_GUARDIAN_ORIGIN_A_V1',
+  status:'STATE_UNKNOWN',code:'WATCHDOG_R4_GUARDIAN_ORIGIN_UNVERIFIED',
+  stageVerified:false,naturalRestartObserved:false,
+  guardianProbePassed:false,originMismatches:[],
+  activationApproved:false,activationExecuted:false,promotionApproved:false,
+  operationalWrites:0,providerCalls:0,d1Writes:0};
+ const out=(code,patch={})=>({...base,...patch,code});
+ if(runtime?.installedMatch!==true||runtime?.controllerTargetMatch!==true)
+  return out('WATCHDOG_R4_STAGE_OR_CONTROLLER_SOURCE_UNVERIFIED');
+ const basis={stageVerified:true,naturalRestartObserved:runtime.naturalRestartObserved===true};
+ if(basis.naturalRestartObserved)
+  return {...out('WATCHDOG_R4_ALREADY_RESTARTED',basis),status:'READ_ONLY_OBSERVED'};
+ let mismatches;
+ try{mismatches=parseOriginProof(originOutput);}
+ catch{return out('WATCHDOG_R4_GUARDIAN_ORIGIN_INVALID',basis);}
+ const passed=String(probeOutput??'').trim()==='WATCHDOG_ROTATION_VERIFIED';
+ if(passed&&mismatches.some(x=>x!=='COMMAND_EXACT'))
+  return out('WATCHDOG_R4_GUARDIAN_PROOFS_CONFLICT',{
+   ...basis,originMismatches:mismatches});
+ return {...out(passed?'WATCHDOG_R4_GUARDIAN_WMI_PROBE_VERIFIED':
+  'WATCHDOG_R4_GUARDIAN_WMI_PROBE_DENIED',{
+  ...basis,guardianProbePassed:passed,originMismatches:mismatches}),
+  status:'READ_ONLY_OBSERVED'};
+}
+export function inspectR4GuardianOriginReadonly({
+ filesystem=fs,run=spawnSync,
+ runtime=inspectR4StandbyRuntimeReadonly(),
+ watchdogHome='E:/ZGmini/automation/pc-watchdog'
+}={}){
+ const unknown=code=>({...classifyR4GuardianOrigin(),code});
+ if(runtime?.installedMatch!==true||runtime?.controllerTargetMatch!==true||
+   runtime.naturalRestartObserved===true)
+  return classifyR4GuardianOrigin({runtime});
+ try{
+  const ownerPath=path.join(watchdogHome,'receiver/owner.json');
+  const st=filesystem.lstatSync(ownerPath);
+  if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1||st.size>2048||
+     st.size<10)throw Error('OWNER');
+  const owner=JSON.parse(filesystem.readFileSync(ownerPath,'utf8'));
+  if(!Number.isSafeInteger(owner?.pid)||owner.pid<=0)
+   throw Error('OWNER');
+  const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../watchdog-b');
+  const guardian=path.join(root,'guardian-rotate.vbs');
+  const origin=path.join(root,'guardian-origin-readonly.vbs');
+  if(createHash('sha256').update(filesystem.readFileSync(guardian)).digest('hex')!==
+     GUARDIAN_R4_HELPER_SHA)
+   return unknown('WATCHDOG_R4_GUARDIAN_HELPER_SOURCE_DRIFT');
+  const invoke=args=>run('C:/Windows/System32/cscript.exe',
+   ['//NoLogo',...args],{windowsHide:true,encoding:'utf8',
+     timeout:15000,maxBuffer:2048});
+  const evidence=invoke([origin,String(owner.pid)]);
+  const proof=invoke([guardian,'PROBE',String(owner.pid)]);
+  if(evidence?.error||proof?.error||evidence?.status!==0||
+     typeof evidence.stdout!=='string'||typeof proof.stdout!=='string')
+   return unknown('WATCHDOG_R4_GUARDIAN_WMI_UNAVAILABLE');
+  return classifyR4GuardianOrigin({runtime,
+   probeOutput:proof.stdout,originOutput:evidence.stdout});
+ }catch{return unknown('WATCHDOG_R4_GUARDIAN_ORIGIN_READ_UNVERIFIED');}
+}
+
 const KNOWN_PROCESSES=new Set([
  'runner.listener.exe','runner.worker.exe','node.exe','wscript.exe','cscript.exe',
  'powershell.exe','pwsh.exe','cmd.exe','conhost.exe','git.exe','gh.exe','python.exe',
@@ -411,11 +479,12 @@ export function authenticateProcess(event,env,role){
   const isR3Watchdog=withW05&&raw.probe===R3_WATCHDOG_PREIMAGE_PROBE;
  const isR3Wmi=withW05&&raw.probe===R3_WMI_PROBE;
  const isR4Runtime=withW05&&raw.probe===R4_RUNTIME_PROBE;
+ const isR4GuardianOrigin=withW05&&raw.probe===R4_GUARDIAN_ORIGIN_PROBE;
  const isCiReceiptRoot=withW05&&raw.probe===CI_RECEIPT_ROOT_PROBE;
  const allowedOperatingProbe=isOperator||is2960||is3409||isEr1Postcheck||is3516||
   isD05Writer||isD05PrivateReceipt||isD05Theme||isD05Registration||is3160||
   isCnnStaticGuard||isCnnGitPredicates||isCnnBPins||isCnnBResources||
-  isCnnBCore||isR3Watchdog||isR3Wmi||isR4Runtime;
+  isCnnBCore||isR3Watchdog||isR3Wmi||isR4Runtime||isR4GuardianOrigin;
  const acceptedProbe=(role==='operating'&&allowedOperatingProbe)||
   (role==='handoff'&&isCiReceiptRoot);
  if(!raw||(!basic&&!withJobs&&!withW05)||
@@ -449,6 +518,7 @@ export function authenticateProcess(event,env,role){
    ...(isR3Watchdog?{watchdogR3Preimage:true}:{}),
   ...(isR3Wmi?{standbyRunnerWmi:true}:{}),
   ...(isR4Runtime?{watchdogR4Runtime:true}:{}),
+  ...(isR4GuardianOrigin?{watchdogR4GuardianOrigin:true}:{}),
   ...(isCiReceiptRoot?{ciControllerBReceiptRoot:true}:{})};
 }
 export function sanitizeProbe(raw){
@@ -2576,6 +2646,10 @@ export function collect(role,ctx,env=process.env){
   return {...base,status:observed.status,code:observed.code,
    ciControllerBReceiptRoot:observed};
  }
+ if(ctx.watchdogR4GuardianOrigin===true){
+  const proof=inspectR4GuardianOriginReadonly();
+  return {...base,status:proof.status,code:proof.code,watchdogR4GuardianOrigin:proof};
+ }
  if(ctx.watchdogR4Runtime===true){
   const proof=inspectR4StandbyRuntimeReadonly();
   return {...base,status:proof.status,code:proof.code,watchdogR4Runtime:proof};
@@ -2775,6 +2849,11 @@ export function toText(r){
    'wmiUnknownSession0ServiceAncestorCount='+(r.standbyRunnerWmi.unknownSession0ServiceAncestorCount??'UNKNOWN'),
    'wmiServiceObservationUnavailableCount='+(r.standbyRunnerWmi.serviceObservationUnavailableCount??'UNKNOWN'),
    'standbyPromotionApproved=false']:[]),
+  ...(r.watchdogR4GuardianOrigin?[
+   'watchdogR4GuardianOrigin='+r.watchdogR4GuardianOrigin.code,
+   'guardianProbePassed='+r.watchdogR4GuardianOrigin.guardianProbePassed,
+   'guardianOriginMismatchCodes='+r.watchdogR4GuardianOrigin.originMismatches.join(','),
+   'guardianActivationExecuted=false']:[]),
   ...(r.watchdogR4Runtime?[
    'watchdogR4Runtime='+r.watchdogR4Runtime.code,
    'watchdogR4InstalledMatch='+r.watchdogR4Runtime.installedMatch,
