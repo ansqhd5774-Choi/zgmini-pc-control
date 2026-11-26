@@ -1,0 +1,43 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "4a13569367ff0f1afc5138f971d86a8fa99c3329",
+  "baseHead": "393cee0da46515ff056543173fcd1253a858b3d7",
+  "baseConfigSourceSha": "393cee0da46515ff056543173fcd1253a858b3d7",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "worker/public-feed-refresh.mjs",
+      "change": "M",
+      "beforeSha256": "193034cadb0dc49af3f6f435402fd23fe3e76ac085ffe270490363903bc4d052",
+      "afterSha256": "63923160a66a1cf958c9f2619d8535c2038772f1fc92f40c0025d16e33aecb4c"
+    }
+  ],
+  "protectedFiles": [],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": [
+      {
+        "id": "w06-minute-launcher",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\run-local-cnn-minute.vbs",
+        "sha256": "73c8cf4381fd328182a9fad0a7cb5753cf9093e58524f0c9a04be4df7032d733",
+        "dependsOn": [
+          "worker/public-feed-refresh.mjs"
+        ]
+      }
+    ]
+  },
+  "coreMaintenance": "PAUSE_NEW_STARTS_DRAIN_360S_V1",
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
