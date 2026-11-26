@@ -54,17 +54,17 @@ test('the caller cannot select C-grade effect',async()=>{
 test('unsuccessful source CI event never posts',async()=>{
  const x=fixture();x.event.workflow_run.conclusion='failure';
  const a=await publishNativeCompletion({...x,effect:'A_READONLY'});
- assert.equal(a.code,'CI_NATIVE_PUBLISH_SOURCE_EVENT_MISMATCH');assert.equal(x.readCount(),0);
+ assert.equal(a.state,'IGNORED');assert.equal(a.code,'CI_NATIVE_PUBLISH_SOURCE_EVENT_NOT_TARGET');assert.equal(x.readCount(),0);
 });
 test('source CI ID mismatch never posts even if eligible policy exists',async()=>{
  const x=fixture();x.event.workflow_run.id=333;
  const a=await publishNativeCompletion({...x,effect:'A_READONLY'});
- assert.equal(a.code,'CI_NATIVE_PUBLISH_SOURCE_EVENT_MISMATCH');assert.equal(x.readCount(),0);
+ assert.equal(a.state,'IGNORED');assert.equal(a.code,'CI_NATIVE_PUBLISH_SOURCE_EVENT_NOT_TARGET');assert.equal(x.readCount(),0);
 });
 test('source event from foreign repo never posts',async()=>{
  const x=fixture();x.event.repository.id=99;
  const a=await publishNativeCompletion({...x,effect:'A_READONLY'});
- assert.equal(a.code,'CI_NATIVE_PUBLISH_SOURCE_EVENT_MISMATCH');assert.equal(x.readCount(),0);
+ assert.equal(a.state,'IGNORED');assert.equal(a.code,'CI_NATIVE_PUBLISH_SOURCE_EVENT_NOT_TARGET');assert.equal(x.readCount(),0);
 });
 test('disabled policy never dispatches',async()=>{
  const x=fixture();x.policy.enabled=false;
