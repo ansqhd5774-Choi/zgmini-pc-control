@@ -1216,7 +1216,9 @@ test('S6 old Runner and Watchdog pause proof waits only read-only before owned r
 test('S6 readonly PC preflight checks deployed Watchdog bytes, not just INSTALL pin or stale process status',()=>{
  const src=fs.readFileSync(new URL('../tools/update.mjs',import.meta.url),'utf8');
  const start=src.indexOf('export function readS6OnceCurrentPreimage(');
- const end=src.indexOf('export async function command(',start);
+ // Scope the no-mutation assertion to the read-only preflight, not to
+ // the subsequently introduced, separately gated S6 operating-port source.
+ const end=src.indexOf('export function s6PriorRequestLedgerPreserved(',start);
  assert.ok(start>=0&&end>start);
  const body=src.slice(start,end);
  assert.match(body,/sha256\(fs\.readFileSync\(path\.join\(wdHome,'runner-watchdog\.mjs'\)\)\)===wdInstall\.sha256/);
@@ -1260,7 +1262,9 @@ test('S6 ledger readback fails closed for traversal, malformed SHA and symlinked
 test('S6 local readback uses actual deployed Watchdog WMI and never publishes a synthetic pass',()=>{
  const s=fs.readFileSync(new URL('../tools/update.mjs',import.meta.url),'utf8');
  const begin=s.indexOf('export async function readS6OncePhaseReadback(');
- const end=s.indexOf('export async function command(',begin);
+ // The next function is the separately gated owned-release helper; do not
+ // sweep executable B port source into this read-only observation assertion.
+ const end=s.indexOf('export function s6OwnedLeaseReleaseReadback(',begin);
  assert.ok(begin>0&&end>begin);
  const code=s.slice(begin,end);
  assert.match(code,/sha256\(verifiedWatchdogBytes\)===wdInstall\.sha256/);
