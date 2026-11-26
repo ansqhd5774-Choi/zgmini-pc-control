@@ -2967,6 +2967,33 @@ export function projectS6OnceJournalReadonly(raw){
    journal.leaseReleaseAcknowledged:null,
   backlogState};
 }
+/**
+ * Check exact immutable GitHub approval bytes in a reusable Windows checkout.
+ * Git's existing worktree can retain CRLF when .gitattributes is introduced
+ * after the original checkout. Only CRLF -> LF canonicalization is permitted,
+ * and only when the original approved SHA-256 then matches exactly.
+ * This is read-only diagnostic evidence, NOT an alternate B authorization.
+ */
+export function s6OncePinnedApprovalCheckoutBytes(raw){
+ if(!Buffer.isBuffer(raw)||raw.length<1||raw.length>32768)return null;
+ const digest=b=>createHash('sha256').update(b).digest('hex');
+ if(digest(raw)===S6_JOURNAL_APPROVAL_SHA)return raw;
+ const canonical=[];
+ let changed=false;
+ for(let i=0;i<raw.length;i++){
+  const b=raw[i];
+  if(b===13){
+   if(raw[i+1]!==10)return null;
+   changed=true;
+   continue;
+  }
+  canonical.push(b);
+ }
+ if(!changed)return null;
+ const bytes=Buffer.from(canonical);
+ return digest(bytes)===S6_JOURNAL_APPROVAL_SHA?bytes:null;
+}
+
 export function inspectS6OnceJournalReadonly({
  io=fs,maintenanceHome='E:/ZGmini/automation/pc-maintenance',
  controllerHome='E:/ZGmini/automation/pc-control',
@@ -2987,9 +3014,9 @@ export function inspectS6OnceJournalReadonly({
   const read=p=>JSON.parse(file(p).toString('utf8'));
   const approvalFile=path.join(sourceRoot,'approvals/controller-s6',
    S6_JOURNAL_APPROVAL_SHA+'.json');
-  const bytes=file(approvalFile);
+  const bytes=s6OncePinnedApprovalCheckoutBytes(file(approvalFile));
   const sha=x=>createHash('sha256').update(x).digest('hex');
-  if(sha(bytes)!==S6_JOURNAL_APPROVAL_SHA)
+  if(bytes===null)
    return unknown('S6_ONCE_APPROVAL_BYTES_UNVERIFIED');
   const approved=JSON.parse(bytes.toString('utf8'));
   if(approved.schema!=='ZGMINI_PC_S6_ONCE_B_APPROVAL_V1'||
