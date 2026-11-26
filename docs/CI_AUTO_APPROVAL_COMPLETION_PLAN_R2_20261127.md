@@ -355,3 +355,29 @@
 - #4085 정규 merge SHA **`f4a1152f77419a5737fd3b8ba167c3481a99a8e6`**, latest main 일치. `ci-approval/native-a-execute.mjs` blob `82980e54423bf99d65212324489d757205bfeb1f`, `tests/ci-native-a-execute.test.mjs` blob `b4584e1a06357b5d54fbd0efa6a221faee86b251` readback 완료.
 - 병합은 **A 결과 증명 소스 검증 완료**이고 native scope 설치·활성화 및 실제 PC 무인 완료가 아니다.
 - PR #4086 최신 HEAD는 `0a586c1416cf27180a9071ddd71be579ceb5cf60`. 선행 main 이동은 다른 병합을 보존하여 검증하고, 정확 HEAD CI 완료 이전 병합하지 않는다.
+
+## 16. 열두 번째 실행 기록 — 2026-11-27 KST
+
+### Native A / Writer B 정책 증명 연결 소스 최종 통합
+
+- [PR #4086](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4086), 정확 HEAD `0a586c1416cf27180a9071ddd71be579ceb5cf60`: Windows Source [45886928698](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45886928698), C996 [45886928744](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45886928744), Secret Scan [45886928655](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45886928655), **정확 HEAD CI 3/3 SUCCESS**.
+- 정규 병합 `main=a9c974ff32f91878fcf7f42c4afb2e997973a0a6`. PR 상태 `closed/merged`, main HEAD 및 4파일 Git blob 재조회 확인:
+  - `tools/maintenance-contract.mjs`: `caa5209ad1a84fb6cc299c7a5d3c0805ad191dc4`
+  - `tools/maintenance-agent.mjs`: `2fcd599f3b5755b05d0ec45a00c1dcdee921b538`
+  - `tests/maintenance-contract.test.mjs`: `0d41dd376bb2c9c3dd92d99ba1d02f6e02e38640`
+  - `tests/maintenance-agent.test.mjs`: `d024f4a579356ebef1ea28b8ed41f7cc39d7f1fb`
+- 직접 결함 해결 범위: 새 Native B policy effect가 기존 B Owner 승인 명세와 실제 독립 설치 성공에 정확히 연결될 때만 `ciNativeEffect`·`ciNativePolicySha256`를 원장 및 원격 JSON/TXT에서 보존. 과거 B 성공/임의 updater 응답은 자동 위임으로 승격 불가.
+- 코드 병합은 실제 운영 PC 유지보수기 source 교체·별도 local native Scope/proof 설치·권한 활성화·실제 무인 발행을 포함하지 않는다.
+
+### 잔여 실제 실행 증거·비충돌 범위
+
+- 운영 A [Run 45883221676](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45883221676) 조회 시 `operating-process-snapshot` Job 140127435932는 `queued`, runner_id=0/runner_name 없음. 따라서 현재 native scope·PC 설치 버전 readback과 3종 무인 실증 아직 미확보; 원래 요청 재발행/새 승인 우회 금지.
+- 별도 S6 [Draft PR #4087](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4087)에서 `tools/maintenance-agent.mjs` 변경 중이므로 후속 수정 시 이 공유 파일 병합 충돌을 독립 보호한다. S6 실제 UNKNOWN의 원인을 이번 CI 작업 완료로 전환하지 않는다.
+- 자동 승인 관련 현재 `approvals/` 코드 검색에서 `ciNativeApproval`의 실제 승인된 manifest 증거를 확인하지 못했으며(검색 인덱스 범위 한계), Controller B #4029의 마지막 PC 정책 `false/not configured`는 과거 실증이다. **새 수동 Owner JSON 댓글 Gate를 추가하지 않는다.**
+- 실제 완료율 **0/3** 유지.
+
+### 다음 실행 (즉시 필요한 순서)
+
+1. 기존 현재 운영 PC 읽기 전용 Run 및 원장을 회수해 설치 유지보수기 `tools/maintenance-agent.mjs`의 실제 런타임 SHA, 독립 Native Scope/proof, GH 활성화 변수, effect별 기존 업무 승인 원문을 확인한다. 현재 미접수 Runner Job은 중복 발행하지 않는다.
+2. 인증된 PC B 설치·Scope 설정이 기존 승인 범위와 정확히 맞는 경우에만 기존 정규 승인/CAS/백업/복귀 절차로 적용하고 설치·결과 JSON/TXT readback 후 운영 소스 버전을 확정한다. C/새 보안 권한/승인 외 효과는 사용자 추가 승인 없이는 실행하지 않는다.
+3. A/Writer B/Controller B의 자연 CI 완료→기존 승인 판정→정규 단회 제출→PC 실행→저장·영수증 종단 검증. 현재 실증이 없는 유형은 미완료로 유지한다.
