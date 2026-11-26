@@ -232,6 +232,7 @@ export function authorizeWriterBNative({
    ])))&&p?.effect==='B_WRITER_SOURCE'&&
    p.schema==='ZGMINI_CI_NATIVE_DISPATCH_V1'&&p.enabled===true&&
    p.nativeWriterBExecutionEnabled===true&&
+   SHA40.test(p.nativeWriterBControlSha??'')&&
    SHA64.test(p.nativeWriterBAdapterSha256??'')&&
    SHA64.test(p.businessApprovalSha256??'')&&
    SHA64.test(p.approvedRequestSha256??''),
@@ -244,6 +245,8 @@ export function authorizeWriterBNative({
    /^zgmini-pc-0[1-6]$/.test(env.RUNNER_NAME??'')&&
    /^[1-9][0-9]{0,18}$/.test(env.GITHUB_RUN_ID??'')&&
    SHA40.test(controlHead??'')&&env.GITHUB_SHA===controlHead&&
+   // Pin the full reviewed control tree including all installer transitive files.
+   controlHead===p.nativeWriterBControlSha&&
    Buffer.isBuffer(adapterBytes)&&sha256(adapterBytes)===p.nativeWriterBAdapterSha256,
    'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP');
  need(Buffer.isBuffer(scope.requestBytes)&&
