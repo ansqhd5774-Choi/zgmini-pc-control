@@ -2631,6 +2631,7 @@ test('R4 Watchdog runtime A accepts only the exact W06 selective Controller B su
   x=>x.controllerHost.controllerFiles['controller/standby.mjs']='0'.repeat(64),
   x=>x.controllerHost.controllerFiles['controller/preimage-manifest-contract.mjs']='0'.repeat(64),
   x=>x.controllerHost.controllerFiles=[],
+  x=>x.controllerHost.controllerFiles=null,
   x=>x.install.sha256='0'.repeat(64)
  ]){
   const x=fixture();mutation(x);
