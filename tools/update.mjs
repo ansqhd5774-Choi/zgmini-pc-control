@@ -9,7 +9,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {execFileSync,spawn,spawnSync} from 'node:child_process';
 import {TextDecoder} from 'node:util';
 import {fileURLToPath,pathToFileURL} from 'node:url';
-import {applyApprovedUpdate,maintenanceCliFailureReport} from './maintenance-apply.mjs';
+import {applyApprovedUpdate,maintenanceCliFailureReport,runApprovedS6FailoverOnce} from './maintenance-apply.mjs';
 import {validateUpdateRequest,validateMaintenanceRequest,
  authenticateControllerBIssue,CI_CONTROLLER_ACTOR,installedControllerBPolicy,
 validateControllerConfigTransition,controllerAdmissionForPurpose,
@@ -3717,6 +3717,45 @@ export async function command(args=process.argv.slice(2)) {
  if(cmd==='s6-once-status'){
   need(args.length===3&&args[1]==='--request-id','MAINTENANCE_ARGS');
   return readS6OnceCurrentPreimage(requestId);
+ }
+ if(cmd==='s6-once-apply'){
+  need(args.length===5&&args[1]==='--request-id'&&args[3]==='--manifest-file',
+   'MAINTENANCE_ARGS');
+  // An Actions runner or a Controller child must never invoke the live port.
+  need(process.platform==='win32'&&!process.env.GITHUB_ACTIONS&&!process.env.RUNNER_NAME,
+   'S6_PORT_INDEPENDENT_WINDOWS_ONLY');
+  const approvedPath=path.join(maintenanceRoot,'approved',requestId+'.json');
+  need(path.resolve(args[4])===path.resolve(approvedPath),
+   'S6_ONCE_APPROVAL_FILE_PATH');
+  const file=fs.lstatSync(approvedPath);
+  need(file.isFile()&&!file.isSymbolicLink()&&file.size>0&&file.size<=131072,
+   'S6_ONCE_APPROVAL_PACKAGE_UNVERIFIED');
+  const pkg=json(approvedPath);
+  need(pkg?.actor==='ansqhd5774-Choi'&&
+   Number.isSafeInteger(pkg.issueNumber)&&pkg.issueNumber>0&&
+   pkg.issue?.requestId===requestId&&
+   typeof pkg.manifestRawBase64==='string'&&
+   typeof pkg.manifest==='object'&&pkg.manifest!==null,
+   'S6_ONCE_PACKAGE_IDENTITY');
+  const issue=validateS6OnceIssueEnvelope(pkg.issue,{
+   actor:pkg.actor,controlRepository});
+  const raw=Buffer.from(pkg.manifestRawBase64,'base64');
+  need(raw.length>0&&raw.length<=32768&&
+   raw.toString('base64')===pkg.manifestRawBase64&&
+   sha256(raw)===issue.approvalManifestSha256,
+   'S6_ONCE_PACKAGE_MANIFEST_PIN');
+  let decoded;try{decoded=JSON.parse(raw.toString('utf8'));}
+  catch{need(false,'S6_ONCE_PACKAGE_MANIFEST_INVALID');}
+  need(JSON.stringify(decoded)===JSON.stringify(pkg.manifest),
+   'S6_ONCE_PACKAGE_MANIFEST_CHANGED');
+  const current=readS6OnceCurrentPreimage(requestId);
+  validateS6OnceBManifest(issue,raw,{
+   actor:pkg.actor,controlRepository,live:current.s6Live});
+  // The operating port independently reauthenticates the live GitHub B Issue,
+  // exact manifest bytes, owner CAS and protected state at every effect boundary.
+  const port=makeS6OnceOwnedOperatingPort({request:issue,approvedBytes:raw,
+   actor:pkg.actor,issueNumber:pkg.issueNumber});
+  return runApprovedS6FailoverOnce(issue,port);
  }
  if(cmd==='source-bundle-status'){
   need(args.length===3&&args[1]==='--request-id','MAINTENANCE_ARGS');
