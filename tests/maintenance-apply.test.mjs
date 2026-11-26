@@ -1160,6 +1160,36 @@ test('S6 coordinator refuses duplicate, wrong operation, unverifiable approval o
   assert.equal(calls.includes('releaseOwnedInstallLease'),false);
  }
 });
+test('S6 preclaim errors preserve bounded stage and never start any effect',async()=>{
+ const failures=[
+  ['read','STATE_UNKNOWN','S6_ONCE_PRECLAIM_LEDGER_READ_UNVERIFIED',null],
+  ['attestApproval','BLOCKED','S6_PORT_ISSUE_CHANGED_OR_CANCELED','S6_PORT_ISSUE_CHANGED_OR_CANCELED'],
+  ['captureBaseline','BLOCKED','S6_BASELINE_SIX_CHILDREN_UNVERIFIED','S6_BASELINE_SIX_CHILDREN_UNVERIFIED'],
+  ['attestApproval','BLOCKED','UPDATE_VALIDATE_FAILED',null],
+  ['captureBaseline','BLOCKED','UPDATE_INSPECT_FAILED',null],
+  ['claimOnce','STATE_UNKNOWN','S6_ONCE_CLAIM_OUTCOME_UNVERIFIED','EACCES']
+ ];
+ for(const [step,status,code,coded] of failures){
+  const {port,calls,journal}=s6Fixture();
+  port[step]=async()=>{
+   calls.push(step);
+   const error=new Error('S6_TEST_PRIVATE_LOCAL_PATH_OR_SECRET');
+   if(coded)error.code=coded;
+   throw error;
+  };
+  const result=await runApprovedS6FailoverOnce(s6Request(),port);
+  assert.equal(result.status,status,step);
+  assert.equal(result.code,code,step);
+  assert.equal(result.failoverTested,false);
+  assert.equal(result.promotionApproved,false);
+  assert.equal(journal.length,0);
+  for(const effect of ['acquireOwnedInstallLease','pauseIntake','stopOwnTree',
+    'releaseOwnedInstallLease','reconcileBacklog'])
+   assert.equal(calls.includes(effect),false,step+' should not '+effect);
+  assert.doesNotMatch(JSON.stringify(result),/S6_TEST_PRIVATE_LOCAL_PATH_OR_SECRET/);
+ }
+});
+
 test('S6 coordinator never releases install lease after uncertain pause, stop, WMI or release guard',async()=>{
  for(const opts of [
   {failAcquire:true},{failPause:true},{stopGuard:false},{failStop:true},
