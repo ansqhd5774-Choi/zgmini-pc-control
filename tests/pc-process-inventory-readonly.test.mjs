@@ -3358,6 +3358,53 @@ test('S6 #3947 raw approved manifest checksum survives LF and reusable Windows C
  assert.equal(s6OncePinnedApprovalCheckoutBytes(edited),null);
  assert.equal(s6OncePinnedApprovalCheckoutBytes(Buffer.alloc(32769,65)),null);
 });
+test('S6 #4069 current approved journal uses pinned bytes, owner, phase, and read-only operating scope',()=>{
+ const e=event(),body=JSON.parse(e.issue.body);
+ const probe='controller-s6-4069-journal-readonly';
+ const scoped={...e,issue:{...e.issue,body:JSON.stringify({...body,probe})}};
+ assert.equal(authenticateProcess(scoped,env,'operating').s6CurrentJournal,true);
+ assert.throws(()=>authenticateProcess(scoped,env,'handoff'),/REQUEST_SCOPE_INVALID/);
+ for(const invalid of [{path:'E:/other'},{targetRequestId:'other'},{probe:probe+';stop'}]){
+  assert.throws(()=>authenticateProcess({...scoped,issue:{...e.issue,
+   body:JSON.stringify({...body,probe,...invalid})}},env,'operating'),/REQUEST_SCOPE_INVALID/);
+ }
+ const ref='1fceeba061f7f8731811220b27cac245bd91d44e87d68935cd8475117f094141';
+ const requestId='pc-s6-63afb126-72dc-4ec5-a721-4819771fa9ee';
+ const checkout=fs.readFileSync(new URL('../approvals/controller-s6/'+ref+'.json',import.meta.url));
+ const approved=s6OncePinnedApprovalCheckoutBytes(checkout,{scope:'CURRENT'});
+ assert.ok(Buffer.isBuffer(approved));
+ assert.equal(JSON.parse(approved.toString('utf8')).requestId,requestId);
+ assert.equal(createHash('sha256').update(approved).digest('hex'),ref);
+ const crlf=Buffer.from(approved.toString('utf8').replace(/\n/g,'\r\n'));
+ assert.ok(s6OncePinnedApprovalCheckoutBytes(crlf,{scope:'CURRENT'}).equals(approved));
+ assert.equal(s6OncePinnedApprovalCheckoutBytes(checkout,{scope:'OTHER'}),null);
+ assert.equal(s6OncePinnedApprovalCheckoutBytes(checkout,{scope:'ORIGINAL'}),null);
+ const changed=Buffer.from(checkout);changed[10]^=1;
+ assert.equal(s6OncePinnedApprovalCheckoutBytes(changed,{scope:'CURRENT'}),null);
+ const raw={approvalValid:true,ownerByteMatch:false,claimPresent:true,claimValid:true,
+  journal:{schema:'ZGMINI_S6_ONCE_JOURNAL_V1',requestId,
+   phase:'OLD_TREE_STOP_ATTEMPT'},backlog:null};
+ const observed=projectS6OnceJournalReadonly(raw,{scope:'CURRENT'});
+ assert.equal(observed.status,'READ_ONLY_OBSERVED');
+ assert.equal(observed.journalPhase,'OLD_TREE_STOP_ATTEMPT');
+ assert.equal(observed.priorOwnerByteMatch,false);
+ assert.equal(observed.requestId,requestId);
+ assert.equal(observed.effectExecuted,null);
+ assert.equal(observed.successEstablished,false);
+ assert.equal(observed.recoveryAuthorized,false);
+ assert.equal(observed.operationalWrites,0);
+ const wrong={...raw,journal:{...raw.journal,
+  requestId:'pc-s6-d7c0a971-5219-4a3a-9dce-30b0543b0e72'}};
+ assert.equal(projectS6OnceJournalReadonly(wrong,{scope:'CURRENT'}).status,'STATE_UNKNOWN');
+ assert.equal(projectS6OnceJournalReadonly(raw,{scope:'BAD'}).code,'S6_ONCE_FIXED_SCOPE_DENIED');
+ const denied=inspectS6OnceJournalReadonly({scope:'CURRENT',
+  io:{lstatSync(){throw Error('PRIVATE_WIN32_PATH');}}});
+ assert.equal(denied.code,'S6_ONCE_APPROVAL_READ_UNVERIFIED');
+ assert.doesNotMatch(JSON.stringify(denied),/PRIVATE_WIN32_PATH/);
+ assert.doesNotMatch(toText({schema:SCHEMA,role:'operating',requestId:'A',
+  status:'READ_ONLY_OBSERVED',code:observed.code,s6CurrentJournal:observed}),
+  /ownerSha256|nonce|standbyPids=|ownerPid=|[a-f0-9]{64}/i);
+});
 test('exact Controller B installed-policy CAS A uses one fixed operating-only probe',()=>{
  const original=event('operating'),body=JSON.parse(original.issue.body);
  const scoped={...original,issue:{...original.issue,body:JSON.stringify({...body,
