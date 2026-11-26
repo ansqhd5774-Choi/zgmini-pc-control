@@ -56,6 +56,38 @@ test('operator single-click wrapper requires C-grade and cannot auto-run in Acti
  assert.match(wrapper,/Get-FileHash -LiteralPath \$env:ZG_SCRIPT -Algorithm SHA256/);
  assert.doesNotMatch(wrapper,/ExecutionPolicy|EncodedCommand|runas|curl|wget|git |node /i);
 });
+
+test('diagnosed local-dot Runner StartName is resolved through fixed host before SID translation',()=>{
+ assert.match(source,/\$serviceAccount\.StartsWith\('\.\\',\s*\[System\.StringComparison\]::Ordinal\)/);
+ assert.match(source,/\$localName = \$serviceAccount\.Substring\(2\)/);
+ assert.match(source,/\[string\]::IsNullOrWhiteSpace\(\$localName\)/);
+ assert.match(source,/\$localName\.Contains\('\\'\)/);
+ assert.match(source,/\$localName\.Contains\('\/'\)/);
+ assert.match(source,/\$sidAccount = \[Environment\]::MachineName \+ '\\' \+ \$localName/);
+ assert.match(source,/NTAccount\]::new\(\$sidAccount\)/);
+ assert.doesNotMatch(source,/NTAccount\]::new\(\$serviceAccount\)/);
+ assert.match(source,/CI_RECEIPT_RUNNER_ACCOUNT_SHAPE_UNVERIFIED/);
+ assert.match(source,/CI_RECEIPT_RUNNER_SID_UNVERIFIED/);
+ assert.doesNotMatch(source,/New-LocalUser|Set-LocalUser|Set-Acl|icacls|takeown|Set-ExecutionPolicy/i);
+});
+test('previously approved process-local launcher pins corrected C1 bytes and remains interactive',()=>{
+ const launch=readFileSync(new URL('../tools/operator-packets/ZGMINI_C1_APPROVED_ONCE.cmd',import.meta.url),'utf8');
+ const digest=createHash('sha256').update(source,'utf8').digest('hex').toUpperCase();
+ assert.match(launch,/if defined GITHUB_ACTIONS goto :denied/);
+ assert.match(launch,/if defined RUNNER_NAME goto :denied/);
+ assert.match(launch,/MachineName\.ToUpperInvariant\(\)/);
+ assert.match(launch,/WindowsBuiltInRole\]::Administrator/);
+ assert.match(launch,/-ExecutionPolicy RemoteSigned/);
+ assert.match(launch,/Get-ExecutionPolicy/);
+ assert.match(launch,/Get-FileHash -LiteralPath \$p -Algorithm SHA256/);
+ assert.match(launch,/Unblock-File -LiteralPath \$p -ErrorAction Stop/);
+ assert.match(launch,/Get-Item -LiteralPath \$p -Stream Zone\.Identifier/);
+ assert.ok(launch.includes(String.fromCharCode(39)+digest+String.fromCharCode(39)));
+ assert.match(launch,/& \$p -Apply/);
+ assert.match(launch,/exit \$LASTEXITCODE/);
+ assert.doesNotMatch(launch,/Set-ExecutionPolicy|EncodedCommand|curl|wget|Invoke-WebRequest|net user|icacls/i);
+});
+
 test('Windows PowerShell parser accepts C operator source without executing it',async t=>{
  if(process.platform!=='win32')return t.skip('Windows parser only');
  const {spawnSync}=await import('node:child_process');

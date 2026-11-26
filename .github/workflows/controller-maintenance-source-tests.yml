@@ -5,6 +5,7 @@ on:
     paths:
       - 'tools/operator-packets/CI_CONTROLLER_B_RECEIPT_ROOT_C1.ps1'
       - 'tools/operator-packets/CI_CONTROLLER_B_RECEIPT_ROOT_C1.cmd'
+      - 'tools/operator-packets/ZGMINI_C1_APPROVED_ONCE.cmd'
       - 'tests/ci-controller-b-receipt-root-c.test.mjs'
       - 'ci-approval/**'
       - 'tests/ci-approval-completed-run-intake.test.mjs'
