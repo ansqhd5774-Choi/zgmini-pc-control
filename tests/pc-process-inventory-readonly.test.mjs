@@ -1,6 +1,8 @@
 import './w04-3409-source-preflight-readonly.test.mjs';
 import './w04-3516-archive-receipt-readonly.test.mjs';
 import test from 'node:test';
+// Existing inventory CI owns this fixed, operating-only orphan seat proof.
+import './supervisor-orphan-seat-readonly.test.mjs';
 import {createHash} from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -3702,4 +3704,20 @@ test('R6 read-only refuses SHA drift, malformed Owner, stale heartbeat or partia
   controllerHome:'E:/ZGmini/absent'});
  assert.equal(missing.status,'STATE_UNKNOWN');
  assert.equal(missing.code,'WATCHDOG_R6_RUNTIME_READ_UNVERIFIED');
+});
+
+test('fixed orphan per-seat A accepts only canonical operating-only probe',()=>{
+ const e=event('operating'),body=JSON.parse(e.issue.body);
+ const request={...e,issue:{...e.issue,body:JSON.stringify({...body,
+  probe:'controller-orphan-seat-map-readonly'})}};
+ assert.equal(authenticateProcess(request,env,'operating').orphanSeatMap,true);
+ assert.throws(()=>authenticateProcess(request,env,'handoff'));
+ for(const bad of ['controller-orphan-seat-map-readonly;Stop-Process',
+   'controller-orphan-seat-map-runnable']){
+  const altered={...e,issue:{...e.issue,body:JSON.stringify({...body,probe:bad})}};
+  assert.throws(()=>authenticateProcess(altered,env,'operating'));
+ }
+ const command={...e,issue:{...e.issue,body:JSON.stringify({...body,
+  probe:'controller-orphan-seat-map-readonly',pid:1234})}};
+ assert.throws(()=>authenticateProcess(command,env,'operating'));
 });
