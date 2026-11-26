@@ -3,7 +3,7 @@ import {publishExactControllerApprovalPair} from '../ci-approval/approval-pr-pub
 import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {observeCompletedRun,observePublishedControllerApprovals,createControllerPublicationPorts,publishExistingControllerApprovals,createAutoApprovalContextReader,ciPublicationExitCode,publishConfiguredControllerApproval,createConfiguredSelectivePreparer,createControllerPrPublicationIo,initialControllerPublicationPolicy} from '../ci-approval/completed-run-intake.mjs';
+import {observeCompletedRun,observePublishedControllerApprovals,observeLateOwnerMergedControllerApproval,publishLateOwnerMergedControllerApproval,createControllerPublicationPorts,publishExistingControllerApprovals,createAutoApprovalContextReader,ciPublicationExitCode,publishConfiguredControllerApproval,createConfiguredSelectivePreparer,createControllerPrPublicationIo,initialControllerPublicationPolicy} from '../ci-approval/completed-run-intake.mjs';
 
 const repository={id:1442936296,full_name:'ansqhd5774-Choi/zgmini-pc-control',private:true};
 const event=()=>({action:'completed',repository:{...repository},workflow_run:{
@@ -45,6 +45,125 @@ test('unavailable authenticated read is not success',async()=>{
  assert.equal(r.state,'EVIDENCE_MISSING');assert.equal(r.canPublish,false);
 });
 
+
+function lateOwnerFixture(){
+ const e=event(),target='c'.repeat(40),num=3573,
+  manifestPath='approvals/controller-updates/'+target+'.json',
+  mergedSha='b'.repeat(40);
+ const bytes=Buffer.from(JSON.stringify({
+  schema:'ZGMINI_PC_UPDATE_V1',targetSha:target,
+  purpose:'pc-controller-maintenance',controllerOnlyInstall:true,
+  selectiveSource:{branch:'codex/owner-approved'},
+  approval:{ref:'https://github.com/'+repository.full_name+'/pull/'+num}
+ }));
+ const blob=createHash('sha1')
+  .update(Buffer.from('blob '+bytes.length+'\\0')).update(bytes).digest('hex');
+ const pr={number:num,merged:true,merged_at:'2026-11-26T22:20:00Z',
+  merged_by:{login:'ansqhd5774-Choi',id:327938088,type:'User'},
+  merge_commit_sha:mergedSha,
+  base:{ref:'main',repo:repository},head:{sha:e.workflow_run.head_sha,repo:repository}};
+ const file={filename:manifestPath,status:'added',sha:blob};
+ const record={type:'file',path:manifestPath,encoding:'base64',sha:blob,
+  content:bytes.toString('base64')};
+ const calls=[],getJson=async route=>{
+  calls.push(route);
+  if(route==='actions/runs/'+e.workflow_run.id)return {...e.workflow_run};
+  if(route==='commits/'+e.workflow_run.head_sha+'/pulls?per_page=100')
+   return [{number:num,merged_at:pr.merged_at}];
+  if(route==='pulls/'+num)return pr;
+  if(route==='pulls/'+num+'/files?per_page=100')return [file];
+  if(route==='contents/'+manifestPath+'?ref='+mergedSha||
+     route==='contents/'+manifestPath+'?ref=main')return record;
+  throw Error('unexpected route: '+route);
+ };
+ return {e,target,num,mergedSha,manifestPath,bytes,pr,file,record,calls,getJson};
+}
+test('late Owner-merged CI run recovers only original immutable approval bytes',async()=>{
+ const f=lateOwnerFixture(),x=await observeLateOwnerMergedControllerApproval(f.e,f);
+ assert.equal(x.state,'OWNER_APPROVAL_RUN_OBSERVED_ONLY');
+ assert.equal(x.reason,'EXACT_OWNER_MERGED_SOURCE_RUN_MATCH_ONLY');
+ assert.deepEqual(x.entries,[{targetSha:f.target,approvalPrNumber:f.num,
+  manifestSha256:createHash('sha256').update(f.bytes).digest('hex'),
+  sourceRunId:f.e.workflow_run.id}]);
+ assert.equal(x.canPublish,false);assert.equal(x.canExecute,false);
+ assert.ok(f.calls.includes('contents/'+f.manifestPath+'?ref='+f.mergedSha));
+ assert.ok(f.calls.includes('contents/'+f.manifestPath+'?ref=main'));
+ assert.ok(!f.calls.some(route=>route.startsWith('issues')));
+});
+test('late source CI never trusts PR event association or wrong Owner merge identity',async()=>{
+ for(const change of [
+  f=>{f.pr.merged_by.login='github-actions[bot]';},
+  f=>{f.pr.merged_by.id=999;},
+  f=>{f.pr.merged_by.type='Bot';},
+  f=>{f.pr.merged=false;},
+  f=>{f.pr.head.sha='f'.repeat(40);},
+  f=>{f.pr.base.ref='other';},
+  f=>{f.pr.base.repo.id=0;},
+  f=>{f.pr.head.repo.id=0;},
+  f=>{f.pr.merge_commit_sha='invalid';}
+ ]){
+  const f=lateOwnerFixture();change(f);
+  f.e.workflow_run.pull_requests=[{number:f.num,head:{sha:'d'.repeat(40)}}];
+  const x=await observeLateOwnerMergedControllerApproval(f.e,f);
+  assert.equal(x.state,'IGNORED');
+  assert.deepEqual(x.entries,[]);
+  assert.ok(!f.calls.some(route=>route.startsWith('contents/')));
+ }
+});
+test('incomplete or altered existing merged approval fails closed before publication',async()=>{
+ for(const change of [
+  f=>{f.record.sha='f'.repeat(40);},
+  f=>{f.record.content=Buffer.from('{}').toString('base64');},
+  f=>{f.file.status='modified';},
+  f=>{f.file.sha='0'.repeat(40);},
+  f=>{f.pr.merge_commit_sha='0'.repeat(40);
+    f.getJson=async()=>{throw Error('unavailable');};}
+ ]){
+  const f=lateOwnerFixture();change(f);
+  const x=await observeLateOwnerMergedControllerApproval(f.e,f);
+  assert.ok(['EVIDENCE_MISSING','IGNORED'].includes(x.state),x.state);
+  assert.equal(x.canPublish,false);assert.equal(x.canExecute,false);
+ }
+ const f=lateOwnerFixture(),actual=f.getJson;
+ f.getJson=async route=>route==='contents/'+f.manifestPath+'?ref=main'
+  ?{...f.record,content:Buffer.from('MODIFIED').toString('base64')}:
+   actual(route);
+ const x=await observeLateOwnerMergedControllerApproval(f.e,f);
+ assert.equal(x.state,'EVIDENCE_MISSING');
+ assert.equal(x.reason,'OWNER_APPROVAL_BYTES_UNVERIFIED');
+});
+test('successful unrelated source CI does not reach any Controller B posting port',async()=>{
+ const f=lateOwnerFixture();f.e.workflow_run.conclusion='failure';
+ const x=await publishLateOwnerMergedControllerApproval(f.e,{
+  getJson:()=>assert.fail('failed run cannot read'),
+  ports:{readRepository:()=>assert.fail('no B submission')},
+  runId:245,attempt:1,emitReceipt:()=>assert.fail('no B receipt')});
+ assert.equal(x.state,'IGNORED');
+ assert.deepEqual(x.results,[]);
+});
+test('late Owner-merged run invokes existing strict B submitter, not direct CI Issue POST',async()=>{
+ const f=lateOwnerFixture(),read=[];
+ const x=await publishLateOwnerMergedControllerApproval(f.e,{
+  getJson:f.getJson,runId:245,attempt:1,
+  ports:{readRepository:async()=>{read.push('strict B');return null},
+   createIssue:()=>assert.fail('repository guard must run first')},
+  emitReceipt:()=>assert.fail('no B receipt')});
+ assert.deepEqual(read,['strict B']);
+ assert.equal(x.state,'PUBLICATION_PROCESSED');
+ assert.equal(x.results.length,1);
+ assert.equal(x.results[0].status,'STATE_UNKNOWN');
+ assert.equal(x.results[0].code,'MAINTENANCE_CI_REPOSITORY_DENIED');
+ assert.equal(ciPublicationExitCode(x,{publish:true}),1);
+});
+test('late-run source is inert until existing Controller B receiver pin is separately installed',()=>{
+ const y=readFileSync(new URL('../.github/workflows/ci-approval-controller-b.yml',import.meta.url),'utf8');
+ const publisher=readFileSync(new URL('../ci-approval/completed-run-intake.mjs',import.meta.url),'utf8');
+ assert.match(y,/vars\\.ZGMINI_CI_CONTROLLER_B_ENABLED == 'true'/);
+ assert.match(y,/vars\\.ZGMINI_CI_CONTROLLER_B_POLICY != ''/);
+ assert.match(y,/ref: cfe57f3d720219613c87eff21338de0d35edbf6b/);
+ assert.match(publisher,/return publishLateOwnerMergedControllerApproval\\(event,opts\\)/);
+ assert.doesNotMatch(y,/workflow_dispatch:|schedule:/);
+});
 function publicationFixture(){
  const before='a'.repeat(40),after='b'.repeat(40),target='c'.repeat(40);
  const path='approvals/controller-updates/'+target+'.json';
