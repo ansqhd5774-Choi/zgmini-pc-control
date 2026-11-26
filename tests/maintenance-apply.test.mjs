@@ -13,7 +13,7 @@ import {applyApprovedUpdate,maintenanceFailureCode,reconcileInterruptedRollback,
 import {isolatedControllerStage,recoveryOperatorProofStatus,waitForSupervisorStopIdle,
  s6PriorRequestLedgerPreserved,normalizeS6OldChildren,
  s6WatchdogPinMatches,s6OwnedLeaseReleaseReadback,
- makeS6OnceOwnedOperatingPort,reconcileMaintenanceBacklog} from '../tools/update.mjs';
+ makeS6OnceOwnedOperatingPort,reconcileMaintenanceBacklog,command} from '../tools/update.mjs';
 
 test('independent recovery proof keeps strict identity and returns exact sanitized failure categories',()=>{
  assert.deepEqual(recoveryOperatorProofStatus({exitCode:0,stdout:'INDEPENDENT_OPERATOR\r\n'}),{verified:true,code:'RECOVERY_OPERATOR_VERIFIED'});
@@ -1382,7 +1382,7 @@ test('S6 owned release requires exact old owner, empty WMI, preserved ledger and
  assert.equal(s6OwnedLeaseReleaseReadback(null,baseline,{now}),false);
  assert.equal(s6OwnedLeaseReleaseReadback(snap,null,{now}),false);
 });
-test('S6 live operating-port entry is not available to CI or Runner and has no direct CLI dispatch',()=>{
+test('S6 live operating-port remains blocked in CI and only exact pinned CLI can enter',async()=>{
  assert.throws(()=>makeS6OnceOwnedOperatingPort({}),/S6_PORT_INDEPENDENT_WINDOWS_ONLY|S6_PORT_OPERATOR_OR_ISSUE_UNVERIFIED/);
  const src=fs.readFileSync(new URL('../tools/update.mjs',import.meta.url),'utf8');
  const b=src.indexOf('export function makeS6OnceOwnedOperatingPort(');
@@ -1406,7 +1406,18 @@ test('S6 live operating-port entry is not available to CI or Runner and has no d
  assert.match(body,/S6_PORT_SYSTEMROOT_UNVERIFIED/);
  assert.match(body,/s6OwnedLeaseReleaseReadback\(snap,baseline\)/);
  assert.match(body,/case.*claim|claimOnce:/);
- assert.doesNotMatch(src.slice(e),/if\(cmd==='s6-once-apply'\)/);
+ assert.match(src.slice(e),/if\\(cmd==='s6-once-apply'\\)/);
+ const cli=src.slice(src.indexOf("if(cmd==='s6-once-apply')"),
+  src.indexOf("if(cmd==='source-bundle-status')"));
+ assert.match(cli,/S6_PORT_INDEPENDENT_WINDOWS_ONLY/);
+ assert.match(cli,/S6_ONCE_APPROVAL_FILE_PATH/);
+ assert.match(cli,/S6_ONCE_PACKAGE_MANIFEST_PIN/);
+ assert.match(cli,/validateS6OnceBManifest/);
+ assert.match(cli,/makeS6OnceOwnedOperatingPort/);
+ assert.match(cli,/runApprovedS6FailoverOnce/);
+ await assert.rejects(command(['s6-once-apply','--request-id',
+  'pc-s6-12345678-abcd-4def-8123-123456789abc','--manifest-file',
+  '/tmp/untrusted-s6.json']),/S6_PORT_INDEPENDENT_WINDOWS_ONLY/);
 });
 
 
