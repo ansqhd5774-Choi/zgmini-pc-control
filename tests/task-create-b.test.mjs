@@ -28,7 +28,8 @@ const approval=bytes=>({
  schema:APPROVAL_SCHEMA,status:'APPROVED_B',
  scope:'W06_ONE_TASK_CREATE_AND_ENABLE_WITH_CNN_RUNTIME_EFFECTS',
  taskName:TASK,installedSourceSha:INSTALLED_SOURCE,
- candidateSourceSha:'f'.repeat(40),candidateFileSha256:'e'.repeat(64),sourceRoot:SOURCE_ROOT,
+ candidateSourceSha:'0bae713aa6df1f4c00037db908050c74ae3dd20c',
+ candidateFileSha256:'694474d9966ef0a06dd46bb5d5b684150c5d66b5fcf989501fc4f9aa1502a7e7',sourceRoot:SOURCE_ROOT,
  wrapperPath:WRAPPER,launcherSha256:digest(bytes.launcher),
  disabledTemplateSha256:normalizedW06TaskTemplate(bytes.disabledXml),enabledTemplateSha256:normalizedW06TaskTemplate(bytes.enabledXml),
  coreTaskXmlSha256:'d'.repeat(64),sidecarSourceSha256:'e'.repeat(64),
@@ -144,6 +145,14 @@ test('B: authentic owner, committed raw manifest and explicit HTTP/SQLite/D1 eff
  assert.throws(()=>verifyTaskCreateBCandidate(proof,{...bytes,launcher:Buffer.from('bad')}),
   e=>e.code==='TASK_CREATE_B_CANDIDATE_HASH_STOP');
  assert.equal(sha256(bytes.launcher),digest(bytes.launcher));
+ for(const changed of [{candidateSourceSha:'f'.repeat(40)},
+  {candidateFileSha256:'e'.repeat(64)}]){
+  const other=Buffer.from(JSON.stringify({...JSON.parse(raw.toString()),...changed}));
+  const req=JSON.parse(event.issue.body);req.approvalManifestSha256=digest(other);
+  const foreign={...event,issue:{...event.issue,body:JSON.stringify(req)}};
+  assert.throws(()=>authorizeTaskCreateB({event:foreign,manifestBytes:other,manifestCommitted:true}),
+   e=>e.code==='TASK_CREATE_B_APPROVAL_SCOPE_STOP');
+ }
 });
 test('B: Task absence, installed source, original Core/Sidecar hashes required',()=>{
  const {proof,original}=proofSetup();
