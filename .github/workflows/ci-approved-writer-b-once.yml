@@ -52,7 +52,7 @@ jobs:
       cancel-in-progress: false
       queue: max
     runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
-    timeout-minutes: 5
+    timeout-minutes: 12
     defaults:
       run:
         shell: cmd
@@ -67,3 +67,35 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           ZGMINI_CI_NATIVE_EFFECT: B_WRITER_SOURCE
         run: '"E:\ZGmini\runtime\node.exe" ci-approval\native-receiver-observe.mjs'
+      # Independent opt-in: receiver admission alone must never install Writer B.
+      - name: Verify installed native Writer B grant and emit exact approved candidate
+        id: native-writer-preflight
+        if: vars.ZGMINI_CI_NATIVE_WRITER_B_EXEC_ENABLED == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ZGMINI_CI_NATIVE_WRITER_B_EXEC_ENABLED: ${{ vars.ZGMINI_CI_NATIVE_WRITER_B_EXEC_ENABLED }}
+        run: '"E:\ZGmini\runtime\node.exe" ci-approval\native-writer-b-execute.mjs --preflight'
+      - name: Checkout only the independently approved Writer B candidate SHA
+        if: steps.native-writer-preflight.outcome == 'success'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: ${{ steps.native-writer-preflight.outputs.candidateSourceSha }}
+          path: writer-b-candidate
+          persist-credentials: false
+      - name: Execute existing Writer B CAS lease and rollback transaction once
+        if: steps.native-writer-preflight.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ZGMINI_CI_NATIVE_WRITER_B_EXEC_ENABLED: ${{ vars.ZGMINI_CI_NATIVE_WRITER_B_EXEC_ENABLED }}
+        run: '"E:\ZGmini\runtime\node.exe" ci-approval\native-writer-b-execute.mjs --execute'
+      - name: Upload bounded native Writer B result pair
+        if: always() && vars.ZGMINI_CI_NATIVE_WRITER_B_EXEC_ENABLED == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: zgmini-ci-native-writer-b-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/zgmini-ci-native-writer-b-${{ github.run_id }}-*.json
+            ${{ runner.temp }}/zgmini-ci-native-writer-b-${{ github.run_id }}-*.txt
+          retention-days: 7
+          if-no-files-found: error
