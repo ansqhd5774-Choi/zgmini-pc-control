@@ -108,6 +108,7 @@ export function verifyR4GuardianPostcheck({install,sourceDigest,oldOwner,newOwne
     now<statusAt||now-statusAt>60000||
     !valid(oldOwner?.pid)||!valid(newOwner?.pid)||
     newOwner.pid===oldOwner.pid||
+    typeof newOwner.nonce!=='string'||newOwner.nonce.length<16||
     newOwner.nonce===oldOwner.nonce||
     !valid(status?.pid)||status.pid!==newOwner.pid||
     status.state!=='HEALTHY'||status.standbyRole!=='READY'||
