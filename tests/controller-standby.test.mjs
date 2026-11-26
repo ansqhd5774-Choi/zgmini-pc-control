@@ -236,3 +236,45 @@ test('Standby initial boot permits only true absent owner and heartbeat pair',()
  assert.match(src,/scanControllerRunnersReadOnly\(\)!=='NO_CONTROLLER_RUNNER_PROCESS'/);
  assert.match(src,/archiveDeadLease\(path\.join\(control,'leases\/supervisor'\)/);
 });
+
+
+test('WMI missing-path service exception requires a unique registered session-0 Listener',()=>{
+ const opts={controllerRoot:'E:\\ZGmini\\automation\\pc-control',canonicalize:p=>p};
+ const service={pid:12301,name:'Runner.Listener.exe',executablePath:'',
+  sessionId:0,serviceAncestor:true,serviceObservationAvailable:true};
+ const expected='NO_CONTROLLER_RUNNER_PROCESS';
+ assert.equal(classifyRunnerExecutableProof([service],opts),expected);
+ const external={pid:12302,name:'Runner.Listener.exe',
+  executablePath:'D:\\Other\\runner\\bin\\Runner.Listener.exe'};
+ assert.equal(classifyRunnerExecutableProof([service,external],opts),expected);
+ const active={pid:12303,name:'Runner.Listener.exe',
+  executablePath:'E:\\ZGmini\\automation\\pc-control\\runners\\02\\bin\\Runner.Listener.exe'};
+ assert.equal(classifyRunnerExecutableProof([service,active],opts),'ACTIVE_RUNNER_PROCESS');
+ const forbidden=[
+  {...service,sessionId:1},
+  {...service,serviceAncestor:false},
+  {...service,serviceObservationAvailable:false},
+  {...service,serviceObservationAvailable:undefined},
+  {...service,executablePath:null},
+  {...service,executablePath:'relative.exe'},
+  {...service,name:'Runner.Worker.exe'},
+  {...service,pid:0},
+  {...service,serviceAncestor:null}
+ ];
+ for(const bad of forbidden)
+  assert.equal(classifyRunnerExecutableProof([bad],opts),'UNVERIFIED');
+ assert.equal(classifyRunnerExecutableProof([service,{...service,pid:12304}],opts),
+  'UNVERIFIED');
+ assert.equal(classifyRunnerExecutableProof([service,{...service}],opts),'UNVERIFIED');
+});
+
+test('Standby Watchdog service lineage WMI source is strict read-only and bounded',()=>{
+ const source=fs.readFileSync(new URL('../tools/runner-watchdog.mjs',import.meta.url),'utf8');
+ assert.match(source,/Get-CimInstance -ClassName Win32_Process -ErrorAction Stop/);
+ assert.match(source,/Get-CimInstance -ClassName Win32_Service -Filter/);
+ assert.match(source,/PROCESS_SCOPE_EXCEEDED/);
+ assert.match(source,/serviceObservationAvailable===true/);
+ assert.match(source,/row\.sessionId===0/);
+ assert.match(source,/serviceExceptions>1/);
+ assert.match(source,/scanControllerRunnersReadOnly\(\)!=='NO_CONTROLLER_RUNNER_PROCESS'/);
+});
