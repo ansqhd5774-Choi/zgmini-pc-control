@@ -2914,7 +2914,8 @@ test('R5 A admits exact #4036 approved R2 Controller but never promotes or write
   assert.equal(r.promotionApproved,false);
  }
  const stale=structuredClone(x);
- stale.status.at='2026-11-25T01:00:00Z';
+ // More than 60s old, but still after the verified Watchdog owner start.
+ stale.status.at='2026-11-26T01:10:40Z';
  assert.equal(r5Assess(stale).code,'WATCHDOG_R5_HEALTH_STATUS_UNVERIFIED');
 });
 
