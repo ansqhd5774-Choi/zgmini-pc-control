@@ -23,7 +23,7 @@ const base=Object.freeze({
  crossRunDurabilityVerified:false,operationalWrites:0,providerCalls:0,d1Writes:0
 });
 const out=(status,code)=>({...base,status,code,
- cAccountCandidate:code==='DEDICATED_ACCOUNT_CANDIDATE'});
+ cAccountCandidate:code==='CI_RECEIPT_C_DEDICATED_ACCOUNT_CANDIDATE'});
 export function classifyReceiptCOperatorServiceCode(raw){
  if(typeof raw!=='string'||raw.length>80||!CODES.has(raw.trim()))return out('STATE_UNKNOWN','C_SERVICE_ACCOUNT_UNVERIFIED');
  const code=raw.trim();
