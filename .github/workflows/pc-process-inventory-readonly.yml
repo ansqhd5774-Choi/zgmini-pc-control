@@ -62,7 +62,9 @@ jobs:
       contains(github.event.issue.body, '"role":"operating"') &&
       github.run_attempt == 1
     runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
-    timeout-minutes: 4
+    # A #3839 checkout exceeded 4 minutes before the read-only probe began.
+    # Bound only this operating A job; do not alter Runner or other jobs.
+    timeout-minutes: 8
     defaults:
       run:
         shell: cmd
