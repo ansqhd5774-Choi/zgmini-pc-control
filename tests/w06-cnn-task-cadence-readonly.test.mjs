@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {PROBE,projectW06TaskCadence,inspectW06TaskCadenceReadonly,assessW06TaskBXmlReadonly,inspectW06TaskBRecoveryReadonly} from
+import {PROBE,projectW06TaskCadence,inspectW06TaskCadenceReadonly,assessW06TaskBXmlReadonly,inspectW06TaskBRecoveryReadonly,classifyW06TaskRunLevel} from
  '../controller/w06-cnn-task-cadence-readonly.mjs';
 
 const sample=(extra={})=>({schema:'ZGMINI_W06_CNN_TASK_CADENCE_RAW_V1',
@@ -91,4 +91,25 @@ test('W06 retained disabled Task diagnostic checks exact XML semantics without s
  assert.equal(altered.limitPT30M,false);
  assert.equal(inspectW06TaskBRecoveryReadonly({
   filesystem:{existsSync:()=>false}}).status,'STATE_UNKNOWN');
+});
+
+
+test('W06 RunLevel diagnostic distinguishes omitted XML default from effective native privilege',()=>{
+ const xmlOmitted='<Task><Principals><Principal><UserId>PRIVATE</UserId></Principal></Principals></Task>';
+ const limited=classifyW06TaskRunLevel(xmlOmitted,'Limited');
+ assert.deepEqual(limited,{xmlLevel:'OMITTED',effectiveLevel:'LIMITED',nativeLeastPrivilege:true});
+ assert.equal(classifyW06TaskRunLevel(xmlOmitted,'0').nativeLeastPrivilege,true);
+ const elevated=classifyW06TaskRunLevel(xmlOmitted,'Highest');
+ assert.deepEqual(elevated,{xmlLevel:'OMITTED',effectiveLevel:'HIGHEST',nativeLeastPrivilege:false});
+ assert.equal(classifyW06TaskRunLevel(xmlOmitted,'1').nativeLeastPrivilege,false);
+ const unknown=classifyW06TaskRunLevel(xmlOmitted,null);
+ assert.equal(unknown.nativeLeastPrivilege,null);
+ assert.equal(unknown.effectiveLevel,'UNVERIFIED');
+ const explicitleast=classifyW06TaskRunLevel('<Task><RunLevel>LeastPrivilege</RunLevel></Task>','Limited');
+ assert.equal(explicitleast.xmlLevel,'LEAST_PRIVILEGE');
+ const explicitHigh=classifyW06TaskRunLevel('<Task><RunLevel>HighestAvailable</RunLevel></Task>','Highest');
+ assert.equal(explicitHigh.xmlLevel,'HIGHEST_AVAILABLE');
+ const inconsistent=classifyW06TaskRunLevel('<Task><RunLevel>LeastPrivilege</RunLevel></Task>','Highest');
+ assert.equal(inconsistent.nativeLeastPrivilege,false);
+ assert.doesNotMatch(JSON.stringify(inconsistent),/PRIVATE|SECRET|C:\\\\Users/);
 });
