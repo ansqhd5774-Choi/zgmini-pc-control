@@ -446,7 +446,10 @@ export async function main({eventPath=process.env.GITHUB_EVENT_PATH,token=proces
      process.env.GITHUB_REF!=='refs/heads/main'||(eventName==='push'&&process.env.GITHUB_SHA!==event.after)||
      process.env.RUNNER_NAME!=='zgmini-handoff-ci-spare-01'||os.hostname().toUpperCase()!=='DESKTOP-N62L0NG')
    return {state:'DISABLED',code:'CI_PUBLICATION_CONTEXT_DENIED',results:[]};
-  const store=createCiEffectReceiptStore(process.env.ZGMINI_CI_CONTROLLER_B_RECEIPT_ROOT);
+  const store=createCiEffectReceiptStore(process.env.ZGMINI_CI_CONTROLLER_B_RECEIPT_ROOT,{
+   volatileRoots:[process.env.RUNNER_TEMP,process.env.GITHUB_WORKSPACE,
+    process.env.TEMP,process.env.TMP]
+  });
   let policy;
   try{if(process.env.ZGMINI_CI_CONTROLLER_B_POLICY)policy=JSON.parse(process.env.ZGMINI_CI_CONTROLLER_B_POLICY);}
   catch{return {state:'EVIDENCE_MISSING',code:'CI_PUBLICATION_AUTO_POLICY_UNVERIFIED',results:[]};}
