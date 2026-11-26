@@ -3480,7 +3480,7 @@ export function makeS6OnceOwnedOperatingPort({request,approvedBytes,
   need(l.nonce===installLease.owner.nonce&&l.pid===process.pid,
    'S6_PORT_INSTALL_LEASE_OWNER_CHANGED');
  };
- const authenticate=()=>{
+ const assertRemoteBPin=()=>{
   const actual=github('issues/'+issueNumber);
   need(actual?.state==='open'&&actual.title==='pc-controller-s6-once'&&
    actual.user?.login===actor&&
@@ -3498,6 +3498,10 @@ export function makeS6OnceOwnedOperatingPort({request,approvedBytes,
   const bytes=Buffer.from(remote.content.replace(/\s/g,''),'base64');
   need(bytes.equals(approvedBytes)&&sha256(bytes)===issue.approvalManifestSha256,
    'S6_PORT_B_APPROVAL_DRIFT');
+  return bytes;
+ };
+ const authenticate=()=>{
+  const bytes=assertRemoteBPin();
   const live=readS6OnceCurrentPreimage(requestId).s6Live;
   validateS6OnceBManifest(issue,bytes,{actor,controlRepository,live});
   const owner=readOwner().owner;
@@ -3585,6 +3589,7 @@ export function makeS6OnceOwnedOperatingPort({request,approvedBytes,
   },
   pauseIntake:async()=>{
    lockOwned();
+   assertRemoteBPin(); // canceled B Issue cannot begin any new effect
    verifyOld(baseline);
    need(github('actions/workflows/pc-job.yml').state==='active',
     'S6_PORT_INTAKE_STATE_CHANGED');
@@ -3619,6 +3624,7 @@ export function makeS6OnceOwnedOperatingPort({request,approvedBytes,
   },
   stopOwnTree:async()=>{
    lockOwned();
+   assertRemoteBPin(); // reauthorize just before irreversible old-tree stop
    verifyOld(baseline);
    need(github('actions/workflows/pc-job.yml').state==='disabled_manually'&&
     noLeases()&&pending()===0&&sixIdle(),'S6_PORT_STOP_GUARD_CHANGED');
@@ -3656,6 +3662,7 @@ export function makeS6OnceOwnedOperatingPort({request,approvedBytes,
   },
   releaseOwnedInstallLease:async()=>{
    lockOwned();
+   assertRemoteBPin(); // revoked B Issue cannot silently release ownership
    // Previous guard remains necessary at the irreversible handoff.
    const snap=await observed('STOPPED_HELD',baseline);
    need(s6OwnedLeaseReleaseReadback(snap,baseline),
