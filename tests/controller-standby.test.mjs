@@ -306,5 +306,9 @@ test('dual mode is separately approved; legacy R4 does not start second candidat
  assert.match(src,/BLOCKED_STANDBY_PROMOTION_OUTCOME_UNKNOWN/);
  assert.match(src,/if\(promotionPending\.child\.pid!==owner\.pid\)/);
  assert.match(src,/standbyReadyCount:/);
+ // The existing healthy Active continues to be reported healthy even if
+ // our attempted standby candidate failed the ownership attribution.
+ assert.ok(src.includes("standbyPromotionStatus:'UNVERIFIED_OWNER_MISMATCH'"));
+ assert.doesNotMatch(src,/status\('BLOCKED_STANDBY_PROMOTION_OWNER_UNVERIFIED'/);
  assert.doesNotMatch(src,/taskkill\.exe/);
 });
