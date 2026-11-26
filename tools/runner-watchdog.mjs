@@ -35,6 +35,19 @@ const read=p=>JSON.parse(fs.readFileSync(p,'utf8'));
 const write=(p,x)=>{const tmp=p+'.'+randomUUID()+'.tmp';fs.writeFileSync(tmp,JSON.stringify(x,null,2)+'\n',{flag:'wx'});fs.renameSync(tmp,p);};
 // Deterministic single choice: an unresolved promotion blocks BOTH candidates.
 // The second candidate is a passive fallback, never an additional elector.
+// A promotion attempt is not a completed switchover. If its exact IPC
+// child has exited, a new candidate may be considered only after proving
+// there is no live Supervisor owner or old six-seat Runner process.
+export function canReconcileExitedPendingPromotion({
+ pending,owner,heartbeat,runnerExecutableProof,pidAlive=alive
+}={}){
+ return pending?.promoting===true&&
+  Number.isSafeInteger(pending?.child?.pid)&&pending.child.pid>0&&
+  pidAlive(pending.child.pid)===false&&owner===null&&
+  provenOldRunnerExit({owner,heartbeat,pidAlive})===true&&
+  runnerExecutableProof==='NO_CONTROLLER_RUNNER_PROCESS';
+}
+
 export function selectStandbyCandidate(primary,secondary,{
  dual=false,promotionPending=null
 }={}){
@@ -452,7 +465,21 @@ export async function main(){
    if(state!=='RECOVER'){status(state,{supervisorPid:owner?.pid??null,heartbeatAt:hb?.at??null});return;}
    // No fallback while an earlier promotion has an unknown outcome.
    if(standbyMode&&promotionPending){
-    status('BLOCKED_STANDBY_PROMOTION_OUTCOME_UNKNOWN');return;
+    const pending=promotionPending;
+    // Failed IPC promotion can leave an exited primary in memory while the
+    // secondary remains READY. Never clear this fence just because a status
+    // field is empty or one PID has disappeared.
+    const safe=canReconcileExitedPendingPromotion({
+     pending,owner,heartbeat:hb,runnerExecutableProof:scanControllerRunnersReadOnly()
+    });
+    if(!safe){
+     status('BLOCKED_STANDBY_PROMOTION_OUTCOME_UNKNOWN');return;
+    }
+    // This is not approval to force-promote anything. Existing selection,
+    // six-child proof, WMI checks and atomic Supervisor lease still apply.
+    if(pending.slot===1&&standby===pending)standby=null;
+    if(pending.slot===2&&secondStandby===pending)secondStandby=null;
+    promotionPending=null;
    }
    const candidate=standbyMode?selectStandbyCandidate(standby,secondStandby,
     {dual:standby2Mode,promotionPending}):null;
