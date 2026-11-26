@@ -470,3 +470,23 @@
 1. 기존 운영 A Run 및 실제 PC Native scope/독립 proof/승인 원문/설치 소스를 readback. 불가능하면 해당 효과의 미확인만 보류.
 2. 이미 승인된 운영 설치 권한이 정확히 입증되는 범위에서만 기존 정규 B(lease/CAS/백업/복구)로 실제 필요한 파일/정책을 설치하고 SHA·영구 결과 확인. 승인 없이 보안 변수나 C급 변경 금지.
 3. A, Writer B, Controller B의 자연 CI 완료→독립 승인 판정→정규 단회 발행→Windows 수신/실행→JSON/TXT 영구 영수증·원본 readback. 다른 범위의 S6 장애를 전역 완료 조건으로 확대하지 않음.
+
+## 19. 열다섯 번째 실행 기록 — 2026-11-27 KST
+
+### 운영 PC Runner 배정과 CI 활성화의 독립 장애 구분
+
+- 최신 `main` `5b8c751d4c8b711797c36b1a461b543abc11298e`, PR #4088 완전 병합 상태 보존. 새 코드/운영 설정 변경은 필요 증거 없이 수행하지 않음.
+- 정상 운영 PC A 원본 [Run 45881716545](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45881716545) Job 140122406010: `zgmini-pc-03`, 레이블 `self-hosted, Windows, X64, zgmini-pc-control`, **2026-11-26 19:11:12~19:11:44 UTC SUCCESS**.
+- 그 뒤 기존 운영 PC A [Run 45883221676](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45883221676) Job 140127435932: **queued, runner_id=0, runner_name 공백**. 별도 W06 PC Job [45884082348](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45884082348)도 `queued`, 같은 운영 label. S6 #4069 정확 `pausedAt/resumedAt`와 Runner Online·Busy·Watchdog 상태는 여전히 미확인. '오프라인' 또는 'S6가 원인'이라고 확정할 증거 없음.
+- **격리 CI는 별도 정상:** PR #4088 C996 [Run 45888855342](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45888855342) Job 140146247627이 격리 Runner **`zgmini-handoff-ci-spare-01`, runner_id=27**, `zgmini-handoff-ci-isolated` label에서 **2026-11-26 20:12:19~20:12:47 UTC SUCCESS**. 따라서 GitHub 전체 CI 중단이나 모든 Windows Runner Offline이라는 주장은 반증됨. 격리 Runner를 운영 PC A/B 대체 실행기로 오인하지 않는다.
+- 자동 승인 이벤트 실행도 구분: Native A/Writer 발행 [Run 45889169501](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45889169501) 두 Job **skipped**; Controller B 제출 [Run 45889409938](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45889409938) **skipped**. 반면 기존 Approval Event Intake [Run 45889169522](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45889169522)는 SUCCESS. CI 트리거 인프라 전체 실패가 아니라 독립 활성화/업무 승인 Gate를 계속 확인할 필요가 있다.
+- 연결된 GitHub Actions Variables 사용자 세션의 **이전 브라우저 탭 스냅샷**(마지막 열람 2026-11-26 14:37 UTC)에서 `ZGMINI_CI_CONTROLLER_B_ENABLED=false`; `ZGMINI_CI_NATIVE_A_ENABLED`, `ZGMINI_CI_NATIVE_WRITER_B_ENABLED` 및 효과 실행 플래그는 목록에 보이지 않음. 이것은 **과거 UI 스냅샷이고 최신 변수의 실시간 조회가 아님**. GitHub Connector에서 repository runner/settings read 경로가 지원되지 않아 현시점 Online/Busy와 변수 값을 현재 시점으로 확정하지 않는다. 새 보안 권한/활성화 변수를 임의 설정하지 않는다.
+- 과거 격리 PC 진단 [Run 45871432737](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45871432737) `2026-11-26T17:56:54Z`는 `CI_CONTROLLER_B_AUTO_POLICY_NOT_CONFIGURED`; 그때 독립 Owner Scope와 installed receiver 미입증. 최신 정책 생성/설치는 아직 증거 없음.
+- #4078 Workflow Run **미생성**(19:14:52 UTC)과 #4082/4080 **Run 생성 후 운영 Runner 미배정**은 서로 다른 실패 단계다. #4069의 S6 중지창과 #4078 공백 연계는 실제 local journal 없이 가능성만 유지하며, 이미 별도 S6 담당 Issue에서 조사 중인 범위에 중복 운영 쓰기를 만들지 않는다.
+
+### 판정·다음 직접 실행
+
+1. **소스 개선 완료:** native A/Writer B 사전 승인 결합, Owner B installed-result proof, 영구 effect claim, 이전 #4085/#4086/#4088 정확 CI 3/3 및 main 병합 유효. 해당 부분 추가 소스 재작성은 새 실패 증거 없이는 하지 않는다.
+2. **현재 필수 원인 관측:** 기존 공식 경로에서 6개 `zgmini-pc-0{1..6}` 등록·Online/Busy 및 현장 Watchdog/Supervisor S6 journal phase, 승인된 Native Scope/proof·정확 설치 SHA 확인. 운영 PC 연결이 없어 A Run 재발행/격리 Runner로 PC 실행 대체 금지.
+3. **CI 권한 활성화:** 현재 Actions vars와 실제 Owner-승인 business grant/independent B policy installer의 정확 원문을 대조한다. 이전 UI false/absent와 CI skipped를 원인 후보로 구분한다. 새 권한·보안 변경은 승인 없는 설정 변경 금지.
+4. 권한과 실행기가 검증된 효과만 자연 CI→단회 dispatch→PC A/Writer B/Controller B→JSON/TXT 원본 readback. **무인 실운영 완료 0/3**을 유지한다. 각 고유 효과는 독립적으로 다음 단계 진행.
