@@ -71,10 +71,13 @@ export async function uploadResultPairAtomic({outputs,headers,fetchApi=fetch,
  let commit=await json(fetchApi,`${api}/git/commits`,{method:'POST',headers,
   body:JSON.stringify({message,tree:tree.sha,parents:[base]})},201);
  need(SHA40.test(commit?.sha??''),'CONFIG_B_PAIR_COMMIT_STOP');
- // A definite 422 can be a concurrent main advance. Rebuild at most once,
- // only after proving a descendant HEAD and both destination paths absent.
- // Never replay an ambiguous PATCH outcome or replace existing evidence.
- let updated=null,moved=null;
+ // Only a definite HTTP 422 with a NEW verified descendant HEAD and
+ // both destination paths absent permits rebuilding this same evidence pair.
+ // Two separately proven advances are bounded; no retry on ambiguous PATCH,
+ // stale/unchanged HEAD, non-descendant ref, missing proof or existing file.
+ // This retries Git ref publication only, never the PC operation.
+ let updated=null,moved=null,verifiedBase=base;
+ const MAX_PROVEN_REF_ADVANCES=2;
  const patch=async sha=>{
   try{
    const response=await fetchApi(`${api}/git/refs/heads/main`,{method:'PATCH',headers,
@@ -87,15 +90,19 @@ export async function uploadResultPairAtomic({outputs,headers,fetchApi=fetch,
    return {response,moved:null};
   }catch{return {response:null,moved:null};}
  };
- ({response:updated,moved}=await patch(commit.sha));
- if(updated?.status===422){
+ for(let proven=0;;proven++){
+  ({response:updated,moved}=await patch(commit.sha));
+  if(updated?.status!==422)break;
+  if(proven>=MAX_PROVEN_REF_ADVANCES)
+   return{created:0,verified:0,delivery:'RESULT_PAIR_REF_CONFLICT_UNTOUCHED'};
   let live;
   try{
    const now=await json(fetchApi,`${api}/git/ref/heads/main`,get,200);
    live=now?.object?.sha;
-   if(!SHA40.test(live??'')||live===base)
+   if(!SHA40.test(live??'')||live===verifiedBase)
     return{created:0,verified:0,delivery:'RESULT_PAIR_REF_CONFLICT_UNTOUCHED'};
-   const compared=await json(fetchApi,`${api}/compare/${base}...${live}`,get,200);
+   const compared=await json(fetchApi,
+    `${api}/compare/${verifiedBase}...${live}`,get,200);
    if(compared?.status!=='ahead')
     return{created:0,verified:0,delivery:'RESULT_PAIR_REF_CONFLICT_UNTOUCHED'};
    for(const [filePath] of outputs){
@@ -112,9 +119,7 @@ export async function uploadResultPairAtomic({outputs,headers,fetchApi=fetch,
     body:JSON.stringify({message,tree:newerTree.sha,parents:[live]})},201);
    need(SHA40.test(commit?.sha??''),'CONFIG_B_PAIR_COMMIT_STOP');
   }catch{return{created:0,verified:0,delivery:'RESULT_PAIR_REF_CONFLICT_UNTOUCHED'};}
-  ({response:updated,moved}=await patch(commit.sha));
-  if(updated?.status===422)return{created:0,verified:0,
-   delivery:'RESULT_PAIR_REF_CONFLICT_UNTOUCHED'};
+  verifiedBase=live;
  }
  let branchContainsCommit=updated?.status===200&&moved?.object?.sha===commit.sha;
  if(!branchContainsCommit){
