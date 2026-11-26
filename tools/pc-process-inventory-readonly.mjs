@@ -2785,25 +2785,34 @@ export function projectS6ApprovalPreimageReadonly(raw,{now=Date.now()}={}){
  const obj=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
  const wd=raw?.wd,owner=raw?.owner,sup=raw?.supervisor;
  const at=Date.parse(wd?.at??'');
- if(!obj(raw)||!obj(wd)||!obj(owner)||!obj(sup)||
-    raw.maintainerSourceSha!==S6_INSTALLED_MAINTAINER||
-    raw.maintainerFilesVerified!==true||raw.controllerFilesVerified!==true||
-    raw.installLockHeld!==false||!sha40(raw.controllerSha)||
-    !sha64(raw.watchdogSourceSha256)||!sha64(raw.watchdogActualSha256)||
+ const unknown=code=>({...base,code});
+ if(!obj(raw)||!obj(wd)||!obj(owner)||!obj(sup))
+  return unknown('S6_A_ROSTER_UNAVAILABLE');
+ if(raw.maintainerSourceSha!==S6_INSTALLED_MAINTAINER||
+    raw.maintainerFilesVerified!==true)
+  return unknown('S6_A_MAINTAINER_SOURCE_UNVERIFIED');
+ if(raw.controllerFilesVerified!==true||!sha40(raw.controllerSha)||
+    raw.installLockHeld!==false)
+  return unknown('S6_A_CONTROLLER_OR_LEASE_UNVERIFIED');
+ if(!sha64(raw.watchdogSourceSha256)||!sha64(raw.watchdogActualSha256)||
     raw.watchdogActualSha256!==raw.watchdogSourceSha256||
-    raw.watchdogMode!=='ACTIVE_1_STANDBY_2'||raw.watchdogApproved!==true||
-    wd.state!=='HEALTHY'||wd.standbyRole!=='READY'||
+    raw.watchdogMode!=='ACTIVE_1_STANDBY_2'||raw.watchdogApproved!==true)
+  return unknown('S6_A_WATCHDOG_SOURCE_UNVERIFIED');
+ if(wd.state!=='HEALTHY'||wd.standbyRole!=='READY'||
     wd.secondStandbyRole!=='READY'||wd.standbyReadyCount!==2||
     !pid(wd.pid)||!pid(wd.standbyPid)||!pid(wd.secondStandbyPid)||
     !pid(raw.receiverPid)||wd.pid!==raw.receiverPid||
     new Set([wd.pid,wd.standbyPid,wd.secondStandbyPid]).size!==3||
-    !pid(owner.pid)||owner.pid!==sup.pid||
+    !Number.isFinite(now)||!Number.isFinite(at)||now-at<0||now-at>=45000)
+  return unknown('S6_A_WATCHDOG_RUNTIME_UNVERIFIED');
+ if(!pid(owner.pid)||owner.pid!==sup.pid||
     !/^[a-f0-9-]{36}$/.test(owner.nonce??'')||
     sup.mode!=='LISTENING'||sup.sourceSha!==raw.controllerSha||
     !Array.isArray(sup.children)||sup.children.length!==6||
-    !Number.isFinite(now)||!Number.isFinite(at)||now-at<0||now-at>=45000||
-    !sha64(raw.ownerSha256)||!sha64(raw.protectedSha256))
-  return base;
+    !sha64(raw.ownerSha256))
+  return unknown('S6_A_SUPERVISOR_OWNER_UNVERIFIED');
+ if(!sha64(raw.protectedSha256))
+  return unknown('S6_A_PROTECTED_SNAPSHOT_UNVERIFIED');
  return {...base,status:'PASS',code:'S6_APPROVAL_PREIMAGE_CANDIDATE_ONLY',
   observedAtUtc:new Date(now).toISOString(),
   sixIdleRunnersVerified:false,workflowActiveVerified:false,
@@ -2820,7 +2829,9 @@ export function inspectS6ApprovalPreimageReadonly({
  io=fs,now=Date.now(),protect=protectedSnapshot,
  maintenance=collectMaintenanceStatusReadonly
 }={}){
- const unknown=()=>projectS6ApprovalPreimageReadonly(null,{now});
+ const unknown=code=>({...projectS6ApprovalPreimageReadonly(null,{now}),
+  ...(code?{code}: {})});
+ let stage='MAINTENANCE_STATUS';
  try{
   const rd=p=>{
    const st=io.lstatSync(p);
@@ -2833,21 +2844,30 @@ export function inspectS6ApprovalPreimageReadonly({
   const maintRoot='E:/ZGmini/automation/pc-maintenance';
   const wdRoot='E:/ZGmini/automation/pc-watchdog';
   const ctl='E:/ZGmini/automation/pc-control';
+  stage='WATCHDOG_INSTALL';
   const wdInstall=get(path.join(wdRoot,'INSTALL.json'));
+  stage='WATCHDOG_STATUS';
   const wd=get(path.join(wdRoot,'STATUS.json'));
+  stage='WATCHDOG_OWNER';
   const wdOwner=get(path.join(wdRoot,'receiver/owner.json'));
+  stage='SUPERVISOR_OWNER';
   const ownerRaw=rd(path.join(ctl,'leases/supervisor/owner.json'));
   const owner=JSON.parse(ownerRaw.toString('utf8'));
+  stage='SUPERVISOR_STATUS';
   const sup=get(path.join(ctl,'SUPERVISOR_STATUS.json'));
+  stage='MAINTAINER_INSTALL';
   const maintInstall=get(path.join(maintRoot,'MAINTENANCE_INSTALL.json'));
+  stage='MAINTAINER_FILES';
   const localFiles=Object.entries(maintInstall.files??{});
   if(localFiles.length!==7||localFiles.some(([rel,hash])=>
     !/^tools\/[a-z0-9.-]+$/.test(rel)||
     !/^[a-f0-9]{64}$/.test(hash)||
     createHash('sha256').update(rd(path.join(maintRoot,rel))).digest('hex')!==hash))
-   return unknown();
+   return unknown('S6_A_MAINTAINER_FILES_UNVERIFIED');
   const sha=x=>createHash('sha256').update(x).digest('hex');
+  stage='WATCHDOG_BYTES';
   const wdRaw=rd(path.join(wdRoot,'runner-watchdog.mjs'));
+  stage='PROTECTED_SNAPSHOT';
   const protectedSha256=sha(JSON.stringify(protect()));
   return projectS6ApprovalPreimageReadonly({
    maintainerSourceSha:maintInstall.sourceSha,
@@ -2862,7 +2882,7 @@ export function inspectS6ApprovalPreimageReadonly({
    wd,receiverPid:wdOwner.pid,owner,sup:undefined,
    supervisor:sup,ownerSha256:sha(ownerRaw),protectedSha256
   },{now});
- }catch{return unknown();}
+ }catch{return unknown('S6_A_'+stage+'_READ_UNVERIFIED');}
 }
 
 export function collect(role,ctx,env=process.env){

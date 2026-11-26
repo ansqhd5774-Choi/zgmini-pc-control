@@ -3022,3 +3022,21 @@ test('S6 A file reader reuses real nested controller integrity signal and exact 
  write(path.join(base,'tools/update.mjs'),'tampered');
  assert.equal(inspect().status,'STATE_UNKNOWN');
 });
+
+test('S6 A negative evidence returns bounded stage code without raw identity or retry effects',()=>{
+ const unavailable=inspectS6ApprovalPreimageReadonly({maintenance:()=>{throw Error('SECRET_ACCESS_DENIED');}});
+ assert.equal(unavailable.status,'STATE_UNKNOWN');
+ assert.equal(unavailable.code,'S6_A_MAINTENANCE_STATUS_READ_UNVERIFIED');
+ const unreadable=inspectS6ApprovalPreimageReadonly({
+  maintenance:()=>({maintenanceFilesVerified:true}),
+  io:{lstatSync(){throw Error('SECRET_OPERATIONAL_ROOT');}}
+ });
+ assert.equal(unreadable.status,'STATE_UNKNOWN');
+ assert.equal(unreadable.code,'S6_A_WATCHDOG_INSTALL_READ_UNVERIFIED');
+ assert.doesNotMatch(JSON.stringify(unreadable)+JSON.stringify(unavailable),
+   /SECRET|C:\\|E:\\|ownerPid|nonce|token|password/i);
+ assert.equal(unavailable.independentOperatorAttested,false);
+ assert.equal(unavailable.bAuthorization,false);
+ assert.equal(unavailable.operationalWrites,0);
+ assert.equal(projectS6ApprovalPreimageReadonly(null).code,'S6_A_ROSTER_UNAVAILABLE');
+});
