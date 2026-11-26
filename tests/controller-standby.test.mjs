@@ -1,4 +1,6 @@
 import test from 'node:test';
+// No operational process or lease effect; pure orphan no-spawn monitor regressions.
+import './supervisor-orphan-no-spawn-monitor.test.mjs';
 // Source-only continuity contract: no Windows runtime owner or Runner effect.
 import './supervisor-orphan-owner-continuity.test.mjs';
 // Reuse existing standby CI; this preflight has no Windows operating effects.
