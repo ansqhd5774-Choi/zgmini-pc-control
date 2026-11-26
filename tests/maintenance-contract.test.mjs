@@ -647,7 +647,8 @@ const s6=(phase,observed=s6Snapshot(),baseline=s6Baseline())=>
 const s6Stopped=()=>({
  ...s6Snapshot(),oldSupervisorAlive:false,oldSixChildrenStopped:true,
  runnerExecutableProof:'NO_CONTROLLER_RUNNER_PROCESS',
- workflowState:'disabled_manually',maintenanceLeaseHeld:true
+ workflowState:'disabled_manually',maintenanceLeaseHeld:true,
+ watchdogPaused:true
 });
 
 test('S6 independent phase evidence is never an executable approval',()=>{
@@ -723,11 +724,16 @@ test('S6 stopped under maintenance lease cannot be counted as Watchdog promotion
   'S6_WATCHDOG_RELEASE_BOUNDARY_NOT_CLEAR');
  assert.equal(s6('STOPPED_HELD',{...snap,maintenanceLeaseHeld:false}).code,
   'S6_HELD_STOP_BOUNDARY_NOT_ATTESTED');
+ assert.equal(s6('STOPPED_HELD',{...snap,watchdogPaused:false}).code,
+  'S6_HELD_STOP_BOUNDARY_NOT_ATTESTED');
+ assert.equal(s6('STOPPED_HELD',{...snap,watchdogPaused:null}).status,
+  'BLOCKED');
 });
 
 test('S6 release is blocked by live old Runner, unknown WMI or shared pause',()=>{
  const stopped=s6Stopped();
- const ready={...stopped,maintenanceLeaseHeld:false,workflowState:'active'};
+ const ready={...stopped,maintenanceLeaseHeld:false,workflowState:'active',
+  watchdogPaused:false};
  assert.equal(s6('WATCHDOG_RELEASED',ready).code,
   'S6_WATCHDOG_RECOVERY_ELIGIBILITY_OBSERVED');
  for(const patch of [
