@@ -56,12 +56,17 @@ export function requireHandoffApproval(approval,target,installedSha){
  }
  need(false,'HANDOFF_APPROVAL_REQUIRED');
 }
-export function approvedRuntimeChanges(mode,installedFiles,approvedFiles){
+export function approvedRuntimeChanges(mode,installedFiles,approvedFiles,policyOnlyContext=null){
  if(mode===sixToSeven)requireSixToSevenContract(installedFiles,approvedFiles);
  else if(mode===sevenToSeven)requireSevenToSevenContract(installedFiles,approvedFiles);
  else need(false,'HANDOFF_TRANSITION_UNSUPPORTED');
  const changes=nextRuntimeFiles.filter(rel=>installedFiles[rel]!==approvedFiles[rel]);
- need(changes.length>0,'HANDOFF_NO_RUNTIME_CHANGE');
+ // A separately approved V2 policy-pin rotation can change only the installed
+ // manifest. Never require a dummy executable diff to authorize this effect.
+ // Every other no-op handoff retains the historical fail-closed rejection.
+ need(changes.length>0||mode===sevenToSeven&&
+  approvedPolicyOnlyHandoff(policyOnlyContext?.before,policyOnlyContext?.approval,policyOnlyContext?.target),
+  'HANDOFF_NO_RUNTIME_CHANGE');
  return changes;
 }
 // CI authentication is NOT activated by source merging. It is installed
@@ -85,8 +90,24 @@ export function approvedHandoffCiPolicy(before,approval,nextManifest){
  }catch{need(false,'HANDOFF_CI_POLICY_INVALID');}
  return structuredClone(policy);
 }
-export function handoffFilePlan(mode,installedFiles,approvedFiles){
- const changes=approvedRuntimeChanges(mode,installedFiles,approvedFiles);
+// Policy-only 7->7 is an *explicitly approved* source transition, never an
+// automatic authorization derived from CI success, a candidate PR or a new
+// workflow hash. The installed policy's other identity fields are preserved.
+export function approvedPolicyOnlyHandoff(before,approval,target){
+ const prior=before?.ciControllerBPolicy,proposed=approval?.ciControllerBPolicy;
+ if(!prior||!proposed||!/^[a-f0-9]{40}$/.test(prior.workflowBlobSha??'')||
+    prior.workflowBlobSha===proposed.workflowBlobSha||
+    ['schema','enabled','workflowId','workflowPath'].some(k=>prior[k]!==proposed[k]))
+  return false;
+ try{
+  const candidate={...before,sourceSha:target,
+   files:Object.fromEntries(nextRuntimeFiles.map(rel=>[rel,approval.files?.[rel]]))};
+  const checked=approvedHandoffCiPolicy(before,approval,candidate);
+  return checked?.workflowBlobSha===proposed.workflowBlobSha;
+ }catch{return false;}
+}
+export function handoffFilePlan(mode,installedFiles,approvedFiles,policyOnlyContext=null){
+ const changes=approvedRuntimeChanges(mode,installedFiles,approvedFiles,policyOnlyContext);
  return {
   installed:mode===sixToSeven?[...priorRuntimeFiles]:[...nextRuntimeFiles],
   writes:mode===sixToSeven?[...nextRuntimeFiles]:changes,
@@ -277,7 +298,7 @@ export async function main(args=process.argv.slice(2)){
  const before=read(root+'/MAINTENANCE_INSTALL.json');
  need(before.sourceSha===approval.installedSha,'HANDOFF_INSTALLED_SHA_MISMATCH');
  const mode=requireHandoffApproval(approval,target,before.sourceSha);
- const filePlan=handoffFilePlan(mode,before.files,approval.files);
+ const filePlan=handoffFilePlan(mode,before.files,approval.files,{before,approval,target});
  const installedRuntimeFiles=filePlan.installed;
  if(mode===sevenToSeven){
   requireNoUnfinishedHandoff(root);

@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto';
 import {execFileSync}from'node:child_process';
 import {requireHandoffCheckoutScope,requireStopped,requireNoReplacement,requireReceiverOrigin,requireNewReceiverOrigin,requireCurrentReceiverIdentity,reserveReceiverSlot,reservationFailureStatus,rollbackStatus,
   priorRuntimeFiles,nextRuntimeFiles,requireSixToSevenContract,requireSevenToSevenContract,
-  requireHandoffApproval,approvedRuntimeChanges,handoffFilePlan,
+  requireHandoffApproval,approvedRuntimeChanges,approvedPolicyOnlyHandoff,handoffFilePlan,
   requireDirectInstalledFiles,requireNoUnfinishedHandoff,requireOwnedInstallGuard,requireRollbackWindow,
   requireOriginalStartupBytes,preserveRollbackReservation}from'../tools/handoff-maintenance.mjs';
 import {sourceFiles as bootstrapFiles}from'../tools/bootstrap-maintenance.mjs';
@@ -114,6 +114,50 @@ test('seven-to-seven checks all seven installed hashes and exact nine target has
   /HANDOFF_TARGET_FILE_SET_MISMATCH/);
  assert.throws(()=>approvedRuntimeChanges('UNKNOWN',installed,target),/HANDOFF_TRANSITION_UNSUPPORTED/);
 });
+test('seven-to-seven policy-only handoff requires exact approved V2 pin rotation',()=>{
+ const installed=Object.fromEntries(nextRuntimeFiles.map((rel,i)=>[rel,String(i+1).repeat(64)]));
+ const policy={schema:'ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V1',enabled:true,
+  workflowId:430972394,workflowBlobSha:'b'.repeat(40),
+  workflowPath:'.github/workflows/ci-approval-controller-b.yml'};
+ const before={schema:'ZGMINI_PC_MAINTENANCE_INSTALL_V1',sourceSha:'a'.repeat(40),
+  startupSha256:'f'.repeat(64),files:installed,ciControllerBPolicy:policy};
+ const files=Object.fromEntries([...nextRuntimeFiles,
+  'tools/bootstrap-maintenance.mjs','tools/handoff-maintenance.mjs']
+  .map(rel=>[rel,installed[rel]??'d'.repeat(64)]));
+ const approval={schema:'ZGMINI_MAINTENANCE_HANDOFF_V2',transition:'SEVEN_TO_SEVEN',
+  approved:true,installedSha:before.sourceSha,targetSha:'c'.repeat(40),
+  ciControllerBPolicy:{...policy,workflowBlobSha:'e'.repeat(40)},files};
+ const scope={before,approval,target:approval.targetSha};
+ // Without the independently approved policy scope, the historical rejection stays.
+ assert.throws(()=>handoffFilePlan('SEVEN_TO_SEVEN',installed,files),/HANDOFF_NO_RUNTIME_CHANGE/);
+ assert.equal(approvedPolicyOnlyHandoff(before,approval,scope.target),true);
+ const plan=handoffFilePlan('SEVEN_TO_SEVEN',installed,files,scope);
+ assert.deepEqual(plan.installed,nextRuntimeFiles);
+ assert.deepEqual(plan.writes,[]); // No executable dummy diff or overwrite.
+ assert.deepEqual(plan.rollbackAdded,[]);
+ const cases=[
+  {...approval,approved:false},
+  {...approval,schema:'ZGMINI_MAINTENANCE_HANDOFF_V1'},
+  {...approval,transition:'SIX_TO_SEVEN'},
+  {...approval,installedSha:'f'.repeat(40)},
+  {...approval,targetSha:'f'.repeat(40)},
+  {...approval,ciControllerBPolicy:policy}, // No policy effect to install.
+  {...approval,ciControllerBPolicy:{...approval.ciControllerBPolicy,workflowId:1}},
+  {...approval,ciControllerBPolicy:{...approval.ciControllerBPolicy,workflowPath:'other.yml'}},
+  {...approval,ciControllerBPolicy:{...approval.ciControllerBPolicy,enabled:false}},
+  {...approval,ciControllerBPolicy:{...approval.ciControllerBPolicy,workflowBlobSha:'invalid'}},
+ ];
+ for(const candidate of cases){
+  assert.equal(approvedPolicyOnlyHandoff(before,candidate,scope.target),false);
+  assert.throws(()=>handoffFilePlan('SEVEN_TO_SEVEN',installed,files,
+   {...scope,approval:candidate}),/HANDOFF_NO_RUNTIME_CHANGE/);
+ }
+ assert.equal(approvedPolicyOnlyHandoff({...before,ciControllerBPolicy:null},
+  approval,scope.target),false);
+ assert.throws(()=>handoffFilePlan('SEVEN_TO_SEVEN',installed,files,
+  {...scope,before:{...before,ciControllerBPolicy:null}}),/HANDOFF_NO_RUNTIME_CHANGE/);
+});
+
 test('seven-to-seven rollback plan preserves all original runtime files and never removes an old module',()=>{
  const installed=Object.fromEntries(nextRuntimeFiles.map((name,index)=>[name,
   String(index+1).repeat(64)]));
