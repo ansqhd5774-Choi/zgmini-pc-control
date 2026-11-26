@@ -930,3 +930,30 @@
 
 **이번 종료:** 신규 정확 S6 이후 후보·미승인 manifest·정적/격리 회귀시험·정확 HEAD CI 3/3·기존 PR 원본 정정까지 완료. 새 운영 PC A/B 요청, GitHub Actions 변수/운영 Workflow 병합, B 효과 발행, 설치·원자료/DB/D1/Runner 변경 **0건**. 종단 무인 실행 **0/3 (0%)** 유지.
 
+## 36. 서른두 번째 실행 기록 — 미승인 B 정책-only 제안 소스 main 병합 (2026-11-27 KST)
+
+### 범위 구분 — 운영 승인/설치 아님
+
+- 현행 Controller B 인계 Receiver B 정책은 [#4148](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4148) 실제 설치 CAS **source `b08f3a482e9bb39523f47675ae06bc6e02e01d2d`**, installed manifest SHA256 `0b4a38f82a32021c358220c8a8fe49b11eb17c3752d55810fb2180bbea7ee378`, `workflowId=430972394`, `workflowBlobSha=27e48ecde81bdf6f15cccffcffd9b3e70482a5f3` (당시 2026-11-26T22:33:47.585Z). 기존 #4146 인계와 별개 새 Owner 정책-only 7→7 효과 승인은 현재 **미확보**, 동일 A와 기존 C/B 작업 재실행 금지.
+- [Draft PR #4152](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4152)의 새 정책 Workflow SHA1 `a31972f47badcd35b0ffffa61721a93308d23067`, 고정 게시기 SHA `fcbbf12cd662544ee308295c13076d4ca2f4aeba`; **Draft/open/unmerged** 유지.
+- 정책 인계 안전 후보 `905c0b1806a3988f39400dc82536fd753b9ff764`는 현 installed source `b08f...`의 단일 후손이며 9개 maintainer 파일 Git blob 9/9 동일하고 차이는 결과 JSON/TXT 2개만 추가. 해당 후보를 **이미 승인됨**으로 해석하지 않는다. 이 설치 source SHA를 CI publisher checkout SHA와 혼동 금지.
+
+### 완료한 소스-only 통합
+
+- [PR #4155](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4155) 정확 Source HEAD **`f2f761a347d75254b22942ac3b13b53186953b37`**, 변경 **3파일**: `proposals/maintenance-handoffs/905c0b1806a3988f39400dc82536fd753b9ff764.json`, `tests/ci-controller-b-policy-only-proposal.test.mjs`, `.github/workflows/controller-maintenance-source-tests.yml`. 실제 B 실행 계약 `approvals/maintenance-handoffs/` 경로와 Production `.github/workflows/ci-approval-controller-b.yml`는 변경하지 않음.
+- 원본 proposal은 **`approved:false`**, `PROPOSED_NOT_APPROVED`, 정확 B 인계 대기 상태. CI source test는 `HANDOFF_APPROVAL_REQUIRED` 및 `HANDOFF_NO_RUNTIME_CHANGE` 실행 거부를 검증, 가상 메모리 Owner 승인일 때에만 9 source pin·0 executable write·정확 workflow policy 차이 수용을 독립 검증한다. 제안 파일은 운영 실행기에 입력되지 않음.
+- 정확 HEAD CI 세 건 재확인:
+  - [Source 45907245575](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45907245575) `completed/success`.
+  - [C996 45907245579](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45907245579) `completed/success`.
+  - [Secret Scan 45907245668](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45907245668) `completed/success`.
+- 위 정확 CI 3/3·3파일·`approved:false` 검증 후 PR #4155 ready → **squash merged `main` SHA `e21dec8fdfbd51d1aa8a5f04a90cf86e47fde0b6`**. `main` 원격 readback: `proposals/` blob `3368c2eef85a6fee7591677867989f8734121013`, `tests/ci-controller-b-policy-only-proposal.test.mjs` blob `3760ca0ce56402f1a002500f7ae588e58f13cc32` 확인. Production Workflow blob 원래 `27e48ecde81bdf6f15cccffcffd9b3e70482a5f3` 그대로, PR #4152 여전히 Draft/unmerged.
+- 이 병합은 **Source safety/proposal-only 변경**으로 **Owner의 신규 보안 정책 승인, Windows B 설치, ACTIVATE, 신규 B 업무/영수증 PASS**를 수행하지 않았다. 이미 설치된 영수증 root의 #3925/#3926 실제 CROSS_RUN PASS를 다시 요구하지 않는다.
+
+### 정확한 다음 필수 작업
+
+1. 이번 새 정책 blob `27e48ecde81bdf6f15cccffcffd9b3e70482a5f3 → a31972f47badcd35b0ffffa61721a93308d23067`과 설치 source `b08f3a482e9bb39523f47675ae06bc6e02e01d2d → 905c0b1806a3988f39400dc82536fd753b9ff764`의 독립 **Owner B 효과 승인**을 실제로 확보해야 한다. 이미 명시된 단회 기존 #4024/#4025 승인 재사용 불가. 이 단계가 승인되기 전 `proposals/`를 `approvals/`로 복사하거나 `approved:true`로 전환하지 않는다.
+2. 승인됐다면 기존 정규 independent Windows C handoff가 **직전 운영 PC installed source·manifest raw SHA256·9 source/Windows owner/lease/backup/rollback CAS**를 검증한 후 7→7 단회 실제 설치, 신규 설치 policy raw 영수증과 postcheck 회수; 완료 전 PR #4152 병합·GitHub publisher 활성화 금지.
+3. 신규 Owner-approved 미소진 Controller B 업무의 정확한 source CI→신규 정책 영수증 검증 이후에만 Controller B 종단 1/3 반영. Native A/Writer B의 독립 trust roots와 실제 Native Owner B-installed 증명은 #4143 미확보 그대로.
+
+**종료:** 실제 무인 CI→PC 효과→원격 readback **0/3 (0%)**. 소스 병합 1, 운영 승인/변경·PC 잡·B 실행·DB/D1/Reader/Writer/Runner 변경 0건.
+
