@@ -12,6 +12,8 @@ jobs:
   submit-controller-b:
     name: submit-controller-b
     # Operational activation remains separate from source review and CI PASS.
+    # Keep this candidate unmerged until an independent B Receiver installed
+    # policy is approved for its exact Git blob and read back from Windows.
     # No pull_request, workflow_dispatch, schedule, or arbitrary target input.
     if: >-
       vars.ZGMINI_CI_CONTROLLER_B_ENABLED == 'true' &&
@@ -23,7 +25,10 @@ jobs:
         github.event.forced == false &&
         github.event.deleted == false) ||
        (github.event_name == 'workflow_run' &&
-        vars.ZGMINI_CI_CONTROLLER_B_POLICY != '' &&
+        # Existing Owner-merged approval may finish source CI after its main push.
+        # The pinned publisher independently checks actual Owner merge, source
+        # CI, immutable manifest bytes, B receiver policy and durable receipt.
+        # CI-generated approvals STILL require a configured exact policy in code.
         github.event.workflow_run.event == 'pull_request' &&
         github.event.workflow_run.conclusion == 'success' &&
         github.event.workflow_run.head_repository.id == 1442936296))
@@ -49,7 +54,7 @@ jobs:
       # event's main revision, candidate PR or mutable branch.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: cfe57f3d720219613c87eff21338de0d35edbf6b
+          ref: fcbbf12cd662544ee308295c13076d4ca2f4aeba
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
