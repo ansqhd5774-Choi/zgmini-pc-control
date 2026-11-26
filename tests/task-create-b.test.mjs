@@ -11,7 +11,7 @@ import {
  REQUEST_SCHEMA,ISSUE_TITLE,ISSUE_LABEL,sha256,normalizedW06TaskTemplate
 } from '../task-create-b/contract.mjs';
 import {applyTaskCreateB} from '../task-create-b/transaction.mjs';
-import {hasOnlyApprovedMinuteTrigger,hasOnlyApprovedSingleExec,reconcileTaskEnabled} from '../task-create-b/windows-adapter.mjs';
+import {hasOnlyApprovedMinuteTrigger,hasOnlyApprovedSingleExec,reconcileTaskEnabled,approvedTaskRunLevel} from '../task-create-b/windows-adapter.mjs';
 
 const reqId='abec1087-3a25-4452-a5a8-a45218f05c37';
 const digest=value=>createHash('sha256').update(value).digest('hex');
@@ -91,6 +91,19 @@ test('B: Task XML omitted Enabled uses native Scheduler state with conflict prot
  assert.throws(()=>reconcileTaskEnabled(missing,null),
   e=>e.code==='TASK_CREATE_B_TASK_ENABLED_UNVERIFIED_STOP');
 });
+test('B: omitted RunLevel requires independent native Limited principal',()=>{
+ const missing='<Task><Principal><UserId>REDACTED</UserId></Principal></Task>';
+ assert.equal(approvedTaskRunLevel(missing,true),true);
+ assert.equal(approvedTaskRunLevel(missing,false),false);
+ assert.equal(approvedTaskRunLevel(missing,null),false);
+ const exact='<Task><RunLevel>LeastPrivilege</RunLevel></Task>';
+ assert.equal(approvedTaskRunLevel(exact,true),true);
+ assert.equal(approvedTaskRunLevel(exact,false),false);
+ assert.equal(approvedTaskRunLevel('<Task><RunLevel>HighestAvailable</RunLevel></Task>',true),false);
+ assert.equal(approvedTaskRunLevel('<Task><RunLevel>LeastPrivilege</RunLevel><RunLevel>LeastPrivilege</RunLevel></Task>',true),false);
+ assert.equal(approvedTaskRunLevel('<Task><RunLevel>UNKNOWN</RunLevel></Task>',true),false);
+});
+
 test('B: Task readback rejects extra actions even if one approved Exec remains',()=>{
  const single='<Task><Actions Context="User"><Exec><Command>C:\\\\Windows\\\\System32\\\\wscript.exe</Command></Exec></Actions></Task>';
  assert.equal(hasOnlyApprovedSingleExec(single),true);
