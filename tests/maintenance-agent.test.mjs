@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import {test} from "node:test";
 
-import {createMaintenanceAgent,failedUpdaterResult,normalizedResult} from "../tools/maintenance-agent.mjs";
+import {createMaintenanceAgent,failedUpdaterResult,normalizedResult,parseS6NonzeroRecoveryReport} from "../tools/maintenance-agent.mjs";
 import {prepareMaintenanceIssue} from '../tools/maintenance-request.mjs';
 
 test('pre-install child rejection retains exact safe code and current installed SHA',()=>{
@@ -917,6 +917,69 @@ test('S6 recovery-required outcome is durable and cannot stop twice',async t=>{
   'BACKLOG_REPLAY_OUTCOME_UNKNOWN');
  assert.equal((await f.agent.processIssue(f.issue)).code,'DUPLICATE_REQUEST_SUPPRESSED');
  assert.equal(f.stats.applies,1);
+});
+test('S6 updater exit 2 with exact RECOVERY_REQUIRED JSON preserves failed boundary without replay',async t=>{
+ const s6=s6AgentCase();
+ const raw={schema:'ZGMINI_S6_ONCE_RESULT_V1',status:'RECOVERY_REQUIRED',
+  code:'S6_ONCE_RUNTIME_OUTCOME_RECONCILE',requestId:s6.request.requestId,
+  operationalEffectUnverified:true,failoverTested:false,promotionApproved:false,
+  mutationAttempted:true,failedCode:'S6_PORT_INTAKE_PAUSE_LOST',
+  failedAt:'INTAKE_PAUSED',leaseReleaseAcknowledged:false,
+  token:'MUST_NOT_LEAK',ownerPid:3244};
+ const error=Object.assign(Error('child exited with code 2'),{
+  code:2,stdout:JSON.stringify(raw)+'\\n',stderr:'private path',killed:false,signal:null
+ });
+ const bounded=parseS6NonzeroRecoveryReport(error,s6.request.requestId);
+ assert.equal(bounded?.status,'RECOVERY_REQUIRED');
+ assert.equal(bounded.failedAt,'INTAKE_PAUSED');
+ assert.equal(bounded.failedCode,'S6_PORT_INTAKE_PAUSE_LOST');
+ assert.equal(Object.hasOwn(bounded,'token'),false);
+ assert.equal(Object.hasOwn(bounded,'ownerPid'),false);
+ const f=fixture(t,{title:'pc-controller-s6-once',
+  issuePatch:{body:JSON.stringify(s6.request)},s6RawManifest:s6.raw,
+  s6Status:s6.status,s6ApplyError:error});
+ const result=await f.agent.processIssue(f.issue);
+ const recorded=f.agent.loadLedger(s6.request.requestId).result;
+ assert.equal(result.status,'UNKNOWN');
+ assert.equal(result.code,'S6_ONCE_RUNTIME_OUTCOME_RECONCILE');
+ assert.equal(recorded.s6ExecutionStatus,'RECOVERY_REQUIRED');
+ assert.equal(recorded.firstFail,'S6_PORT_INTAKE_PAUSE_LOST');
+ assert.equal(recorded.s6LastPhase,'INTAKE_PAUSED');
+ assert.equal(recorded.s6LeaseReleaseAcknowledged,false);
+ const json=f.remote.get(`repos/${REPO}/contents/results/maintenance-${s6.request.requestId}.json`);
+ assert.ok(Buffer.isBuffer(json));
+ const uploaded=JSON.parse(json.toString('utf8'));
+ assert.equal(uploaded.firstFail,'S6_PORT_INTAKE_PAUSE_LOST');
+ assert.equal(uploaded.s6LastPhase,'INTAKE_PAUSED');
+ assert.equal(uploaded.s6ExecutionStatus,'RECOVERY_REQUIRED');
+ assert.doesNotMatch(JSON.stringify(uploaded),/MUST_NOT_LEAK|private path|ownerPid/);
+ assert.equal((await f.agent.processIssue(f.issue)).code,'DUPLICATE_REQUEST_SUPPRESSED');
+ assert.equal(f.stats.applies,1);
+});
+test('S6 updater nonzero exit rejects arbitrary, mismatched, or successful JSON fail-closed',()=>{
+ const s6=s6AgentCase(),id=s6.request.requestId;
+ const raw={schema:'ZGMINI_S6_ONCE_RESULT_V1',requestId:id,
+  status:'RECOVERY_REQUIRED',code:'S6_ONCE_RUNTIME_OUTCOME_RECONCILE',
+  operationalEffectUnverified:true,failoverTested:false,promotionApproved:false,
+  mutationAttempted:true,failedAt:'OLD_TREE_STOP_ATTEMPT',
+  failedCode:'S6_PORT_STOP_GUARD_CHANGED',leaseReleaseAcknowledged:false};
+ const error={code:2,stdout:JSON.stringify(raw),signal:null,killed:false};
+ assert.equal(parseS6NonzeroRecoveryReport(error,id).failedAt,'OLD_TREE_STOP_ATTEMPT');
+ for(const bad of [
+  {...error,code:1},{...error,code:9},{...error,killed:true},
+  {...error,signal:'SIGTERM'}, {...error,stdout:'private Windows log'},
+  {...error,stdout:'X'.repeat(16385)},
+  {...error,stdout:JSON.stringify({...raw,requestId:'pc-s6-00000000-0000-4000-8000-000000000000'})},
+  {...error,stdout:JSON.stringify({...raw,status:'POSTCHECK_PENDING'})},
+  {...error,stdout:JSON.stringify({...raw,operationalEffectUnverified:false})},
+  {...error,stdout:JSON.stringify({...raw,mutationAttempted:false})},
+  {...error,stdout:JSON.stringify({...raw,promotionApproved:true})},
+  {...error,stdout:JSON.stringify({...raw,failedAt:'FAKE_SUCCESS'})},
+  {...error,stdout:JSON.stringify({...raw,failedCode:'BAD/PATH'})},
+  {...error,stdout:JSON.stringify({...raw,leaseReleaseAcknowledged:'yes'})}
+ ]){
+  assert.equal(parseS6NonzeroRecoveryReport(bad,id),null);
+ }
 });
 test('S6 lost updater response remains unknown without automatic retry',async t=>{
  const s6=s6AgentCase();
