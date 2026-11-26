@@ -22,7 +22,11 @@ export function projectW06HttpChecksReadonly(rows,{observedAtMs}={}){
   recentTenMinutesCount:null,verifiedCount:null,verifiedAfterActivation:null,
   http2xxCount:null,http429Count:null,http5xxCount:null,fetchFailedCount:null,
   latestCheckedAt:null,latestVerifiedAt:null,latestHttpStatus:null,
-  latestOutcome:null,providerCalls:0,sqliteWrites:0,d1Writes:0};
+  latestOutcome:null,afterActivationFirstRequestAt:null,
+  afterActivationLastRequestAt:null,requestGapSampleCount:null,
+  minRequestGapSeconds:null,medianRequestGapSeconds:null,maxRequestGapSeconds:null,
+  gapsOver90Seconds:null,recentRequestIntervalsSeconds:null,
+  providerCalls:0,sqliteWrites:0,d1Writes:0};
  if(!Number.isSafeInteger(observedAtMs)||observedAtMs<=CNN_ACTIVATED_UTC||
   !Array.isArray(rows)||rows.length>2)return empty;
  const utcDay=new Date(observedAtMs).toISOString().slice(0,10);
@@ -45,12 +49,22 @@ export function projectW06HttpChecksReadonly(rows,{observedAtMs}={}){
      (x.outcome==='FETCH_FAILED'?x.httpStatus!==null:
       !Number.isInteger(x.httpStatus)||x.httpStatus<100||x.httpStatus>599))
      throw Error('CHECK');
-    checks.push({checkedAt:x.checkedAt,httpStatus:x.httpStatus,outcome:x.outcome});
+    checks.push({requestedAt:x.requestedAt,checkedAt:x.checkedAt,httpStatus:x.httpStatus,outcome:x.outcome});
    }
   }
  }catch{return empty}
  checks.sort((a,b)=>a.checkedAt-b.checkedAt);
  const last=checks.at(-1),verified=checks.filter(x=>x.outcome==='VERIFIED');
+ // Actual HTTP request gaps, NOT Task Scheduler tick durations or evidence
+ // that every missed tick was caused by a busy Task.
+ const post=checks.filter(x=>x.requestedAt>=CNN_ACTIVATED_UTC)
+  .sort((a,b)=>a.requestedAt-b.requestedAt);
+ const gaps=post.slice(1).map((x,i)=>
+  Math.round((x.requestedAt-post[i].requestedAt)/1000));
+ const sortedGaps=[...gaps].sort((a,b)=>a-b);
+ const median=sortedGaps.length?
+  sortedGaps.length%2===1?sortedGaps[(sortedGaps.length-1)/2]:
+  (sortedGaps[sortedGaps.length/2-1]+sortedGaps[sortedGaps.length/2])/2:null;
  return {...empty,status:'READ',code:'CNN_HTTP_LOCAL_2DAY_READ',
   twoDayCount:checks.length,
   afterActivationCount:checks.filter(x=>x.checkedAt>=CNN_ACTIVATED_UTC).length,
@@ -62,7 +76,15 @@ export function projectW06HttpChecksReadonly(rows,{observedAtMs}={}){
   http5xxCount:checks.filter(x=>x.httpStatus>=500&&x.httpStatus<600).length,
   fetchFailedCount:checks.filter(x=>x.outcome==='FETCH_FAILED').length,
   latestCheckedAt:isoMs(last?.checkedAt),latestVerifiedAt:isoMs(verified.at(-1)?.checkedAt),
-  latestHttpStatus:last?.httpStatus??null,latestOutcome:last?.outcome??null};
+  latestHttpStatus:last?.httpStatus??null,latestOutcome:last?.outcome??null,
+  afterActivationFirstRequestAt:isoMs(post[0]?.requestedAt),
+  afterActivationLastRequestAt:isoMs(post.at(-1)?.requestedAt),
+  requestGapSampleCount:gaps.length,
+  minRequestGapSeconds:sortedGaps[0]??null,
+  medianRequestGapSeconds:median,
+  maxRequestGapSeconds:sortedGaps.at(-1)??null,
+  gapsOver90Seconds:gaps.filter(x=>x>90).length,
+  recentRequestIntervalsSeconds:gaps.slice(-12)};
 }
 export function inspectW06HttpChecksReadonly({filesystem=fs,connect=p=>
  new DatabaseSync(p,{readOnly:true,timeout:1000}),clock=Date.now}={}){
