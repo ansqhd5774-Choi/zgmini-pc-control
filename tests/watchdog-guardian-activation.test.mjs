@@ -206,7 +206,11 @@ test('R4 exact Guardian same-purpose B admission is inert without exact authoriz
  assert.equal(approval.installedManifestSha256,
   'a47343964fbf3668d27f77deba69dbfc9b53788775c26ea420eeb3b2509e3805');
  assert.equal(approval.guardianHelperSha256,helperDigest);
- assert.equal(approval.activationScriptSha256,scriptDigest);
+ // R4 was consumed by #3837. Its exact historical source SHA must NOT
+ // silently change when the successor R5 Guardian code is developed.
+ assert.equal(approval.activationScriptSha256,
+  '7e41426db2ac7831c23d8567e1651f163ffc75417991f0ff6cbbdb3309af86c1');
+ assert.notEqual(approval.activationScriptSha256,scriptDigest);
  assert.equal(approval.stageRequestId,R4_GUARDIAN_STAGE_REQUEST_ID);
  assert.equal(approval.oldStageIssueNumber,R4_GUARDIAN_STAGE_ISSUE);
  assert.equal(approval.expectedControllerSha,R4_GUARDIAN_CONTROLLER_SHA);
@@ -216,7 +220,8 @@ test('R4 exact Guardian same-purpose B admission is inert without exact authoriz
  real.approval=approval;
  real.approvalDigest=digest(bytes);
  real.body.approvalManifestSha256=digest(bytes);
- assert.equal(admitR4(real).requestId,R4_GUARDIAN_REQUEST_ID);
+ // Historic approval cannot be reused with this changed executable.
+ assert.throws(()=>admitR4(real),/WATCHDOG_R4_GUARDIAN_APPROVAL_INVALID/);
 });
 test('R4 Guardian old process must be healthy, pre-stage and WMI-identity attributable',()=>{
  const x=r4Stage();
@@ -283,4 +288,142 @@ test('R4 Guardian adapter retains one original ACTIVATE call and exact source gu
  const reporter=fs.readFileSync(path.join(root,'watchdog-b/guardian-result.mjs'),'utf8');
  assert.match(reporter,/R4_GUARDIAN_REQUEST_ID/);
  assert.match(reporter,/R4_GUARDIAN_TARGET/);
+});
+
+import {
+ R5_GUARDIAN_TARGET,R5_GUARDIAN_SOURCE_SHA256,R5_GUARDIAN_REQUEST_ID,
+ R5_GUARDIAN_INSTALL_RAW_SHA256,R5_GUARDIAN_STAGE_REQUEST_ID,
+ R5_GUARDIAN_STAGE_ISSUE,R5_GUARDIAN_SCHEMA,R5_GUARDIAN_SCOPE,
+ R5_GUARDIAN_EFFECT,R5_GUARDIAN_BASIS,R5_GUARDIAN_CONTROLLER_SHA,
+ R5_GUARDIAN_HELPER_SHA256,validateR5GuardianRequest,
+ verifyR5GuardianPrecheck,verifyR5GuardianPostcheck
+} from '../watchdog-b/guardian-r5-contract.mjs';
+
+function fixtureR5(){
+ const x=fixtureR4();
+ x.body={...x.body,targetSha:R5_GUARDIAN_TARGET,
+  requestId:R5_GUARDIAN_REQUEST_ID};
+ x.approval={...x.approval,schema:R5_GUARDIAN_SCHEMA,
+  scope:R5_GUARDIAN_SCOPE,targetSha:R5_GUARDIAN_TARGET,
+  installedSha256:R5_GUARDIAN_SOURCE_SHA256,
+  installedManifestSha256:R5_GUARDIAN_INSTALL_RAW_SHA256,
+  guardianHelperSha256:R5_GUARDIAN_HELPER_SHA256,
+  stageRequestId:R5_GUARDIAN_STAGE_REQUEST_ID,
+  oldStageIssueNumber:R5_GUARDIAN_STAGE_ISSUE,
+  expectedControllerSha:R5_GUARDIAN_CONTROLLER_SHA,
+  effect:R5_GUARDIAN_EFFECT,approvalBasis:R5_GUARDIAN_BASIS,
+  activationScriptSha256:scriptDigest};
+ return x;
+}
+const admitR5=x=>validateR5GuardianRequest(x.event,x.body,x.approval,{
+ approvalDigest:x.approvalDigest,helperDigest,
+ activationScriptDigest:scriptDigest});
+function r5Stage(){
+ const install={sha256:R5_GUARDIAN_SOURCE_SHA256,
+  scope:'RUNNER_RECOVERY_AND_MAINTENANCE_HANDOFF_V1',
+  approvedTargetSourceSha:R5_GUARDIAN_TARGET,
+  standby:{mode:'ACTIVE_1_STANDBY_2',approved:true},
+  upgradedAt:'2026-11-26T11:00:00.000Z'};
+ const owner={pid:6101,nonce:'4d20d96c-16f5-4dc1-ac6e-4d0b21eeed2f',
+  at:'2026-11-26T10:00:00.000Z'};
+ const status={pid:6101,state:'HEALTHY',at:'2026-11-26T11:01:00.000Z',
+  supervisorPid:6301,standbyPid:6401,standbyRole:'READY'};
+ const stage={schema:'ZGMINI_PC_WATCHDOG_B_RESULT_V1',
+  requestId:R5_GUARDIAN_STAGE_REQUEST_ID,issueNumber:R5_GUARDIAN_STAGE_ISSUE,
+  targetSha:R5_GUARDIAN_TARGET,targetSourceSha256:R5_GUARDIAN_SOURCE_SHA256,
+  status:'STAGED',writes:2};
+ return {install,sourceDigest:R5_GUARDIAN_SOURCE_SHA256,
+  installedManifestDigest:R5_GUARDIAN_INSTALL_RAW_SHA256,
+  stage,owner,status,now:Date.parse('2026-11-26T11:02:00.000Z'),
+  pidAlive:()=>true};
+}
+test('R5 exact Guardian B requires independent version and approved raw source',()=>{
+ const x=fixtureR5();
+ assert.equal(admitR5(x).requestId,R5_GUARDIAN_REQUEST_ID);
+ for(const mutate of [
+  x=>{x.body.requestId=R4_GUARDIAN_REQUEST_ID;},
+  x=>{x.body.targetSha=R4_GUARDIAN_TARGET;},
+  x=>{x.body.command='taskkill';},
+  x=>{x.event.issue.labels=[];},
+  x=>{x.approval.approved=false;},
+  x=>{x.approval.installedSha256=R4_GUARDIAN_SOURCE_SHA256;},
+  x=>{x.approval.installedManifestSha256=R4_GUARDIAN_INSTALL_RAW_SHA256;},
+  x=>{x.approval.targetSha=R4_GUARDIAN_TARGET;},
+  x=>{x.approval.stageRequestId=R4_GUARDIAN_STAGE_REQUEST_ID;},
+  x=>{x.approval.oldStageIssueNumber=3784;},
+  x=>{x.approval.activationScriptSha256='0'.repeat(64);},
+  x=>{x.approval.effect='ANY_PROCESS_KILL';},
+  x=>{x.approvalDigest='f'.repeat(64);}
+ ]){const t=structuredClone(x);mutate(t);
+  assert.throws(()=>admitR5(t),/WATCHDOG_R5_GUARDIAN_/);
+ }
+ // Approval awaits byte-for-byte source hash and exact CI of this PR.
+ assert.equal(fs.existsSync(path.join(root,'approvals/watchdog-activations/',
+  R5_GUARDIAN_TARGET+'-r5.json')),false);
+});
+test('R5 Guardian rejects staged source if previous R4 1+1 READY not proven',()=>{
+ const x=r5Stage();assert.equal(verifyR5GuardianPrecheck(x),true);
+ for(const mutate of [
+  x=>{x.installedManifestDigest='f'.repeat(64);},
+  x=>{x.sourceDigest=R4_GUARDIAN_SOURCE_SHA256;},
+  x=>{x.install.standby.mode='ACTIVE_1_STANDBY_1';},
+  x=>{x.stage.requestId=R4_GUARDIAN_STAGE_REQUEST_ID;},
+  x=>{x.stage.status='RUNNING';},
+  x=>{x.stage.writes=1;},
+  x=>{x.owner.at='2026-11-26T11:01:00.000Z';},
+  x=>{x.status.standbyRole='STARTING';},
+  x=>{x.status.secondStandbyRole='READY';},
+  x=>{x.status.standbyPid=x.status.supervisorPid;},
+  x=>{x.status.state='BLOCKED';},
+  x=>{x.pidAlive=()=>false;}
+ ]){
+  const t={...x,install:structuredClone(x.install),stage:structuredClone(x.stage),
+   owner:structuredClone(x.owner),status:structuredClone(x.status)};
+  mutate(t);
+  assert.throws(()=>verifyR5GuardianPrecheck(t),/WATCHDOG_R5_GUARDIAN_/);
+ }
+});
+test('R5 Guardian postcheck requires one Active and precisely two live READY IPCs',()=>{
+ const x=r5Stage();
+ const valid={install:x.install,sourceDigest:x.sourceDigest,
+  installedManifestDigest:x.installedManifestDigest,oldOwner:x.owner,
+  oldStatus:x.status,
+  newOwner:{pid:6201,nonce:'b90ae689-0adf-4bf9-a74a-43cb0f8b14e6',
+   at:'2026-11-26T11:02:10.000Z'},
+  status:{pid:6201,state:'HEALTHY',at:'2026-11-26T11:02:20.000Z',
+   supervisorPid:6301,standbyPid:6501,standbyRole:'READY',
+   secondStandbyPid:6502,secondStandbyRole:'READY',standbyReadyCount:2},
+  signalledAt:'2026-11-26T11:02:09.000Z',
+  now:Date.parse('2026-11-26T11:02:25.000Z'),pidAlive:()=>true};
+ assert.equal(verifyR5GuardianPostcheck(valid),true);
+ for(const mutate of [
+  t=>{t.installedManifestDigest='0'.repeat(64);},
+  t=>{t.newOwner.pid=t.oldOwner.pid;},
+  t=>{t.newOwner.nonce=t.oldOwner.nonce;},
+  t=>{t.status.secondStandbyRole='STARTING';},
+  t=>{t.status.standbyReadyCount=1;},
+  t=>{t.status.secondStandbyPid=t.status.standbyPid;},
+  t=>{t.status.secondStandbyPid=t.status.supervisorPid;},
+  t=>{t.status.supervisorPid=9999;},
+  t=>{t.status.standbyRole='STARTING';},
+  t=>{t.status.state='BLOCKED';},
+  t=>{t.pidAlive=()=>false;}
+ ]){
+  const t={...valid,oldOwner:structuredClone(valid.oldOwner),
+   oldStatus:structuredClone(valid.oldStatus),install:structuredClone(valid.install),
+   newOwner:structuredClone(valid.newOwner),status:structuredClone(valid.status)};
+  mutate(t);
+  assert.throws(()=>verifyR5GuardianPostcheck(t),/WATCHDOG_R5_GUARDIAN_/);
+ }
+});
+test('R5 Guardian executor retains exactly one ACTIVATE and no extra B runner',()=>{
+ const src=fs.readFileSync(path.join(root,'watchdog-b/guardian-activation.mjs'),'utf8');
+ const reporter=fs.readFileSync(path.join(root,'watchdog-b/guardian-result.mjs'),'utf8');
+ assert.equal(src.split("witness('ACTIVATE',owner.pid)").length-1,1);
+ assert.ok(src.indexOf('verifyR5GuardianPrecheck(')<src.indexOf('persist(ledger,initial,true)'));
+ assert.match(src,/verifyR5GuardianPostcheck\(/);
+ assert.match(src,/R5_GUARDIAN_INSTALL_RAW_SHA256/);
+ assert.match(src,/verifyR5ControllerHost\(/);
+ assert.match(reporter,/R5_GUARDIAN_REQUEST_ID/);
+ assert.match(reporter,/VERIFY_R5_ACTIVE_AND_TWO_STANDBY_RUNTIME/);
 });
