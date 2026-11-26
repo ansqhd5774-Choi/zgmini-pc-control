@@ -1,0 +1,138 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {
+ authorizeTaskCreateB,verifyTaskCreateBPreimage,verifyTaskCreateBCandidate,
+ TASK,INSTALLED_SOURCE,SOURCE_ROOT,WRAPPER,APPROVAL_SCHEMA,
+ REQUEST_SCHEMA,ISSUE_TITLE,ISSUE_LABEL,sha256
+} from '../task-create-b/contract.mjs';
+import {applyTaskCreateB} from '../task-create-b/transaction.mjs';
+
+const reqId='abec1087-3a25-4452-a5a8-a45218f05c37';
+const digest=value=>createHash('sha256').update(value).digest('hex');
+const candidate=()=>{
+ const text='<Task><Triggers><TimeTrigger><Repetition><Interval>PT1M</Interval></Repetition></TimeTrigger></Triggers>'+
+  '<Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>'+
+  '<Enabled>true</Enabled><ExecutionTimeLimit>PT30M</ExecutionTimeLimit></Settings>'+
+  '<Actions><Exec><Arguments>run-local-cnn-minute.vbs</Arguments></Exec></Actions></Task>';
+ const off=text.replace('<Enabled>true</Enabled>','<Enabled>false</Enabled>');
+ return {launcher:Buffer.from('local-cycle.mjs --cnn-minute --publish','utf8'),
+  enabledXml:Buffer.from(text,'utf16le'),disabledXml:Buffer.from(off,'utf16le')};
+};
+const approval=bytes=>({
+ schema:APPROVAL_SCHEMA,status:'APPROVED_B',
+ scope:'W06_ONE_TASK_CREATE_AND_ENABLE_WITH_CNN_RUNTIME_EFFECTS',
+ taskName:TASK,installedSourceSha:INSTALLED_SOURCE,sourceRoot:SOURCE_ROOT,
+ wrapperPath:WRAPPER,launcherSha256:digest(bytes.launcher),
+ disabledXmlSha256:digest(bytes.disabledXml),enabledXmlSha256:digest(bytes.enabledXml),
+ coreTaskXmlSha256:'d'.repeat(64),sidecarSourceSha256:'e'.repeat(64),
+ allowCnnHttpRequests:true,allowSqliteObservationWrites:true,
+ allowD1PublicProjectionWrites:true,allowOtherTaskChanges:false,runCount:1
+});
+function proofSetup(){
+ const bytes=candidate(),manifest=approval(bytes),raw=Buffer.from(JSON.stringify(manifest));
+ const request={schema:REQUEST_SCHEMA,requestId:reqId,operation:'task-create-once',
+  approvalManifestPath:'approvals/task-create-b/w06-cnn-minute-20261126.json',
+  approvalManifestSha256:digest(raw)};
+ const event={action:'opened',issue:{title:ISSUE_TITLE,
+  user:{login:'ansqhd5774-Choi'},labels:[{name:ISSUE_LABEL}],body:JSON.stringify(request)}};
+ const proof=authorizeTaskCreateB({event,manifestBytes:raw,manifestCommitted:true});
+ const original={taskExists:false,wrapperExists:false,installedSourceSha:INSTALLED_SOURCE,
+  configSourceSha:INSTALLED_SOURCE,coreTaskXmlSha256:manifest.coreTaskXmlSha256,
+  sidecarSourceSha256:manifest.sidecarSourceSha256,
+  coreTaskEnabled:true,unrelatedTaskMutation:false};
+ return {bytes,manifest,raw,event,proof,original};
+}
+function port(original,{disabledReadback=true,enabledReadback=true,throwOnEnable=false,
+ protectedOk=true,restoreOk=true,taskUndoOk=true}={}){
+ const log=[];
+ const io={
+  async acquireSharedLease(){log.push('lease')},
+  async observe(){log.push('observe');return original},
+  async claimOnce(){log.push('claim')},
+  async backupProtected(){log.push('backup')},
+  async createLauncherExclusive(){log.push('wrapper')},
+  async launcherReadback(){log.push('wrapperReadback');return true},
+  async registerTaskDisabled(){log.push('registerDisabled')},
+  async taskReadback(a){log.push('taskReadback:'+a.enabled);
+   return a.enabled?enabledReadback:disabledReadback},
+  async enableTask(){log.push('enable');if(throwOnEnable)throw Error('UNCERTAIN')},
+  async verifyProtectedUnchanged(){log.push('protected');return protectedOk},
+  async undoOwnedTaskIfExact(){log.push('undoTask');return taskUndoOk},
+  async undoOwnedLauncherIfExact(){log.push('undoWrapper');return true},
+  async verifyRestored(){log.push('verifyRestored');return restoreOk},
+  async releaseSharedLease(){log.push('release')}
+ };
+ return {io,log};
+}
+
+test('B: authentic owner, committed raw manifest and explicit HTTP/SQLite/D1 effects',()=>{
+ const {event,raw,proof,bytes,original}=proofSetup();
+ assert.equal(verifyTaskCreateBPreimage(proof,original),true);
+ assert.equal(verifyTaskCreateBCandidate(proof,bytes),true);
+ assert.throws(()=>authorizeTaskCreateB({event,manifestBytes:raw,manifestCommitted:false}),
+  e=>e.code==='TASK_CREATE_B_OWNER_OR_COMMIT_STOP');
+ assert.throws(()=>authorizeTaskCreateB({event:{...event,issue:{...event.issue,
+  user:{login:'untrusted'}}},manifestBytes:raw,manifestCommitted:true}),
+  e=>e.code==='TASK_CREATE_B_OWNER_OR_COMMIT_STOP');
+ const changed=Buffer.from(raw);changed[10]=changed[10]^1;
+ assert.throws(()=>authorizeTaskCreateB({event,manifestBytes:changed,manifestCommitted:true}),
+  e=>['TASK_CREATE_B_REQUEST_SCOPE_STOP','TASK_CREATE_B_REQUEST_OR_MANIFEST_JSON_STOP'].includes(e.code));
+ assert.throws(()=>verifyTaskCreateBCandidate(proof,{...bytes,launcher:Buffer.from('bad')}),
+  e=>e.code==='TASK_CREATE_B_CANDIDATE_HASH_STOP');
+ assert.equal(sha256(bytes.launcher),digest(bytes.launcher));
+});
+test('B: Task absence, installed source, original Core/Sidecar hashes required',()=>{
+ const {proof,original}=proofSetup();
+ for(const patch of [{taskExists:true},{wrapperExists:true},
+  {configSourceSha:'0'.repeat(40)},{coreTaskEnabled:false},
+  {sidecarSourceSha256:'0'.repeat(64)},{unrelatedTaskMutation:true}]){
+  assert.throws(()=>verifyTaskCreateBPreimage(proof,{...original,...patch}),
+   e=>e.code==='TASK_CREATE_B_PREIMAGE_STOP');
+ }
+});
+test('B: creates exact disabled Task, validates, then enables once',async()=>{
+ const {proof,bytes,original}=proofSetup(),{io,log}=port(original);
+ const result=await applyTaskCreateB(proof,bytes,io);
+ assert.equal(result.status,'TASK_CREATE_B_INSTALLED_VERIFIED');
+ assert.equal(result.code,'TASK_CREATE_B_ONE_TASK_ENABLE_READBACK_PASS');
+ assert.equal(result.taskChanges,1);assert.equal(result.otherTaskChanges,0);
+ assert.deepEqual(log,['lease','observe','claim','backup','observe','wrapper',
+  'wrapperReadback','registerDisabled','taskReadback:false','protected',
+  'enable','taskReadback:true','protected','release']);
+ assert.equal(log.filter(x=>x==='enable').length,1);
+});
+test('B: preflight never claims or mutates Task',async()=>{
+ const {proof,bytes,original}=proofSetup(),{io,log}=port({...original,taskExists:true});
+ const result=await applyTaskCreateB(proof,bytes,io);
+ assert.equal(result.status,'TASK_CREATE_B_PREFLIGHT_STOP');
+ assert.equal(result.created,false);
+ assert.deepEqual(log,['lease','observe','release']);
+});
+test('B: failure before enable restores only exactly owned Task/launcher',async()=>{
+ const {proof,bytes,original}=proofSetup();
+ const {io,log}=port(original,{disabledReadback:false});
+ const result=await applyTaskCreateB(proof,bytes,io);
+ assert.equal(result.status,'TASK_CREATE_B_INSTALL_STOP_RESTORED');
+ assert.equal(result.taskChanges,0);
+ assert.ok(log.includes('undoTask'));assert.ok(log.includes('undoWrapper'));
+ assert.ok(log.includes('verifyRestored'));assert.ok(log.includes('release'));
+ assert.equal(log.includes('enable'),false);
+});
+test('B: unknown activation is RECOVERY_REQUIRED, no unsafe rollback/replay',async()=>{
+ const {proof,bytes,original}=proofSetup(),{io,log}=port(original,{throwOnEnable:true});
+ const result=await applyTaskCreateB(proof,bytes,io);
+ assert.equal(result.status,'TASK_CREATE_B_RECOVERY_REQUIRED');
+ assert.equal(result.created,null);assert.equal(result.providerCalls,null);
+ assert.equal(log.filter(x=>x==='enable').length,1);
+ assert.equal(log.includes('undoTask'),false);
+ assert.equal(log.includes('release'),false);
+});
+test('B: failed pre-enable rollback retains lease and claim for reconciliation',async()=>{
+ const {proof,bytes,original}=proofSetup();
+ const {io,log}=port(original,{disabledReadback:false,taskUndoOk:false});
+ const result=await applyTaskCreateB(proof,bytes,io);
+ assert.equal(result.status,'TASK_CREATE_B_RECOVERY_REQUIRED');
+ assert.equal(result.code,'TASK_CREATE_B_ROLLBACK_UNVERIFIED');
+ assert.equal(log.includes('release'),false);
+});
