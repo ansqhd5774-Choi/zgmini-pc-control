@@ -20,6 +20,7 @@ export function assessOrphanRunnerPreflight({
   controllerListenerCount:0,serviceListenerExceptions:0,workerCount:0,
   promotionAuthorized:false,runnerTerminationAuthorized:false,
   supervisorSpawnAuthorized:false,leaseMutationAuthorized:false,
+  controllerJobAdmissionVerified:false,runnerTokenRebindRequired:true,
   operationalWrites:0,providerCalls:0,d1Writes:0};
  const fail=(code,extra={})=>({...base,code,...extra});
  if(!sha40(installedControllerSha)||installedControllerSha!==expectedControllerSha||
@@ -98,8 +99,8 @@ export function assessOrphanRunnerPreflight({
  // prior parentage, active request lease continuity or new Supervisor safety.
  // A separate Windows source, CAS/rollback/lease contract and explicit effect
  // approval are necessary before creating any new Supervisor or child.
- return {...base,status:'READ_ONLY_CANDIDATE',
-  code:'ORPHAN_SIX_CONTROLLER_LISTENERS_PRESERVED',
+ return {...base,status:'OBSERVED_ONLY',
+  code:'ORPHAN_SIX_LISTENERS_REQUIRE_NONCE_REBIND',
   controllerListenerCount:6,serviceListenerExceptions:services,
   workerCount:workers};
 }
