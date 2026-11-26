@@ -11,6 +11,8 @@ on:
       - 'tools/ci-controller-b-receipt-root-readonly.mjs'
       - 'tools/ci-controller-b-c-operator-readonly.mjs'
       - 'tests/ci-controller-b-c-operator-readonly.test.mjs'
+      - 'tools/ci-controller-b-receipt-proof.mjs'
+      - 'tests/ci-controller-b-receipt-proof.test.mjs'
       - 'tools/w03-paid-private-readonly.mjs'
       - 'tools/w03-paid-source-coverage-readonly.mjs'
       - 'tests/w03-paid-source-coverage-readonly.test.mjs'
@@ -52,6 +54,8 @@ jobs:
           node-version: '22'
       - name: Verify process discovery excludes commands and secrets
         run: node --test tests/pc-process-inventory-readonly.test.mjs tests/w06-cnn-task-cadence-readonly.test.mjs tests/runner-job-history-readonly.test.mjs tests/w03-paid-private-readonly.test.mjs tests/w03-paid-source-coverage-readonly.test.mjs tests/cnn-r10-guard-replay-readonly.test.mjs writer-config-b/result-pair-atomic.test.mjs
+      - name: Verify isolated receipt proof is exclusively scoped
+        run: node --test tests/ci-controller-b-receipt-proof.test.mjs
       - name: Check C operator service account preflight remains readonly
         if: hashFiles('tests/ci-controller-b-c-operator-readonly.test.mjs') != ''
         run: node --test tests/ci-controller-b-c-operator-readonly.test.mjs
@@ -111,3 +115,37 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           ZGMINI_CI_CONTROLLER_B_RECEIPT_ROOT: ${{ vars.ZGMINI_CI_CONTROLLER_B_RECEIPT_ROOT }}
         run: node tools/pc-process-inventory-readonly.mjs handoff
+
+  # Separate opt-in owner Issue job. The existing A inventory job remains readonly.
+  # No new Runner, schedule, publisher permission, or approval effect is introduced.
+  ci-receipt-proof:
+    permissions:
+      contents: read
+    if: >-
+      github.event_name == 'issues' &&
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.id == 1442936296 &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'ci-controller-b-receipt-proof' &&
+      contains(github.event.issue.body, '"schema":"ZGMINI_CI_RECEIPT_PROOF_REQUEST_V1"') &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 8
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Prove fixed receipt root write or subsequent run readback
+        env:
+          ZGMINI_CI_CONTROLLER_B_ENABLED: ${{ vars.ZGMINI_CI_CONTROLLER_B_ENABLED }}
+          ZGMINI_CI_CONTROLLER_B_RECEIPT_ROOT: ${{ vars.ZGMINI_CI_CONTROLLER_B_RECEIPT_ROOT }}
+        run: node tools/ci-controller-b-receipt-proof.mjs
