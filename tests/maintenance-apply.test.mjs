@@ -12,7 +12,8 @@ import {execFileSync} from 'node:child_process';
 import {applyApprovedUpdate,maintenanceFailureCode,reconcileInterruptedRollback,runApprovedS6FailoverOnce} from '../tools/maintenance-apply.mjs';
 import {isolatedControllerStage,recoveryOperatorProofStatus,waitForSupervisorStopIdle,
  s6PriorRequestLedgerPreserved,normalizeS6OldChildren,
- s6WatchdogPinMatches} from '../tools/update.mjs';
+ s6WatchdogPinMatches,s6OwnedLeaseReleaseReadback,
+ makeS6OnceOwnedOperatingPort} from '../tools/update.mjs';
 
 test('independent recovery proof keeps strict identity and returns exact sanitized failure categories',()=>{
  assert.deepEqual(recoveryOperatorProofStatus({exitCode:0,stdout:'INDEPENDENT_OPERATOR\r\n'}),{verified:true,code:'RECOVERY_OPERATOR_VERIFIED'});
@@ -1215,7 +1216,9 @@ test('S6 old Runner and Watchdog pause proof waits only read-only before owned r
 test('S6 readonly PC preflight checks deployed Watchdog bytes, not just INSTALL pin or stale process status',()=>{
  const src=fs.readFileSync(new URL('../tools/update.mjs',import.meta.url),'utf8');
  const start=src.indexOf('export function readS6OnceCurrentPreimage(');
- const end=src.indexOf('export async function command(',start);
+ // Scope the no-mutation assertion to the read-only preflight, not to
+ // the subsequently introduced, separately gated S6 operating-port source.
+ const end=src.indexOf('export function s6PriorRequestLedgerPreserved(',start);
  assert.ok(start>=0&&end>start);
  const body=src.slice(start,end);
  assert.match(body,/sha256\(fs\.readFileSync\(path\.join\(wdHome,'runner-watchdog\.mjs'\)\)\)===wdInstall\.sha256/);
@@ -1259,7 +1262,9 @@ test('S6 ledger readback fails closed for traversal, malformed SHA and symlinked
 test('S6 local readback uses actual deployed Watchdog WMI and never publishes a synthetic pass',()=>{
  const s=fs.readFileSync(new URL('../tools/update.mjs',import.meta.url),'utf8');
  const begin=s.indexOf('export async function readS6OncePhaseReadback(');
- const end=s.indexOf('export async function command(',begin);
+ // The next function is the separately gated owned-release helper; do not
+ // sweep executable B port source into this read-only observation assertion.
+ const end=s.indexOf('export function s6OwnedLeaseReleaseReadback(',begin);
  assert.ok(begin>0&&end>begin);
  const code=s.slice(begin,end);
  assert.match(code,/sha256\(verifiedWatchdogBytes\)===wdInstall\.sha256/);
@@ -1313,4 +1318,74 @@ test('S6 Watchdog approval pin rejects replaced source, receiver nonce and recyc
   {baseline:{...baseline,watchdogPid:null}}
  ])assert.equal(s6WatchdogPinMatches({...good,...altered}),false,
   JSON.stringify(altered));
+});
+
+
+test('S6 owned release requires exact old owner, empty WMI, preserved ledger and same B operator source',()=>{
+ const now=Date.parse('2026-11-26T13:00:00Z');
+ const baseline={
+  requestId:'pc-s6-12345678-aaaa-4ccc-8ddd-123456789abc',
+  controllerSha:'a'.repeat(40),protectedSha256:'b'.repeat(64),
+  watchdogPid:13001,oldSupervisorNonce:'11111111-2222-4333-8444-555555555555'
+ };
+ const snap={
+  requestId:baseline.requestId,controllerSha:baseline.controllerSha,
+  protectedSha256:baseline.protectedSha256,
+  watchdogPid:baseline.watchdogPid,
+  oldSupervisorNonce:baseline.oldSupervisorNonce,
+  oldOwnerIdentityMatched:true,independentOperatorAttested:true,
+  exactApprovalBytesAttested:true,
+  observedAtUtc:new Date(now-1000).toISOString(),
+  oldSupervisorAlive:false,oldSixChildrenStopped:true,
+  runnerExecutableProof:'NO_CONTROLLER_RUNNER_PROCESS',
+  watchdogPaused:true,maintenanceLeaseHeld:true,
+  workflowState:'active',controllerDraining:false,
+  relatedLeasesAbsent:true,existingRequestLedgerPreserved:true,
+  pendingWorkCount:1 // newly queued legitimate A job is not old Writer activity
+ };
+ assert.equal(s6OwnedLeaseReleaseReadback(snap,baseline,{now}),true);
+ for(const change of [
+  {requestId:'pc-s6-mismatch'},{controllerSha:'c'.repeat(40)},
+  {protectedSha256:'c'.repeat(64)},{watchdogPid:13002},
+  {oldSupervisorNonce:'99999999-2222-4333-8444-555555555555'},
+  {oldOwnerIdentityMatched:false},{independentOperatorAttested:false},
+  {exactApprovalBytesAttested:false},
+  {oldSupervisorAlive:true},{oldSixChildrenStopped:false},
+  {runnerExecutableProof:'UNVERIFIED'},
+  {runnerExecutableProof:'ACTIVE_RUNNER_PROCESS'},
+  {watchdogPaused:false},{maintenanceLeaseHeld:false},
+  {workflowState:'disabled_manually'},{controllerDraining:true},
+  {relatedLeasesAbsent:false},{existingRequestLedgerPreserved:false},
+  {observedAtUtc:new Date(now-46000).toISOString()},
+  {observedAtUtc:new Date(now+1000).toISOString()}
+ ])assert.equal(s6OwnedLeaseReleaseReadback({...snap,...change},baseline,{now}),false,
+  JSON.stringify(change));
+ assert.equal(s6OwnedLeaseReleaseReadback(null,baseline,{now}),false);
+ assert.equal(s6OwnedLeaseReleaseReadback(snap,null,{now}),false);
+});
+test('S6 live operating-port entry is not available to CI or Runner and has no direct CLI dispatch',()=>{
+ assert.throws(()=>makeS6OnceOwnedOperatingPort({}),/S6_PORT_INDEPENDENT_WINDOWS_ONLY|S6_PORT_OPERATOR_OR_ISSUE_UNVERIFIED/);
+ const src=fs.readFileSync(new URL('../tools/update.mjs',import.meta.url),'utf8');
+ const b=src.indexOf('export function makeS6OnceOwnedOperatingPort(');
+ const e=src.indexOf('export async function command(',b);
+ assert.ok(b>=0&&e>b);
+ const body=src.slice(b,e);
+ assert.match(body,/validateS6OnceIssueEnvelope/);
+ assert.match(body,/validateS6OnceBManifest/);
+ assert.match(body,/verifyIndependent/);
+ assert.match(body,/assertRemoteBPin/);
+ for(const [start,end] of [['pauseIntake:async','waitForDrain:async'],
+  ['stopOwnTree:async','waitForStoppedHeld:async'],
+  ['releaseOwnedInstallLease:async','waitForPromotion:async']]){
+  const from=body.indexOf(start),to=body.indexOf(end,from);
+  assert.ok(from>=0&&to>from);
+  assert.match(body.slice(from,to),/assertRemoteBPin\(\)/);
+ }
+
+ assert.match(body,/acquireMaintenanceLock\(maintenanceRoot,'controller-install'\)/);
+ assert.match(body,/path\.win32\.join\(systemRoot,'System32','taskkill\.exe'\)/);
+ assert.match(body,/S6_PORT_SYSTEMROOT_UNVERIFIED/);
+ assert.match(body,/s6OwnedLeaseReleaseReadback\(snap,baseline\)/);
+ assert.match(body,/case.*claim|claimOnce:/);
+ assert.doesNotMatch(src.slice(e),/if\(cmd==='s6-once-apply'\)/);
 });
