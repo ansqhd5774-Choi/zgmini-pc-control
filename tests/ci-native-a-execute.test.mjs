@@ -125,3 +125,22 @@ test('unverified engine response cannot yield successful A receipt',async()=>{
  const r=await runNativeAReadOnly({...x,executeJob:async()=>({report:{status:'PASS'}})});
  assert.equal(r.code,'CI_NATIVE_A_RESULT_UNVERIFIED');
 });
+
+test('read-only A cannot report PASS if actual worker claims provider calls',async()=>{
+ const x=make();
+ const r=await runNativeAReadOnly({...x,executeJob:async raw=>({report:{
+  schema:'ZGMINI_PC_RESULT_V1',requestId:raw.requestId,
+  operation:raw.operation,status:'PASS',code:'RUNNER_COMMAND_EXECUTED',
+  operationalWrites:0,providerCalls:1,d1Writes:0
+ }})});
+ assert.equal(r.code,'CI_NATIVE_A_UNEXPECTED_WRITE_OR_PROVIDER_EFFECT');
+});
+test('read-only A cannot report PASS if actual worker wrote D1 or operational files',async()=>{
+ const x=make();
+ const r=await runNativeAReadOnly({...x,executeJob:async raw=>({report:{
+  schema:'ZGMINI_PC_RESULT_V1',requestId:raw.requestId,
+  operation:raw.operation,status:'PASS',code:'RUNNER_COMMAND_EXECUTED',
+  operationalWrites:1,providerCalls:0,d1Writes:1
+ }})});
+ assert.equal(r.code,'CI_NATIVE_A_UNEXPECTED_WRITE_OR_PROVIDER_EFFECT');
+});
