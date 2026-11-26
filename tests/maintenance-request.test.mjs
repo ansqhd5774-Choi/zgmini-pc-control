@@ -383,7 +383,8 @@ test('CI lost POST response may recover exact bot Issue in its original successf
  assert.equal(result.issueNumber,42);assert.equal(f.saved.phase,'READBACK_VERIFIED');
  assert.match(result.receiptMarker,/^ZGMINI_CI_CONTROLLER_B_RECEIPT=42:[a-f0-9]{64}$/);
  const later=await submitExistingControllerApprovalFromCi({...f.input,runId:900},f.ports);
- assert.equal(later.code,'MAINTENANCE_CI_EXISTING_RECEIPT_NO_REPOST');
+ assert.equal(later.status,'EXISTING_REQUEST_REUSED');
+ assert.deepEqual(later.issueNumbers,[42]);
  assert.equal(later.receiptMarker,undefined);assert.equal(f.posts,1);
 });
 test('CI first readback failure can recover the same bot Issue without another POST',async()=>{
@@ -466,7 +467,8 @@ test('durable effect receipt survives independent submitter instances and preser
  assert.equal(first.status,'REQUEST_READBACK_VERIFIED');assert.equal(f.posts,1);
  const secondStore=createCiEffectReceiptStore(root);
  const retry=await submitExistingControllerApprovalFromCi({...f.input,runId:999},{...f.ports,...secondStore});
- assert.equal(retry.code,'MAINTENANCE_CI_EXISTING_RECEIPT_NO_REPOST');assert.equal(f.posts,1);
+ assert.equal(retry.status,'EXISTING_REQUEST_REUSED');assert.deepEqual(retry.issueNumbers,[42]);
+ assert.equal(f.posts,1);assert.equal(retry.receiptMarker,undefined);
  assert.equal(secondStore.loadReceipt(first.effectKey).issueNumber,42);
 });
 test('exclusive receipt claim survives an uncertain POST with no auto replay',async t=>{
