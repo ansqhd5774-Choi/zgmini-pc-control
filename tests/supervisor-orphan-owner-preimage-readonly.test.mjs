@@ -116,7 +116,8 @@ test('only canonical Windows PC and three fixed files are read twice',()=>{
 test('read-only CAS source has no mutable process, lease, DB or network calls',()=>{
  const txt=fs.readFileSync(new URL('../tools/supervisor-orphan-owner-preimage-readonly.mjs',
   import.meta.url),'utf8');
- assert.doesNotMatch(txt,/\bspawn\s*\(|\bexecFileSync\s*\(|\bwriteFileSync\s*\(|\bkill\s*\(|unlinkSync|renameSync|mkdirSync|taskkill|workflow_dispatch/);
+ assert.doesNotMatch(txt,/\bspawn\s*\(|\bexecFileSync\s*\(|\bwriteFileSync\s*\(|unlinkSync|renameSync|mkdirSync|taskkill|workflow_dispatch/);
+ assert.match(txt,/process\.kill\(pid,0\)/); // signal zero checks liveness only
  assert.match(txt,/leaseMutationAuthorized:false/);
  assert.match(txt,/effectAuthorized:false/);
 });
