@@ -216,3 +216,29 @@ test('event-bound live policy cannot drift from independent installed approved s
  assert.equal(r.code,'CI_NATIVE_DISPATCH_RECEIVER_NOT_ATTESTED');
  assert.equal(x.claims.length,0);
 });
+
+
+for(const mode of ['FIXED','EVENT_COMPLETION_V1'])test('installed full native policy pins execution toggles and adapter/controller SHA in '+mode+' mode',async()=>{
+ for(const changed of [
+  {nativeAExecutionEnabled:true},
+  {nativeWriterBExecutionEnabled:true},
+  {nativeAAdapterSha256:'a'.repeat(64)},
+  {nativeWriterBAdapterSha256:'b'.repeat(64)},
+  {nativeWriterBControlSha:'c'.repeat(40)},
+  {installedControllerSha:'d'.repeat(40)}
+ ]){
+  const x=make();
+  if(mode==='EVENT_COMPLETION_V1'){
+   delete x.policy.sourceRunId;
+   x.policy.sourceRunMode=mode;
+  }
+  const approved={...x.policy};
+  x.ports.readInstalledReceiver=async()=>approved;
+  const caller={...x.policy,...changed,
+   ...(mode==='EVENT_COMPLETION_V1'?{sourceRunId:123}:{})};
+  const r=await dispatchApprovedCiEffect({policy:caller,requestBytes:x.bytes,ports:x.ports});
+  assert.equal(r.code,'CI_NATIVE_DISPATCH_RECEIVER_NOT_ATTESTED');
+  assert.equal(x.dispatches.length,0);
+  assert.equal(x.claims.length,0);
+ }
+});
