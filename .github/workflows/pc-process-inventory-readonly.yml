@@ -62,7 +62,7 @@ jobs:
       contains(github.event.issue.body, '"role":"operating"') &&
       github.run_attempt == 1
     runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
-    timeout-minutes: 4
+    timeout-minutes: 10
     defaults:
       run:
         shell: cmd
