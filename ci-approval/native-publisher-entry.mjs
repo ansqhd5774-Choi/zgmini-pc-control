@@ -111,6 +111,12 @@ export async function publishNativeCompletion({effect,event,env,ports}={}){
  // exact installed source Run may produce a dispatch; ignore all others.
  if(!sourceEventMatches(event,env,scope.policy))
   return out('IGNORED','CI_NATIVE_PUBLISH_SOURCE_EVENT_NOT_TARGET');
+ // Do not irreversibly consume a one-shot dispatch claim if the locally
+ // installed business approval bytes have drifted. The receiver also checks
+ // the bytes independently before any PC effect.
+ if(!Buffer.isBuffer(scope.approvalBytes)||
+    digest(scope.approvalBytes)!==scope.policy.businessApprovalSha256)
+  return out('EVIDENCE_MISSING','CI_NATIVE_PUBLISH_APPROVAL_BYTES_DRIFT');
  // Bind only the original authenticated event's actual run number; it is
  // neither an approval grant nor a replacement for the installed SHA pins.
  const approvedPolicy=scope.policy.sourceRunMode==='EVENT_COMPLETION_V1'
