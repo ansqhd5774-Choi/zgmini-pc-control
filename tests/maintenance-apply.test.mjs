@@ -1088,6 +1088,7 @@ function s6Fixture(options={}){
   waitForDrain:async()=>{add('waitForDrain');},
   verifyStopGuard:async()=>{add('verifyStopGuard');return options.stopGuard!==false;},
   stopOwnTree:async()=>{add('stopOwnTree');if(options.failStop)throw Object.assign(Error('S6_TEST_STOP_UNKNOWN'),{code:'S6_TEST_STOP_UNKNOWN'});},
+  waitForStoppedHeld:async()=>{add('waitForStoppedHeld');if(options.failWaitStopped)throw Object.assign(Error('S6_TEST_STOPPED_WAIT_TIMEOUT'),{code:'S6_TEST_STOPPED_WAIT_TIMEOUT'});},
   resumeIntake:async()=>{add('resumeIntake');},
   verifyReleaseGuard:async()=>{add('verifyReleaseGuard');return options.releaseGuard!==false;},
   releaseOwnedInstallLease:async()=>{add('releaseOwnedInstallLease');
@@ -1111,7 +1112,8 @@ test('S6 coordinator keeps exact one-shot owner transitions and never marks the 
  assert.ok(calls.indexOf('pauseIntake')<calls.indexOf('waitForDrain'));
  assert.ok(calls.indexOf('waitForDrain')<calls.indexOf('verifyStopGuard'));
  assert.ok(calls.indexOf('verifyStopGuard')<calls.indexOf('stopOwnTree'));
- assert.ok(calls.indexOf('stopOwnTree')<calls.indexOf('observe:STOPPED_HELD'));
+ assert.ok(calls.indexOf('stopOwnTree')<calls.indexOf('waitForStoppedHeld'));
+ assert.ok(calls.indexOf('waitForStoppedHeld')<calls.indexOf('observe:STOPPED_HELD'));
  assert.ok(calls.indexOf('observe:STOPPED_HELD')<calls.indexOf('resumeIntake'));
  assert.ok(calls.indexOf('resumeIntake')<calls.indexOf('verifyReleaseGuard'));
  assert.ok(calls.indexOf('verifyReleaseGuard')<calls.indexOf('releaseOwnedInstallLease'));
@@ -1139,6 +1141,7 @@ test('S6 coordinator refuses duplicate, wrong operation, unverifiable approval o
 test('S6 coordinator never releases install lease after uncertain pause, stop, WMI or release guard',async()=>{
  for(const opts of [
   {failAcquire:true},{failPause:true},{stopGuard:false},{failStop:true},
+  {failWaitStopped:true},
   {failHeld:true},{releaseGuard:false}
  ]){
   const {port,calls,journal}=s6Fixture(opts);
@@ -1188,6 +1191,20 @@ test('S6 does not open intake-pause or old process stop before owned install lea
  assert.equal(calls.filter(x=>x==='acquireOwnedInstallLease').length,1);
  assert.equal(calls.includes('pauseIntake'),false);
  assert.equal(calls.includes('stopOwnTree'),false);
+ assert.equal(calls.includes('releaseOwnedInstallLease'),false);
+ assert.equal(journal.at(-1).phase,'RECOVERY_REQUIRED');
+});
+
+
+test('S6 old Runner and Watchdog pause proof waits only read-only before owned release',async()=>{
+ const {port,calls,journal}=s6Fixture({failWaitStopped:true});
+ const result=await runApprovedS6FailoverOnce(s6Request(),port);
+ assert.equal(result.status,'RECOVERY_REQUIRED');
+ assert.equal(result.leaseReleaseAcknowledged,false);
+ assert.equal(calls.filter(x=>x==='stopOwnTree').length,1);
+ assert.equal(calls.filter(x=>x==='waitForStoppedHeld').length,1);
+ assert.equal(calls.includes('observe:STOPPED_HELD'),false);
+ assert.equal(calls.includes('resumeIntake'),false);
  assert.equal(calls.includes('releaseOwnedInstallLease'),false);
  assert.equal(journal.at(-1).phase,'RECOVERY_REQUIRED');
 });
