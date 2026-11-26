@@ -99,8 +99,10 @@ export async function publishNativeCompletion({effect,event,env,ports}={}){
  let scope;
  try{scope=await ports.readNativeScope(effect)}catch{return out('EVIDENCE_MISSING','CI_NATIVE_PUBLISH_SCOPE_UNAVAILABLE')}
  if(scope?.policy?.enabled!==true)return out('DISABLED','CI_NATIVE_PUBLISH_POLICY_DISABLED');
+ // An unrelated successful CI run is not an approval failure. Only the
+ // exact installed source Run may produce a dispatch; ignore all others.
  if(!sourceEventMatches(event,env,scope.policy))
-  return out('REJECTED','CI_NATIVE_PUBLISH_SOURCE_EVENT_MISMATCH');
+  return out('IGNORED','CI_NATIVE_PUBLISH_SOURCE_EVENT_NOT_TARGET');
  // Keep independent receiver verification in the existing core dispatcher.
  const publishPorts={...ports};
  return dispatchApprovedCiEffect({policy:scope.policy,requestBytes:scope.requestBytes,
@@ -157,7 +159,7 @@ async function main(){
  const result=await publishNativeCompletion({effect,event,env,ports});
  // Log status only. Never log approval bytes, request body, token or paths.
  console.log(JSON.stringify(result));
- return result.state==='DISPATCH_ACCEPTED_NOT_EXECUTED'?0:1;
+ return ['DISPATCH_ACCEPTED_NOT_EXECUTED','IGNORED'].includes(result.state)?0:1;
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  process.exitCode=await main();
