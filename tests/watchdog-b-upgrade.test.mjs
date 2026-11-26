@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {parseCanonicalBody,validateRequest,decideUpgradeState,
   TARGET,ORIGINAL,REPLACEMENT,INITIAL_SCOPE,FINAL_SCOPE,
   NEXT_TARGET,NEXT_SOURCE_SHA,R3_REQUEST_ID,R3_MANIFEST_SCHEMA,validateR3Request} from '../watchdog-b/contract.mjs';
@@ -147,6 +148,8 @@ import {
  validateR4Request,verifyR4ControllerHost,projectR4InstalledManifest,rawSha256
 } from '../watchdog-b/standby-r4-contract.mjs';
 
+const R4_CONTROLLER_TARGET='b91340d5047daf753e1c17a5c966e4d2aecea586';
+
 function fixtureR4(){
  const x=fixture();
  x.body.targetSha=R4_TARGET;
@@ -158,7 +161,7 @@ function fixtureR4(){
   fromScope:FINAL_SCOPE,toScope:FINAL_SCOPE,
   allowedFiles:['pc-watchdog/runner-watchdog.mjs','pc-watchdog/INSTALL.json'],
   operation:'watchdog-b-upgrade',approvalBasis:R4_BASIS,revision:4,
-  expectedControllerSha:R4_TARGET,
+  expectedControllerSha:R4_CONTROLLER_TARGET,
   expectedControllerFiles:{...R4_CONTROLLER_FILES},
   protectionPolicy:'CURRENT_CAS_WITH_HISTORICAL_KEY_PRESENCE',
   standby:{...R4_STANDBY}
@@ -217,9 +220,9 @@ test('R4 admission fails closed for old manifest drift, approval and wrong sourc
 });
 
 test('R4 Controller must already be installed with exact five standby file hashes',()=>{
- const host={controllerSourceSha:R4_TARGET,controllerFiles:{
+ const host={controllerSourceSha:R4_CONTROLLER_TARGET,controllerFiles:{
   ...R4_CONTROLLER_FILES,'controller/extra.mjs':'d'.repeat(64)}};
- assert.equal(verifyR4ControllerHost(host,R4_TARGET),true);
+ assert.equal(verifyR4ControllerHost(host,R4_CONTROLLER_TARGET),true);
  assert.equal(verifyR4ControllerHost({...host,controllerSourceSha:NEXT_TARGET},NEXT_TARGET),true);
  for(const mutation of [
   x=>{x.controllerSourceSha=NEXT_TARGET;},
@@ -230,7 +233,7 @@ test('R4 Controller must already be installed with exact five standby file hashe
   const actual={controllerSourceSha:host.controllerSourceSha,
    controllerFiles:{...host.controllerFiles}};
   mutation(actual);
-  assert.throws(()=>verifyR4ControllerHost(actual,R4_TARGET),/WATCHDOG_R4_/);
+  assert.throws(()=>verifyR4ControllerHost(actual,R4_CONTROLLER_TARGET),/WATCHDOG_R4_/);
  }
 });
 
@@ -248,4 +251,26 @@ test('R4 projected B stage changes only approved Watchdog fields, never input',(
   assert.throws(()=>projectR4InstalledManifest(installed,patch,at),
    /WATCHDOG_R4_INSTALL_PROJECTION_INVALID/);
  }
+});
+
+
+test('R4 disabled service-proof successor binds exact Watchdog and all six Controller bytes',()=>{
+ const candidate=JSON.parse(fs.readFileSync(
+  new URL('../approvals/watchdog-upgrades/'+R4_TARGET+'.json',import.meta.url),'utf8'));
+ assert.equal(candidate.schema,R4_MANIFEST_SCHEMA);
+ assert.equal(candidate.approved,false);
+ assert.equal(candidate.targetSha,R4_TARGET);
+ assert.equal(candidate.targetSha256,R4_SOURCE_SHA256);
+ assert.equal(candidate.installedSha256,R4_PREIMAGE_SHA256);
+ assert.equal(candidate.installedManifestSha256,R4_INSTALL_PREIMAGE_SHA256);
+ assert.equal(candidate.expectedControllerSha,R4_CONTROLLER_TARGET);
+ assert.equal(Object.keys(R4_CONTROLLER_FILES).length,6);
+ assert.equal(R4_CONTROLLER_FILES['controller/operations.mjs'],
+  'd4a76910806cba861b3253f5fd24eccc8968fcbaa66133999483034b2f661cd3');
+ assert.deepEqual(candidate.expectedControllerFiles,R4_CONTROLLER_FILES);
+ const fixture=fixtureR4();fixture.approval=candidate;
+ assert.throws(()=>admitR4(fixture),/WATCHDOG_R4_APPROVAL_OR_SOURCE_MISMATCH/);
+ assert.equal(fs.existsSync(new URL(
+  '../approvals/watchdog-upgrades/c0c4dcff6c8071b1318cca956e43ba82718c4975.json',
+  import.meta.url)),false);
 });
