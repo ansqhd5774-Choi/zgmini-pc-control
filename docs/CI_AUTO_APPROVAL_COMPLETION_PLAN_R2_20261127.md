@@ -404,3 +404,11 @@
 1. #4088 정확 HEAD CI 3/3 확인; 실패 시 실제 원인 최소 수정, 성공 시 main 병합 및 blob readback.
 2. 기존 정규 A 운영 Run에서 PC 설치/정책 source를 확보하고 사용 가능한 승인 Scope만 실제 활성화; 정책 코드가 자동으로 승인 원본을 생성하는 것으로 해석하지 않는다.
 3. 승인된 A/Writer/Controller B 각 자연 CI 완료→정규 단회 제출→PC 실행·사후 검사→원격 JSON/TXT readback. 현재 무인 운영 완료율 **0/3**.
+
+
+### #4088 후속 — 전 필드 설치 권한 대조 및 정확 HEAD 갱신
+
+- 처음 구현의 `dispatchApprovedCiEffect`는 정책 설치 proof와 발행 Scope 사이에 Workflow/업무 해시 등 주요 필드만 비교하고, `nativeAExecutionEnabled`, `nativeWriterBExecutionEnabled`, `nativeAAdapterSha256`, `nativeWriterBAdapterSha256`, `nativeWriterBControlSha`, `installedControllerSha` 같은 **실제 실행 권한 필드**는 별도로 비교하지 않았다. 실행 권한이 다른 로컬 Scope를 일부 필드 일치만으로 승인하면 독립 B proof 결합이 약해질 수 있다.
+- 기존 effect-key/receipt-claim 및 Runtime origin 검증과 함께, 이제 `JSON.stringify(installedPolicy)`와 현재 정책 전체를 대조한다. `EVENT_COMPLETION_V1`에서는 검증한 현재 Run ID **하나만** 제거하고 비교하며 나머지 모든 권한·어댑터/설치 SHA 항목은 정확히 일치해야 한다. 기존 고정 모드의 sourceRunId 검증도 유지한다.
+- 고정/이벤트 모드별 각 실행 플래그·어댑터/Controller SHA 변조를 차단하는 회귀 12가지 사례 추가. [PR #4088](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4088)의 **최신 HEAD는 `0cd02981418984d7392537b0e45f56040656c1b1`**, 이전 `fb0fe5fe...` CI를 새 HEAD 합격 증거로 재사용하지 않는다.
+- 신규 정확 HEAD CI: [C996 45888305188](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45888305188), [Windows Source 45888305199](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45888305199), [Secret Scan 45888305340](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45888305340), 최초 관측 `queued/pending`. 병합·운영 활성화·PC 설치는 실행하지 않았다.
