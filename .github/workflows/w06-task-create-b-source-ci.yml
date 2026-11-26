@@ -5,6 +5,7 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - 'task-create-b/**'
+      - 'approvals/task-create-b/**'
       - 'tests/task-create-b*.test.mjs'
       - '.github/workflows/w06-task-create-b-source-ci.yml'
       - '.github/workflows/pc-writer-b-source-once.yml'
