@@ -46,6 +46,19 @@ function taskPresent(name){
  need(n==='0'||n==='1','TASK_CREATE_B_INVENTORY_UNVERIFIED_STOP');
  return n==='1';
 }
+// Any second action (including COM handlers) would execute outside the
+// approved one-command CNN path. Do not infer safety from finding one Exec.
+export function hasOnlyApprovedSingleExec(xml){
+ if(typeof xml!=='string')return false;
+ const blocks=[...xml.matchAll(/<Actions(?:\s[^>]*)?>([\s\S]*?)<\/Actions>/gi)];
+ if(blocks.length!==1)return false;
+ const content=blocks[0][1].trim();
+ return /^<Exec(?:\s[^>]*)?>[\s\S]*<\/Exec>$/i.test(content)&&
+  (content.match(/<Exec\b/gi)??[]).length===1&&
+  (content.match(/<\/Exec\s*>/gi)??[]).length===1&&
+  !/<(?:ComHandler|SendEmail|ShowMessage)\b/i.test(content);
+}
+
 // The scheduler may reserialize an approved trigger but must not add
 // boot/calendar/logon/event triggers beyond the sole minute TimeTrigger.
 export function hasOnlyApprovedMinuteTrigger(xml){
@@ -126,7 +139,7 @@ export function createOperatingTaskCreateBPort(proof){
    xml.includes('<ExecutionTimeLimit>PT30M</ExecutionTimeLimit>')&&
    xml.includes('<LogonType>InteractiveToken</LogonType>')&&
    xml.includes('<RunLevel>LeastPrivilege</RunLevel>')&&
-   hasOnlyApprovedMinuteTrigger(xml)&&
+   hasOnlyApprovedMinuteTrigger(xml)&&hasOnlyApprovedSingleExec(xml)&&
    (xml.match(/<Exec\b/gi)??[]).length===1&&
    commands.length===1&&args.length===1&&working.length===1&&
    path.win32.normalize(cmd).toLowerCase()===path.win32.normalize(expectedCommand).toLowerCase()&&
