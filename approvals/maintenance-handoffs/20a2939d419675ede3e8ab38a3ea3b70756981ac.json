@@ -1,0 +1,45 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "05ef3bd6b5dc753c5abfbecccacc09375eb18d10",
+  "targetSha": "20a2939d419675ede3e8ab38a3ea3b70756981ac",
+  "approved": false,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "UNAPPROVED S6-specific source-only candidate. Exact Owner-native approval of the 3-file independent maintainer runtime update is not on record. A future approved:true manifest requires separate exact approval, current operating-PC installed source/7-file CAS, independent Windows operator, stopped receiver, lease/backup/rollback/readback. This draft is not execution authorization.",
+  "files": {
+    "tools/maintenance-contract.mjs": "d24f03ee6db54c7e176e89f31bce8eb6de9aafba082cbb48213748d0f0b9facf",
+    "tools/maintenance-apply.mjs": "864a51d372243fee1f0426740c582d1db7461e2ffe03bc9aa76b807e9d246b1a",
+    "tools/maintenance-agent.mjs": "3e284c78d93a124b27364152057d9671942173ae295b8036cc74abccc68051da",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "3e4204c8b5ba3ae2f8f8c3ad14491346161581c5cc74712ccb34b070d27d4861",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "af31ab1f6a159aa1d8467d2585eb16750e8a1a293f9ecfb90b85c388d8640d70",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "23f3709ed0387cfb0132d9546f0fd6e2f10eabfad4212a67a170d5201a4a5de0"
+  },
+  "runtimeChangedFiles": [
+    "tools/maintenance-apply.mjs",
+    "tools/maintenance-agent.mjs",
+    "tools/update.mjs"
+  ],
+  "checks": {
+    "sourceCi": "S6 PR #3978 head 04f311df9f1d8c59641dcdac96a87f90f6c5c229 C996/Secret Scan/Controller Maintenance Source Tests/Automation Status Source Tests all SUCCESS, main merge 20a2939d419675ede3e8ab38a3ea3b70756981ac. This checks source only, not Windows handoff.",
+    "installedWindowsEvidence": "Prior installed maintainer SHA 05ef3bd6b5dc753c5abfbecccacc09375eb18d10 verified with seven installed files at #3917 Run 45843942160; #3975 Run 45859943800 verifies source sha and current candidate S6 preimage at 2026-11-26T16:35:24Z; neither substitutes immediately preceding operating CAS.",
+    "exactBytePlan": "All nine target Git source file bytes at immutable merge commit 20a2939d... SHA-256 checked using pure SHA-256 validated against abc standard test vector and six unchanged approved prior file hashes. Source differs from previous installed 05ef in exactly 3 of 7 runtime files: maintenance-apply, maintenance-agent, update. Six of nine source files identical. Preserve installed CI policy unchanged; no ciControllerBPolicy field in this candidate.",
+    "windowsHandoffExecuted": false,
+    "ownerNativeEffectApproved": false,
+    "ciControllerBEnabled": false
+  },
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "effects": [
+    "Candidate ONLY: approved independent seven-to-seven maintenance receiver source handoff changing exactly tools/maintenance-apply.mjs, tools/maintenance-agent.mjs, and tools/update.mjs. The running receiver must be independently stopped and live source/lease/CAS and seven files revalidated before any authorized write.",
+    "Do not rotate installed CI Controller B policy, do not publish or enable any GitHub Actions workflow, and do not launch S6 #3947 one-shot again."
+  ],
+  "preserve": [
+    "Original maintenance installed source and exact 7-file CAS, prior durable handoff journals, approved backup/rollback and independent Windows receiver identity",
+    "Installed Controller, active R5 Watchdog, Supervisor and six dedicated Runner process/registration, existing pending work and S6 #3947 UNKNOWN evidence",
+    "Existing CI Controller B policy, workflow source, disabled publisher variable, Writer, provider data, SQLite, D1, Cloudflare and all protected install paths"
+  ],
+  "scopeNote": "NON-EXECUTABLE OWNER-UNAPPROVED S6 SOURCE CANDIDATE (approved=false). The actual handoff receiver must reject this exact manifest with HANDOFF_APPROVAL_REQUIRED. Competing CI policy candidate PR #3981 has a different target and effect; do not combine or install concurrently. Exact Owner-native approval and current live CAS are required separately."
+}
