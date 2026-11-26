@@ -1,0 +1,52 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "20a2939d419675ede3e8ab38a3ea3b70756981ac",
+  "targetSha": "5a85f803fd9cb280561395f88a3544ee8e7d4660",
+  "approved": false,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "UNAPPROVED POLICY-ONLY CANDIDATE. Source-only approved independent seven-file S6 handoff to installed source 20a2939d... was observed PASS on Issue #3993 and separately READBACK_VERIFIED via operating A Issue #3995 Run 45865291025. This candidate DOES NOT inherit that approval for a NEW CI Controller B installed workflow-blob policy change. Actual independent Owner-native approval for this exact policy effect has not been established; the official maintainer must reject this artifact until expressly authorized. Post-approval final approved:true manifest must be separately hashed and verified against fresh installed policy/CAS before execution.",
+  "files": {
+    "tools/maintenance-contract.mjs": "d24f03ee6db54c7e176e89f31bce8eb6de9aafba082cbb48213748d0f0b9facf",
+    "tools/maintenance-apply.mjs": "864a51d372243fee1f0426740c582d1db7461e2ffe03bc9aa76b807e9d246b1a",
+    "tools/maintenance-agent.mjs": "3e284c78d93a124b27364152057d9671942173ae295b8036cc74abccc68051da",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "3e4204c8b5ba3ae2f8f8c3ad14491346161581c5cc74712ccb34b070d27d4861",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "af31ab1f6a159aa1d8467d2585eb16750e8a1a293f9ecfb90b85c388d8640d70",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "23f3709ed0387cfb0132d9546f0fd6e2f10eabfad4212a67a170d5201a4a5de0"
+  },
+  "ciControllerBPolicy": {
+    "schema": "ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V1",
+    "enabled": true,
+    "workflowId": 430972394,
+    "workflowBlobSha": "27e48ecde81bdf6f15cccffcffd9b3e70482a5f3",
+    "workflowPath": ".github/workflows/ci-approval-controller-b.yml"
+  },
+  "runtimeChangedFiles": [],
+  "checks": {
+    "sourceCi": "PENDING: exact candidate/test HEAD CI. Publisher candidate Draft PR #3970 head d8abac88cd87f5d6bcaefc86bfd7f56968a9b5b5 passed C996, Secret Scan, Controller Maintenance Source Tests 3/3, but source-only CI does NOT prove Windows policy activation or Owner approval.",
+    "installedWindowsEvidence": "Operating A #3995 Run 45865291025, observedAtUtc 2026-11-26T17:10:35.456Z, JSON/TXT readback confirmed independent source-only handoff #3993: installed maintenanceSourceSha=20a2939d419675ede3e8ab38a3ea3b70756981ac, maintenanceFilesVerified=true, receiver LISTENING, installLockHeld=false, CI receiver approvedV2PinMatches=false, approvedReceiptGuardPinMatches=false, executionAuthorized=false, operationalWrites=0. Recheck fresh installed source SHA, 7-file CAS, manifest, incumbent workflow policy bytes, receiver origin and lease before any authorized policy effect.",
+    "exactBytePlan": "Approved installed source 20a2939d... and new immutable target 5a85f803... have identical 9 GitHub source files and nine SHA-256 hashes. Seven installed runtime files are byte-for-byte unchanged (writes=[]). Allowed effect is only installed CI Controller B workflowBlobSha rotation to 27e48ecde81bdf6f15cccffcffd9b3e70482a5f3 and exact protected manifest/startup metadata required by handoff contract. Existing CI publisher GitHub variable and business target permissions are not changed. A different current installed ciControllerBPolicy source value or lease must fail closed.",
+    "sourceAncestry": "Immutable target 5a85f803fd9cb280561395f88a3544ee8e7d4660 descends from installed source 20a2939d419675ede3e8ab38a3ea3b70756981ac by 14 commits; compare commits shows no changes to nine protected maintainer source files. Later main advances are distinct and checkout source bytes must still match immutable target at execution.",
+    "workflowPinEvidence": "Unmerged Draft PR #3970, head d8abac88cd87f5d6bcaefc86bfd7f56968a9b5b5, fixed reviewed CI publisher checkout cfe57f3d720219613c87eff21338de0d35edbf6b, exact proposed Git workflow blob SHA1 27e48ecde81bdf6f15cccffcffd9b3e70482a5f3. CI 3/3 success. This publisher checkout ref need not equal independently installed maintainer source SHA. The actual GitHub production Workflow remains old until it is separately merged after exact policy installation readback.",
+    "windowsHandoffExecuted": false,
+    "ciControllerBEnabled": false,
+    "ownerNativeEffectApproved": false
+  },
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "effects": [
+    "ONE explicitly approved (only if newly Owner-authorized) independent seven-to-seven installed-policy-only manifest handoff from 20a2939d... to 5a85f803..., with NO maintenance executable replacement: all 7 runtime source bytes unchanged and all 9 source SHA-256 equal",
+    "Rotate ONLY fixed installed CI Controller B policy workflowBlobSha to 27e48ecde81bdf6f15cccffcffd9b3e70482a5f3 while preserving workflowId, enabled value, workflowPath, existing Controller and other authorization gates",
+    "Do not change GitHub Workflow before approved installed policy readback; do not enable CI publisher variable or publish/replay any Controller B business effect, S6 one-shot or existing receipt"
+  ],
+  "preserve": [
+    "Installed operating source 20a2939d... and 7-file runtime CAS, receiver identity, lease, approved recovery backup and independent Windows operator requirements",
+    "Existing Controller 182bb46f... at previous observation, Supervisor, active R5 Watchdog, six dedicated Runners and their live ownership, and S6 #3947 uncertain original effect ledger",
+    "SQLite/Writer/DB/D1/Task/Cron/provider data, GitHub security settings, current disabled publisher variable and existing approved business data",
+    "Separation of maintenance source-only handoff Issue #3993, new installed policy-only effect, GitHub workflow source merge Draft #3970 and separately Owner-approved new Controller B business effect"
+  ],
+  "scopeNote": "NONEXECUTABLE POLICY-ONLY DRAFT, approved=false. Must fail requireHandoffApproval with HANDOFF_APPROVAL_REQUIRED; any hypothetical approved:true form is ONLY for source-regression testing and not an authorization. The prior #3993 source-only approval does not authorize this distinct workflow policy change. Even after a future Owner grant, validate actual live policy CAS (not disclosed by format-only A), nonempty prior policy workflowBlobSha and exact workflowId/path, startup, backup, no active lease, stopped receiver, and new policy readback. Never replay original S6 #3947 or merge Draft #3970 early."
+}
