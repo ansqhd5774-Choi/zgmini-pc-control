@@ -37,6 +37,11 @@ test('no false writable/durable/published attestation',()=>{
  assert.match(source,/CI_RECEIPT_ACL_BOUNDARY_STOP/);
  assert.match(source,/CI_RECEIPT_HOST_MISMATCH/);
 });
+test('Windows checkout must preserve exact PowerShell source bytes',()=>{
+ const attrs=readFileSync(new URL('../.gitattributes',import.meta.url),'utf8');
+ const rule='tools/operator-packets/CI_CONTROLLER_B_RECEIPT_ROOT_C1.ps1 text eol=lf';
+ assert.equal(attrs.trimEnd().split(/\r?\n/).at(-1),rule);
+});
 test('operator single-click wrapper requires C-grade and cannot auto-run in Actions',()=>{
  assert.match(source,/param\(\[switch\]\$Apply\)/);
  assert.match(source,/CI_RECEIPT_EXPLICIT_C_APPLY_REQUIRED/);
