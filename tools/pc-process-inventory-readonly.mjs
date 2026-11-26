@@ -64,6 +64,9 @@ const R3_WMI_PROBE='controller-standby-runner-wmi-readonly';
 const R4_RUNTIME_PROBE='controller-standby-r4-runtime-readonly';
 const R5_RUNTIME_PROBE='controller-standby-r5-runtime-readonly';
 const S6_PREIMAGE_PROBE='controller-s6-once-approval-preimage-readonly';
+const S6_JOURNAL_PROBE='controller-s6-once-journal-readonly';
+const S6_JOURNAL_REQUEST='pc-s6-d7c0a971-5219-4a3a-9dce-30b0543b0e72';
+const S6_JOURNAL_APPROVAL_SHA='b8fed5bebec6a473730ed0b09ede5b5dc173db53af5cfc1e619e34a45bb8aefd';
 const S6_INSTALLED_MAINTAINER='05ef3bd6b5dc753c5abfbecccacc09375eb18d10';
 const R4_GUARDIAN_ORIGIN_PROBE='controller-standby-r4-guardian-origin-readonly';
 const CI_RECEIPT_ROOT_PROBE='ci-controller-b-receipt-root-readonly';
@@ -607,13 +610,14 @@ export function authenticateProcess(event,env,role){
  const isR4Runtime=withW05&&raw.probe===R4_RUNTIME_PROBE;
  const isR5Runtime=withW05&&raw.probe===R5_RUNTIME_PROBE;
  const isS6Preimage=withW05&&raw.probe===S6_PREIMAGE_PROBE;
+ const isS6Journal=withW05&&raw.probe===S6_JOURNAL_PROBE;
  const isR4GuardianOrigin=withW05&&raw.probe===R4_GUARDIAN_ORIGIN_PROBE;
  const isCiReceiptRoot=withW05&&raw.probe===CI_RECEIPT_ROOT_PROBE;
  const isCiActivation=withW05&&raw.probe===CI_CONTROLLER_B_ACTIVATION_PROBE;
  const allowedOperatingProbe=isOperator||is2960||is3409||isEr1Postcheck||is3516||
   isD05Writer||isD05PrivateReceipt||isD05Theme||isD05Registration||is3160||
   isCnnStaticGuard||isCnnGitPredicates||isCnnBPins||isCnnBResources||
-  isCnnBCore||isW06Task||isR3Watchdog||isR3Wmi||isR4Runtime||isR5Runtime||isS6Preimage||isR4GuardianOrigin;
+  isCnnBCore||isW06Task||isR3Watchdog||isR3Wmi||isR4Runtime||isR5Runtime||isS6Preimage||isS6Journal||isR4GuardianOrigin;
  const acceptedProbe=(role==='operating'&&allowedOperatingProbe)||
   (role==='handoff'&&(isCiReceiptRoot||isCiActivation));
  if(!raw||(!basic&&!withJobs&&!withW05)||
@@ -650,6 +654,7 @@ export function authenticateProcess(event,env,role){
   ...(isR4Runtime?{watchdogR4Runtime:true}:{}),
   ...(isR5Runtime?{watchdogR5Runtime:true}:{}),
    ...(isS6Preimage?{s6ApprovalPreimage:true}:{}),
+   ...(isS6Journal?{s6OnceJournal:true}:{}),
   ...(isR4GuardianOrigin?{watchdogR4GuardianOrigin:true}:{}),
   ...(isCiReceiptRoot?{ciControllerBReceiptRoot:true}:{}),
   ...(isCiActivation?{ciControllerBActivation:true}:{})};
@@ -2892,6 +2897,142 @@ export function inspectS6ApprovalPreimageReadonly({
  }catch{return unknown('S6_A_'+stage+'_READ_UNVERIFIED');}
 }
 
+
+/**
+ * Only the immutable #3947 S6 one-shot journal is read. This is an A
+ * observation of a failed/unknown B effect, NOT a replay or recovery port.
+ * Never return the claim nonce, owner PID, raw hashes, arbitrary paths or
+ * raw phase files. A live healthy Controller does not establish promotion.
+ */
+const S6_JOURNAL_PHASES=new Set([
+ 'CLAIMED','INSTALL_LEASE_ACQUIRE_ATTEMPT','INSTALL_LEASE_ACQUIRED',
+ 'INTAKE_PAUSE_ATTEMPT','INTAKE_PAUSED','DRAINED','OLD_TREE_STOP_ATTEMPT',
+ 'OLD_TREE_STOP_SUBMITTED','OLD_TREE_STOP_VERIFIED',
+ 'INTAKE_RESUME_ATTEMPT','INTAKE_RESUMED','OWNED_LEASE_RELEASE_ATTEMPT',
+ 'OWNED_LEASE_RELEASED','WATCHDOG_RELEASE_OBSERVED',
+ 'FAST_PROMOTION_OBSERVED','WATCHDOG_RELEASE_OUTCOME_UNVERIFIED',
+ 'BACKLOG_RECONCILE_ATTEMPT','BACKLOG_RECONCILED',
+ 'PROMOTED_READBACK_VERIFIED','RECOVERY_REQUIRED'
+]);
+export function projectS6OnceJournalReadonly(raw){
+ const base={schema:'ZGMINI_S6_ONCE_JOURNAL_A_V1',
+  requestId:S6_JOURNAL_REQUEST,status:'STATE_UNKNOWN',
+  code:'S6_ONCE_JOURNAL_UNVERIFIED',claimPresent:null,
+  journalPhase:null,failedAt:null,failedCode:null,
+  mutationAttempted:null,leaseReleaseAcknowledged:null,
+  priorOwnerByteMatch:null,backlogState:'UNVERIFIED',
+  effectExecuted:null,successEstablished:false,
+  recoveryAuthorized:false,originalRequestRetried:false,
+  operationalWrites:0,providerCalls:0,d1Writes:0};
+ const invalid=(code)=>({...base,code});
+ if(raw?.approvalValid!==true||typeof raw.ownerByteMatch!=='boolean')
+  return invalid('S6_ONCE_APPROVAL_OR_OWNER_CAS_UNVERIFIED');
+ const owner={priorOwnerByteMatch:raw.ownerByteMatch};
+ if(raw.claimPresent===false&&raw.journal===null&&raw.backlog===null)
+  return {...base,...owner,status:'READ_ONLY_OBSERVED',
+   code:'S6_ONCE_CLAIM_ABSENT_AT_OBSERVATION',claimPresent:false,
+   backlogState:'ABSENT'};
+ if(raw.claimPresent!==true)
+  return invalid('S6_ONCE_CLAIM_STATUS_UNVERIFIED');
+ if(raw.claimValid!==true)
+  return invalid('S6_ONCE_CLAIM_IDENTITY_UNVERIFIED');
+ const journal=raw.journal;
+ if(journal===null)
+  return {...base,...owner,claimPresent:true,
+   code:'S6_ONCE_CLAIM_WITHOUT_JOURNAL',
+   backlogState:raw.backlog===null?'ABSENT':'UNVERIFIED'};
+ if(journal?.schema!=='ZGMINI_S6_ONCE_JOURNAL_V1'||
+    journal.requestId!==S6_JOURNAL_REQUEST||
+    !S6_JOURNAL_PHASES.has(journal.phase))
+  return invalid('S6_ONCE_JOURNAL_IDENTITY_UNVERIFIED');
+ const failedAt=typeof journal.failedAt==='string'&&
+  S6_JOURNAL_PHASES.has(journal.failedAt)?journal.failedAt:null;
+ const failedCode=typeof journal.code==='string'&&
+  /^S6_[A-Z0-9_]{1,90}$/.test(journal.code)?journal.code:null;
+ const backlog=raw.backlog;
+ if(backlog!==null&&(backlog.schema!=='ZGMINI_PC_BACKLOG_V1'||
+    backlog.requestId!==S6_JOURNAL_REQUEST||
+    !Array.isArray(backlog.windows)||backlog.windows.length<1||
+    typeof backlog.pausedAt!=='string'))
+  return invalid('S6_ONCE_BACKLOG_IDENTITY_UNVERIFIED');
+ const backlogState=backlog===null?'ABSENT':
+  backlog.resumedAt?'RESUMED':'PAUSED';
+ return {...base,...owner,status:'READ_ONLY_OBSERVED',
+  code:'S6_ONCE_JOURNAL_PHASE_OBSERVED',claimPresent:true,
+  journalPhase:journal.phase,failedAt,failedCode,
+  mutationAttempted:typeof journal.mutationAttempted==='boolean'?
+   journal.mutationAttempted:null,
+  leaseReleaseAcknowledged:
+   typeof journal.leaseReleaseAcknowledged==='boolean'?
+   journal.leaseReleaseAcknowledged:null,
+  backlogState};
+}
+export function inspectS6OnceJournalReadonly({
+ io=fs,maintenanceHome='E:/ZGmini/automation/pc-maintenance',
+ controllerHome='E:/ZGmini/automation/pc-control',
+ sourceRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..')
+}={}){
+ const unknown=code=>({...projectS6OnceJournalReadonly(null),code});
+ let stage='APPROVAL';
+ try{
+  const file=(p,max=32768)=>{
+   const st=io.lstatSync(p);
+   if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1||
+      st.size<1||st.size>max)throw Error('S6_A_FIXED_FILE_UNVERIFIED');
+   const bytes=io.readFileSync(p);
+   if(!Buffer.isBuffer(bytes)||bytes.length!==st.size)
+    throw Error('S6_A_FIXED_BYTES_CHANGED');
+   return bytes;
+  };
+  const read=p=>JSON.parse(file(p).toString('utf8'));
+  const approvalFile=path.join(sourceRoot,'approvals/controller-s6',
+   S6_JOURNAL_APPROVAL_SHA+'.json');
+  const bytes=file(approvalFile);
+  const sha=x=>createHash('sha256').update(x).digest('hex');
+  if(sha(bytes)!==S6_JOURNAL_APPROVAL_SHA)
+   return unknown('S6_ONCE_APPROVAL_BYTES_UNVERIFIED');
+  const approved=JSON.parse(bytes.toString('utf8'));
+  if(approved.schema!=='ZGMINI_PC_S6_ONCE_B_APPROVAL_V1'||
+     approved.requestId!==S6_JOURNAL_REQUEST||
+     approved.approval?.approved!==true||
+     !/^[a-f0-9]{64}$/.test(approved.ownerSha256??''))
+   return unknown('S6_ONCE_APPROVAL_IDENTITY_UNVERIFIED');
+  stage='CONTROLLER_OWNER';
+  const originalOwner=file(path.join(controllerHome,'leases/supervisor/owner.json'));
+  const ownerByteMatch=sha(originalOwner)===approved.ownerSha256;
+  stage='LEDGER_DIR';
+  const ledger=path.join(maintenanceHome,'ledger');
+  const ls=io.lstatSync(ledger);
+  if(!ls.isDirectory()||ls.isSymbolicLink())
+   return unknown('S6_ONCE_LEDGER_ROOT_UNVERIFIED');
+  const owned=path.join(ledger,'S6_ONCE_'+S6_JOURNAL_REQUEST);
+  let dir;
+  try{dir=io.lstatSync(owned);}
+  catch(error){
+   if(error?.code==='ENOENT')
+    return projectS6OnceJournalReadonly({approvalValid:true,
+     ownerByteMatch,claimPresent:false,journal:null,backlog:null});
+   throw error;
+  }
+  if(!dir.isDirectory()||dir.isSymbolicLink())
+   return unknown('S6_ONCE_CLAIM_DIR_UNVERIFIED');
+  stage='CLAIM';
+  const claim=read(path.join(owned,'claim.json'));
+  const claimValid=claim.schema==='ZGMINI_S6_CLAIM_V1'&&
+   claim.requestId===S6_JOURNAL_REQUEST&&
+   typeof claim.nonce==='string'&&/^[0-9a-f-]{36}$/.test(claim.nonce);
+  const optional=(name,stageName)=>{
+   stage=stageName;
+   try{return read(path.join(owned,name));}
+   catch(error){if(error?.code==='ENOENT')return null;throw error;}
+  };
+  const journal=optional('journal.json','JOURNAL');
+  const backlog=optional('backlog.json','BACKLOG');
+  return projectS6OnceJournalReadonly({approvalValid:true,
+   ownerByteMatch,claimPresent:true,claimValid,journal,backlog});
+ }catch{return unknown('S6_ONCE_'+stage+'_READ_UNVERIFIED');}
+}
+
 export function collect(role,ctx,env=process.env){
  const host=os.hostname().toUpperCase();
  const runnerName=String(env.RUNNER_NAME||'');
@@ -2930,6 +3071,11 @@ export function collect(role,ctx,env=process.env){
  if(ctx.watchdogR4GuardianOrigin===true){
   const proof=inspectR4GuardianOriginReadonly();
   return {...base,status:proof.status,code:proof.code,watchdogR4GuardianOrigin:proof};
+ }
+ if(ctx.s6OnceJournal===true){
+  const evidence=inspectS6OnceJournalReadonly();
+  return {...base,status:evidence.status,code:evidence.code,
+   s6OnceJournal:evidence};
  }
  if(ctx.s6ApprovalPreimage===true){
   const evidence=inspectS6ApprovalPreimageReadonly();
@@ -3144,6 +3290,12 @@ export function toText(r){
    'guardianProbePassed='+r.watchdogR4GuardianOrigin.guardianProbePassed,
    'guardianOriginMismatchCodes='+r.watchdogR4GuardianOrigin.originMismatches.join(','),
    'guardianActivationExecuted=false']:[]),
+  ...(r.s6OnceJournal?[
+   's6OnceJournal='+r.s6OnceJournal.code,
+   's6ClaimPresent='+r.s6OnceJournal.claimPresent,
+   's6JournalPhase='+(r.s6OnceJournal.journalPhase??'UNVERIFIED'),
+   's6BacklogState='+r.s6OnceJournal.backlogState,
+   's6SuccessEstablished=false']:[]),
   ...(r.s6ApprovalPreimage?[
    's6ApprovalPreimage='+r.s6ApprovalPreimage.code,
    's6ApprovalCandidateOnly='+r.s6ApprovalPreimage.status,
