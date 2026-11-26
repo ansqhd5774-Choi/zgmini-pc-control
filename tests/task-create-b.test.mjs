@@ -11,7 +11,7 @@ import {
  REQUEST_SCHEMA,ISSUE_TITLE,ISSUE_LABEL,sha256,normalizedW06TaskTemplate
 } from '../task-create-b/contract.mjs';
 import {applyTaskCreateB} from '../task-create-b/transaction.mjs';
-import {hasOnlyApprovedMinuteTrigger,hasOnlyApprovedSingleExec} from '../task-create-b/windows-adapter.mjs';
+import {hasOnlyApprovedMinuteTrigger,hasOnlyApprovedSingleExec,reconcileTaskEnabled} from '../task-create-b/windows-adapter.mjs';
 
 const reqId='abec1087-3a25-4452-a5a8-a45218f05c37';
 const digest=value=>createHash('sha256').update(value).digest('hex');
@@ -74,6 +74,23 @@ function port(original,{disabledReadback=true,enabledReadback=true,throwOnEnable
 }
 
 
+test('B: Task XML omitted Enabled uses native Scheduler state with conflict protection',()=>{
+ const missing='<Task><Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy></Settings></Task>';
+ const enabled=missing.replace('</Settings>','<Enabled>true</Enabled></Settings>');
+ const disabled=missing.replace('</Settings>','<Enabled>false</Enabled></Settings>');
+ assert.equal(reconcileTaskEnabled(missing,true),true);
+ assert.equal(reconcileTaskEnabled(missing,false),false);
+ assert.equal(reconcileTaskEnabled(enabled,true),true);
+ assert.equal(reconcileTaskEnabled(disabled,false),false);
+ assert.throws(()=>reconcileTaskEnabled(enabled,false),
+  e=>e.code==='TASK_CREATE_B_TASK_ENABLED_STATE_DRIFT_STOP');
+ assert.throws(()=>reconcileTaskEnabled(disabled,true),
+  e=>e.code==='TASK_CREATE_B_TASK_ENABLED_STATE_DRIFT_STOP');
+ assert.throws(()=>reconcileTaskEnabled('<Task/>',true),
+  e=>e.code==='TASK_CREATE_B_TASK_SETTINGS_UNVERIFIED_STOP');
+ assert.throws(()=>reconcileTaskEnabled(missing,null),
+  e=>e.code==='TASK_CREATE_B_TASK_ENABLED_UNVERIFIED_STOP');
+});
 test('B: Task readback rejects extra actions even if one approved Exec remains',()=>{
  const single='<Task><Actions Context="User"><Exec><Command>C:\\\\Windows\\\\System32\\\\wscript.exe</Command></Exec></Actions></Task>';
  assert.equal(hasOnlyApprovedSingleExec(single),true);

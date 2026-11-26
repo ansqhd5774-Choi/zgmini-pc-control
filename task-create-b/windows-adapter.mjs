@@ -60,6 +60,16 @@ function taskPresent(name){
  need(n==='0'||n==='1','TASK_CREATE_B_INVENTORY_UNVERIFIED_STOP');
  return n==='1';
 }
+// Schtasks XML can omit default Settings.Enabled: inspect the fixed Task's
+// effective state directly through Windows Task Scheduler.
+function nativeTaskEnabled(name){
+ need([CORE,KOREA,WRITER,TASK].includes(name),'TASK_CREATE_B_ENABLED_TASK_SCOPE_STOP');
+ const script=`$ErrorActionPreference='Stop';$t=@(Get-ScheduledTask -ErrorAction Stop|Where-Object {$_.TaskName -eq '${name}'});if($t.Count -ne 1){throw 'TASK_SCOPE_UNKNOWN'};[Console]::Out.Write([string]$t[0].Settings.Enabled)`;
+ const out=run(BIN.powershell,['-NoProfile','-NonInteractive','-Command',script]);
+ const value=out.toString('utf8').trim().toLowerCase();
+ need(value==='true'||value==='false','TASK_CREATE_B_NATIVE_ENABLED_UNVERIFIED_STOP');
+ return value==='true';
+}
 // Any second action (including COM handlers) would execute outside the
 // approved one-command CNN path. Do not infer safety from finding one Exec.
 export function hasOnlyApprovedSingleExec(xml){
@@ -93,12 +103,21 @@ export function hasOnlyApprovedMinuteTrigger(xml){
   !/<(?!TimeTrigger\b)[A-Za-z]+Trigger\b/i.test(content);
 }
 
-const taskEnabled=xml=>{
+export function reconcileTaskEnabled(xml,nativeEnabled){
+ need(typeof xml==='string'&&typeof nativeEnabled==='boolean',
+  'TASK_CREATE_B_TASK_ENABLED_UNVERIFIED_STOP');
  const settings=xml.match(/<Settings(?:\s[^>]*)?>([\s\S]*?)<\/Settings>/i)?.[1];
- const enabled=settings?.match(/<Enabled>\s*(true|false)\s*<\/Enabled>/i)?.[1];
- need(enabled==='true'||enabled==='false','TASK_CREATE_B_TASK_ENABLED_UNVERIFIED_STOP');
- return enabled==='true';
-};
+ need(typeof settings==='string','TASK_CREATE_B_TASK_SETTINGS_UNVERIFIED_STOP');
+ const tags=[...settings.matchAll(/<Enabled>([^<]{1,12})<\/Enabled>/gi)];
+ need(tags.length<=1,'TASK_CREATE_B_TASK_ENABLED_UNVERIFIED_STOP');
+ if(tags.length===1){
+  const value=tags[0][1].trim().toLowerCase();
+  need(value==='true'||value==='false','TASK_CREATE_B_TASK_ENABLED_UNVERIFIED_STOP');
+  need((value==='true')===nativeEnabled,'TASK_CREATE_B_TASK_ENABLED_STATE_DRIFT_STOP');
+ }
+ return nativeEnabled;
+}
+const taskEnabled=(xml,name)=>reconcileTaskEnabled(xml,nativeTaskEnabled(name));
 const xmlUser=xml=>{
  const value=xml.match(/<UserId>([^<]{1,512})<\/UserId>/i)?.[1];
  need(typeof value==='string'&&value.length>0,'TASK_CREATE_B_PRINCIPAL_UNKNOWN_STOP');
@@ -138,6 +157,7 @@ export function createOperatingTaskCreateBPort(proof){
   return state.installedSourceSha===INSTALLED_SOURCE&&
    state.configSourceSha===INSTALLED_SOURCE&&
    coreHash()===m.coreTaskXmlSha256&&
+   taskEnabled(coreXml(),CORE)===true&&
    digest(scopedFile(SIDE,131072))===m.sidecarSourceSha256&&
    (!original||protectedTaskNames.every(name=>
     snapshots()[name].bytes.equals(original[name].bytes)));
@@ -167,7 +187,7 @@ export function createOperatingTaskCreateBPort(proof){
    argumentsText==='"'+WRAPPER+'"'&&
    path.win32.normalize(workingDir).toLowerCase()===path.win32.normalize(SOURCE_ROOT).toLowerCase()&&
    xmlUser(xml)===account&&
-   taskEnabled(xml)===expectedEnabled&&settings.length>0;
+   taskEnabled(xml,TASK)===expectedEnabled&&settings.length>0;
  };
  const backing=path.win32.join(JOURNAL,proof.request.requestId);
  return {
@@ -181,7 +201,7 @@ export function createOperatingTaskCreateBPort(proof){
    return {...src,taskExists:taskPresent(TASK),wrapperExists:fs.existsSync(WRAPPER),
     coreTaskXmlSha256:digest(coreBytes),
     sidecarSourceSha256:digest(scopedFile(SIDE,131072)),
-    coreTaskEnabled:taskEnabled(core),unrelatedTaskMutation:false};
+    coreTaskEnabled:taskEnabled(core,CORE),unrelatedTaskMutation:false};
   },
   operatingAccount(){need(typeof account==='string','TASK_CREATE_B_ACCOUNT_PRECHECK_STOP');return account;},
   async claimOnce(requestId){
