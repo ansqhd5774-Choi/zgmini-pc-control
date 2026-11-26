@@ -66,6 +66,11 @@ function scopedFile(file,maxBytes){
 }
 const installedSource=()=>{
  const head=run(BIN.git,['--no-optional-locks','-C',SOURCE_ROOT,'rev-parse','HEAD']).toString('utf8').trim();
+ // The installed minute lane itself rejects dirty scoped sources.
+ const dirty=run(BIN.git,['--no-optional-locks','-C',SOURCE_ROOT,
+  'status','--porcelain','--untracked-files=all','--','lib','worker',
+  'scripts/pc-writer']).toString('utf8').trim();
+ need(!dirty,'TASK_CREATE_B_INSTALLED_SOURCE_DIRTY_STOP');
  let cfg;try{cfg=JSON.parse(scopedFile(CONFIG,65536).toString('utf8'));}
  catch{stop('TASK_CREATE_B_CONFIG_SOURCE_STOP')}
  need(/^[a-f0-9]{40}$/.test(head),'TASK_CREATE_B_SOURCE_HEAD_STOP');
