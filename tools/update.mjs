@@ -3191,6 +3191,26 @@ export function s6PriorRequestLedgerPreserved(pinned,{root=path.join(controlRoot
  }catch{return false;}
 }
 
+
+/** Supervisor restarts reinsert child seats at the end of its Map. The
+ * heartbeat order is not seat order; verify a full unique seat/PID set and
+ * canonicalize before pinning old-runner exit evidence. */
+export function normalizeS6OldChildren(children,{requireAlive=false}={}){
+ if(!Array.isArray(children)||children.length!==6)return null;
+ const rows=[],seats=new Set(),pids=new Set();
+ for(const item of children){
+  if(!item||typeof item!=='object'||
+     !Number.isSafeInteger(item.seat)||item.seat<1||item.seat>6||
+     !Number.isSafeInteger(item.pid)||item.pid<=0||
+     (requireAlive&&item.alive!==true)||
+     seats.has(item.seat)||pids.has(item.pid))return null;
+  seats.add(item.seat);pids.add(item.pid);
+  rows.push({seat:item.seat,pid:item.pid});
+ }
+ if(seats.size!==6)return null;
+ return rows.sort((a,b)=>a.seat-b.seat);
+}
+
 /**
  * Preserve the *exact* S6 old owner, six children and earlier request ledger
  * hashes before any operational effect. A candidate manifest only becomes
@@ -3204,11 +3224,9 @@ export function captureS6OncePinnedBaseline(issue,approvedBytes,{actor=null}={})
  need(pinned.operationalEffectExecuted===false&&pinned.authorization===false,
   'S6_BASELINE_ADMISSION_NOT_EFFECT_AUTHORITY');
  const {owner,status}=readOwner();
+ const sortedChildren=normalizeS6OldChildren(status.children,{requireAlive:true});
  need(status.pid===owner.pid&&status.mode==='LISTENING'&&
-  Array.isArray(status.children)&&status.children.length===6&&
-  status.children.every((r,i)=>r?.seat===i+1&&
-   Number.isSafeInteger(r.pid)&&r.pid>0&&r.alive===true)&&
-  new Set(status.children.map(r=>r.pid)).size===6,
+  sortedChildren!==null,
   'S6_BASELINE_SIX_CHILDREN_UNVERIFIED');
  const root=path.join(controlRoot,'ledger');
  need(fs.existsSync(root)&&fs.statSync(root).isDirectory(),
@@ -3238,7 +3256,7 @@ export function captureS6OncePinnedBaseline(issue,approvedBytes,{actor=null}={})
   oldSupervisorPid:owner.pid,oldSupervisorNonce:owner.nonce,
   watchdogPid:observation.s6Live.watchdogPid,
   standbyPids:Object.freeze([...observation.s6Live.standbyPids]),
-  oldChildren:Object.freeze(status.children.map(({seat,pid})=>Object.freeze({seat,pid}))),
+  oldChildren:Object.freeze(sortedChildren.map(row=>Object.freeze(row))),
   ledgerHashes:Object.freeze({...ledgerHashes})
  });
 }
@@ -3260,9 +3278,7 @@ export async function readS6OncePhaseReadback({phase,baseline,
   /^[a-f0-9]{64}$/.test(baseline.ownerSha256??'')&&
   /^[a-f0-9]{64}$/.test(baseline.protectedSha256??'')&&
   Number.isSafeInteger(baseline.oldSupervisorPid)&&baseline.oldSupervisorPid>0&&
-  Array.isArray(baseline.oldChildren)&&baseline.oldChildren.length===6&&
-  baseline.oldChildren.every((r,i)=>r?.seat===i+1&&Number.isSafeInteger(r.pid)&&r.pid>0)&&
-  new Set(baseline.oldChildren.map(r=>r.pid)).size===6,
+  normalizeS6OldChildren(baseline.oldChildren)!==null,
   'S6_READBACK_PINNED_BASELINE_INVALID');
  need(exactApprovalBytesAttested===true&&independentOperatorAttested===true,
   'S6_READBACK_INDEPENDENT_ATTESTATION_REQUIRED');
