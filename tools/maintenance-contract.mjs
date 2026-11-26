@@ -1292,7 +1292,8 @@ export function assessS6ControllerTransition({phase,baseline,observed,now=Date.n
     observed.heartbeatFresh!==true||
     observed.activeOwnerNonceChanged!==true||
     observed.watchdogStatusHealthy!==true||
-    observed.standbyReadyCount<1||
+    !Number.isSafeInteger(observed.standbyReadyCount)||
+    observed.standbyReadyCount<1||observed.standbyReadyCount>2||
     observed.previousOwnerFenced!==true||
     observed.existingRequestLedgerPreserved!==true)
   return out('S6_PROMOTION_OR_LEDGER_UNVERIFIED');
