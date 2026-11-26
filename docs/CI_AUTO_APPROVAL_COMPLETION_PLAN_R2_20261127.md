@@ -636,3 +636,9 @@
 1. 격리 PC Native read-only scope 정책/독립 B-installed proof, 영구 단회 receipt root는 현재 Workflow 환경에서 모두 **미설정**. 기존 Owner 업무 승인 원본과 정확한 B 설치 proof 및 격리 PC 실제 Root/ACL preimage가 따로 증명되는지 확인하고, 기존 정규 설치/설정 변경 권한이 있는 범위에 한해서만 연결. 신뢰 root나 승인 원본을 GitHub Source fixture, 타 효과 영수증, CI 성공만으로 생성하지 않는다.
 2. 실제 설정이 검증된 효과만 **Native A / Writer B** 자연 CI → 단회 발행 → 정규 Windows Receiver 실행 및 원본 JSON/TXT 확인. Controller B는 독립 #4100 CAS PASS를 유지하되 자동 발행 정책(#4029 미구성 당시)과 업무 Owner proof는 별도 검증.
 3. 현재 Native/Controller B 실제 무인 종단 **0/3**. Runner 6/6 복구와 원래 S6 과거 UNKNOWN을 분리 유지. 이번 소스 CI/고정 A 발행 성공을 3개 무인 효과로 계산하지 않는다.
+
+### Controller B 별도 현재 활성화 상태 — 중복 금지 대기 요청
+
+- Native A/Writer B의 격리 Root 미설정과 **다른 효과**인 Controller B 자동 발행 상태를 구분하기 위해 기존 고정 Owner A `role=handoff`, `probe=ci-controller-b-activation-readonly` 단회 [Issue #4117](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4117)를 requestId `b0d6a8ce-c503-4651-b21c-7c830ce38c51`로 1회 접수.
+- 등록된 [Run 45899164961](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45899164961)의 `handoff-process-snapshot`은 마지막 확인 시 `queued`/미배정, 원격 결과 댓글 0. 기존 #4029의 과거 `CI_CONTROLLER_B_AUTO_POLICY_NOT_CONFIGURED`를 **현재 설정의 직접 증거로 재사용하지 않음**.
+- 이 Job이 실제 PC에서 완료되면 같은 Issue의 고유 JSON/TXT와 실제 상태코드를 읽고, Controller B의 현재 변수/업무 정책 상태만 판정한다. 같은 진단 이슈 반복 발행·CI 강제 재시도·활성화 변수 임의 설정 금지.
