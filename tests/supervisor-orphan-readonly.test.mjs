@@ -78,7 +78,7 @@ test('dead owner, installed source, old seat lineage and roster mandatory',()=>{
 
 test('duplicate seats, WMI unknown paths and PID ambiguity fail closed',()=>{
  const mutations=[
-  x=>{x.wmiRows.pop();x.wmiRows.pop();},
+  x=>{x.wmiRows.splice(1,1);},
   x=>{x.wmiRows[5].executablePath=x.wmiRows[4].executablePath;},
   x=>{x.wmiRows[5].pid=x.wmiRows[4].pid;},
   x=>{x.wmiRows[2].executablePath=['E:','Other','bin','Runner.Listener.exe'].join(sep);},
