@@ -87,7 +87,7 @@ export function hasOnlyApprovedMinuteTrigger(xml){
   // elsewhere in the Task cannot attest a different trigger's cadence.
   // A task can be enabled while its only time trigger is explicitly disabled.
   // Never attest a naturally scheduled minute lane in that state.
-  !/<Enabled>\\s*false\\s*<\\/Enabled>/i.test(content)&&
+  !/<Enabled>\s*false\s*<\/Enabled>/i.test(content)&&
   (content.match(/<Interval\b/gi)??[]).length===1&&
   /<Repetition(?:\s[^>]*)?>[\s\S]*?<Interval>PT1M<\/Interval>[\s\S]*?<\/Repetition>/i.test(content)&&
   !/<(?!TimeTrigger\b)[A-Za-z]+Trigger\b/i.test(content);
