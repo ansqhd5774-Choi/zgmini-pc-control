@@ -151,3 +151,27 @@
 2. A·Writer B 각각의 **독립 CI 전용 수신 workflow 및 PC측 인증·효과 원장·사후검사**를 기존 공통 엔진과 연결한다. owner-only 경로를 우회하지 않는다.
 3. 실제 인증된 발행 주체가 기존 승인 원본을 독립 검증한 뒤 정규 단회 호출하도록 연결한다. 새 권한이 필요한 경로는 정규 승인 없이 활성화하지 않는다.
 4. A / Controller B / Writer B 실제 CI 무인 종단 검증은 여전히 **0/3**이다. 이 PR을 운영 DONE으로 계산하지 않는다.
+
+## 7. 세 번째 실행 기록 — 2026-11-27 KST
+
+### 기존 완료·운영 근거
+
+- 직전 [PR #4044](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4044)는 CI 3/3 SUCCESS 후 `main@422cd4044973154038fa0575ad30cc1bd8791c1c` 병합되었으며 shadow-only receiver admission 증거 누락 오판을 차단했다. 운영 활성화 효과는 없다.
+- [#4036 수동 B](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4036#issuecomment-7200174075)는 `SUCCEEDED`, 실제 설치 SHA `3c7d4cfefacf072fd35cb19706b352c64c5e4fd2`, 결과 JSON/TXT VERIFIED. 무인 CI 자동발행 실증으로 오인하지 않는다.
+- [GitHub 공식 GITHUB_TOKEN 이벤트 계약](https://docs.github.com/en/actions/concepts/security/github_token): 토큰-created Issue가 다른 `issues` workflow를 실행하지 않으므로 A·Writer B에는 `workflow_dispatch`의 별도 정규 호출·수신 인증이 필요하다. 사용자 수동 댓글 Gate #4038은 폐기 유지.
+
+### 현재 소스·위험 구분 및 실제 변경
+
+- [PR #4050](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4050) — 실제 대상 코드 브랜치 `codex/ci-a-writer-native-dispatch-20261127`, `ci-approval/native-dispatch.mjs`, `tests/ci-native-dispatch.test.mjs`, 기존 Controller CI workflow의 테스트 연결 3파일.
+- **이번 실행에서 실제 수정한 문제:** 소스 Run 성공만 보고 소스 Workflow Git Blob을 독립 검증하지 않던 문제와, 설치된 receiver 정책을 업무 승인 SHA·source run·원본 branch·receiver 경로까지 전부 비교하지 않는 문제를 확인해 모두 fail-closed로 보완했다.
+- 원본 source Workflow의 SHA-1 Git blob 및 raw content를 해당 `head_sha`에서 다시 읽어 고정한다. 신뢰 설치 readback의 12개 주요 필드와 기 설정 정책을 대조하며 위조 승인·source run·path를 거부한다.
+- `workflow_dispatch` 응답은 구형 204(실행 ID 없음) 및 2026-03-10 API의 200(정확 `workflow_run_id`, API URL, HTML URL)만 허용한다. 발행 결과가 확인되어도 **PC 실행 성공은 별도 증거**다. [공식 GitHub 변경 기록](https://github.blog/changelog/2026-02-19-workflow-dispatch-api-now-returns-run-ids/).
+- 기존 A/Writer Owner-only workflow·PC Runner 권한·설치 정책·운영 DB·D1·예약 **변경 없음**. 신규 readback 전송 함수는 실제 Workflow/PC측 receiver 연결이 없으므로 운영 호출 0.
+- 이번 HEAD **`dee4fa414b94777156817a28dd9a95872b2bd00a`**, 신규 GitHub CI Run C996 **#45878463061**, Controller Source **#45878463073**, Secret Scan **#45878463236** (아직 확정되지 않은 상태; PASS 주장 금지). 로컬 기존 22개 시험에 추가로 소스 Pin·설치 인수 인증 등 9개 테스트를 추가했다. **GitHub CI 전체 결과를 이 파일럿의 합격 기준**으로 사용한다.
+
+### 남은 실제 구현 순서
+
+1. 정확 HEAD CI 3종 완료와 오류 코드를 대조하여 PR #4050의 문제를 수정·검증 후 안전한 경우만 병합.
+2. 실질적인 CI A/Writer B receiver workflow·PC측 독립 인증·업무 승인·파일 원본 CAS·실제 실행 계약을 기존 권한 범위에서 구현/검증. 테스트용 transport 신호만으로 운영 완료 처리 금지.
+3. Controller B 기존 인증·정본 정책의 미구성과 겹치는 인증 변경은 효과별로 분리하며, 기존 승인된 실제 신규 업무가 확인된 경우에만 자연 CI 이벤트·단회 요청·PC 결과로 실증.
+4. 세 지원 유형 **운영 종단 0/3 확인 상태 유지**, 정확한 다음 미완료 구간 이외에 새 Gate나 예약을 추가하지 않는다.
