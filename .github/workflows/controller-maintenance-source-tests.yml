@@ -12,6 +12,9 @@ on:
       - 'tests/ci-approval-execution-identity.test.mjs'
       - '.github/workflows/ci-approval-event-intake.yml'
       - '.github/workflows/ci-approval-controller-b.yml'
+      - '.github/workflows/ci-approved-a-once.yml'
+      - '.github/workflows/ci-approved-writer-b-once.yml'
+      - 'tests/ci-native-receiver-observe.test.mjs'
       - 'tests/ci-approval-shadow-decision.test.mjs'
       - 'tests/ci-native-dispatch.test.mjs'
       - 'tests/ci-native-receiver-contract.test.mjs'
@@ -312,6 +315,11 @@ jobs:
         run: |
           node --check ci-approval/native-receiver-contract.mjs
           node --test --test-concurrency=1 tests/ci-native-receiver-contract.test.mjs
+      - name: Verify gated A Writer CI receiver observed event with no PC effects
+        if: hashFiles('ci-approval/native-receiver-observe.mjs') != '' && hashFiles('tests/ci-native-receiver-observe.test.mjs') != ''
+        run: |
+          node --check ci-approval/native-receiver-observe.mjs
+          node --test --test-concurrency=1 tests/ci-native-receiver-observe.test.mjs
       - name: Verify deterministic scoped request previews without submission
         if: hashFiles('ci-approval/request-preview.mjs', 'tests/ci-approval-request-preview.test.mjs') != ''
         run: node --test --test-concurrency=1 tests/ci-approval-request-preview.test.mjs
