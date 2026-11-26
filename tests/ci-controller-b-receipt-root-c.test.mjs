@@ -43,7 +43,9 @@ test('no false writable/durable/published attestation',()=>{
 test('Windows checkout must preserve exact PowerShell source bytes',()=>{
  const attrs=readFileSync(new URL('../.gitattributes',import.meta.url),'utf8');
  const rule='tools/operator-packets/CI_CONTROLLER_B_RECEIPT_ROOT_C1.ps1 text eol=lf';
- assert.equal(attrs.trimEnd().split(/\r?\n/).at(-1),rule);
+ const lines=attrs.trimEnd().split(/\r?\n/);
+ // Independent LF rules can follow; require the exact protected rule once.
+ assert.equal(lines.filter(line=>line===rule).length,1);
 });
 test('operator single-click wrapper requires C-grade and cannot auto-run in Actions',()=>{
  assert.match(source,/param\(\[switch\]\$Apply\)/);
