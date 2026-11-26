@@ -7,6 +7,7 @@
 import {createHash} from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import {isDeepStrictEqual} from 'node:util';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control', REPO_ID=1442936296;
 const RECEIVERS=Object.freeze({
@@ -95,7 +96,7 @@ export async function dispatchApprovedCiEffect({policy,requestBytes,ports}={}){
  if(eventBound)delete authorizedPolicy.sourceRunId;
  if(installed?.enabled!==true||
     (eventBound&&policy.sourceAttempt!==1)||
-    JSON.stringify(installed)!==JSON.stringify(authorizedPolicy))
+    !isDeepStrictEqual(installed,authorizedPolicy))
   return denied('EVIDENCE_MISSING','CI_NATIVE_DISPATCH_RECEIVER_NOT_ATTESTED',{effectKey:key});
  let prior;
  try{prior=await ports.loadReceipt(key);}catch{return denied('STATE_UNKNOWN','CI_NATIVE_DISPATCH_RECEIPT_READ_UNKNOWN',{effectKey:key});}
