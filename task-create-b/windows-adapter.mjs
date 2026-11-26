@@ -46,6 +46,19 @@ function taskPresent(name){
  need(n==='0'||n==='1','TASK_CREATE_B_INVENTORY_UNVERIFIED_STOP');
  return n==='1';
 }
+// The scheduler may reserialize an approved trigger but must not add
+// boot/calendar/logon/event triggers beyond the sole minute TimeTrigger.
+export function hasOnlyApprovedMinuteTrigger(xml){
+ if(typeof xml!=='string')return false;
+ const blocks=[...xml.matchAll(/<Triggers(?:\s[^>]*)?>([\s\S]*?)<\/Triggers>/gi)];
+ if(blocks.length!==1)return false;
+ const content=blocks[0][1].trim();
+ return /^<TimeTrigger(?:\s[^>]*)?>[\s\S]*<\/TimeTrigger>$/i.test(content)&&
+  (content.match(/<TimeTrigger\b/gi)??[]).length===1&&
+  (content.match(/<\/TimeTrigger\s*>/gi)??[]).length===1&&
+  !/<(?!TimeTrigger\b)[A-Za-z]+Trigger\b/i.test(content);
+}
+
 const taskEnabled=xml=>{
  const settings=xml.match(/<Settings(?:\s[^>]*)?>([\s\S]*?)<\/Settings>/i)?.[1];
  const enabled=settings?.match(/<Enabled>\s*(true|false)\s*<\/Enabled>/i)?.[1];
@@ -113,7 +126,7 @@ export function createOperatingTaskCreateBPort(proof){
    xml.includes('<ExecutionTimeLimit>PT30M</ExecutionTimeLimit>')&&
    xml.includes('<LogonType>InteractiveToken</LogonType>')&&
    xml.includes('<RunLevel>LeastPrivilege</RunLevel>')&&
-   (xml.match(/<TimeTrigger\b/gi)??[]).length===1&&
+   hasOnlyApprovedMinuteTrigger(xml)&&
    (xml.match(/<Exec\b/gi)??[]).length===1&&
    commands.length===1&&args.length===1&&working.length===1&&
    path.win32.normalize(cmd).toLowerCase()===path.win32.normalize(expectedCommand).toLowerCase()&&
