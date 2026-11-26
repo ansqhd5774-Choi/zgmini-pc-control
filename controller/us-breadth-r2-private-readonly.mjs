@@ -100,7 +100,12 @@ function inspectPrivate(fsys,home){
  if(digest(bytes)!==matched[2])return {...out,state:'OUTPUT_SHA_MISMATCH'};
  let record;
  try{record=JSON.parse(bytes.toString('utf8'));}catch{return {...out,state:'OUTPUT_JSON_INVALID'};}
+ const pct=n=>typeof n==='number'&&Number.isFinite(n)&&n>=0&&n<=100;
+ const source='MARKETPARQUET_PAID_SPLIT_ADJUSTED_DAILY';
  if(record?.schema!=='ZGMINI_US_PAID_BREADTH_R2_PRIVATE_V1'
+  ||record.source!==source||record.priceMode!=='SPLIT_ADJUSTED_DAILY_CLOSE'
+  ||record.phase!=='CONFIRMED'||record.publicationAllowed!==false
+  ||record.sourceLatestProviderDateVerified!==false
   ||record.lastDate!==matched[1]||!validDay(record.firstDate)
   ||!Array.isArray(record.points)
   ||!Array.isArray(record.sourceReceipts)
@@ -111,6 +116,20 @@ function inspectPrivate(fsys,home){
   ||record.points[0]?.date!==record.firstDate
   ||record.points.at(-1)?.date!==record.lastDate)
   return {...out,state:'OUTPUT_CONTRACT_UNVERIFIED'};
+ for(let n=0;n<record.sourceReceipts.length;n++){
+  const receipt=record.sourceReceipts[n];
+  if(!validDay(receipt?.date)||!SHA.test(receipt?.sha256)
+   ||!SHA.test(receipt?.projectionSha256)
+   ||n>0&&receipt.date<=record.sourceReceipts[n-1].date)
+   return {...out,state:'OUTPUT_CONTRACT_UNVERIFIED'};
+ }
+ for(let n=0;n<record.points.length;n++){
+  const point=record.points[n];
+  if(!validDay(point?.date)||point.date!==record.sourceReceipts[n+1].date
+   ||!pct(point.risingPct)||!pct(point.unchangedPct)||!pct(point.fallingPct)
+   ||Math.abs(point.risingPct+point.unchangedPct+point.fallingPct-100)>1e-7)
+   return {...out,state:'OUTPUT_CONTRACT_UNVERIFIED'};
+ }
  return {...out,state:'PRIVATE_FILE_SHA_READBACK_VERIFIED',
   lastDate:record.lastDate,comparedSessions:record.comparedSessions,
   historyComplete:record.fullYearHistory,fileSha256:matched[2]};
