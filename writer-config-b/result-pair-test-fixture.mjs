@@ -4,10 +4,11 @@ const digest=i=>i.toString(16).padStart(40,'0');
 
 export function createGitPairFixture({rejectRefUpdate=false,throwAfterUpdate=false,
  malformedPatchResponse=false,advanceMainOnFirstPatch=false,
- advanceMainWithExistingPath=null,divergeMainOnFirstPatch=false,
+ advanceMainOnSecondPatch=false,advanceMainWithExistingPath=null,divergeMainOnFirstPatch=false,
  existingPaths=[]}={}){
  const base=digest(10),baseTree=digest(20),advanced=digest(50),
-  advancedTree=digest(60),files=new Map(),blobs=new Map();
+  advancedTree=digest(60),secondAdvanced=digest(51),secondAdvancedTree=digest(61),
+  files=new Map(),blobs=new Map();
  for(const p of existingPaths)files.set(p,Buffer.from('old result'));
  let count=100,commits=0,updates=0,comments=0,readbacks=0,treeEntries=[],
  current=base,advancedOnce=false,lastTree=digest(30);
@@ -23,6 +24,8 @@ export function createGitPairFixture({rejectRefUpdate=false,throwAfterUpdate=fal
    return response(200,{tree:{sha:baseTree}});
   if(method==='GET'&&pathname.endsWith('/git/commits/'+advanced))
    return response(200,{tree:{sha:advancedTree}});
+  if(method==='GET'&&pathname.endsWith('/git/commits/'+secondAdvanced))
+   return response(200,{tree:{sha:secondAdvancedTree}});
   if(method==='POST'&&pathname.endsWith('/git/blobs')){
    const body=JSON.parse(opts.body),sha=digest(++count);
    assert.equal(body.encoding,'base64');
@@ -31,13 +34,15 @@ export function createGitPairFixture({rejectRefUpdate=false,throwAfterUpdate=fal
   }
   if(method==='POST'&&pathname.endsWith('/git/trees')){
    const body=JSON.parse(opts.body);
-   assert.equal(body.base_tree,commits===0?baseTree:advancedTree);
+   assert.equal(body.base_tree,commits===0?baseTree:
+    commits===1?advancedTree:secondAdvancedTree);
    treeEntries=body.tree;lastTree=digest(30+commits);
    return response(201,{sha:lastTree});
   }
   if(method==='POST'&&pathname.endsWith('/git/commits')){
    const body=JSON.parse(opts.body);commits++;
-   assert.deepEqual(body.parents,[commits===1?base:advanced]);
+   assert.deepEqual(body.parents,[commits===1?base:
+    commits===2?advanced:secondAdvanced]);
    assert.equal(body.tree,lastTree);
    return response(201,{sha:digest(39+commits)});
   }
@@ -50,6 +55,10 @@ export function createGitPairFixture({rejectRefUpdate=false,throwAfterUpdate=fal
     if(advanceMainWithExistingPath)files.set(advanceMainWithExistingPath,Buffer.from('old result'));
     return response(422,{message:'not a fast forward'});
    }
+   if(advanceMainOnSecondPatch&&updates===2){
+    current=secondAdvanced;
+    return response(422,{message:'not a fast forward'});
+   }
    if(rejectRefUpdate)return response(422,{message:'not a fast forward'});
    treeEntries.forEach(entry=>files.set(entry.path,blobs.get(entry.sha)));
    current=body.sha;
@@ -60,6 +69,8 @@ export function createGitPairFixture({rejectRefUpdate=false,throwAfterUpdate=fal
   if(method==='GET'&&pathname.includes('/compare/')){
    if(pathname.endsWith('/compare/'+base+'...'+advanced))
     return response(200,{status:divergeMainOnFirstPatch?'diverged':'ahead'});
+   if(pathname.endsWith('/compare/'+advanced+'...'+secondAdvanced))
+    return response(200,{status:'ahead'});
    return response(200,{status:current===digest(39+commits)?'identical':'diverged'});
   }
   if(method==='GET'&&pathname.includes('/contents/')){
