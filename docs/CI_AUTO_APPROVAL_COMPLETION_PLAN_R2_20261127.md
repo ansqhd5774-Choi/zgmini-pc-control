@@ -747,3 +747,17 @@
 
 **다음 필수 단계:** #4136의 정확 HEAD 검사 완료 → 안전한 소스 PR 병합(가능한 경우) → 기존 독립 설치 증명과 정확 Owner 승인 대상이 갖춰진 효과만 정규 발행 검토. 활성화는 이 PR의 자동 효과가 아니다.
 
+### #4136 정확 HEAD CI 3/3 및 main 병합 확정
+
+- [PR #4136](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4136) 최종 HEAD `a220a19de81cb60b87518d90866fe14f4d4ed861` 정확 일치:
+  - [Secret Scan 45902012331](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45902012331): `completed/success`.
+  - [C996 45902012311](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45902012311): `completed/success`.
+  - [Two-PC Process Source 45902012288](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45902012288): `completed/success`; 해당 `process-source-tests` Job `140189790556`의 **Controller B policy read-only/redaction 회귀 스텝 성공** 포함. 나머지 Issue-only snapshot Job의 skipped는 이 PR의 소스시험 실패가 아니다.
+- 정규 squash **`main` 병합 SHA `2a3344afd3e36fd797162620a49596cb1bfc44cc`**: PR `merged=true`, 최신 main 일치 재조회 확인.
+- 정확 2파일 Git blob 원격 readback:
+  - `tools/ci-controller-b-activation-readonly.mjs` — `6e9160954f055786bffba9b558362ddb1e34f52d`
+  - `tests/ci-controller-b-activation-readonly.test.mjs` — `0464e1039672a838f84e8e29bd9bbedc8005f3bb`
+- 기존 `CI_CONTROLLER_B_AUTO_POLICY_NOT_CONFIGURED` 상태 코드는 유지했으나 Owner-merged 기존 명세의 POLICY 비필수성 및 신규 CI 생성 승인 경로 POLICY 필수성을 **고정 비민감 필드로 분리**. 이 소스 정정은 자동 승인 활성화/업무 설치나 #4117 원본 JSON/TXT 복원 증거가 아니다.
+- 운영 승인·GitHub variables·독립 scope/receipt roots·기존 maintenance 정책·PC 데이터/DB/D1/Task·예약 변경 **0건**. **무인 자동화 실제 효과 A/Writer B/Controller B 0/3(0%)**, 신규 요청 중복 0.
+- 다음 직접 필수 실행은 효과별 **실제 B-installed 독립 정책/업무 원본·영구 claim root 확인**과 기존 허가된 실행 연결이다. Controller B는 이 수정을 이유로 수동 Owner 댓글을 새로 요구하거나 정책 변수를 강제 생성하지 않는다. 활성화 권한은 source-only PR과 별개.
+
