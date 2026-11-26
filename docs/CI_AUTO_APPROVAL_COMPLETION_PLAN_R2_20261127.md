@@ -418,3 +418,13 @@
 - 정확 비교 조건의 추가 확인: 독립 설치된 `proof.policy`와 `scope.policy`는 동일 권한이더라도 JSON 객체 필드 순서가 다를 수 있다. 원문 `JSON.stringify` 비교는 유효한 승인을 오탐 거절한다. `isDeepStrictEqual`로 구조·자료형·추가 권한 필드까지 정확 비교하도록 수정하고 JSON 필드 순서 차이의 정상 통과 회귀시험 2건 추가. 기존 권한 변조 12종 차단 시험 유지.
 - [PR #4088](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4088)의 **최신 HEAD `cd20a96ac6f71dd079014135e991102df0223768`**. 정확 HEAD 테스트 세 종류: Windows Source Run [45888649625](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45888649625), C996 [45888649626](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45888649626), Secret Scan [45888649590](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45888649590), 관측 시 3종 `queued`. 이전 HEAD 시험 결과 재사용하지 않음.
 - 이 조치는 승인 정책 설치/승인 확대가 아닌 읽기 정확성 수정이다. C996/Windows/Secret 3/3 결과 전에는 병합하지 않고, 실제 PC 운영 무인 완료는 **0/3**을 유지한다.
+
+### #4088 추가 실제 결함 및 현재 최신 HEAD — 2026-11-27 KST
+
+- 기존 `dispatchApprovedCiEffect`의 설치 정책 비교가 transport 주요 필드만 포함해 Writer/A 실제 실행 활성화·어댑터 SHA·Controller SHA 권한 차이를 거르지 못할 수 있었다. 전체 정책 구조 동등성(`isDeepStrictEqual`) 검사로 보강하여 출처/필드 순서가 달라도 동일 정책은 수락, 실행 권한 drift는 거부. 기존 `sourceRunId` 고정 방식 유지, `EVENT_COMPLETION_V1`만 GitHub에서 재검증한 동적 Run ID 한 필드를 제외한다.
+- 또 `publishNativeCompletion`이 B-signed 승인 원문과 현재 로컬 `approvalBytes`의 SHA-256을 검사하기 전에 단회 dispatch claim을 소모할 수 있음을 확인했다. 수신기에서 실패할 변경된 승인 bytes를 발행 단계에서 `CI_NATIVE_PUBLISH_APPROVAL_BYTES_DRIFT`로 막고, 단회 POST 0회 유지하도록 수정. 해당 코드와 정확 회귀시험을 기존 #4088에 통합.
+- [PR #4088](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4088) **현재 HEAD `535f38c3584ec81d4f4eddfd33ecdd6599a62ff5`**. 정확 HEAD CI: Windows Source [45888855283](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45888855283), C996 [45888855342](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45888855342), Secret Scan [45888855329](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45888855329), 모두 최초 관측 시 `queued`. **이전 HEAD의 실행 결과로 병합하지 않는다.**
+- 같은 시간 다른 S6 담당자의 main 변경 HEAD `d2e8fece77c8aa01cf54669800e0a36154e8e2d1`가 들어왔다. `maintenance-agent.mjs`, `maintenance-apply.mjs`와 두 관련 시험 파일만 변경되었으며 #4088의 native 8파일과 겹치지 않는다. shared source 보존 및 추후 mergeability 재검증.
+- 기존 운영 PC A Run 45883221676 `queued`, runner_id 0; A/Writer B/Controller B 실제 무인 작업 증거 **0/3** 유지. 변경은 소스·시험·Plan만이며 PC install/승인 flag/정책 원본 운영 효과 0.
+
+다음 필수 실행: #4088 최종 CI 3/3 결과 → 성공 시 정확 SHA로 병합/main blob readback, 아니면 실패한 테스트만 최소 수정 → 실제 PC 승인 Scope 확인 및 효과별 자연 무인 종단 증거 회수.
