@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 const wrapper=readFileSync(new URL('../tools/operator-packets/CI_CONTROLLER_B_RECEIPT_ROOT_C1.cmd',import.meta.url),'utf8');
 const source=readFileSync(new URL('../tools/operator-packets/CI_CONTROLLER_B_RECEIPT_ROOT_C1.ps1',import.meta.url),'utf8');
 test('exact isolated Windows host, fixed non-TEMP ProgramData root, separate Runner identity',()=>{
@@ -41,7 +42,10 @@ test('operator single-click wrapper requires C-grade and cannot auto-run in Acti
  assert.match(source,/CI_RECEIPT_EXPLICIT_C_APPLY_REQUIRED/);
  assert.match(wrapper,/if defined GITHUB_ACTIONS exit \/b 1/);
  assert.match(wrapper,/if defined RUNNER_NAME exit \/b 1/);
- assert.match(wrapper,/powershell\.exe .* -File "%~dp0CI_CONTROLLER_B_RECEIPT_ROOT_C1\.ps1" -Apply/);
+ assert.match(wrapper,/powershell\.exe .* -File "%ZG_SCRIPT%" -Apply/);
+ const digest=createHash('sha256').update(source,'utf8').digest('hex').toUpperCase();
+ assert.ok(wrapper.includes(String.fromCharCode(39)+digest+String.fromCharCode(39)),'launcher must pin exact script SHA-256');
+ assert.match(wrapper,/Get-FileHash -LiteralPath \$env:ZG_SCRIPT -Algorithm SHA256/);
  assert.doesNotMatch(wrapper,/ExecutionPolicy|EncodedCommand|runas|curl|wget|git |node /i);
 });
 test('Windows PowerShell parser accepts C operator source without executing it',async t=>{
