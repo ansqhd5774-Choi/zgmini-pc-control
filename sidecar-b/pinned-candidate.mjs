@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {sha256,validateManifest} from './contract.mjs';
+import {validateManifest,verifyCandidateBytes} from './contract.mjs';
 export const APPROVED_CANDIDATE='sidecar-b/approved/archive-run.mjs';
 const fail=c=>{throw Object.assign(Error(c),{code:c});};
 const need=(ok,c)=>{if(!ok)fail(c);};
@@ -54,7 +54,5 @@ export function readPinnedSidecarCandidate({candidateRoot,manifest,runGit=git}){
   if(e?.code?.startsWith('SIDECAR_B_'))throw e;
   fail('SIDECAR_B_CANDIDATE_MISSING_STOP');
  }
- need(sha256(bytes)===manifest.afterSha256,
-  'SIDECAR_B_CANDIDATE_HASH_STOP');
- return bytes;
+ return verifyCandidateBytes(manifest,bytes);
 }
