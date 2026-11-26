@@ -91,8 +91,20 @@ try {
   if ($serviceAccount -match '^(?i:LocalSystem|LocalService|NetworkService|NT AUTHORITY\\.*)$') {
     Stop-C 'CI_RECEIPT_DEDICATED_RUNNER_ACCOUNT_REQUIRED'
   }
+  # Win32_Service.StartName may use '.\user' for a dedicated local Runner.
+  # Windows NTAccount translation can reject this spelling even when
+  # 'COMPUTERNAME\user' resolves to the same account. Do not change identity.
+  $sidAccount = $serviceAccount
+  if ($serviceAccount.StartsWith('.\', [System.StringComparison]::Ordinal)) {
+    $localName = $serviceAccount.Substring(2)
+    if ([string]::IsNullOrWhiteSpace($localName) -or $localName.Contains('\') -or
+        $localName.Contains('/') -or $localName -ne $localName.Trim()) {
+      Stop-C 'CI_RECEIPT_RUNNER_ACCOUNT_SHAPE_UNVERIFIED'
+    }
+    $sidAccount = [Environment]::MachineName + '\' + $localName
+  }
   try {
-    $runnerSid = ([System.Security.Principal.NTAccount]::new($serviceAccount)).Translate([System.Security.Principal.SecurityIdentifier])
+    $runnerSid = ([System.Security.Principal.NTAccount]::new($sidAccount)).Translate([System.Security.Principal.SecurityIdentifier])
   } catch { Stop-C 'CI_RECEIPT_RUNNER_SID_UNVERIFIED' }
   if ($runnerSid.Value -in @('S-1-5-18','S-1-5-19','S-1-5-20','S-1-5-32-544')) {
     Stop-C 'CI_RECEIPT_SHARED_RUNNER_ACCOUNT_DENIED'
