@@ -1,0 +1,45 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "08c0df1c4315019d85502dca2b0e4fd980eef48a",
+  "targetSha": "73f70de98b030d4bac0af48ac50023ec1bd7ce1f",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "CANDIDATE ONLY until independently Owner-native merged: reuse existing user-approved ZGMINI automatic CI approval system policy-pin rotation effect. This is the exact reviewed source SHA and proposed workflow blob, not a grant for any new business B effect, new permissions, variable enablement, or Windows filesystem/ACL administration. Approved=true is the required formal manifest field and has no operational force without owner-native PR merge, operator-gated Windows maintenance handoff, fresh installed CAS, and preserved backup/rollback/receiver identity checks.",
+  "files": {
+    "tools/maintenance-contract.mjs": "a850c66bfa4251798ad79e7d452dad93d6d3f5ed65cd0549fd335b0bb2524787",
+    "tools/maintenance-apply.mjs": "a99c6a51a024deaf4e3c6aa806182e73aeb4049604636db7dbd65614a40eb51e",
+    "tools/maintenance-agent.mjs": "ab19c890e21b3c2a605291374f8ebeae8ea8e9188b04131a5c7873543165fc37",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "2b9938f1327a8c148ab9b11b8c1fd0101682f123b9723d944916ab476bd8cf9d",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "af31ab1f6a159aa1d8467d2585eb16750e8a1a293f9ecfb90b85c388d8640d70",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "23f3709ed0387cfb0132d9546f0fd6e2f10eabfad4212a67a170d5201a4a5de0"
+  },
+  "ciControllerBPolicy": {
+    "schema": "ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V1",
+    "enabled": true,
+    "workflowId": 430972394,
+    "workflowBlobSha": "b568bbc5de05b2d6fff75419b88322b3e2de020c",
+    "workflowPath": ".github/workflows/ci-approval-controller-b.yml"
+  },
+  "checks": {
+    "sourceCi": "Proposed source target 73f70de98b030d4bac0af48ac50023ec1bd7ce1f is a main-ancestor 40 commits ahead of installed 08c0df1c4315019d85502dca2b0e4fd980eef48a. The exact 9 fixed maintainer source files have identical Git blob SHAs in both revisions; their raw SHA256 values are preserved from the last owner-approved installed manifest. The only changed file under maintenance tools in the 40-commit compare is tools/maintenance-request.mjs (outside handoffSourceFiles); the 7 installed runtime files are byte-identical. Exact PR #3856 source CI 3/3 PASS 45811181292/45811181402/45811181331, merged as target 73f70de98b030d4bac0af48ac50023ec1bd7ce1f.",
+    "installedWindowsEvidence": "2026-11-26T10:57:24.738Z official operating PC A results/pc-process-inventory-45805889078-1-operating.json: maintenanceSourceSha=08c0df1c4315019d85502dca2b0e4fd980eef48a; maintenanceFilesVerified=true; ciControllerBReceiver.approvedV2PinMatches=true, executionAuthorized=false. This is historical and MUST be independently refreshed at actual Windows handoff; no current local CAS is asserted.",
+    "exactBytePlan": "All nine approved handoff source files fetched at immutable installed and target revisions, Git blob SHA equality 9/9. Actual runtime source writes remain exactly zero (seven installed runtime files equal). Only maintenance manifest sourceSha and ciControllerBPolicy.workflowBlobSha are eligible to change via the already installed protected handoff; existing startup byte/owner/WMI/leasing/backups/rollback/readback contract remains mandatory.",
+    "workflowPinEvidence": "Candidate Draft PR #3859 head 42c495288d3a5b03b1e9ad1b530eabf62814ba16, Workflow Git blob SHA b568bbc5de05b2d6fff75419b88322b3e2de020c read from exact Draft branch. Its checkout ref is immutable publisher source 73f70de98b030d4bac0af48ac50023ec1bd7ce1f. Current live main Workflow blob d3c175329a7ac955f5b45ce2b13dad78ce272d9a. Draft #3859 must NOT merge before Owner-native approval of this exact manifest, successful independent Windows handoff to the new policy and exact installed pin readback. New PR #3859 CI was queued at preparation; not asserted PASS.",
+    "windowsHandoffExecuted": false
+  },
+  "runtimeChangedFiles": [],
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "preserve": [
+    "Existing installed Controller, Supervisor, six dedicated Runner seats and operating PC files outside the seven-file maintenance receiver contract",
+    "Original maintenance files, source manifests, startup, leases, backup and receiver origin evidence",
+    "Original local SQLite, Writer, PC jobs, provider data, D1, DNS and all CI approval ledgers",
+    "GitHub Actions publisher activation remains disabled until receipt root and independent policy readback succeed",
+    "No replay of previously completed Controller B work or artificial B jobs; reservation/schedule verification is only a later follow-up"
+  ],
+  "scopeNote": "Policy-only seven-to-seven source metadata transition, installed 08c0df1c4315019d85502dca2b0e4fd980eef48a to immutable main-ancestor 73f70de98b030d4bac0af48ac50023ec1bd7ce1f; no installed runtime byte writes. New workflow pinned candidate b568bbc5de05b2d6fff75419b88322b3e2de020c differs from installed d3c175329a7ac955f5b45ce2b13dad78ce272d9a. This unmerged candidate neither issues Owner approval nor executes the handoff. Any mismatch/unknown state stops with no new job; no repeat of old B effects. GitHub ENABLED stays false. Reservation verification excluded."
+}
