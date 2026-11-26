@@ -385,7 +385,11 @@ const BACKUP_KEYS=["strategy","rollback"];
 const ROLLBACK_KEYS=["kind","sha"];
 const FILE_KEYS=["path","sha256"];
 const optionalManifestKeys=raw=>[...MANIFEST_KEYS,...
-  ['infrastructureEvidence','controllerOnlyInstall','selectiveSource'].filter(k=>Object.hasOwn(raw,k))];
+  ['infrastructureEvidence','controllerOnlyInstall','selectiveSource','ciNativeApproval']
+    .filter(k=>Object.hasOwn(raw,k))];
+// This is an explicit, separately reviewed Controller B approval annotation.
+// Merely installing some successful B is never evidence of CI-native authority.
+const CI_NATIVE_APPROVAL_KEYS=['schema','effect','nativePolicySha256'];
 // The approval pins every deployed file and the updater checks the exact Git
 // diff. New readonly adapters must not require replacing this maintainer just
 // to append another filename. Keep paths confined to controller modules.
@@ -739,6 +743,18 @@ export function validateUpdateRequest(issue,manifestBytes,{
       x.customPaths.some(p=>!manifest.files.some(f=>f.path===p)))
       throw Error('SELECTIVE_SOURCE_CUSTOM_PATH_INVALID');
   }
+  if(Object.hasOwn(raw,'ciNativeApproval')){
+    const native=raw.ciNativeApproval;
+    if(actor!==CONTROL_ACTOR||ciAuthorization!==null||
+       raw.purpose!=='pc-controller-maintenance'||raw.controllerOnlyInstall!==true||
+       !raw.selectiveSource)
+      throw Error('UPDATE_CI_NATIVE_OWNER_SCOPE_DENIED');
+    requireKeys(native,CI_NATIVE_APPROVAL_KEYS,'UPDATE_CI_NATIVE_APPROVAL_FIELDS_INVALID');
+    if(native.schema!=='ZGMINI_CI_NATIVE_B_POLICY_APPROVAL_V1'||
+       !['A_READONLY','B_WRITER_SOURCE'].includes(native.effect))
+      throw Error('UPDATE_CI_NATIVE_EFFECT_DENIED');
+    requireDigest(native.nativePolicySha256,'UPDATE_CI_NATIVE_POLICY_SHA_INVALID');
+  }
   if(typeof raw.postSourceBranch!=="string"
     ||!(/^(?:main|codex\/[a-z0-9][a-z0-9./_-]{2,100})$/.test(raw.postSourceBranch))
     ||raw.postSourceBranch.includes(".."))throw Error("UPDATE_POST_SOURCE_BRANCH_INVALID");
@@ -769,6 +785,7 @@ export function validateUpdateRequest(issue,manifestBytes,{
       customPaths:Object.freeze([...raw.selectiveSource.customPaths].sort())
     })}:{}),
     ...(raw.infrastructureEvidence?{infrastructureEvidence:structuredClone(raw.infrastructureEvidence)}:{}),
+    ...(raw.ciNativeApproval?{ciNativeApproval:Object.freeze({...raw.ciNativeApproval})}:{}),
   });
   return Object.freeze({request,manifest:normalized});
 }
