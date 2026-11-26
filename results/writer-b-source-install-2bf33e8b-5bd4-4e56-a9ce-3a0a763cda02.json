@@ -1,0 +1,28 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "2bf33e8b-5bd4-4e56-a9ce-3a0a763cda02",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "393cee0da46515ff056543173fcd1253a858b3d7",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "d8ac245003e7b8e006c2345382d5c639c6d5f18b",
+  "candidateSourceSha": "0f0bb62e4d4879369e061e9289ed1c79d91f0044",
+  "manifestSha256": "d7b68d89d428126e919ceb0156f5a64666a792ea81898dff9deefbe259f795bf",
+  "baseTreeOid": "0196ec05fd0c15dbdc094443115ace0a4b375f85",
+  "preparedTreeOid": "517718bc9f5d6935262b890b539360173f7d0e96",
+  "provenanceSha256": "afe5a29d042700cd53d5df40e82d48a8d76f1d126af4b02e9b676c1d50938cbf",
+  "runId": "45802270334",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "lib/cnn-observed-history-r1.mjs",
+    "scripts/pc-writer/cnn-observed-archive-publication-r1.mjs",
+    "scripts/pc-writer/collect-local.mjs",
+    "scripts/pc-writer/collection-publication-policy.mjs",
+    "scripts/pc-writer/local-cycle.mjs",
+    "scripts/pc-writer/quota-ledger.mjs",
+    "scripts/pc-writer/run-local.mjs",
+    "worker/public-feed-refresh.mjs",
+    "worker/public-feed-store.mjs"
+  ]
+}
