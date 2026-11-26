@@ -1,0 +1,32 @@
+{
+  "schema": "ZGMINI_PC_WATCHDOG_B_MANIFEST_V4",
+  "approved": false,
+  "scope": "SAME_HOST_ACTIVE_1_STANDBY_1_WATCHDOG_B",
+  "installedSha256": "3f99ea3357c6731cc9000bde1273db915cb07ba5fa480718194deb6330c29072",
+  "installedManifestSha256": "28c8017d469a0e2b13af96e01e686bae874d174b1ddac9e6a170ee2487bd6829",
+  "targetSha": "f9c2760ae92ce98ca20784e4a26150edbd0e3578",
+  "targetSha256": "9150a024bcb979b69a9d908c75b8eb7cec6794d22506384a28b64a722074951b",
+  "fromScope": "RUNNER_RECOVERY_AND_MAINTENANCE_HANDOFF_V1",
+  "toScope": "RUNNER_RECOVERY_AND_MAINTENANCE_HANDOFF_V1",
+  "allowedFiles": [
+    "pc-watchdog/runner-watchdog.mjs",
+    "pc-watchdog/INSTALL.json"
+  ],
+  "operation": "watchdog-b-upgrade",
+  "approvalBasis": "2026-11-26_R3_SAME_HOST_ACTIVE_1_STANDBY_1_USER_SCOPE",
+  "revision": 4,
+  "expectedControllerSha": "b91340d5047daf753e1c17a5c966e4d2aecea586",
+  "expectedControllerFiles": {
+    "controller/common.mjs": "91e4ceb5d26412893cc047670a420338aa8ef293e95498f852ac0a2f5edd6cc6",
+    "controller/engine.mjs": "6112b5a357d6ecba2ffb299857c2649ee51ca97e1e7755162efd69337976769f",
+    "controller/entry.mjs": "407ea8693ab48a03b04ec77fe63f86d05537a37661b42c9ddcd55f5b36aa01d7",
+    "controller/supervisor.mjs": "5ec0952872adcaa16eb14adec614f024bac7264deb5b59fb68b9080f0edb0344",
+    "controller/standby.mjs": "e18c09b7e9b90fc483d5200e1e0c4741d2e4f93e049328566d710e37c21be7e7",
+    "controller/operations.mjs": "d4a76910806cba861b3253f5fd24eccc8968fcbaa66133999483034b2f661cd3"
+  },
+  "protectionPolicy": "CURRENT_CAS_WITH_HISTORICAL_KEY_PRESENCE",
+  "standby": {
+    "mode": "ACTIVE_1_STANDBY_1",
+    "approved": true
+  }
+}
