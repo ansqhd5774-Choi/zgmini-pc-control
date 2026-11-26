@@ -3034,7 +3034,7 @@ export function toText(r){
    'ciReceiptCFixedPath='+r.ciControllerBCFixedPathPreflight.code,
    'ciReceiptCParent='+r.ciControllerBCFixedPathPreflight.parent,
    'ciReceiptCRoot='+r.ciControllerBCFixedPathPreflight.receiptRoot,
-   'ciReceiptCOriginalOperatorMayRunUnchanged='+r.ciControllerBCFixedPathPreflight.originalCOperatorMayRunUnchanged
+   'ciReceiptCFixedTargetVacantObserved='+r.ciControllerBCFixedPathPreflight.fixedTargetVacantObserved
   ]:[]),
   'maintenanceSourceSha='+(r.maintenance?.maintenanceSourceSha??'UNKNOWN'),
   'installLockHeld='+(r.maintenance?.installLockHeld??'UNKNOWN'),
