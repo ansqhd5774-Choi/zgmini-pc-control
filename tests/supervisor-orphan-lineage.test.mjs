@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import {assessOrphanSeatLineage as assess} from '../tools/supervisor-orphan-lineage.mjs';
 const owner={pid:100,nonce:'12345678-1234-4234-8234-123456789abc'};
 const heartbeat={pid:100,children:Array.from({length:6},(_,i)=>({seat:i+1,pid:200+i}))};
-const root='E:\\\\ZGmini\\\\automation\\\\pc-control';
+const root='E:\\ZGmini\\automation\\pc-control';
 const rows=()=>heartbeat.children.flatMap(c=>[
  {pid:c.pid,ppid:100,name:'cmd.exe'},
  {pid:300+c.seat,ppid:c.pid,name:'Runner.Listener.exe',
-  executablePath:root+'\\\\runners\\\\'+String(c.seat).padStart(2,'0')+'\\\\bin\\\\Runner.Listener.exe'}
+  executablePath:root+'\\runners\\'+String(c.seat).padStart(2,'0')+'\\bin\\Runner.Listener.exe'}
 ]);
 const run=override=>assess({owner,ownerAlive:false,heartbeat,processes:rows(),controllerRoot:root,...override});
 test('six distinct existing Runner genealogies are observational, never adoption authority',()=>{
@@ -24,7 +24,7 @@ test('missing, duplicate, extra or wrong-seat listeners refuse the claim',()=>{
  for(const processes of [
   base.filter(x=>x.pid!==301),
   [...base,{...base.find(x=>x.pid===301),pid:999}],
-  [...base,{pid:999,ppid:100,name:'Runner.Listener.exe',executablePath:'C:\\\\service\\\\Runner.Listener.exe'}],
+  [...base,{pid:999,ppid:100,name:'Runner.Listener.exe',executablePath:'C:\\service\\Runner.Listener.exe'}],
   base.map(x=>x.pid===301?{...x,ppid:205}:x)
  ]) assert.equal(run({processes}).status,'BLOCKED');
 });
