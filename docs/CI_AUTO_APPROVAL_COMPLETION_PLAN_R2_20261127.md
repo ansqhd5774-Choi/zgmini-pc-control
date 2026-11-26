@@ -772,3 +772,31 @@
 
 **다음 필수 실행:** 이미 확인된 Controller B Receiver CAS #4100 재사용, 기존 승인된 아직 실행되지 않은 업무의 원본·독립 영수증 저장 루트/인가된 opt-in 변경 경로가 실제로 확인될 때만 `push` 기반 기존 Owner 승인 업무의 CI 자동 발행 검증 진행. 별도 native A/Writer B의 #4113 루트·proof 미구성은 독립 대상이며 기존 원본 없이는 정책이나 `true`를 제조하지 않음. #4117 기존 실패는 개별 OPEN 원장으로 보존.
 
+## 30. 스물여섯 번째 실행 기록 — Native 후보 경로 원본 관측으로 미설정과 미설치 구분 (2026-11-27 KST)
+
+### 기존 구성 누락과 로컬 파일 부재를 구분한 최소 수정 및 실측
+
+- 실측 기준 [#4113](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4113)에서는 handoff host의 `ZGMINI_CI_NATIVE_SCOPE_ROOT`·`ZGMINI_CI_NATIVE_RECEIPT_ROOT`와 Native A/Writer B publisher/execution opt-in 변수 미설정만 관측했으며, **실제 파일 부재는 미관측**이었다. 같은 A를 반복하지 않고 판단을 바꿀 고정 경로 존재 관측을 최소 추가.
+- `main` `604cd8e22cf961521218e84f14af5193133a7754` 기준 별도 최소 소스 브랜치 `codex/pc-automation-process-improvement-native-scope-presence-20261127`에서 [PR #4142](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4142), 정확 HEAD `fab744e1e78d5668d2d74409e37622d290e8ea35`. 수정 2파일: `tools/ci-native-publisher-local-readonly.mjs`/해당 테스트. 이미 `readNativeScope`의 **표준 기본 후보**로 사용한 경로만 Windows `lstatSync`로 확인하며 symlink/reparse 및 파일 크기 검사, 경로·파일명·승인 원문·토큰 결과 출력 금지. 이 후보는 **권한 출처/실제 구성 root 자체가 아님**. 기존 `status/code`/검증기/opt-in/PC 동작 불변.
+- exact HEAD CI **3/3 SUCCESS**:
+  - [Two-PC Source Run 45903203736](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45903203736): `process-source-tests` 신규 고정경로 메타데이터 테스트 포함 SUCCESS.
+  - [Secret Scan Run 45903203726](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45903203726): SUCCESS.
+  - [C996 Run 45903203732](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45903203732): SUCCESS.
+- `main` squash 병합 SHA **`82a44e22eeef153b06a7c9f196d39f5e7237f186`** GitHub readback. 본문 Git blob `aa22ed3dbd280dc02f7941cff810e9fa167e6b16`, 테스트 Git blob `806284b2ef3b39c8ece2e602409041b78deedfc1`; 원격 재조회 일치.
+
+### 원본 격리 PC A — 추가 증거
+
+- 새 고유 [Issue #4143](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4143)는 기존 `process-inventory-readonly`의 `role=handoff, probe=ci-native-publisher-local-readonly`를 **불필요한 pc-job 라벨 없이** 단회 요청. requestId `947b58c3-8fe4-4950-a85e-6e419d83da72`.
+- 실제 [Run 45903559854](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45903559854), `DESKTOP-N62L0NG`/`zgmini-handoff-ci-spare-01`, observedAtUtc `2026-11-26T22:15:27.718Z`. GitHub `main` JSON `results/pc-process-inventory-45903559854-1-handoff.json` **Git blob `9df0aa76cde60559b36fdc8998f39c6ca47f1635`**; 대응 TXT **blob `c45c9656fd35c20ec2273e5bccea8c5115ca1101`**, 동일 고유 요청·상태 원격 **2/2 readback**.
+- 관측 `READ_ONLY_OBSERVED/CI_NATIVE_LOCAL_ROOTS_NOT_CONFIGURED`: `scopeRootConfigured=false`, `receiptRootConfigured=false`, native opt-in **4개 모두 `UNSET_OR_INVALID`**. 추가한 `standardScopeCandidate.state=ROOT_ABSENT`는 **기존 default 후보 경로 또는 그 부모가 현재 격리 PC에 없음**을 실제 lstat으로 구분했다. **다른 비표준 경로에 설치된 승인 파일의 존재/미존재를 증명하지 않음.** 실제 독립 policy/설치 proof 바이트 및 GitHub B 설치 결과 검증은 여전히 미수행.
+- `independentRootsVerified=false`, `independentGitHubInstallationReceiptVerified=false`, `canPublish/canExecute/canInstall=false`, `operationalWrites/providerCalls/d1Writes/retries=0`. A 상태가 PASS 아닌 까닭의 Job `completed/failure`는 원격 JSON/TXT 저장 실패가 아니라 fail-closed 종료 계약. #4143 정정 댓글 [#7204516561](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4143#issuecomment-7204516561), 조회 목적만 `closed/completed`.
+
+### 업무 목표로 돌아가는 다음 실행
+
+1. **Native A와 Writer B 개별:** `approvals/controller-updates/`의 기존 실제 Owner 승인 및 `ciNativeApproval` 연계 설치 원본이 존재하는지 대상 바이트/효과 단위로 판별. 단순 코드 검색에서 `ciNativeApproval`은 현행 validator/agent·테스트만 발견돼 **실제 설치 grant의 존재를 입증하지 못함**. 소스 검색 부재를 DB나 PC 파일 부재로 오판하지 않는다.
+2. 기존 승인 효과가 실제 고정되면 **각 효과별** 독립 B 설치 결과(`ciNativeEffect`, `ciNativePolicySha256`), 권한 있는 격리 설치·readback, 분리된 영구 receipt root를 정규 CAS/lease/backup 계약으로 연결. 일반 CI PR 소스·디폴트 경로를 trust root로 승격시키지 않고, setup 인증·환경 변수 변경 등 권한 밖 효과는 독립 확인 전 실행 금지.
+3. Controller B는 Owner-merged 기존 승인 `push` 경로에 별도 자동 생성 정책이 필요 없다는 #4136 수정 재사용. 다만 실제 `ENABLED=false`, 영구 receipt root/새 승인 미실행 효과 미확보 상태는 지속; #4036/#4117 재발행 금지.
+4. 각 효과의 실제 자연 CI→고유 정규 발행→PC 실행→본 결과 검증에서만 0/3 분자 증가. 추가 리플레이·빈 정책 제조·보안 값 변경·임의 폴더 생성 금지.
+
+**종료 진행률: 실제 무인 자동화 0/3(0%). 이번 턴 완료는 source CI/merge + 새 읽기 A 2/2 및 표준 후보 경로 부재의 근거 확보이며 운영 적용/승인 권한 부여/실제 PC 효과가 아니다.**
+
