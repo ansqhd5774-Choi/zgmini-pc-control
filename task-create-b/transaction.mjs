@@ -35,14 +35,14 @@ export async function applyTaskCreateB(proof,candidate,io){
   taskMayExist=true;
   await io.registerTaskDisabled(TASK,candidate.disabledXml);
   need(await io.taskReadback({name:TASK,enabled:false,
-   definitionSha256:m.disabledXmlSha256})===true,
+   definitionTemplateSha256:m.disabledTemplateSha256})===true,
    'TASK_CREATE_B_DISABLED_READBACK_STOP');
   need(await io.verifyProtectedUnchanged(m)===true,
    'TASK_CREATE_B_PROTECTED_STATE_DRIFT_STOP');
   enableAttempted=true; // treat unknown enable result as an effect, NEVER replay
   await io.enableTask(TASK);
   need(await io.taskReadback({name:TASK,enabled:true,
-   definitionSha256:m.enabledXmlSha256})===true,
+   definitionTemplateSha256:m.enabledTemplateSha256})===true,
    'TASK_CREATE_B_ENABLED_READBACK_STOP');
   need(await io.verifyProtectedUnchanged(m)===true,
    'TASK_CREATE_B_PROTECTED_POSTCHECK_STOP');
@@ -60,7 +60,7 @@ export async function applyTaskCreateB(proof,candidate,io){
    lastEffect:'ENABLE_ATTEMPTED_INSPECT_TASK_AND_SAVED_CHECKPOINTS'};}
   if(!claimed){return {...result,status:'TASK_CREATE_B_PREFLIGHT_STOP',code};}
   try{
-   if(taskMayExist)need(await io.undoOwnedTaskIfExact(TASK,m.disabledXmlSha256)===true,
+   if(taskMayExist)need(await io.undoOwnedTaskIfExact(TASK,m.disabledTemplateSha256)===true,
     'TASK_CREATE_B_TASK_ROLLBACK_UNVERIFIED');
    if(wrapperMayExist)need(await io.undoOwnedLauncherIfExact(m.wrapperPath,
     m.launcherSha256)===true,'TASK_CREATE_B_WRAPPER_ROLLBACK_UNVERIFIED');
