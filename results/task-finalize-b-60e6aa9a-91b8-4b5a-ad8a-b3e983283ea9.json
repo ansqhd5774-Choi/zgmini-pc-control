@@ -1,0 +1,18 @@
+{
+  "schema": "ZGMINI_PC_TASK_FINALIZE_B_RESULT_V1",
+  "requestId": "60e6aa9a-91b8-4b5a-ad8a-b3e983283ea9",
+  "recoveryRequestId": "5b012ae0-5a2b-4fb9-92a6-72754de915c3",
+  "originalCreateRequestId": "ce21eaa3-7768-4cb8-88d9-0911941d966c",
+  "taskName": "ZGMINI-PC-CNN-Minute",
+  "status": "TASK_FINALIZE_B_FINALIZED_VERIFIED",
+  "code": "TASK_FINALIZE_B_EXACT_OWNER_RELEASE_PASS",
+  "installed": true,
+  "taskChanges": 0,
+  "otherTaskChanges": 0,
+  "ownerLockReleased": true,
+  "installerProviderCalls": 0,
+  "installerSqliteWrites": 0,
+  "installerD1Writes": 0,
+  "scheduledRuntimeEffects": "UNVERIFIED_UNTIL_NATURAL_TICKS",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE"
+}
