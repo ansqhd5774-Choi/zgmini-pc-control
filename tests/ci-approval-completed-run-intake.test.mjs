@@ -57,7 +57,7 @@ function lateOwnerFixture(){
   approval:{ref:'https://github.com/'+repository.full_name+'/pull/'+num}
  }));
  const blob=createHash('sha1')
-  .update(Buffer.from('blob '+bytes.length+'\\0')).update(bytes).digest('hex');
+  .update(Buffer.from('blob '+bytes.length+'\0')).update(bytes).digest('hex');
  const pr={number:num,merged:true,merged_at:'2026-11-26T22:20:00Z',
   merged_by:{login:'ansqhd5774-Choi',id:327938088,type:'User'},
   merge_commit_sha:mergedSha,
