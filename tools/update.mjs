@@ -3211,6 +3211,23 @@ export function normalizeS6OldChildren(children,{requireAlive=false}={}){
  return rows.sort((a,b)=>a.seat-b.seat);
 }
 
+
+/** Fixed evidence that the same pinned Watchdog receiver, original approved
+ * source and current on-disk bytes survived every phase of S6. This is
+ * observation only, never a process or execution authority. */
+export function s6WatchdogPinMatches({baseline,install,receiver,status,sourceSha256}={}){
+ const sha=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
+ const nonce=x=>typeof x==='string'&&/^[a-f0-9-]{36}$/.test(x);
+ return sha(baseline?.watchdogSourceSha256)&&
+  sha(install?.sha256)&&sha(sourceSha256)&&
+  install.sha256===baseline.watchdogSourceSha256&&
+  sourceSha256===baseline.watchdogSourceSha256&&
+  nonce(baseline?.watchdogReceiverNonce)&&
+  receiver?.nonce===baseline.watchdogReceiverNonce&&
+  Number.isSafeInteger(baseline?.watchdogPid)&&baseline.watchdogPid>0&&
+  receiver?.pid===baseline.watchdogPid&&status?.pid===baseline.watchdogPid;
+}
+
 /**
  * Preserve the *exact* S6 old owner, six children and earlier request ledger
  * hashes before any operational effect. A candidate manifest only becomes
@@ -3219,6 +3236,10 @@ export function normalizeS6OldChildren(children,{requireAlive=false}={}){
  */
 export function captureS6OncePinnedBaseline(issue,approvedBytes,{actor=null}={}){
  const observation=readS6OnceCurrentPreimage(issue?.requestId);
+ const receiver=json(path.join('E:/ZGmini/automation/pc-watchdog','receiver/owner.json'));
+ need(receiver.pid===observation.s6Live.watchdogPid&&
+  /^[a-f0-9-]{36}$/.test(receiver.nonce??''),
+  'S6_BASELINE_WATCHDOG_RECEIVER_CHANGED');
  const pinned=validateS6OnceBManifest(issue,approvedBytes,{
   actor,controlRepository,live:observation.s6Live});
  need(pinned.operationalEffectExecuted===false&&pinned.authorization===false,
@@ -3253,6 +3274,8 @@ export function captureS6OncePinnedBaseline(issue,approvedBytes,{actor=null}={})
   approvalManifestSha256:issue.approvalManifestSha256,
   protectedSha256:observation.s6Live.protectedSha256,
   ownerSha256:observation.s6Live.ownerSha256,
+  watchdogSourceSha256:observation.s6Live.watchdogSourceSha256,
+  watchdogReceiverNonce:receiver.nonce,
   oldSupervisorPid:owner.pid,oldSupervisorNonce:owner.nonce,
   watchdogPid:observation.s6Live.watchdogPid,
   standbyPids:Object.freeze([...observation.s6Live.standbyPids]),
@@ -3274,7 +3297,8 @@ export async function readS6OncePhaseReadback({phase,baseline,
  const uuid=x=>typeof x==='string'&&/^[a-f0-9-]{36}$/.test(x);
  need(baseline&&/^pc-s6-[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(
    baseline.requestId??'')&&validSha(baseline.controllerSha)&&
-  uuid(baseline.oldSupervisorNonce)&&
+  uuid(baseline.oldSupervisorNonce)&&uuid(baseline.watchdogReceiverNonce)&&
+  /^[a-f0-9]{64}$/.test(baseline.watchdogSourceSha256??'')&&
   /^[a-f0-9]{64}$/.test(baseline.ownerSha256??'')&&
   /^[a-f0-9]{64}$/.test(baseline.protectedSha256??'')&&
   Number.isSafeInteger(baseline.oldSupervisorPid)&&baseline.oldSupervisorPid>0&&
@@ -3300,6 +3324,9 @@ export async function readS6OncePhaseReadback({phase,baseline,
   'S6_READBACK_WATCHDOG_SOURCE_UNVERIFIED');
  const wdOwner=json(path.join(wdRoot,'receiver/owner.json'));
  const wd=json(path.join(wdRoot,'STATUS.json'));
+ need(s6WatchdogPinMatches({baseline,install:wdInstall,receiver:wdOwner,
+  status:wd,sourceSha256:sha256(verifiedWatchdogBytes)}),
+  'S6_READBACK_WATCHDOG_PIN_OR_OWNER_CHANGED');
  const observedAge=now-Date.parse(wd.at??'');
  const wdFresh=Number.isFinite(observedAge)&&observedAge>=0&&observedAge<45000&&
   wd.pid===wdOwner.pid&&wd.pid===baseline.watchdogPid&&pidAlive(wd.pid)===true;
