@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {sanitizeSidecarBReport} from './report.mjs';
+import {sanitizeSidecarBReport,publishSidecarBReport} from './report.mjs';
+import {createGitPairFixture} from '../writer-config-b/result-pair-test-fixture.mjs';
 const id='8f265fcb-45b7-43b8-acd2-40976524db91';
 const before='b'.repeat(64),after='c'.repeat(64),mhash='d'.repeat(64);
 const head='a'.repeat(40);
@@ -46,47 +47,70 @@ test('untrusted status, code or missing result is state unknown',()=>{
  }
 });
 
-test('reporter emits create-only JSON/TXT and verifies both remote bytes before comment',
- async()=>{
- const {publishSidecarBReport}=await import('./report.mjs');
- const req={schema:'ZGMINI_CNN_SIDECAR_ONEFILE_B_REQUEST_V1',
-  requestId:id,controlHead:head,
-  approvalManifestPath:'approvals/sidecar-b/cnn-r10.json',
-  approvalManifestSha256:mhash};
- const event={repository:{full_name:'ansqhd5774-Choi/zgmini-pc-control',
-  private:true},sender:{login:'ansqhd5774-Choi'},
-  issue:{number:123,user:{login:'ansqhd5774-Choi'},
-   title:'cnn-sidecar-onefile-b-install',labels:[{name:'pc-writer-b-install'}],
-   body:JSON.stringify(req)}};
- const e={GITHUB_SHA:head,GITHUB_ACTOR:'ansqhd5774-Choi',
-  GITHUB_REPOSITORY:'ansqhd5774-Choi/zgmini-pc-control',
-  GITHUB_EVENT_NAME:'issues',GITHUB_EVENT_ACTION:'opened',
-  GITHUB_RUN_ATTEMPT:'1',GITHUB_TOKEN:'x'.repeat(30)};
- const stored=new Map(),comments=[];
- const fake=async(url,opts={})=>{
-  const base=url.split('?')[0];
-  if(opts.method==='PUT'){
-   if(stored.has(base))return {status:422};
-   const record=JSON.parse(opts.body);
-   stored.set(base,Buffer.from(record.content,'base64'));
-   return {status:201};
-  }
-  if(opts.method==='POST'){
-   comments.push(JSON.parse(opts.body).body);
-   return {status:201};
-  }
-  if(stored.has(base))
-   return {status:200,json:async()=>({
-    encoding:'base64',content:stored.get(base).toString('base64')
-   })};
-  return {status:404};
- };
- const result=await publishSidecarBReport({
-  event,env:e,raw:JSON.stringify(success),
-  fetchApi:fake,readCurrent:()=>after
- });
- assert.deepEqual({verified:result.verified,created:result.created},{verified:2,created:2});
- assert.equal(comments.length,1);
- assert.match(comments[0],/APPLIED_VERIFIED/);
- assert.equal(stored.size,2);
+const req={schema:'ZGMINI_CNN_SIDECAR_ONEFILE_B_REQUEST_V1',
+ requestId:id,controlHead:head,
+ approvalManifestPath:'approvals/sidecar-b/cnn-r10.json',
+ approvalManifestSha256:mhash};
+const event={repository:{full_name:'ansqhd5774-Choi/zgmini-pc-control',
+ private:true},sender:{login:'ansqhd5774-Choi'},
+ issue:{number:123,user:{login:'ansqhd5774-Choi'},
+  title:'cnn-sidecar-onefile-b-install',labels:[{name:'pc-writer-b-install'}],
+  body:JSON.stringify(req)}};
+const e={GITHUB_SHA:head,GITHUB_ACTOR:'ansqhd5774-Choi',
+ GITHUB_REPOSITORY:'ansqhd5774-Choi/zgmini-pc-control',
+ GITHUB_EVENT_NAME:'issues',GITHUB_EVENT_ACTION:'opened',
+ GITHUB_RUN_ATTEMPT:'1',GITHUB_TOKEN:'x'.repeat(30)};
+
+test('reporter creates atomic sanitized JSON/TXT and verifies both remote bytes before comment',async()=>{
+ const fixture=createGitPairFixture();
+ const r=await publishSidecarBReport({event,env:e,raw:JSON.stringify(success),
+  fetchApi:fixture.fetchApi,readCurrent:()=>after});
+ assert.deepEqual({verified:r.verified,created:r.created},{verified:2,created:2});
+ assert.equal(r.status,'SIDECAR_B_APPLIED_VERIFIED');
+ assert.equal(fixture.counts.commits,1);
+ assert.equal(fixture.counts.updates,1);
+ assert.equal(fixture.counts.comments,1);
+ const prefix='results/cnn-sidecar-b-'+id;
+ assert.equal(fixture.files.size,2);
+ const json=JSON.parse(fixture.files.get(prefix+'.json').toString('utf8'));
+ const txt=fixture.files.get(prefix+'.txt').toString('utf8');
+ assert.equal(json.requestId,id);assert.equal(json.applied,true);
+ assert.match(txt,/STATUS=SIDECAR_B_APPLIED_VERIFIED/);
+});
+test('failed branch CAS leaves neither result file, and never reports verified',async()=>{
+ const fixture=createGitPairFixture({rejectRefUpdate:true});
+ const r=await publishSidecarBReport({event,env:e,raw:JSON.stringify(success),
+  fetchApi:fixture.fetchApi,readCurrent:()=>after});
+ assert.equal(r.status,'SIDECAR_B_STATE_UNKNOWN');
+ assert.equal(r.created,0);assert.equal(r.verified,0);
+ assert.equal(fixture.files.size,0);
+ assert.equal(fixture.counts.comments,1);
+});
+test('ambiguous lost PATCH acknowledgment reconciles committed pair without reexecution',async()=>{
+ const fixture=createGitPairFixture({throwAfterUpdate:true});
+ const r=await publishSidecarBReport({event,env:e,raw:JSON.stringify(success),
+  fetchApi:fixture.fetchApi,readCurrent:()=>after});
+ assert.equal(r.status,'SIDECAR_B_APPLIED_VERIFIED');
+ assert.equal(r.created,2);assert.equal(r.verified,2);
+ assert.equal(fixture.counts.updates,1);
+ assert.equal(fixture.files.size,2);
+});
+test('concurrent main fast-forward makes one bounded result-only CAS rebase',async()=>{
+ const fixture=createGitPairFixture({advanceMainOnFirstPatch:true});
+ const r=await publishSidecarBReport({event,env:e,raw:JSON.stringify(success),
+  fetchApi:fixture.fetchApi,readCurrent:()=>after});
+ assert.equal(r.status,'SIDECAR_B_APPLIED_VERIFIED');
+ assert.equal(r.created,2);assert.equal(r.verified,2);
+ assert.equal(fixture.counts.updates,2);
+ assert.equal(fixture.files.size,2);
+});
+test('existing evidence blocks overwrite and cannot be reported as successful delivery',async()=>{
+ const prefix='results/cnn-sidecar-b-'+id;
+ const fixture=createGitPairFixture({existingPaths:[prefix+'.json']});
+ const r=await publishSidecarBReport({event,env:e,raw:JSON.stringify(success),
+  fetchApi:fixture.fetchApi,readCurrent:()=>after});
+ assert.equal(r.status,'SIDECAR_B_STATE_UNKNOWN');
+ assert.equal(r.created,0);assert.equal(r.verified,0);
+ assert.equal(fixture.counts.updates,0);
+ assert.equal(fixture.files.size,1);
 });
