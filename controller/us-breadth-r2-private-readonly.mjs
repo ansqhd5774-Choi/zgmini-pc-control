@@ -44,7 +44,7 @@ function fixedBytes(fsys,file,maxBytes){
 function inspectDates(fsys,home,type){
  const directory=path.join(home,type);
  const result={state:'NOT_OBSERVED',receiptDates:0,firstDate:null,
-  lastDate:null,latest251Candidates:0,selectedMetadataValid:0,
+  lastDate:null,latest251FirstDate:null,latest251Candidates:0,selectedMetadataValid:0,
   selectedRawFilesPresent:0,selectedProjectionsPresent:0,
   selectedInvalidOrMissing:0,fullHistoryVerified:false,
   sourceShaReadbackVerified:false,calendarContinuityVerified:false};
@@ -58,6 +58,7 @@ function inspectDates(fsys,home,type){
  result.firstDate=dates[0]??null;
  result.lastDate=dates.at(-1)??null;
  const selected=dates.slice(-WINDOW);
+ result.latest251FirstDate=selected[0]??null;
  result.latest251Candidates=selected.length;
  for(const date of selected){
   const stem=path.join(directory,date+'.parquet');
@@ -91,6 +92,8 @@ function inspectPrivate(fsys,home){
  try{entries=fsys.readdirSync(base);}catch{return {...out,state:'LIST_FAILED'};}
  const candidates=entries.filter(n=>PRIVATE.test(n)).sort().reverse();
  if(!candidates.length)return {...out,state:'NO_PRIVATE_OUTPUT'};
+ if(candidates.length>1&&candidates[0].slice(0,10)===candidates[1].slice(0,10))
+  return {...out,state:'PRIVATE_SAME_DATE_AMBIGUOUS'};
  const name=candidates[0],matched=name.match(PRIVATE);
  const bytes=fixedBytes(fsys,path.join(base,name),MAX_PRIVATE_BYTES);
  if(!bytes)return {...out,state:'OUTPUT_UNREADABLE'};
