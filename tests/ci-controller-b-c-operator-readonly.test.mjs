@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {classifyReceiptCOperatorServiceCode,inspectReceiptCOperatorServiceReadonly}
+import {classifyReceiptCOperatorServiceCode,inspectReceiptCOperatorServiceReadonly,
+ inspectReceiptCFixedPathsReadonly}
  from '../tools/ci-controller-b-c-operator-readonly.mjs';
 
 test('fixed isolated service, native read-only query and identity is not serialized',()=>{
@@ -46,4 +47,52 @@ test('unknown, malformed and error paths do not invent service identity',()=>{
  assert.equal(unavailable.status,'STATE_UNKNOWN');
  assert.equal(inspectReceiptCOperatorServiceReadonly({platform:'linux'}).status,'STATE_UNKNOWN');
  assert.equal(inspectReceiptCOperatorServiceReadonly({platform:'win32',run:()=>{throw Error('PRIVATE')}}).status,'STATE_UNKNOWN');
+});
+
+
+function fakePaths({parent=false,root=false,alias=false,access=false}={}){
+ const present=new Set(['C:\\','C:\\ProgramData']);
+ if(parent)present.add('C:\\ProgramData\\ZGMINI-CI');
+ if(root)present.add('C:\\ProgramData\\ZGMINI-CI\\ControllerBReceipts');
+ const realpathSync=p=>alias&&p==='C:\\ProgramData'? 'C:\\redirect':p;
+ realpathSync.native=realpathSync;
+ return {
+  lstatSync(p){
+   if(access&&p==='C:\\ProgramData'){const e=new Error('PRIVATE');e.code='EACCES';throw e;}
+   if(!present.has(p)){const e=new Error('missing');e.code='ENOENT';throw e;}
+   return {isDirectory:()=>true,isSymbolicLink:()=>false};
+  },
+  realpathSync
+ };
+}
+test('C receipt fixed path preflight reads known physical paths even when GitHub variable is absent',()=>{
+ const r=inspectReceiptCFixedPathsReadonly({platform:'win32',filesystem:fakePaths()});
+ assert.equal(r.status,'PARTIAL');
+ assert.equal(r.code,'CI_RECEIPT_C_TARGET_ABSENT');
+ assert.equal(r.parent,'ABSENT');
+ assert.equal(r.receiptRoot,'ABSENT');
+ assert.equal(r.fixedTargetVacantObserved,true);
+ assert.equal(r.cOperatorApplied,false);
+ assert.equal(r.githubVariableConfiguredVerified,false);
+ assert.equal(r.actualRunnerWriteVerified,false);
+ assert.equal(r.operationalWrites,0);
+ assert.doesNotMatch(JSON.stringify(r),/C:\\|StartName|SID|secret/i);
+});
+test('C packet target already existing is distinguished from variable state',()=>{
+ const p=inspectReceiptCFixedPathsReadonly({platform:'win32',filesystem:fakePaths({parent:true})});
+ assert.equal(p.code,'CI_RECEIPT_C_PARENT_ALREADY_PRESENT');
+ assert.equal(p.fixedTargetVacantObserved,false);
+ const r=inspectReceiptCFixedPathsReadonly({platform:'win32',filesystem:fakePaths({parent:true,root:true})});
+ assert.equal(r.code,'CI_RECEIPT_C_ROOT_ALREADY_PRESENT');
+ assert.equal(r.receiptRoot,'DIRECTORY');
+ assert.equal(r.githubVariableConfiguredVerified,false);
+});
+test('physical path alias and access errors fail closed without changing Windows ACL',()=>{
+ const alias=inspectReceiptCFixedPathsReadonly({platform:'win32',filesystem:fakePaths({alias:true})});
+ assert.equal(alias.status,'BLOCKED');
+ assert.equal(alias.code,'CI_RECEIPT_C_PATH_ALIAS_STOP');
+ const access=inspectReceiptCFixedPathsReadonly({platform:'win32',filesystem:fakePaths({access:true})});
+ assert.equal(access.status,'STATE_UNKNOWN');
+ assert.equal(access.fixedTargetVacantObserved,false);
+ assert.equal(inspectReceiptCFixedPathsReadonly({platform:'linux'}).status,'STATE_UNKNOWN');
 });
