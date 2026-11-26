@@ -444,6 +444,26 @@ test('existing receipt cannot be overwritten by a fresh exclusive claim or chang
  assert.throws(()=>store.saveReceipt(key,changed),/IDENTITY_DRIFT/);
  assert.deepEqual(store.loadReceipt(key),receipt);
 });
+test('CI receipt store rejects an alias in any parent of a real leaf directory',t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-ci-effect-parent-test-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const real=path.join(root,'real'),receipts=path.join(real,'receipts');
+ fs.mkdirSync(real);fs.mkdirSync(receipts);
+ // The legitimate, directly addressed directory must remain usable.
+ assert.doesNotThrow(()=>createCiEffectReceiptStore(receipts));
+ const alias=path.join(root,'alias');
+ try{fs.symlinkSync(real,alias,process.platform==='win32'?'junction':'dir');}
+ catch(error){
+  if(['EPERM','EACCES','ENOTSUP'].includes(error?.code)){t.diagnostic('OS denies link creation');return;}
+  throw error;
+ }
+ // lstat(alias/receipts) is a plain directory, unlike its aliased parent.
+ assert.equal(fs.lstatSync(path.join(alias,'receipts')).isDirectory(),true);
+ assert.equal(fs.lstatSync(path.join(alias,'receipts')).isSymbolicLink(),false);
+ assert.throws(()=>createCiEffectReceiptStore(path.join(alias,'receipts')),
+  /MAINTENANCE_CI_RECEIPT_ROOT_UNVERIFIED/);
+});
+
 test('missing root, invalid effect key and corrupt receipt are not a new effect',t=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-ci-effect-test-'));
  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
