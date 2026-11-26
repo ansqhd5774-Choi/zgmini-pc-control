@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {publishNativeCompletion,readNativeInstalledProof,verifyNativeInstalledProof} from '../ci-approval/native-publisher-entry.mjs';
+import {publishNativeCompletion,readNativeInstalledProof,verifyNativeInstalledProof,createNativePublisherLocalPolicyPorts} from '../ci-approval/native-publisher-entry.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const hash=b=>createHash('sha256').update(b).digest('hex');
 const blob=b=>createHash('sha1').update(Buffer.from('blob '+b.length+'\0')).update(b).digest('hex');
@@ -194,4 +194,66 @@ for(const mode of ['FIXED','EVENT_COMPLETION_V1'])test('approval bytes drift ref
  assert.equal(r.code,'CI_NATIVE_PUBLISH_APPROVAL_BYTES_DRIFT');
  assert.equal(r.state,'EVIDENCE_MISSING');
  assert.equal(x.readCount(),0);
+});
+
+
+test('isolated native publisher uses independently provisioned policy root, not operating E drive or writable claims',async t=>{
+ const base=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-native-roots-'));
+ t.after(()=>fs.rmSync(base,{recursive:true,force:true}));
+ const scopeRoot=path.join(base,'b-installed-policy');
+ const receiptRoot=path.join(base,'one-shot-claims');
+ fs.mkdirSync(scopeRoot);fs.mkdirSync(receiptRoot);
+ for(const effect of ['A_READONLY','B_WRITER_SOURCE']){
+  const x=fixture(effect);
+  const {approvalBytes,requestBytes}=await x.ports.readNativeScope();
+  const policy=x.policy;
+  const scope={schema:'ZGMINI_CI_NATIVE_READONLY_SCOPE_V1',policy,
+   approvalBytesBase64:approvalBytes.toString('base64'),
+   requestBytesBase64:requestBytes.toString('base64')};
+  const proof={schema:'ZGMINI_CI_NATIVE_B_INSTALLED_PROOF_V1',effect,policy,
+   nativePolicySha256:hash(Buffer.from(JSON.stringify(policy))),
+   installationReceiptSha256:'f'.repeat(64),actualControllerSha:'d'.repeat(40),
+   installationRequestId:'pc-update-12345678-1234-4234-8234-123456789abc',
+   installationReceiptPath:'results/maintenance-pc-update-12345678-1234-4234-8234-123456789abc.json'};
+  const basename=effect==='A_READONLY'?'ci-native-a':'ci-native-writer-b';
+  fs.writeFileSync(path.join(scopeRoot,basename+'-approved.json'),JSON.stringify(scope));
+  fs.writeFileSync(path.join(scopeRoot,basename+'-installed-proof.json'),JSON.stringify(proof));
+ }
+ const local=createNativePublisherLocalPolicyPorts({scopeRoot,receiptRoot});
+ for(const effect of ['A_READONLY','B_WRITER_SOURCE']){
+  assert.equal(local.readNativeScope(effect).policy.effect,effect);
+  assert.equal(local.readNativeInstalledProof(effect).effect,effect);
+  assert.equal(local.readNativeInstalledProof(effect).nativePolicySha256,
+   hash(Buffer.from(JSON.stringify(local.readNativeScope(effect).policy))));
+ }
+ assert.equal(fs.readdirSync(receiptRoot).length,0);
+ assert.throws(()=>local.readNativeScope('C_ADMIN'),/CI_NATIVE_SCOPE_EFFECT_DENIED/);
+ assert.throws(()=>local.readNativeInstalledProof('C_ADMIN'),/CI_NATIVE_PROOF_EFFECT_DENIED/);
+});
+test('native publisher never trusts claim, TEMP, checkout or missing path as installed policy',t=>{
+ const base=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-native-roots-denial-'));
+ t.after(()=>fs.rmSync(base,{recursive:true,force:true}));
+ const scopeRoot=path.join(base,'b-installed-policy');
+ const receiptRoot=path.join(base,'one-shot-claims');
+ fs.mkdirSync(scopeRoot);fs.mkdirSync(receiptRoot);
+ for(const args of [
+  {scopeRoot:receiptRoot,receiptRoot},
+  {scopeRoot:base,receiptRoot},
+  {scopeRoot,receiptRoot:base},
+  {scopeRoot,receiptRoot,volatileRoots:[base]},
+  {scopeRoot,receiptRoot,volatileRoots:[scopeRoot]},
+  {scopeRoot:path.join(base,'never-installed'),receiptRoot},
+  {scopeRoot:receiptRoot+'\\0override',receiptRoot},
+  {scopeRoot:'.',receiptRoot}
+ ]){
+  assert.throws(()=>createNativePublisherLocalPolicyPorts(args),
+   /CI_NATIVE_PUBLISH_LOCAL_ROOT_|CI_NATIVE_PUBLISH_POLICY_ROOT_NOT_INDEPENDENT|ENOENT/);
+ }
+});
+test('both native publisher jobs inject separate installed policy root but never enable themselves',()=>{
+ const y=fs.readFileSync(new URL('../.github/workflows/ci-native-auto-publish.yml',import.meta.url),'utf8');
+ assert.equal(y.split('ZGMINI_CI_NATIVE_SCOPE_ROOT:').length-1,2);
+ assert.match(y,/vars.ZGMINI_CI_NATIVE_A_ENABLED == 'true'/);
+ assert.match(y,/vars.ZGMINI_CI_NATIVE_WRITER_B_ENABLED == 'true'/);
+ assert.doesNotMatch(y,/mkdir|New-Item|Copy-Item|icacls|runner-smoke|controller\\entry\.mjs/);
 });
