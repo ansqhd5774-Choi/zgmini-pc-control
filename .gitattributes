@@ -18,3 +18,4 @@ approvals/controller-updates/57d5056d00943b25b88d6c13b1418d94bd14fc21.json text 
 approvals/controller-selective-targets/57d5056d00943b25b88d6c13b1418d94bd14fc21.json text eol=lf
 approvals/controller-updates/f611243f7b830f273e053c1085110ad06b5fdf79.json text eol=lf
 approvals/controller-selective-targets/f611243f7b830f273e053c1085110ad06b5fdf79.json text eol=lf
+tools/operator-packets/CI_CONTROLLER_B_RECEIPT_ROOT_C1.ps1 text eol=lf
