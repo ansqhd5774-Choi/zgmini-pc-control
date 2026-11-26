@@ -84,8 +84,19 @@ export async function observeNativeReceiver({event,env,effect,ports}={}){
   return out('EVIDENCE_MISSING','CI_NATIVE_RECEIVER_PORTS_UNAVAILABLE');
  let scope;
  try{scope=await ports.readNativeScope(effect);}catch{return out('EVIDENCE_MISSING','CI_NATIVE_RECEIVER_LOCAL_SCOPE_UNAVAILABLE');}
- const policy=scope?.policy;
- if(policy?.enabled!==true)return out('DISABLED','CI_NATIVE_RECEIVER_NOT_ENABLED');
+ const installed=scope?.policy;
+ if(installed?.enabled!==true)return out('DISABLED','CI_NATIVE_RECEIVER_NOT_ENABLED');
+ // A preapproved completion-bound scope pins the reviewed commit, workflow
+ // and effect; only its first authenticated dispatcher event supplies the
+ // future CI run ID. This field is never written back into installed scope.
+ const eventBound=installed.sourceRunMode==='EVENT_COMPLETION_V1';
+ const supplied=event?.inputs?.source_run_id;
+ const boundId=typeof supplied==='string'&&/^[1-9]\\d*$/.test(supplied)
+  ?Number(supplied):null;
+ if(eventBound&&(Object.hasOwn(installed,'sourceRunId')||
+    !id(boundId)||String(boundId)!==supplied||installed.sourceAttempt!==1))
+  return out('REJECTED','CI_NATIVE_RECEIVER_SOURCE_RUN_INPUT_DENIED');
+ const policy=eventBound?{...installed,sourceRunId:boundId}:installed;
  if(!id(policy.sourceRunId)||!id(policy.sourceAttempt)||!sha(policy.sourceHeadSha)||
     typeof policy.sourceWorkflowPath!=='string')
   return out('EVIDENCE_MISSING','CI_NATIVE_RECEIVER_LOCAL_SCOPE_INVALID');
