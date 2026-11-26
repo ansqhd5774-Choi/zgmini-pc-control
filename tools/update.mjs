@@ -3413,6 +3413,33 @@ export async function readS6OncePhaseReadback({phase,baseline,
 
 
 
+
+/** Absolute safety gate for the irreversible S6 owned install-lease release.
+ * A successful readback alone does not authorize process mutation or B effect.
+ * The new A queue may contain work after intake resumes, but the old six
+ * children and controller Runner executables must be proven absent. */
+export function s6OwnedLeaseReleaseReadback(snapshot,baseline,{now=Date.now()}={}){
+ const at=Date.parse(snapshot?.observedAtUtc??'');
+ return baseline&&snapshot&&snapshot.requestId===baseline.requestId&&
+  snapshot.controllerSha===baseline.controllerSha&&
+  snapshot.protectedSha256===baseline.protectedSha256&&
+  snapshot.watchdogPid===baseline.watchdogPid&&
+  snapshot.oldSupervisorNonce===baseline.oldSupervisorNonce&&
+  snapshot.oldOwnerIdentityMatched===true&&
+  snapshot.independentOperatorAttested===true&&
+  snapshot.exactApprovalBytesAttested===true&&
+  Number.isFinite(at)&&Number.isFinite(now)&&now-at>=0&&now-at<45000&&
+  snapshot.oldSupervisorAlive===false&&
+  snapshot.oldSixChildrenStopped===true&&
+  snapshot.runnerExecutableProof==='NO_CONTROLLER_RUNNER_PROCESS'&&
+  snapshot.watchdogPaused===true&&
+  snapshot.maintenanceLeaseHeld===true&&
+  snapshot.workflowState==='active'&&
+  snapshot.controllerDraining===false&&
+  snapshot.relatedLeasesAbsent===true&&
+  snapshot.existingRequestLedgerPreserved===true;
+}
+
 /**
  * Proposed S6 B operating-port adapter for the *existing* independent
  * maintainer. It is intentionally NOT invoked by the CLI or Issue receiver.
@@ -3625,23 +3652,13 @@ export function makeS6OnceOwnedOperatingPort({request,approvedBytes,
   verifyReleaseGuard:async()=>{
    lockOwned();
    const snap=await observed('STOPPED_HELD',baseline);
-   return snap.oldSupervisorAlive===false&&
-    snap.oldSixChildrenStopped===true&&
-    snap.runnerExecutableProof==='NO_CONTROLLER_RUNNER_PROCESS'&&
-    snap.watchdogPaused===true&&snap.maintenanceLeaseHeld===true&&
-    snap.workflowState==='active'&&snap.controllerDraining===false&&
-    snap.relatedLeasesAbsent===true&&
-    snap.existingRequestLedgerPreserved===true&&
-    snap.protectedSha256===baseline.protectedSha256;
+   return s6OwnedLeaseReleaseReadback(snap,baseline);
   },
   releaseOwnedInstallLease:async()=>{
    lockOwned();
    // Previous guard remains necessary at the irreversible handoff.
    const snap=await observed('STOPPED_HELD',baseline);
-   need(snap.oldSupervisorAlive===false&&snap.oldSixChildrenStopped===true&&
-    snap.runnerExecutableProof==='NO_CONTROLLER_RUNNER_PROCESS'&&
-    snap.watchdogPaused===true&&snap.workflowState==='active'&&
-    snap.existingRequestLedgerPreserved===true,
+   need(s6OwnedLeaseReleaseReadback(snap,baseline),
     'S6_PORT_RELEASE_PROTECTION_DRIFT');
    installLease.release();
    installLease=null;
