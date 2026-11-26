@@ -1,0 +1,56 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "05ef3bd6b5dc753c5abfbecccacc09375eb18d10",
+  "targetSha": "6975aff74d294625a0ee438dc3e9f78041949227",
+  "approved": false,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "UNAPPROVED SOURCE/POLICY CANDIDATE. Exact Owner-native authorization has not been given for the 3-file receiver source update or CI Controller B policy blob rotation. The official independent Windows handoff must reject this candidate with HANDOFF_APPROVAL_REQUIRED. An approved:true final artifact must be separately established by actual Owner-native authorization and hashed from its own final bytes, after current live CAS and exact effect review.",
+  "files": {
+    "tools/maintenance-contract.mjs": "d24f03ee6db54c7e176e89f31bce8eb6de9aafba082cbb48213748d0f0b9facf",
+    "tools/maintenance-apply.mjs": "864a51d372243fee1f0426740c582d1db7461e2ffe03bc9aa76b807e9d246b1a",
+    "tools/maintenance-agent.mjs": "3e284c78d93a124b27364152057d9671942173ae295b8036cc74abccc68051da",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "3e4204c8b5ba3ae2f8f8c3ad14491346161581c5cc74712ccb34b070d27d4861",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "af31ab1f6a159aa1d8467d2585eb16750e8a1a293f9ecfb90b85c388d8640d70",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "23f3709ed0387cfb0132d9546f0fd6e2f10eabfad4212a67a170d5201a4a5de0"
+  },
+  "ciControllerBPolicy": {
+    "schema": "ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V1",
+    "enabled": true,
+    "workflowId": 430972394,
+    "workflowBlobSha": "27e48ecde81bdf6f15cccffcffd9b3e70482a5f3",
+    "workflowPath": ".github/workflows/ci-approval-controller-b.yml"
+  },
+  "runtimeChangedFiles": [
+    "tools/maintenance-apply.mjs",
+    "tools/maintenance-agent.mjs",
+    "tools/update.mjs"
+  ],
+  "checks": {
+    "sourceCi": "PENDING: this exact candidate/test branch must pass its own C996 and Secret Scan checks. Previous source-only approvals PR #3954/#3963 and pinned publisher PR #3970 do not constitute a maintainer operating install or Owner-native authorization.",
+    "installedWindowsEvidence": "Issue #3986, Run #45863804751, observed 2026-11-26T17:01:07.303Z: installed maintenanceSourceSha=05ef3bd6b5dc753c5abfbecccacc09375eb18d10; maintenanceFilesVerified=true; receiverStatus=LISTENING; installLockHeld=false; ciControllerBReceiver.approvedV2PinMatches=false; approvedReceiptGuardPinMatches=false; executionAuthorized=false; operationalWrites=0. This is a timestamped read-only observation, not an ongoing assertion about the PC.",
+    "exactBytePlan": "Compare the approved installed 05ef manifest's 9 SHA-256 source records to immutable target 6975aff74d294625a0ee438dc3e9f78041949227 checked-in source bytes. Six source bytes unchanged; exactly three runtime writes: maintenance-apply.mjs (S6 preclaim ledger read/approval/baseline and atomic-claim exception safety), maintenance-agent.mjs (fixed S6 once uncertain-result categories), update.mjs (bounded source-owned S6 preclaim error allowlist/CLI handling). Preserve each existing S6 one-shot effect ledger and no-replay constraint. Source SHA-256 is over exact GitHub UTF-8 file content, independently checked against the approved 05ef nine-source manifest.",
+    "sourceAncestry": "Immutable target 6975aff74d294625a0ee438dc3e9f78041949227 was current main at candidate creation. It is a descendant of installed source 05ef3bd6b5dc753c5abfbecccacc09375eb18d10; future main commits must not be treated as part of the target unless source byte equality is proven and main checkout remains clean for handoff.",
+    "workflowPinEvidence": "Draft PR #3970, HEAD d8abac88cd87f5d6bcaefc86bfd7f56968a9b5b5, pinned publisher checkout cfe57f3d720219613c87eff21338de0d35edbf6b and proposed exact workflow Git Blob 27e48ecde81bdf6f15cccffcffd9b3e70482a5f3; its 3/3 source-only CI was SUCCESS. Publisher checkout SHA and independent maintainer installation source SHA are different allowed immutable pins under approvedHandoffCiPolicy; do not conflate them.",
+    "windowsHandoffExecuted": false,
+    "ciControllerBEnabled": false,
+    "ownerNativeEffectApproved": false
+  },
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "effects": [
+    "ONE seven-to-seven independent Windows maintainer receiver source handoff from exact existing 05ef source to immutable target 6975: replace ONLY maintenance-apply.mjs, maintenance-agent.mjs, and update.mjs (3 protected runtime files), update approved installed manifest/startup if required by official handoff contract; no other executable source mutation",
+    "Rotate ONLY installed CI Controller B policy workflowBlobSha to 27e48ecde81bdf6f15cccffcffd9b3e70482a5f3, preserving fixed identity, enabled contract and workflow path; GitHub Actions publication variable remains disabled",
+    "Do not create, approve, retry, merge or execute any business Controller B job or S6 one-shot effect as part of this candidate"
+  ],
+  "preserve": [
+    "Exact installed Controller source 182bb46f2838306ba40d8b4ec32bac40ab75b69a at 2026-11-26T17:01Z last observation and existing Supervisor, active R5 Watchdog, six dedicated Runners; never assume unchanged without fresh evidence",
+    "Local SQLite/Writer/source Tasks, DB, D1, checkpoint, S6 one-shot Issue #3947 uncertain outcome, lease/backup/recovery ownership and existing published data",
+    "9 immutable source SHA-256 pins, 7 protected installed runtime file CAS, receiver origin, medium-integrity independent Windows operator, install lease, exact backup rollback and postcheck",
+    "Current authorized CI Controller B policy and publisher disabled until independent Owner-native authorization, exact handoff result, policy readback and separately valid new B business-effect approval; no GitHub token, permissions or subscriptions changed"
+  ],
+  "scopeNote": "NONEXECUTABLE DRAFT, approved=false. Owner-native new effect authorization is absent. This candidate is not permission to use a standard GitHub bot or Actions runner to replace the protected independent maintainer. Before any future authorized handoff compare exact 05ef live installed SHA and seven-file CAS and the immutable 6975 source byte/hash plan against clean main checkout. If any source file, scope, policy, lease, receiver identity or recovery record drifts, STOP and reconcile. Workflow PR #3970 remains Draft and MUST NOT merge before the new installed workflow policy readback; S6 one-shot is NEVER replayed."
+}
