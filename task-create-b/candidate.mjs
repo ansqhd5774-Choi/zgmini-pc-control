@@ -25,7 +25,8 @@ export async function loadW06TaskCandidate(proof,{root,account,now,runGit=git}={
   typeof account==='string'&&account.length>0&&now instanceof Date&&
   Number.isFinite(now.getTime()),
   'TASK_CREATE_B_CANDIDATE_HOST_SCOPE_STOP');
- need(runGit(root,['rev-parse','HEAD']).stdout?.trim()===m?.candidateSourceSha,
+ const actual=runGit(root,['rev-parse','HEAD']);
+ need(actual?.status===0&&actual.stdout?.trim()===m?.candidateSourceSha,
   'TASK_CREATE_B_CANDIDATE_SOURCE_STOP');
  for(const args of [['ls-files','--error-unmatch','--',CANDIDATE],
   ['diff','--quiet','HEAD','--',CANDIDATE],
