@@ -30,9 +30,9 @@ export async function executeW06TaskCreateB({event,env,controlRoot,candidateRoot
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const env=process.env;
- let result={schema:RESULT_SCHEMA,status:'TASK_CREATE_B_PREFLIGHT_STOP',
-  code:'TASK_CREATE_B_RUNTIME_UNVERIFIED_STOP',created:false,
-  taskChanges:0,otherTaskChanges:0,providerCalls:0,sqliteWrites:0,d1Writes:0};
+ let result={schema:RESULT_SCHEMA,status:'TASK_CREATE_B_STATE_UNKNOWN',
+  code:'TASK_CREATE_B_RUNTIME_UNVERIFIED_STOP',created:null,
+  taskChanges:null,otherTaskChanges:0,providerCalls:null,sqliteWrites:null,d1Writes:null};
  try{
   need(typeof env.GITHUB_WORKSPACE==='string'&&
    typeof env.GITHUB_EVENT_PATH==='string'&&
@@ -43,7 +43,8 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
    controlRoot:path.join(env.GITHUB_WORKSPACE,'writer-b-control'),
    candidateRoot:path.join(env.GITHUB_WORKSPACE,'task-b-candidate')});
  }catch(e){
-  result={...result,status:'TASK_CREATE_B_PREFLIGHT_STOP',code:safe(e)};
+  result={...result,status:'TASK_CREATE_B_STATE_UNKNOWN',code:safe(e),
+   created:null,taskChanges:null,providerCalls:null,sqliteWrites:null,d1Writes:null};
  }
  try{fs.writeFileSync(path.join(env.RUNNER_TEMP,'task-create-b-result.json'),
   JSON.stringify(result)+'\n',{flag:'wx'});}
