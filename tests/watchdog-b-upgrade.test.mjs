@@ -286,3 +286,151 @@ test('R4 exact approved service-proof successor binds six Controller bytes and r
   '../approvals/watchdog-upgrades/c0c4dcff6c8071b1318cca956e43ba82718c4975.json',
   import.meta.url)),false);
 });
+
+
+import {
+ R5_TARGET,R5_SOURCE_SHA256,R5_PREIMAGE_SHA256,R5_INSTALL_PREIMAGE_SHA256,
+ R5_CONTROLLER_SHA,R5_CONTROLLER_FILES,R5_MANIFEST_SCHEMA,R5_SCOPE,R5_BASIS,
+ R5_STANDBY,validateR5Request,verifyR5ControllerHost,
+ verifyR5FirstStandbyReady,projectR5InstalledManifest,rawSha256 as shaR5
+} from '../watchdog-b/standby-r5-contract.mjs';
+
+function fixtureR5(){
+ const x=fixtureR4();
+ x.body.targetSha=R5_TARGET;
+ x.approval={...x.approval,schema:R5_MANIFEST_SCHEMA,scope:R5_SCOPE,
+  installedSha256:R5_PREIMAGE_SHA256,
+  installedManifestSha256:R5_INSTALL_PREIMAGE_SHA256,
+  targetSha:R5_TARGET,targetSha256:R5_SOURCE_SHA256,
+  revision:5,approvalBasis:R5_BASIS,
+  expectedControllerSha:R5_CONTROLLER_SHA,
+  expectedControllerFiles:{...R5_CONTROLLER_FILES},
+  standby:{...R5_STANDBY}};
+ x.installed={...x.installed,sha256:R5_PREIMAGE_SHA256,
+  approvedTargetSourceSha:R4_TARGET,
+  standby:{mode:'ACTIVE_1_STANDBY_1',approved:true},
+  upgradedAt:'2026-11-26T09:00:00.000Z'};
+ x.sourceDigest=R5_SOURCE_SHA256;
+ x.installedManifestDigest=R5_INSTALL_PREIMAGE_SHA256;
+ return x;
+}
+const admitR5=x=>validateR5Request(x.event,x.body,x.approval,x.installed,
+ x.sourceDigest,x.approvalDigest,x.installedManifestDigest);
+
+test('R5 admission pins exact R4 staged raw bytes and dual-passive target',()=>{
+ const x=fixtureR5();
+ assert.equal(R5_PREIMAGE_SHA256,R4_SOURCE_SHA256);
+ assert.equal(R5_CONTROLLER_SHA,'182bb46f2838306ba40d8b4ec32bac40ab75b69a');
+ assert.equal(Object.keys(R5_CONTROLLER_FILES).length,7);
+ assert.equal(shaR5(fs.readFileSync(new URL('../tools/runner-watchdog.mjs',import.meta.url))),
+  R5_SOURCE_SHA256);
+ assert.deepEqual(admitR5(x),{
+  requestId:x.body.requestId,issueNumber:x.event.issue.number,
+  targetSha:R5_TARGET,oldSha:R5_PREIMAGE_SHA256,
+  newSha:R5_SOURCE_SHA256,oldManifestSha:R5_INSTALL_PREIMAGE_SHA256,
+  expectedControllerSha:R5_CONTROLLER_SHA
+ });
+ // No approval manifest is issued from this source-only readiness contract.
+ assert.equal(fs.existsSync(new URL(
+  '../approvals/watchdog-upgrades/'+R5_TARGET+'.json',import.meta.url)),false);
+});
+
+test('R5 is blocked on every unapproved effect, hash, source or actor drift',()=>{
+ const mutations=[
+  x=>{x.event.sender.login='untrusted';},
+  x=>{x.event.issue.labels=[];},
+  x=>{x.body.targetSha=R4_TARGET;},
+  x=>{x.body.command='powershell';},
+  x=>{x.body.requestId='unsafe';},
+  x=>{x.approval.approved=false;},
+  x=>{x.approval.revision=4;},
+  x=>{x.approval.scope='OTHER';},
+  x=>{x.approval.approvalBasis='other';},
+  x=>{x.approval.expectedControllerSha=R4_TARGET;},
+  x=>{x.approval.expectedControllerFiles['controller/preimage-manifest-contract.mjs']='f'.repeat(64);},
+  x=>{delete x.approval.expectedControllerFiles['controller/standby.mjs'];},
+  x=>{x.approval.allowedFiles.push('config/operations.json');},
+  x=>{x.approval.targetSha256='f'.repeat(64);},
+  x=>{x.approval.installedSha256='f'.repeat(64);},
+  x=>{x.approval.installedManifestSha256='f'.repeat(64);},
+  x=>{x.approval.standby.mode='ACTIVE_2_STANDBY_1';},
+  x=>{x.approval.standby.approved=false;},
+  x=>{x.sourceDigest='f'.repeat(64);},
+  x=>{x.approvalDigest='f'.repeat(64);},
+  x=>{x.installedManifestDigest='f'.repeat(64);},
+  x=>{x.installed.sha256='f'.repeat(64);},
+  x=>{x.installed.scope='RUNNER_RECOVERY_ONLY';},
+  x=>{x.installed.standby.mode='ACTIVE_1_STANDBY_2';},
+  x=>{x.installed.approvedTargetSourceSha=R5_TARGET;}
+ ];
+ for(const mutate of mutations){const x=fixtureR5();mutate(x);
+  assert.throws(()=>admitR5(x),/WATCHDOG_R5_/);
+ }
+});
+test('R5 pins W06 seven Controller files without accepting arbitrary successor',()=>{
+ const host={controllerSourceSha:R5_CONTROLLER_SHA,controllerFiles:{
+  ...R5_CONTROLLER_FILES,'controller/extra.mjs':'a'.repeat(64)}};
+ assert.equal(verifyR5ControllerHost(host),true);
+ for(const change of [
+  x=>{x.controllerSourceSha=R4_TARGET;},
+  x=>{delete x.controllerFiles['controller/standby.mjs'];},
+  x=>{x.controllerFiles['controller/preimage-manifest-contract.mjs']='0'.repeat(64);},
+  x=>{x.controllerFiles=[];}
+ ]){const sample=structuredClone(host);change(sample);
+  assert.throws(()=>verifyR5ControllerHost(sample),/WATCHDOG_R5_/);
+ }
+});
+function r5Live(){
+ const installed={sha256:R4_SOURCE_SHA256,scope:FINAL_SCOPE,
+  approvedTargetSourceSha:R4_TARGET,upgradedAt:'2026-11-26T09:00:00.000Z',
+  standby:{mode:'ACTIVE_1_STANDBY_1',approved:true}};
+ const owner={pid:16011,nonce:'a'.repeat(18),at:'2026-11-26T09:01:00.000Z'};
+ const status={pid:16011,state:'HEALTHY',at:'2026-11-26T09:02:00.000Z',
+  supervisorPid:16012,standbyRole:'READY',standbyPid:16013};
+ const options={now:Date.parse('2026-11-26T09:02:01.000Z'),pidAlive:()=>true};
+ return {installed,owner,status,options};
+}
+test('R5 requires natural R4 process restart with a live Active and one READY Standby',()=>{
+ const {installed,owner,status,options}=r5Live();
+ assert.equal(verifyR5FirstStandbyReady(installed,owner,status,options),true);
+ for(const modify of [
+  a=>{a.installed.upgradedAt='2026-11-26T09:01:30.000Z';},
+  a=>{a.installed.standby.mode='ACTIVE_1_STANDBY_2';},
+  a=>{a.installed.sha256=R5_SOURCE_SHA256;},
+  a=>{a.owner.at='2026-11-26T08:59:00.000Z';},
+  a=>{a.owner.nonce='short';},
+  a=>{a.status.state='BLOCKED';},
+  a=>{a.status.standbyRole='STARTING';},
+  a=>{a.status.standbyPid=a.status.supervisorPid;},
+  a=>{a.status.pid=16014;},
+  a=>{a.status.at='2026-11-26T08:59:00.000Z';},
+  a=>{a.options.now=Date.parse('2026-11-26T09:05:00.000Z');},
+  a=>{a.options.pidAlive=pid=>pid!==16013;},
+  a=>{a.options.pidAlive=pid=>pid!==16012;},
+  a=>{a.options.pidAlive=pid=>pid!==16011;}
+ ]){
+  const a=structuredClone({installed,owner,status,options});
+  a.options.pidAlive=()=>true;
+  modify(a);
+  assert.throws(()=>verifyR5FirstStandbyReady(a.installed,a.owner,a.status,
+   a.options),/WATCHDOG_R5_/);
+ }
+});
+test('R5 projected Watchdog B stages only two existing files and target mode',()=>{
+ const x=fixtureR5(),p=admitR5(x);
+ const original=structuredClone(x.installed),at='2026-11-26T10:25:00.000Z';
+ const projected=projectR5InstalledManifest(original,p,at);
+ assert.deepEqual(projected,{...original,
+  sha256:R5_SOURCE_SHA256,scope:FINAL_SCOPE,
+  approvedTargetSourceSha:R5_TARGET,
+  standby:{mode:'ACTIVE_1_STANDBY_2',approved:true},upgradedAt:at});
+ assert.deepEqual(original,x.installed);
+ assert.throws(()=>projectR5InstalledManifest(original,{
+  ...p,oldSha:R4_PREIMAGE_SHA256},at),/WATCHDOG_R5_INSTALL_PROJECTION_INVALID/);
+ const updater=fs.readFileSync(new URL('../watchdog-b/upgrade.mjs',import.meta.url),'utf8');
+ assert.match(updater,/if\(r5\)verifyR5FirstStandbyReady\(/);
+ assert.match(updater,/if\(r5\)verifyR5ControllerHost\(/);
+ assert.match(updater,/projectR5InstalledManifest\(/);
+ assert.match(updater,/result\.standby\?\.mode!=='ACTIVE_1_STANDBY_2'/);
+ assert.doesNotMatch(updater,/taskkill\.exe/);
+});
