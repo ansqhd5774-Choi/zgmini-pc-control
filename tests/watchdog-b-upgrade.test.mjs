@@ -579,10 +579,10 @@ test('R6 only stages existing two-file Watchdog upgrade and preserves active dua
  assert.match(src,/projectR6InstalledManifest\(/);
  assert.match(src,/result\.approvedTargetSourceSha!==R6_TARGET/);
  assert.match(src,/return publish\('STAGED','WATCHDOG_B_APPROVED_SOURCE_STAGED_AWAITING_NATURAL_RESTART',2\)/);
- assert.doesNotMatch(src,/taskkill\\.exe|Stop-Process/i);
+ assert.doesNotMatch(src,/taskkill\.exe|Stop-Process/i);
  // Existing process.kill(pid,0) is a liveness probe, not a termination.
  // Reject any extra or non-zero kill invocation in this B installer.
- const killArgs=[...src.matchAll(/process\\.kill\\(([^)]*)\\)/g)]
-  .map(x=>x[1].replace(/\\s+/g,''));
+ const killArgs=[...src.matchAll(/process\.kill\(([^)]*)\)/g)]
+  .map(x=>x[1].replace(/\s+/g,''));
  assert.deepEqual(killArgs,['pid,0']);
 });
