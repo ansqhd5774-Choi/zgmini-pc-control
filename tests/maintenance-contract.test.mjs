@@ -841,12 +841,14 @@ test('S6 B uses a separate exact owner Issue and never inherits Controller-updat
   {operation:'controller-update'},
   {operation:'runner-smoke'},
   {requestId:'pc-s6-not-uuid'},
-  {extra:'arbitrary'},
-  {targetControllerSha:'c'.repeat(40)}
+  {extra:'arbitrary'}
  ]){
   assert.throws(()=>validateS6OnceIssueEnvelope({...f.request,...change},
    {actor:CONTROL_ACTOR}),/S6_ONCE_/);
  }
+ const mismatched={...f.request,targetControllerSha:'c'.repeat(40)};
+ assert.throws(()=>validateS6OnceBManifest(mismatched,f.bytes,f.ctx),
+  /S6_ONCE_MANIFEST_PREIMAGE_INVALID/);
  assert.throws(()=>validateS6OnceIssueEnvelope(f.request,{actor:'github-actions[bot]'}),
   /S6_ONCE_ACTOR_OR_REPOSITORY_DENIED/);
  assert.throws(()=>validateS6OnceBManifest(f.request,f.bytes,{...f.ctx,actor:'github-actions[bot]'}),
