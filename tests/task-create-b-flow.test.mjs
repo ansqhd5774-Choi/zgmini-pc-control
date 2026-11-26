@@ -24,7 +24,7 @@ test('W06 task result marks natural CNN ticks unverified after Task readback',()
   status:'TASK_CREATE_B_INSTALLED_VERIFIED',
   code:'TASK_CREATE_B_ONE_TASK_ENABLE_READBACK_PASS',
   created:true,taskChanges:1,otherTaskChanges:0};
- assert.equal(sanitizeTaskCreateB(base,request,{verified:false}).installed,false);
+ assert.equal(sanitizeTaskCreateB(base,request,{verified:false}).installed,null);
  const result=sanitizeTaskCreateB(base,request,{verified:true});
  assert.equal(result.installed,true);
  assert.equal(result.taskChanges,1);
