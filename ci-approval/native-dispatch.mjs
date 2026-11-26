@@ -41,8 +41,10 @@ export async function dispatchApprovedCiEffect({policy,requestBytes,ports}={}){
  const methods=['readSourceRun','readReceiverWorkflow','readInstalledReceiver','loadReceipt','saveReceipt','dispatchWorkflow'];
  if(!ports||methods.some(k=>typeof ports[k]!=='function'))
   return denied('EVIDENCE_MISSING','CI_NATIVE_DISPATCH_PORT_UNAVAILABLE');
+ // An approval effect stays the same across policy or receiver revisions.
+ // Excluding those transport versions from the claim key prevents reposts.
  const key=hash(JSON.stringify([effect,policy.businessApprovalSha256,
-   policy.approvedRequestSha256,policy.receiverWorkflowBlobSha,policy.policyRevision]));
+   policy.approvedRequestSha256]));
  let run,receiverFile,installed;
  try{
   [run,receiverFile,installed]=await Promise.all([
