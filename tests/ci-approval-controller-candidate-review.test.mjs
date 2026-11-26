@@ -180,7 +180,8 @@ test('one CI flow merges exact tested approval PR and immediately submits withou
  assert.equal(r.status,'REQUEST_READBACK_VERIFIED');assert.equal(f.merges,1);assert.equal(f.store.posts,1);
  assert.match(r.receiptMarker,/^ZGMINI_CI_CONTROLLER_B_RECEIPT=42:/);
  const second=await mergeAndSubmitPreparedControllerApproval(f.mergeInput,f.ports);
- assert.equal(second.code,'MAINTENANCE_CI_EXISTING_RECEIPT_NO_REPOST');assert.equal(f.merges,1);assert.equal(f.store.posts,1);
+ assert.equal(second.status,'EXISTING_REQUEST_REUSED');assert.deepEqual(second.issueNumbers,[42]);
+ assert.equal(second.receiptMarker,undefined);assert.equal(f.merges,1);assert.equal(f.store.posts,1);
 });
 test('unrelated PR file stops merge and submission',async()=>{
  const f=await mergeSubmissionFixture();
