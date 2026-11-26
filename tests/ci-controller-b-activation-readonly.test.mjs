@@ -81,12 +81,12 @@ test('existing Owner-approved push path is independent of generated-approval pol
  const request=readFileSync(new URL('../tools/maintenance-request.mjs',import.meta.url),'utf8');
  // The trigger requires ENABLED but does not require POLICY on push;
  // workflow_run generated-approval path alone has that additional gate.
- assert.match(workflow,/vars\\.ZGMINI_CI_CONTROLLER_B_ENABLED == 'true'/);
- assert.match(workflow,/github\\.event_name == 'push' &&/);
- assert.match(workflow,/github\\.event_name == 'workflow_run' &&\\s+vars\\.ZGMINI_CI_CONTROLLER_B_POLICY != ''/);
- assert.match(publisher,/if\\(policy\\)\\s*\\{/);
- assert.match(publisher,/if\\(eventName==='push'\\)return publishExistingControllerApprovals\\(event,opts\\)/);
- assert.match(request,/if\\(ownerMerged\\)\\s*\\{\\s*await resolveControllerApprovalCI/);
+ assert.match(workflow,/vars\.ZGMINI_CI_CONTROLLER_B_ENABLED == 'true'/);
+ assert.match(workflow,/github\.event_name == 'push' &&/);
+ assert.match(workflow,/github\.event_name == 'workflow_run' &&\s+vars\.ZGMINI_CI_CONTROLLER_B_POLICY != ''/);
+ assert.match(publisher,/if\(policy\)\s*\{/);
+ assert.match(publisher,/if\(eventName==='push'\)return publishExistingControllerApprovals\(event,opts\)/);
+ assert.match(request,/if\(ownerMerged\)\s*\{\s*await resolveControllerApprovalCI/);
  const observed=inspect({enabled:'false',policy:''});
  assert.equal(observed.ownerMergedExistingApprovalPolicyRequired,false);
  assert.equal(observed.ciGeneratedApprovalPolicyRequired,true);
