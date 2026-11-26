@@ -1,6 +1,8 @@
 import './w04-3409-source-preflight-readonly.test.mjs';
 import './w04-3516-archive-receipt-readonly.test.mjs';
 import test from 'node:test';
+// Existing inventory CI owns this fixed, operating-only orphan seat proof.
+import './supervisor-orphan-seat-readonly.test.mjs';
 import {createHash} from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
