@@ -21,7 +21,7 @@ const candidate=()=>{
   '<Enabled>true</Enabled><ExecutionTimeLimit>PT30M</ExecutionTimeLimit></Settings>'+
   '<Principals><Principal><UserId>PC\\\\test</UserId></Principal></Principals><Actions><Exec><Arguments>run-local-cnn-minute.vbs</Arguments></Exec></Actions></Task>';
  const off=text.replace('<Enabled>true</Enabled>','<Enabled>false</Enabled>');
- return {launcher:Buffer.from('local-cycle.mjs --cnn-minute --publish','utf8'),
+ return {launcher:Buffer.from('Set shell = CreateObject("WScript.Shell")\r\nSet taskEnvironment = shell.Environment("PROCESS")\r\ntaskEnvironment("ZGMINI_PC_HOME") = "E:\\ZGmini\\data\\pc-writer"\r\nWScript.Quit shell.Run("local-cycle.mjs --cnn-minute --publish", 0, True)\r\n','utf8'),
   enabledXml:Buffer.from(text,'utf16le'),disabledXml:Buffer.from(off,'utf16le')};
 };
 const approval=bytes=>({
@@ -130,6 +130,9 @@ test('B: authentic owner, committed raw manifest and explicit HTTP/SQLite/D1 eff
  const {event,raw,proof,bytes,original}=proofSetup();
  assert.equal(verifyTaskCreateBPreimage(proof,original),true);
  assert.equal(verifyTaskCreateBCandidate(proof,bytes),true);
+ const missingHome={...bytes,launcher:Buffer.from('local-cycle.mjs --cnn-minute --publish')};
+ assert.throws(()=>verifyTaskCreateBCandidate(proof,missingHome),
+  e=>e.code==='TASK_CREATE_B_CANDIDATE_HASH_STOP');
  assert.throws(()=>authorizeTaskCreateB({event,manifestBytes:raw,manifestCommitted:false}),
   e=>e.code==='TASK_CREATE_B_OWNER_OR_COMMIT_STOP');
  assert.throws(()=>authorizeTaskCreateB({event:{...event,issue:{...event.issue,
