@@ -332,6 +332,29 @@ export function normalizedResult(request,result,code){
         observedBusy:from.supervisorIdleWait.observedBusy}}:{}),
   };
 }
+// Publish a CI-native installation attestation only from an explicitly
+// Owner-approved B manifest AND a verified successful original updater result.
+// Do not trust extra fields supplied by the child stdout, Issue or CI bot.
+export function attachApprovedNativeBReceipt(result,validated,actor){
+ const pin=validated?.manifest?.ciNativeApproval;
+ if(!pin)return result;
+ if(actor!=="ansqhd5774-Choi"||
+    validated?.request?.operation!=='controller-update'||
+    validated.request.requestId!==result?.requestId||
+    validated.request.targetControllerSha!==result.targetControllerSha||
+    validated.manifest.purpose!=='pc-controller-maintenance'||
+    validated.manifest.controllerOnlyInstall!==true||
+    !validated.manifest.selectiveSource||
+    pin.schema!=='ZGMINI_CI_NATIVE_B_POLICY_APPROVAL_V1'||
+    !['A_READONLY','B_WRITER_SOURCE'].includes(pin.effect)||
+    !SHA256.test(pin.nativePolicySha256)||
+    result.status!=='SUCCEEDED'||
+    result.actualControllerSha!==validated.request.targetControllerSha||
+    result.protectedStateUnchanged!==true)
+  return result;
+ return {...result,ciNativeEffect:pin.effect,
+  ciNativePolicySha256:pin.nativePolicySha256};
+}
 function resultComment(result,uploadStatus=null){
   return [commentMarker(result.requestId),
     "ZGMINI PC maintenance result (out-of-band)",
@@ -348,6 +371,8 @@ function resultComment(result,uploadStatus=null){
     ...(result.originalFailureCode?[`ORIGINAL_FAILURE_CODE: ${result.originalFailureCode}`,
       `ROLLBACK_FAILURE_CODE: ${result.rollbackFailureCode??'NONE'}`]:[]),
     `PROTECTED_STATE_UNCHANGED: ${result.protectedStateUnchanged??'UNVERIFIED'}`,
+    ...(result.ciNativeEffect?[`CI_NATIVE_EFFECT: ${result.ciNativeEffect}`,
+      `CI_NATIVE_POLICY_SHA256: ${result.ciNativePolicySha256}`]:[]),
     `WORKFLOW_ENABLED: ${result.workflowEnabled??'UNVERIFIED'}`,
     ...(result.sourceInventory?.filter(row=>row.state!=='OLD').map(row=>
       `R54_SOURCE_DRIFT: ${row.path} ${row.state} ${row.actual??'MISSING'}`)??[]),
@@ -547,10 +572,25 @@ export function createMaintenanceAgent({
         throw coded("MAINTENANCE_RESULT_LEDGER_INVALID");
       // Operation comes from the newly authenticated Issue envelope, not an
       // unpinned ledger field. Older ledgers intentionally lack operation.
-      const safeResult=normalizedResult({requestId:entry.requestId,
+      let safeResult=normalizedResult({requestId:entry.requestId,
         targetControllerSha:entry.targetControllerSha,operation},entry.result,entry.result.code);
       if(safeResult.status!==entry.result.status)
         throw coded("MAINTENANCE_RESULT_LEDGER_INVALID");
+      // A successful Owner-B attestation has already been bound to its
+      // validated manifest before ledger commit. Reconstruct the exact
+      // bounded fields during crash-safe readback; normalizer drops unknown
+      // child stdout fields and must never silently strip this trusted proof.
+      const native=entry.result;
+      if(entry.actor==="ansqhd5774-Choi"&&operation==='controller-update'&&
+         entry.status==='SUCCEEDED'&&safeResult.status==='SUCCEEDED'&&
+         safeResult.actualControllerSha===entry.targetControllerSha&&
+         safeResult.protectedStateUnchanged===true&&
+         ['A_READONLY','B_WRITER_SOURCE'].includes(native.ciNativeEffect)&&
+         SHA256.test(native.ciNativePolicySha256??'')&&
+         SHA256.test(entry.bodyDigest??'')&&SHA256.test(entry.fingerprint??'')){
+        safeResult={...safeResult,ciNativeEffect:native.ciNativeEffect,
+          ciNativePolicySha256:native.ciNativePolicySha256};
+      }
       await uploadOneResult(entry.requestId,"json",JSON.stringify(safeResult,null,2)+"\n");
       await uploadOneResult(entry.requestId,"txt",resultComment(safeResult)+"\r\n");
       status="VERIFIED";code="REPORT_UPLOAD_VERIFIED";
@@ -1144,6 +1184,9 @@ export function createMaintenanceAgent({
       const executed=parseJsonOutput(await updater([command,"--request-id",request.requestId,
         "--manifest-file",packageFile]),"UPDATE_OUTPUT_INVALID");
       result=normalizedResult(request,executed,executed.code);
+      // Owner-pinned policy effect can be carried only on an actual
+      // verified B success; old installations remain unprivileged.
+      result=attachApprovedNativeBReceipt(result,approved,issue.author.login);
     }catch(error){
       // Never retry an ambiguous apply. Query the independent updater ledger.
       let status=null;
