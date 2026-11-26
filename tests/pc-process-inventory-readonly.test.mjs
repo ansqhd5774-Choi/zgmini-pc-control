@@ -2807,7 +2807,7 @@ test('R4 Guardian inspector runs ONLY the pinned historical helper PROBE, never 
 });
 
 const r5RuntimeFixture=()=>{
- const x=r4RuntimeFixture(),h=x.controllerHost;
+ const x=r4RuntimeFixture();
  x.sourceSha256='9137447231d354d9999cdadbbb5b2a6dee7f0bf869df61881742902ac445128f';
  x.install.approvedTargetSourceSha='45807c661ee7f5f11a20b5780e6fd31116b24f84';
  x.install.sha256=x.sourceSha256;
@@ -2884,4 +2884,17 @@ test('R5 A fails closed on missing second slot, stale status, source or controll
  const x=r5RuntimeFixture(),r=assessR5StandbyRuntimeSnapshot(x,{
   now:r4Now,pidAlive:pid=>pid!==5344});
  assert.equal(r.code,'WATCHDOG_R5_SECOND_STANDBY_IPC_UNVERIFIED');
+});
+
+test('R5 A never treats unsafe or missing fixed operating files as READY',()=>{
+ const r=inspectR5StandbyRuntimeReadonly({
+  watchdogHome:'E:/ZGmini/unsafe',
+  controllerHome:'E:/ZGmini/unsafe',
+  filesystem:{lstatSync:()=>{throw Error('NO_FILE');}}
+ });
+ assert.equal(r.status,'STATE_UNKNOWN');
+ assert.equal(r.code,'WATCHDOG_R5_RUNTIME_READ_UNVERIFIED');
+ assert.equal(r.firstStandbyIpcReady,false);
+ assert.equal(r.secondStandbyIpcReady,false);
+ assert.equal(r.operationalWrites,0);
 });
