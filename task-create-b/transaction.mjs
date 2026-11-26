@@ -20,12 +20,13 @@ export async function applyTaskCreateB(proof,candidate,io){
  const result={schema:RESULT_SCHEMA,requestId,taskName:TASK,created:false,
   status:'TASK_CREATE_B_STATE_UNKNOWN',code:'TASK_CREATE_B_NOT_STARTED',
   taskChanges:0,otherTaskChanges:0,providerCalls:0,sqliteWrites:0,d1Writes:0};
- let lease=false,claimed=false,wrapperCreateAttempted=false,wrapperCreated=false;
+ let lease=false,claimAttempted=false,claimed=false,wrapperCreateAttempted=false,wrapperCreated=false;
  let taskRegisterAttempted=false,taskRegistered=false;
  let enableAttempted=false,retained=false;
  try{
   await io.acquireSharedLease(requestId);lease=true;
   verifyTaskCreateBPreimage(proof,await io.observe());
+  claimAttempted=true;
   await io.claimOnce(requestId);claimed=true;
   await io.backupProtected(m.coreTaskXmlSha256,m.sidecarSourceSha256);
   verifyTaskCreateBPreimage(proof,await io.observe());
@@ -61,7 +62,14 @@ export async function applyTaskCreateB(proof,candidate,io){
    status:'TASK_CREATE_B_RECOVERY_REQUIRED',code,
    created:null,taskChanges:null,providerCalls:null,sqliteWrites:null,d1Writes:null,
    lastEffect:'ENABLE_ATTEMPTED_INSPECT_TASK_AND_SAVED_CHECKPOINTS'};}
-  if(!claimed){return {...result,status:'TASK_CREATE_B_PREFLIGHT_STOP',code};}
+  if(!claimed){
+   if(claimAttempted){
+    retained=true;return {...result,status:'TASK_CREATE_B_RECOVERY_REQUIRED',
+     code:'TASK_CREATE_B_CLAIM_OUTCOME_UNKNOWN',created:null,taskChanges:null,
+     lastEffect:'INSPECT_ONCE_JOURNAL_AND_OWNER_LOCK_BEFORE_NEW_REQUEST'};
+   }
+   return {...result,status:'TASK_CREATE_B_PREFLIGHT_STOP',code};
+  }
   // An exclusive-create or native scheduler call can fail AFTER an effect.
   // A failed call does not prove we own the destination. Never delete a file
   // or Task created by a different actor with coincidentally matching bytes.
