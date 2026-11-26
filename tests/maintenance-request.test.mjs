@@ -286,8 +286,39 @@ test('CI publisher creates exact existing B request once and records request-bou
  assert.equal(f.saved.phase,'READBACK_VERIFIED');assert.match(result.receiptMarker,/^ZGMINI_CI_CONTROLLER_B_RECEIPT=42:[a-f0-9]{64}$/);
  assert.equal(JSON.parse(f.actual.body).chatId,'chat-ci-456-1');
  const retry=await submitExistingControllerApprovalFromCi({...f.input,runId:789},f.ports);
- assert.equal(retry.code,'MAINTENANCE_CI_EXISTING_RECEIPT_NO_REPOST');assert.equal(f.posts,1);
+ assert.equal(retry.status,'EXISTING_REQUEST_REUSED');assert.deepEqual(retry.issueNumbers,[42]);
+ assert.equal(f.posts,1);
  assert.equal(retry.effectKey,result.effectKey);assert.equal(retry.receiptMarker,undefined);
+});
+test('CI previously verified original request remains reusable after closure',async()=>{
+ const f=workloadPublisherFixture();
+ await submitExistingControllerApprovalFromCi(f.input,f.ports);
+ f.actual.state='closed';
+ const result=await submitExistingControllerApprovalFromCi({...f.input,runId:789},f.ports);
+ assert.equal(result.status,'EXISTING_REQUEST_REUSED');
+ assert.deepEqual(result.issueNumbers,[42]);assert.equal(f.posts,1);
+ assert.equal(result.receiptMarker,undefined);
+});
+test('CI non-verified or drifted receipt cannot claim a reused request',async()=>{
+ const mutations=[
+  f=>{f.saved.phase='CREATION_UNKNOWN';},
+  f=>{f.saved.phase='READBACK_PENDING';},
+  f=>{f.saved.expected.body=JSON.stringify({...JSON.parse(f.saved.expected.body),
+   approvalManifestSha256:'f'.repeat(64)});},
+  f=>{f.actual.body='{}';},
+  f=>{f.actual.user={login:'ansqhd5774-Choi',id:327938088,type:'User'};},
+  f=>{f.actual.number=73;},
+  f=>{f.ports.readIssue=async()=>{throw Error('read unavailable')};}
+ ];
+ for(const mutate of mutations){
+  const f=workloadPublisherFixture();
+  await submitExistingControllerApprovalFromCi(f.input,f.ports);
+  mutate(f);
+  const result=await submitExistingControllerApprovalFromCi({...f.input,runId:789},f.ports);
+  assert.equal(result.status,'STATE_UNKNOWN');
+  assert.equal(result.code,'MAINTENANCE_CI_EXISTING_RECEIPT_NO_REPOST');
+  assert.equal(result.receiptMarker,undefined);assert.equal(f.posts,1);
+ }
 });
 test('existing manual request with matching manifest is reused without issuing a CI receipt',async()=>{
  const f=workloadPublisherFixture();
