@@ -102,23 +102,32 @@ export async function dispatchApprovedCiEffect({policy,requestBytes,ports}={}){
    source_attempt:String(policy.sourceAttempt),approval_sha256:policy.businessApprovalSha256,
    request_sha256:policy.approvedRequestSha256,effect_key:key});
  const record={schema:'ZGMINI_CI_NATIVE_DISPATCH_RECEIPT_V1',phase:'CREATING',
-   effect,effectKey:key,receiver,ref:'main',inputs};
+   effect,effectKey:key,receiver,ref:'main',inputs,downstreamRunId:null};
  try{await ports.saveReceipt(key,record,{exclusive:true});}
  catch{return denied('STATE_UNKNOWN','CI_NATIVE_DISPATCH_RECEIPT_CLAIM_UNKNOWN',{effectKey:key});}
+ let downstreamRunId=null;
  try{
   const accepted=await ports.dispatchWorkflow(receiver,{ref:'main',inputs});
-  if(accepted?.status!==204)throw Error('CI_NATIVE_DISPATCH_RESPONSE_UNVERIFIED');
+  if(accepted?.status===200){
+   // GitHub API 2026-03-10 returns exact downstream Run details. This
+   // identifies the run to read back, but is not evidence of execution.
+   const n=accepted.workflow_run_id;
+   if(!id(n)||accepted.run_url!=='https://api.github.com/repos/'+REPO+'/actions/runs/'+n||
+      accepted.html_url!=='https://github.com/'+REPO+'/actions/runs/'+n)
+    throw Error('CI_NATIVE_DISPATCH_RESPONSE_UNVERIFIED');
+   downstreamRunId=n;
+  }else if(accepted?.status!==204)throw Error('CI_NATIVE_DISPATCH_RESPONSE_UNVERIFIED');
  }catch{
   try{await ports.saveReceipt(key,{...record,phase:'DISPATCH_OUTCOME_UNKNOWN'});}catch{}
   return denied('STATE_UNKNOWN','CI_NATIVE_DISPATCH_POST_OUTCOME_UNKNOWN',{effectKey:key});
  }
- try{await ports.saveReceipt(key,{...record,phase:'DISPATCH_ACCEPTED_NOT_EXECUTED'});}catch{
+ try{await ports.saveReceipt(key,{...record,phase:'DISPATCH_ACCEPTED_NOT_EXECUTED',downstreamRunId});}catch{
   return denied('STATE_UNKNOWN','CI_NATIVE_DISPATCH_RECEIPT_WRITE_UNKNOWN',{effectKey:key});
  }
- // GitHub returns no downstream Run ID from workflow_dispatch. Neither this
- // response nor a GITHUB_TOKEN API success establishes receiver execution.
+ // A 204 response has no Run ID; a validated 200 response may include one.
+ // Neither establishes the receiver job's result or PC execution.
  return Object.freeze({state:'DISPATCH_ACCEPTED_NOT_EXECUTED',code:'CI_NATIVE_DISPATCH_WAKEUP_ONLY',
-  dispatched:true,executed:false,effectKey:key});
+  dispatched:true,executed:false,effectKey:key,downstreamRunId});
 }
 
 
@@ -157,6 +166,8 @@ export function createCiNativeReceiptStore(root,{volatileRoots=[]}={}){
     !Object.hasOwn(RECEIVERS,r.effect)||r.receiver!==RECEIVERS[r.effect]||
     r.ref!=='main'||
     !['CREATING','DISPATCH_OUTCOME_UNKNOWN','DISPATCH_ACCEPTED_NOT_EXECUTED'].includes(r.phase)||
+    !(r.downstreamRunId===null||id(r.downstreamRunId))||
+    (r.phase!=='DISPATCH_ACCEPTED_NOT_EXECUTED'&&r.downstreamRunId!==null)||
     r.inputs?.effect!==r.effect||r.inputs?.effect_key!==key||
     !hex(r.inputs?.approval_sha256,64)||!hex(r.inputs?.request_sha256,64)||
     !/^[1-9]\d*$/.test(r.inputs?.source_run_id??'')||
