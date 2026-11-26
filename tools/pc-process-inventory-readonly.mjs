@@ -23,6 +23,7 @@ import {createHash} from 'node:crypto';
 import {inspectTask as inspectMarketParquetTask} from './marketparquet-task-source-readonly.mjs';
 import {inspectW03PaidPrivateReadonly,inspectD05PaidThemeFinalOutputsReadonly,inspectD05ConfiguredRegistrationReadonly} from './w03-paid-private-readonly.mjs';
 import {validateRunnerJobRefs,inspectRunnerJobHistory} from './runner-job-history-readonly.mjs';
+import {inspectW06TaskCadenceReadonly,PROBE as W06_TASK_CADENCE_PROBE} from '../controller/w06-cnn-task-cadence-readonly.mjs';
 import {inspectW043409SourcePreflightReadonly} from './w04-3409-source-preflight-readonly.mjs';
 import {inspect3409ArchivedReceiptReadonly} from './w04-3409-archive-receipt-readonly.mjs';
 import {inspect3516ArchivedReceiptReadonly} from './w04-3516-archive-receipt-readonly.mjs';
@@ -54,6 +55,7 @@ const CNN_GIT_PREDICATES_PROBE='cnn-sidecar-git-predicates-readonly';
 const CNN_B_PINS_PROBE='cnn-sidecar-b-preimage-pins-readonly';
 const CNN_B_RESOURCE_PROBE='cnn-sidecar-b-resource-readonly';
 const CNN_B_CORE_PROBE='cnn-sidecar-b-core-readonly';
+const W06_FIXED_TASK_PROBE=W06_TASK_CADENCE_PROBE;
 const MAX_BYTES=32768;
 const R3_WATCHDOG_PREIMAGE_PROBE='controller-standby-watchdog-preimage-readonly';
 const R3_WMI_PROBE='controller-standby-runner-wmi-readonly';
@@ -594,6 +596,7 @@ export function authenticateProcess(event,env,role){
   const isCnnBPins=withW05&&raw.probe===CNN_B_PINS_PROBE;
   const isCnnBResources=withW05&&raw.probe===CNN_B_RESOURCE_PROBE;
   const isCnnBCore=withW05&&raw.probe===CNN_B_CORE_PROBE;
+   const isW06Task=withW05&&raw.probe===W06_FIXED_TASK_PROBE;
   const isR3Watchdog=withW05&&raw.probe===R3_WATCHDOG_PREIMAGE_PROBE;
  const isR3Wmi=withW05&&raw.probe===R3_WMI_PROBE;
  const isR4Runtime=withW05&&raw.probe===R4_RUNTIME_PROBE;
@@ -603,7 +606,7 @@ export function authenticateProcess(event,env,role){
  const allowedOperatingProbe=isOperator||is2960||is3409||isEr1Postcheck||is3516||
   isD05Writer||isD05PrivateReceipt||isD05Theme||isD05Registration||is3160||
   isCnnStaticGuard||isCnnGitPredicates||isCnnBPins||isCnnBResources||
-  isCnnBCore||isR3Watchdog||isR3Wmi||isR4Runtime||isR5Runtime||isR4GuardianOrigin;
+  isCnnBCore||isW06Task||isR3Watchdog||isR3Wmi||isR4Runtime||isR5Runtime||isR4GuardianOrigin;
  const acceptedProbe=(role==='operating'&&allowedOperatingProbe)||
   (role==='handoff'&&isCiReceiptRoot);
  if(!raw||(!basic&&!withJobs&&!withW05)||
@@ -634,6 +637,7 @@ export function authenticateProcess(event,env,role){
    ...(isCnnBPins?{cnnSidecarBPreimagePins:true}:{}),
    ...(isCnnBResources?{cnnSidecarBResources:true}:{}),
    ...(isCnnBCore?{cnnSidecarBCore:true}:{}),
+    ...(isW06Task?{w06TaskCadence:true}:{}),
    ...(isR3Watchdog?{watchdogR3Preimage:true}:{}),
   ...(isR3Wmi?{standbyRunnerWmi:true}:{}),
   ...(isR4Runtime?{watchdogR4Runtime:true}:{}),
@@ -2764,6 +2768,10 @@ export function collect(role,ctx,env=process.env){
   commandLinesCaptured:false,environmentValuesCaptured:false};
  if(identity!=='MATCH'||(role==='operating'&&host!=='PC')){
   return {...base,status:'BLOCKED',code:identity==='MATCH'?'HOST_NOT_CANONICAL':identity};
+ }
+ if(ctx.w06TaskCadence===true){
+  const observed=inspectW06TaskCadenceReadonly();
+  return {...base,status:observed.status,code:observed.code,w06TaskCadence:observed};
  }
  if(ctx.ciControllerBReceiptRoot===true){
   const observed=inspectCiControllerBReceiptRootReadonly({
