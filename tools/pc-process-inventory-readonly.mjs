@@ -11,6 +11,7 @@ import {uploadResultPairAtomic} from '../writer-config-b/result-pair-atomic.mjs'
 import {collectAutomationStatus} from './automation-status.mjs';
 import {installedControllerBPolicy} from './maintenance-contract.mjs';
 import {inspectCiControllerBReceiptRootReadonly} from './ci-controller-b-receipt-root-readonly.mjs';
+import {inspectCiControllerBActivationReadonly} from './ci-controller-b-activation-readonly.mjs';
 import {inspectReceiptCOperatorServiceReadonly,inspectReceiptCFixedPathsReadonly} from './ci-controller-b-c-operator-readonly.mjs';
 import {inspectProviderActivity} from '../controller/provider-activity-runtime-readonly.mjs';
 import {inspectHttp32TwoHostCheckpoints} from '../controller/http32-two-host-checkpoints-readonly.mjs';
@@ -66,6 +67,7 @@ const S6_PREIMAGE_PROBE='controller-s6-once-approval-preimage-readonly';
 const S6_INSTALLED_MAINTAINER='05ef3bd6b5dc753c5abfbecccacc09375eb18d10';
 const R4_GUARDIAN_ORIGIN_PROBE='controller-standby-r4-guardian-origin-readonly';
 const CI_RECEIPT_ROOT_PROBE='ci-controller-b-receipt-root-readonly';
+const CI_CONTROLLER_B_ACTIVATION_PROBE='ci-controller-b-activation-readonly';
 // Existing A only: observe whether the same fixed WMI process-path query
 // used by the candidate Watchdog can classify installed Runner executables.
 // This single instant is NOT an owner/child-exit proof and cannot promote Standby.
@@ -607,12 +609,13 @@ export function authenticateProcess(event,env,role){
  const isS6Preimage=withW05&&raw.probe===S6_PREIMAGE_PROBE;
  const isR4GuardianOrigin=withW05&&raw.probe===R4_GUARDIAN_ORIGIN_PROBE;
  const isCiReceiptRoot=withW05&&raw.probe===CI_RECEIPT_ROOT_PROBE;
+ const isCiActivation=withW05&&raw.probe===CI_CONTROLLER_B_ACTIVATION_PROBE;
  const allowedOperatingProbe=isOperator||is2960||is3409||isEr1Postcheck||is3516||
   isD05Writer||isD05PrivateReceipt||isD05Theme||isD05Registration||is3160||
   isCnnStaticGuard||isCnnGitPredicates||isCnnBPins||isCnnBResources||
   isCnnBCore||isW06Task||isR3Watchdog||isR3Wmi||isR4Runtime||isR5Runtime||isS6Preimage||isR4GuardianOrigin;
  const acceptedProbe=(role==='operating'&&allowedOperatingProbe)||
-  (role==='handoff'&&isCiReceiptRoot);
+  (role==='handoff'&&(isCiReceiptRoot||isCiActivation));
  if(!raw||(!basic&&!withJobs&&!withW05)||
    raw.schema!==SCHEMA||raw.operation!==ROLE_OPERATION||raw.role!==role||
    (withJobs&&role!=='operating')||
@@ -648,7 +651,8 @@ export function authenticateProcess(event,env,role){
   ...(isR5Runtime?{watchdogR5Runtime:true}:{}),
    ...(isS6Preimage?{s6ApprovalPreimage:true}:{}),
   ...(isR4GuardianOrigin?{watchdogR4GuardianOrigin:true}:{}),
-  ...(isCiReceiptRoot?{ciControllerBReceiptRoot:true}:{})};
+  ...(isCiReceiptRoot?{ciControllerBReceiptRoot:true}:{}),
+  ...(isCiActivation?{ciControllerBActivation:true}:{})};
 }
 export function sanitizeProbe(raw){
  if(!raw||raw.schema!=='ZGMINI_PC_PROCESS_PROBE_V1')fail('PROBE_SCHEMA_INVALID');
@@ -2883,6 +2887,13 @@ export function collect(role,ctx,env=process.env){
   const observed=inspectW06TaskCadenceReadonly();
   return {...base,status:observed.status,code:observed.code,w06TaskCadence:observed};
  }
+ if(ctx.ciControllerBActivation===true){
+  const observed=inspectCiControllerBActivationReadonly({
+   enabled:env.ZGMINI_CI_CONTROLLER_B_ENABLED,
+   policy:env.ZGMINI_CI_CONTROLLER_B_POLICY});
+  return {...base,status:observed.status,code:observed.code,
+   ciControllerBActivation:observed};
+ }
  if(ctx.ciControllerBReceiptRoot===true){
   const observed=inspectCiControllerBReceiptRootReadonly({
    root:env.ZGMINI_CI_CONTROLLER_B_RECEIPT_ROOT,
@@ -3134,6 +3145,12 @@ export function toText(r){
    'watchdogManifestSha256='+(r.watchdogR3Preimage.manifestSha256??'UNKNOWN'),
    'watchdogSourceMatchesManifest='+r.watchdogR3Preimage.installedMatch
   ]:[]),
+  ...(r.ciControllerBActivation?[
+   'ciControllerBActivation='+r.ciControllerBActivation.code,
+   'ciPublisherDisabled='+r.ciControllerBActivation.variableEnabledVerified,
+   'ciBusinessPolicyConfigured='+r.ciControllerBActivation.policyConfigured,
+   'ciBusinessPolicyFormatObserved='+r.ciControllerBActivation.policyShapeVerified,
+   'ciActivationAuthorized=false']:[]),
   ...(r.ciControllerBReceiptRoot?[
    'ciReceiptRoot='+r.ciControllerBReceiptRoot.code,
    'ciReceiptRootConfigured='+r.ciControllerBReceiptRoot.configured,
