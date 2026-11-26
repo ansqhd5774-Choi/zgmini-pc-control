@@ -1,0 +1,9 @@
+schema=ZGMINI_PC_RESULT_V1
+jobId=run-45909216646-1-seat-1
+status=BLOCKED
+code=SUPERVISOR_OWNERSHIP_LOST
+lastPass=EVENT_RECEIVED
+firstFail=EVENT_OR_REQUEST_VALIDATION
+operationalWrites=0
+providerCalls=0
+d1Writes=0
