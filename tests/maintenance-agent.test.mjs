@@ -913,6 +913,7 @@ test('S6 recovery-required outcome is durable and cannot stop twice',async t=>{
  const result=await f.agent.processIssue(f.issue);
  assert.equal(result.status,'UNKNOWN');
  assert.equal(result.s6ExecutionStatus,'RECOVERY_REQUIRED');
+ assert.equal(f.agent.loadLedger(s6.request.requestId).result.actualControllerSha,null);
  assert.equal(f.agent.loadLedger(s6.request.requestId).result.firstFail,
   'BACKLOG_REPLAY_OUTCOME_UNKNOWN');
  assert.equal((await f.agent.processIssue(f.issue)).code,'DUPLICATE_REQUEST_SUPPRESSED');
@@ -943,6 +944,7 @@ test('S6 updater exit 2 with exact RECOVERY_REQUIRED JSON preserves failed bound
  assert.equal(result.status,'UNKNOWN');
  assert.equal(result.code,'S6_ONCE_RUNTIME_OUTCOME_RECONCILE');
  assert.equal(recorded.s6ExecutionStatus,'RECOVERY_REQUIRED');
+ assert.equal(recorded.actualControllerSha,null);
  assert.equal(recorded.firstFail,'S6_PORT_INTAKE_PAUSE_LOST');
  assert.equal(recorded.s6LastPhase,'INTAKE_PAUSED');
  assert.equal(recorded.s6LeaseReleaseAcknowledged,false);
@@ -950,6 +952,7 @@ test('S6 updater exit 2 with exact RECOVERY_REQUIRED JSON preserves failed bound
  assert.ok(Buffer.isBuffer(json));
  const uploaded=JSON.parse(json.toString('utf8'));
  assert.equal(uploaded.firstFail,'S6_PORT_INTAKE_PAUSE_LOST');
+ assert.equal(uploaded.actualControllerSha,null);
  assert.equal(uploaded.s6LastPhase,'INTAKE_PAUSED');
  assert.equal(uploaded.s6ExecutionStatus,'RECOVERY_REQUIRED');
  assert.doesNotMatch(JSON.stringify(uploaded),/MUST_NOT_LEAK|private path|ownerPid/);
