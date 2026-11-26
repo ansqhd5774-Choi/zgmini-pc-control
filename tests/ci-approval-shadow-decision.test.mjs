@@ -3,13 +3,17 @@ import assert from 'node:assert/strict';
 import {evaluateShadow} from '../ci-approval/shadow-decision.mjs';
 function cases(){
  const sha="a".repeat(40),scope="b".repeat(64),base="c".repeat(40);
- const make=(effect="B_CONTROLLER_INSTALL")=>({request:{requestId:"pc-test-001",effect,targetSha:sha,scopeDigest:scope},facts:{prChangesAuthority:false,requestState:"NEW",authority:{effect,targetSha:sha,scopeDigest:scope,policySha:"d".repeat(40),requestId:"pc-test-001",provenance:"SIMULATED_TRUSTED_INPUT"},existingContractPass:true,readOnly:true,ci:{targetSha:sha,scopeDigest:scope,conclusion:"success",trustedWorkflow:true,current:true},expectedBaseSha:base,currentBaseSha:base,configSourceSha:base,rollbackVerified:true,postcheckBound:true,resourceState:"READY"}});
+ const make=(effect="B_CONTROLLER_INSTALL")=>({request:{requestId:"pc-test-001",effect,targetSha:sha,scopeDigest:scope},facts:{prChangesAuthority:false,requestState:"NEW",authority:{effect,targetSha:sha,scopeDigest:scope,policySha:"d".repeat(40),requestId:"pc-test-001",provenance:"SIMULATED_TRUSTED_INPUT"},existingContractPass:true,readOnly:true,ci:{targetSha:sha,scopeDigest:scope,conclusion:"success",trustedWorkflow:true,current:true},expectedBaseSha:base,currentBaseSha:base,configSourceSha:base,rollbackVerified:true,postcheckBound:true,resourceState:"READY",receiverAdmissionVerified:true}});
  const out=[];
  const add=(name,effect,modify,expected)=>{let v=make(effect);modify(v);out.push({name,...v,expected})};
  const good="WOULD_MATCH_EXISTING_AUTHORITY",missing="EVIDENCE_MISSING",outside="OUT_OF_SCOPE",wait="WAIT_RESOURCE";
  add("A existing readonly", "A_READONLY",v=>{delete v.facts.ci;delete v.facts.rollbackVerified},good);
  add("B Controller",undefined,()=>{},good);
  add("B Writer","B_WRITER_SOURCE",()=>{},good);
+ add("A CI bot is not automatically admitted by owner-only receiver","A_READONLY",v=>{v.facts.receiverAdmissionVerified=false;},missing);
+ add("Writer B CI bot requires independently verified receiver admission","B_WRITER_SOURCE",v=>{delete v.facts.receiverAdmissionVerified;},missing);
+ add("Controller B CI proof cannot be inferred from business approval",undefined,v=>{v.facts.receiverAdmissionVerified=false;},missing);
+ add("an owner-name string is not receiver proof","A_READONLY",v=>{v.facts.receiverAdmissionVerified="ansqhd5774-Choi";},missing);
  add("C excluded","C_ADMIN",()=>{},outside);
  add("D1 excluded","B_D1_WRITE",()=>{},outside);
  add("missing evidence",undefined,v=>{v.facts=null},missing);
