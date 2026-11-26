@@ -83,7 +83,7 @@ test('invalid observation contract fails before any read',async()=>{
  await assert.rejects(awaitNaturalSidecarIdle({
   observe:()=>{reads++;return snapshot();},
   pause:async()=>{},clock:()=>0,
-  windowMs:240_001
+  windowMs:420_001
  }),code('SIDECAR_B_IDLE_WINDOW_CONTRACT_STOP'));
  assert.equal(reads,0);
 });
