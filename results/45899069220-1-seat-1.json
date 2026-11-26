@@ -1,0 +1,81 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-45899069220-1-seat-1",
+  "requestId": "pc-7e308d18-6c59-4a54-bc96-5d9b26a8ca17",
+  "startedAt": "2026-11-26T21:34:41.450Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "3c7d4cfefacf072fd35cb19706b352c64c5e4fd2",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "f7ea89305df8471ffb1827d974fc2e0c223d0b09",
+  "sourceBranch": "main",
+  "operation": "cnn-public-d1-api-readback-readonly",
+  "seat": 1,
+  "status": "PASS",
+  "code": "CNN_SQLITE_D1_API_1D_1W_MATCHED",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": true,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-w06-cnn-wrangler-oauth-post-login-20261127-0633",
+  "effectClass": "REGISTERED_OPERATION",
+  "pcOperationalApprovedSha": "c8ed53a3991212dd1778742cda8a86ac133e0796",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "CNN_SQLITE_D1_API_1D_1W_MATCHED",
+    "local": {
+      "status": "READ",
+      "date": "2026-11-26",
+      "observedCount": 1,
+      "checkedCount": 1,
+      "lastObservedAt": "2026-11-26T01:59:59.000Z",
+      "lastCheckedAt": "2026-11-26T11:45:35.868Z",
+      "currentScore": 14.9967450271248
+    },
+    "d1": {
+      "status": "MATCHED",
+      "date": "2026-11-26",
+      "observedCount": 1,
+      "checkedCount": 1,
+      "lastObservedAt": "2026-11-26T01:59:59.000Z",
+      "lastCheckedAt": "2026-11-26T11:45:35.868Z",
+      "observedStoredAt": 1795689353820,
+      "checkedStoredAt": 1795693535868,
+      "observedBodySha256": "ad62cc537d92ffd5a5710b757afa9956d5c780beca7a804be1abcb45ca48f30a",
+      "checkedBodySha256": "2b4b4d08dc808a649926a03d030d27b92a50ac044802252e777312f837d7622b"
+    },
+    "api": {
+      "status": "MATCHED",
+      "periods": {
+        "1D": {
+          "httpStatus": 200,
+          "status": "MATCHED",
+          "observedMatch": true,
+          "checksMatch": true
+        },
+        "1W": {
+          "httpStatus": 200,
+          "status": "MATCHED",
+          "observedMatch": true,
+          "checksMatch": true
+        }
+      }
+    },
+    "sameDayMatched": true,
+    "publicPeriodsMatched": true,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "operationalWrites": 0,
+    "sqliteOpened": true
+  },
+  "protectedBeforeSha256": "1e04296eab72cc0397c43ac2741252af9c3e2d9f31a7b38c189093d9765a0bee",
+  "protectedAfterSha256": "1e04296eab72cc0397c43ac2741252af9c3e2d9f31a7b38c189093d9765a0bee",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "3c7d4cfefacf072fd35cb19706b352c64c5e4fd2",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-26T21:34:56.323Z",
+  "durationMs": 14873
+}
