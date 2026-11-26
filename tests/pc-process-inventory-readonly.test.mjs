@@ -2401,3 +2401,67 @@ test('R3 WMI exact unknown process type and cause remain safe aggregate counts',
  assert.match(text,/wmiCanonicalizationFailedCount=1/);
  assert.doesNotMatch(text,/7501|7502|7503|7504|relative\.exe|seat-3|ACCESS_DENIED/);
 });
+
+test('R3 missing WMI Listener reports bounded session-zero service ancestry without promotion',()=>{
+ const canonicalize=p=>p;
+ const name='Runner.Listener.exe';
+ const input={rows:[
+  {pid:8001,name,executablePath:'E:\\ZGmini\\automation\\pc-control\\runners\\01\\Runner.Listener.exe',sessionId:1,serviceAncestor:false,serviceObservationAvailable:true},
+  {pid:8002,name,executablePath:'',sessionId:0,serviceAncestor:true,serviceObservationAvailable:true}
+ ]};
+ const result=classifyR3RunnerWmiRows(input,{canonicalize});
+ assert.equal(result.status,'STATE_UNKNOWN');
+ assert.equal(result.unknownListenerCount,1);
+ assert.equal(result.unknownSession0Count,1);
+ assert.equal(result.unknownServiceAncestorCount,1);
+ assert.equal(result.unknownSession0ServiceAncestorCount,1);
+ assert.equal(result.serviceObservationUnavailableCount,0);
+ assert.equal(result.promotionApproved,false);
+ assert.doesNotMatch(JSON.stringify(result),/8001|8002|actions\.runner|ExecutablePath|SessionId|serviceName/i);
+ const unreliable=classifyR3RunnerWmiRows({rows:[{
+  ...input.rows[1],serviceAncestor:false,serviceObservationAvailable:false
+ }]},{canonicalize});
+ assert.equal(unreliable.unknownSession0Count,1);
+ assert.equal(unreliable.unknownServiceAncestorCount,0);
+ assert.equal(unreliable.serviceObservationUnavailableCount,1);
+ assert.equal(unreliable.status,'STATE_UNKNOWN');
+ const output=toText({schema:'ZGMINI_PC_PROCESS_INVENTORY_RESULT_V1',
+  requestId:'fixed',role:'operating',runId:1,attempt:1,host:'PC',
+  runnerName:'zgmini-pc-01',status:result.status,code:result.code,
+  observedAtUtc:'2026-11-26T00:00:00Z',standbyRunnerWmi:result});
+ assert.match(output,/wmiUnknownSession0ServiceAncestorCount=1/);
+ assert.match(output,/wmiUnknownSession0Count=1/);
+ assert.doesNotMatch(output,/8001|8002|E:\\ZGmini|actions\.runner/i);
+});
+
+test('R3 WMI fixed ancestry code invokes only read-only process/service CIM in Windows',()=>{
+ let calls=0;
+ const result=inspectR3RunnerWmiReadonly({
+  env:{SystemRoot:'C:\\Windows'},
+  filesystem:{statSync:()=>({isFile:()=>true})},
+  canonicalize:p=>p,
+  run:(command,args,opts)=>{
+   calls++;
+   assert.match(command,/powershell\.exe$/i);
+   assert.equal(opts.shell,false);
+   assert.equal(opts.maxBuffer,65536);
+   assert.ok(args.includes('-NonInteractive'));
+   assert.match(args[args.length-1],/Win32_Process/);
+   assert.match(args[args.length-1],/Win32_Service/);
+   assert.match(args[args.length-1],/ParentProcessId/);
+   return {status:0,stdout:JSON.stringify({rows:[{
+    pid:8002,name:'Runner.Listener.exe',executablePath:'',
+    sessionId:0,serviceAncestor:true,serviceObservationAvailable:true
+   }]})};
+  }
+ });
+ if(process.platform==='win32'){
+  assert.equal(calls,1);
+  assert.equal(result.unknownSession0ServiceAncestorCount,1);
+  assert.equal(result.status,'STATE_UNKNOWN');
+ }else{
+  assert.equal(calls,0);
+  assert.equal(result.status,'STATE_UNKNOWN');
+ }
+ assert.equal(result.promotionApproved,false);
+});
