@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {inspectTask, TASK} from '../tools/marketparquet-task-source-readonly.mjs';
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
-import {inspectCiControllerBReceiverReadOnly} from '../tools/pc-process-inventory-readonly.mjs';
+import {inspectCiControllerBReceiverReadOnly,inspectCiControllerBPolicyCasReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 import assert from 'node:assert/strict';
 import {classifyInstalledReconciliationProof,main as maintenanceRecoveryMain} from '../tools/maintenance-recovery.mjs';
 import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,project2960MaintenanceStatus,project3409MaintenanceStatus,compact3409ProcessResult,projectEr1PostcheckLinkReadonly,assess3409OriginalLeaseLineage,project3516MaintenanceStatus,compact3516ProcessResult,assess3516OriginalLeaseLineage,project3409PauseWindows,compare2960ProtectedBaseline,classify2960ProtectionDifference,assess2960OriginalLeaseLineage,compact2960ProcessResult,projectD05WriterCheckpoint,compactD05WriterResult,inspectD05PrivateFinalReceiptReadonly,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
@@ -3236,3 +3236,77 @@ test('S6 #3947 raw approved manifest checksum survives LF and reusable Windows C
  assert.equal(s6OncePinnedApprovalCheckoutBytes(Buffer.alloc(32769,65)),null);
 });
 
+
+test('exact Controller B installed-policy CAS A uses one fixed operating-only probe',()=>{
+ const original=event('operating'),body=JSON.parse(original.issue.body);
+ const scoped={...original,issue:{...original.issue,body:JSON.stringify({...body,
+  probe:'ci-controller-b-policy-cas-readonly'})}};
+ assert.equal(authenticateProcess(scoped,env,'operating').ciControllerBPolicyCas,true);
+ assert.throws(()=>authenticateProcess({...event('handoff'),
+  issue:{...event('handoff').issue,body:JSON.stringify({...body,
+   role:'handoff',probe:'ci-controller-b-policy-cas-readonly'})}},env,'handoff'),
+  /REQUEST_SCOPE_INVALID/);
+ for(const extra of [{path:'E:/private'}, {policy:'override'},
+   {probe:'ci-controller-b-policy-cas-readonly;cmd'}]){
+  assert.throws(()=>authenticateProcess({...scoped,
+   issue:{...scoped.issue,body:JSON.stringify({...body,
+    probe:'ci-controller-b-policy-cas-readonly',...extra})}},env,'operating'),
+   /REQUEST_SCOPE_INVALID/);
+ }
+ const installed={
+  schema:'ZGMINI_PC_MAINTENANCE_INSTALL_V1',
+  sourceSha:'20a2939d419675ede3e8ab38a3ea3b70756981ac',
+  startupSha256:'f'.repeat(64),
+  files:Object.fromEntries([
+   'tools/maintenance-contract.mjs','tools/maintenance-apply.mjs',
+   'tools/maintenance-agent.mjs','tools/maintenance-lock.mjs',
+   'tools/update.mjs','tools/maintenance-ancestry.vbs',
+   'tools/source-bundle-register.mjs'].map(p=>[p,'a'.repeat(64)])),
+  ciControllerBPolicy:{
+   schema:'ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V1',
+   enabled:true,workflowId:430972394,
+   workflowBlobSha:'b568bbc5de05b2d6fff75419b88322b3e2de020c',
+   workflowPath:'.github/workflows/ci-approval-controller-b.yml'}
+ };
+ const bytes=Buffer.from(JSON.stringify(installed)+'\n','utf8');
+ const fixed='E:/ZGmini/automation/pc-maintenance/MAINTENANCE_INSTALL.json';
+ const fake=(b,{link=false,size=b.length}={})=>({
+  lstatSync:p=>{assert.equal(p,fixed);return{
+   isFile:()=>true,isSymbolicLink:()=>link,size};},
+  readFileSync:p=>{assert.equal(p,fixed);return b;}
+ });
+ const good=inspectCiControllerBPolicyCasReadonly(fake(bytes));
+ assert.equal(good.schema,'ZGMINI_CI_CONTROLLER_B_POLICY_CAS_READONLY_V1');
+ assert.equal(good.status,'PASS');
+ assert.equal(good.code,'CI_POLICY_CAS_READONLY_OBSERVED');
+ assert.equal(good.policyCas.sourceSha,installed.sourceSha);
+ assert.equal(good.policyCas.installedManifestSha256,
+  createHash('sha256').update(bytes).digest('hex'));
+ assert.equal(good.policyCas.workflowId,430972394);
+ assert.equal(good.policyCas.workflowBlobSha,installed.ciControllerBPolicy.workflowBlobSha);
+ assert.equal(good.policyCas.fixedWorkflowPathVerified,true);
+ assert.equal(good.policyCas.enabledShapeVerified,true);
+ assert.equal(good.executionAuthorized,false);
+ assert.equal(good.operationalWrites,0);
+ assert.equal(good.providerCalls,0);
+ assert.equal(good.d1Writes,0);
+ assert.doesNotMatch(JSON.stringify(good),/E:\/|secret|password|token/i);
+ const cases=[
+  fake(Buffer.from('not json')),
+  fake(Buffer.from(JSON.stringify({...installed,ciControllerBPolicy:undefined}))),
+  fake(Buffer.from(JSON.stringify({...installed,sourceSha:'bad'}))),
+  fake(Buffer.from(JSON.stringify({...installed,ciControllerBPolicy:{
+   ...installed.ciControllerBPolicy,workflowBlobSha:'bad'}}))),
+  fake(bytes,{link:true}),
+  fake(bytes,{size:bytes.length+1}),
+  {lstatSync:()=>{throw Error('PRIVATE TOKEN');}}
+ ];
+ for(const fixture of cases){
+  const result=inspectCiControllerBPolicyCasReadonly(fixture);
+  assert.equal(result.status,'STATE_UNKNOWN');
+  assert.equal(result.code,'CI_POLICY_CAS_NOT_VERIFIED');
+  assert.equal(result.policyCas,null);
+  assert.equal(result.executionAuthorized,false);
+  assert.doesNotMatch(JSON.stringify(result),/PRIVATE|TOKEN|E:\//i);
+ }
+});
