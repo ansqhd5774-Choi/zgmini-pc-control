@@ -27,8 +27,8 @@ export const sha256=sha;
 const REQUEST_KEYS=['schema','requestId','operation','approvalManifestPath',
  'approvalManifestSha256'];
 const MANIFEST_KEYS=['schema','status','scope','taskName','installedSourceSha',
- 'sourceRoot','wrapperPath','launcherSha256','disabledXmlSha256',
- 'enabledXmlSha256','coreTaskXmlSha256','sidecarSourceSha256',
+ 'sourceRoot','wrapperPath','launcherSha256','disabledTemplateSha256',
+ 'enabledTemplateSha256','coreTaskXmlSha256','sidecarSourceSha256',
  'allowCnnHttpRequests','allowSqliteObservationWrites',
  'allowD1PublicProjectionWrites','allowOtherTaskChanges','runCount'];
 
@@ -54,8 +54,8 @@ export function authorizeTaskCreateB({event,manifestBytes,manifestCommitted=fals
   manifest.taskName===TASK&&manifest.installedSourceSha===INSTALLED_SOURCE&&
   manifest.sourceRoot===SOURCE_ROOT&&manifest.wrapperPath===WRAPPER&&
   H64.test(manifest.launcherSha256??'')&&
-  H64.test(manifest.disabledXmlSha256??'')&&
-  H64.test(manifest.enabledXmlSha256??'')&&
+  H64.test(manifest.disabledTemplateSha256??'')&&
+  H64.test(manifest.enabledTemplateSha256??'')&&
   H64.test(manifest.coreTaskXmlSha256??'')&&
   H64.test(manifest.sidecarSourceSha256??'')&&
   manifest.allowCnnHttpRequests===true&&
@@ -82,20 +82,41 @@ export function verifyTaskCreateBPreimage(proof,preimage){
  return true;
 }
 
+// Hash an exact XML template without exporting the operating user's principal
+// or fixing the minute-boundary start time in a public approval manifest.
+export function normalizedW06TaskTemplate(raw){
+ check(Buffer.isBuffer(raw)&&raw.length>0&&raw.length<=131072&&
+  raw.length%2===0,'TASK_CREATE_B_XML_BYTES_STOP');
+ const xml=raw.toString('utf16le');
+ check(Buffer.from(xml,'utf16le').equals(raw),'TASK_CREATE_B_XML_ENCODING_STOP');
+ const dates=[...xml.matchAll(/<StartBoundary>([^<]+)<\/StartBoundary>/g)];
+ const users=[...xml.matchAll(/<UserId>([^<]+)<\/UserId>/g)];
+ check(dates.length===1&&users.length===1&&
+  /^\d{4}-\d\d-\d\dT\d\d:\d\d:00(?:\.000)?Z$/.test(dates[0][1])&&
+  Number.isFinite(Date.parse(dates[0][1]))&&users[0][1].length<=512,
+  'TASK_CREATE_B_XML_DYNAMIC_SCOPE_STOP');
+ const template=xml.replace(dates[0][0],
+  '<StartBoundary>{{UTC_MINUTE}}</StartBoundary>')
+  .replace(users[0][0],'<UserId>{{OPERATING_PRINCIPAL}}</UserId>');
+ return sha(Buffer.from(template,'utf16le'));
+}
+
 export function verifyTaskCreateBCandidate(proof,candidate){
  check(authorized.has(proof),'TASK_CREATE_B_AUTH_REQUIRED');
  const m=proof.manifest;
  check(Buffer.isBuffer(candidate?.launcher)&&candidate.launcher.length<=8192&&
-  Buffer.isBuffer(candidate?.disabledXml)&&candidate.disabledXml.length<=131072&&
-  Buffer.isBuffer(candidate?.enabledXml)&&candidate.enabledXml.length<=131072&&
+  Buffer.isBuffer(candidate?.disabledXml)&&Buffer.isBuffer(candidate?.enabledXml)&&
   sha(candidate.launcher)===m.launcherSha256&&
-  sha(candidate.disabledXml)===m.disabledXmlSha256&&
-  sha(candidate.enabledXml)===m.enabledXmlSha256,
+  normalizedW06TaskTemplate(candidate.disabledXml)===m.disabledTemplateSha256&&
+  normalizedW06TaskTemplate(candidate.enabledXml)===m.enabledTemplateSha256,
   'TASK_CREATE_B_CANDIDATE_HASH_STOP');
  const xml=candidate.enabledXml.toString('utf16le');
  const disabled=candidate.disabledXml.toString('utf16le');
  const wrapper=candidate.launcher.toString('utf8');
- check(xml.includes('<Interval>PT1M</Interval>')&&
+ const update=xml.replace(/(<Settings>[\s\S]*?<Enabled>)true(<\/Enabled>)/,
+  '$1false$2');
+ check(update!==xml&&disabled===update&&
+  xml.includes('<Interval>PT1M</Interval>')&&
   xml.includes('<MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>')&&
   xml.includes('<ExecutionTimeLimit>PT30M</ExecutionTimeLimit>')&&
   xml.includes('<Settings>')&&xml.includes('<Enabled>true</Enabled>')&&
