@@ -6,6 +6,7 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - 'tools/pc-process-inventory-readonly.mjs'
+      - 'tools/ci-controller-b-receipt-root-readonly.mjs'
       - 'tools/w03-paid-private-readonly.mjs'
       - 'tools/w03-paid-source-coverage-readonly.mjs'
       - 'tests/w03-paid-source-coverage-readonly.test.mjs'
@@ -95,4 +96,5 @@ jobs:
       - name: Collect read-only runtime process snapshot on isolated handoff PC
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          ZGMINI_CI_CONTROLLER_B_RECEIPT_ROOT: ${{ vars.ZGMINI_CI_CONTROLLER_B_RECEIPT_ROOT }}
         run: node tools/pc-process-inventory-readonly.mjs handoff
