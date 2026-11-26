@@ -17,6 +17,7 @@ import {inspect3160RollbackPreflightReadonly} from '../tools/pc-process-inventor
 import {projectCnnSidecarStaticGuard} from '../tools/pc-process-inventory-readonly.mjs';
 import {inspectR3WatchdogPreimageReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 import {classifyR3RunnerWmiRows,inspectR3RunnerWmiReadonly} from '../tools/pc-process-inventory-readonly.mjs';
+import {assessR4StandbyRuntimeSnapshot,inspectR4StandbyRuntimeReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
  const request={schema:SCHEMA,operation:ROLE_OPERATION,role,
@@ -2525,6 +2526,113 @@ test('CI B receipt-root A inspector never reports directory paths or write autho
  assert.equal(inspect({filesystem:unreadable}).code,'CI_RECEIPT_ROOT_READ_UNVERIFIED');
 });
 
+
+const r4RuntimeFixture=()=>({
+ sourceSha256:'9150a024bcb979b69a9d908c75b8eb7cec6794d22506384a28b64a722074951b',
+ install:{scope:'RUNNER_RECOVERY_AND_MAINTENANCE_HANDOFF_V1',
+  approvedTargetSourceSha:'f9c2760ae92ce98ca20784e4a26150edbd0e3578',
+  sha256:'9150a024bcb979b69a9d908c75b8eb7cec6794d22506384a28b64a722074951b',
+  upgradedAt:'2026-11-26T01:10:00Z',
+  standby:{mode:'ACTIVE_1_STANDBY_1',approved:true}},
+ controllerHost:{controllerSourceSha:'b91340d5047daf753e1c17a5c966e4d2aecea586'},
+ owner:{pid:5311,nonce:'fixed-r4-owner-nonce-very-long',at:'2026-11-26T01:10:30Z'},
+ status:{pid:5311,state:'HEALTHY',standbyRole:'READY',
+  standbyPid:5333,supervisorPid:5322,at:'2026-11-26T01:11:45Z'}
+});
+const r4Now=Date.parse('2026-11-26T01:12:00Z');
+const r4Assess=x=>assessR4StandbyRuntimeSnapshot(x,{now:r4Now,pidAlive:()=>true});
+
+test('R4 Watchdog runtime A is only the fixed authenticated operating probe',()=>{
+ const original=event(),body=JSON.parse(original.issue.body);
+ const request={...original,issue:{...original.issue,body:JSON.stringify({
+  ...body,probe:'controller-standby-r4-runtime-readonly'})}};
+ assert.equal(authenticateProcess(request,env,'operating').watchdogR4Runtime,true);
+ assert.throws(()=>authenticateProcess(request,env,'handoff'));
+ for(const probe of ['controller-standby-r4-runtime-readonly;Remove-Item',
+  'controller-standby-r4-runtime-test']){
+  const bad={...original,issue:{...original.issue,body:JSON.stringify({...body,probe})}};
+  assert.throws(()=>authenticateProcess(bad,env,'operating'));
+ }
+ const bad={...original,issue:{...original.issue,body:JSON.stringify({
+  ...body,probe:'controller-standby-r4-runtime-readonly',
+  path:'C:/private/anything'})}};
+ assert.throws(()=>authenticateProcess(bad,env,'operating'));
+});
+
+test('R4 Watchdog active and passive IPC readiness is not failover proof',()=>{
+ const result=r4Assess(r4RuntimeFixture());
+ assert.equal(result.status,'PASS');
+ assert.equal(result.code,'WATCHDOG_R4_ACTIVE_HEALTHY_STANDBY_IPC_READY');
+ for(const field of ['installedMatch','controllerTargetMatch','naturalRestartObserved',
+  'statusFresh','watchdogOwnerVerified','activeSupervisorVerified','standbyIpcReady'])
+  assert.equal(result[field],true);
+ assert.equal(result.failoverTested,false);
+ assert.equal(result.promotionApproved,false);
+ assert.equal(result.operationalWrites,0);
+ assert.doesNotMatch(JSON.stringify(result),/5311|5322|5333|nonce|ExecutablePath|userName|commandLine/i);
+});
+
+test('R4 Watchdog candidate before natural restart or without exact live identity fails closed',()=>{
+ const edits=[
+  [x=>x.owner.at='2026-11-26T01:09:00Z','WATCHDOG_R4_NATURAL_RESTART_PENDING'],
+  [x=>x.status.standbyRole='STARTING','WATCHDOG_R4_STANDBY_IPC_UNVERIFIED'],
+  [x=>x.status.standbyPid=x.status.supervisorPid,'WATCHDOG_R4_STANDBY_IPC_UNVERIFIED'],
+  [x=>x.status.pid=5,'WATCHDOG_R4_PROCESS_OWNER_UNVERIFIED'],
+  [x=>x.status.at='2026-11-26T01:08:00Z','WATCHDOG_R4_NATURAL_RESTART_PENDING'],
+  [x=>x.status.state='BLOCKED','WATCHDOG_R4_HEALTH_STATUS_UNVERIFIED'],
+  [x=>x.sourceSha256='0'.repeat(64),'WATCHDOG_R4_STAGE_OR_CONTROLLER_SOURCE_UNVERIFIED'],
+  [x=>x.controllerHost.controllerSourceSha='old','WATCHDOG_R4_STAGE_OR_CONTROLLER_SOURCE_UNVERIFIED'],
+  [x=>x.install.standby.approved=false,'WATCHDOG_R4_STAGE_OR_CONTROLLER_SOURCE_UNVERIFIED'],
+ ];
+ for(const [edit,code] of edits){
+  const x=r4RuntimeFixture();edit(x);
+  const result=r4Assess(x);
+  assert.equal(result.status,'STATE_UNKNOWN');
+  assert.equal(result.code,code);
+  assert.equal(result.failoverTested,false);
+  assert.equal(result.promotionApproved,false);
+ }
+ const unavailable=assessR4StandbyRuntimeSnapshot(r4RuntimeFixture(),{
+  now:r4Now,pidAlive:()=>null});
+ assert.equal(unavailable.status,'STATE_UNKNOWN');
+ assert.equal(unavailable.code,'WATCHDOG_R4_PROCESS_OWNER_UNVERIFIED');
+});
+
+test('R4 fixed read-only file evidence rejects aliases and reports only safe status',()=>{
+ const wd=path.resolve('fixture-r4-watchdog'),controller=path.resolve('fixture-r4-controller');
+ const exactSource=fs.readFileSync(new URL('../tools/runner-watchdog.mjs',import.meta.url));
+ const x=r4RuntimeFixture();
+ const data=new Map([
+  [path.join(wd,'runner-watchdog.mjs'),exactSource],
+  [path.join(wd,'INSTALL.json'),Buffer.from(JSON.stringify(x.install))],
+  [path.join(wd,'receiver/owner.json'),Buffer.from(JSON.stringify(x.owner))],
+  [path.join(wd,'STATUS.json'),Buffer.from(JSON.stringify(x.status))],
+  [path.join(controller,'host.json'),Buffer.from(JSON.stringify(x.controllerHost))]
+ ]);
+ let writes=0;
+ const makeFs=badPath=>({
+  lstatSync:p=>{
+   if(p===wd||p===controller)return {isDirectory:()=>true,isSymbolicLink:()=>false};
+   const b=data.get(p);if(!b)throw Error('missing');
+   return {isFile:()=>true,isSymbolicLink:()=>p===badPath,
+    nlink:1,size:b.length,mtimeMs:1,ino:p};
+  },
+  readFileSync:p=>data.get(p),
+  writeFileSync:()=>{writes++;throw Error('UNEXPECTED_WRITE');}
+ });
+ const options={watchdogHome:wd,controllerHome:controller,
+  now:r4Now,pidAlive:()=>true};
+ const matched=inspectR4StandbyRuntimeReadonly({...options,filesystem:makeFs()});
+ assert.equal(matched.status,'PASS');
+ assert.equal(matched.failoverTested,false);
+ assert.equal(writes,0);
+ const denied=inspectR4StandbyRuntimeReadonly({...options,
+  filesystem:makeFs(path.join(wd,'INSTALL.json'))});
+ assert.equal(denied.status,'STATE_UNKNOWN');
+ assert.equal(denied.code,'WATCHDOG_R4_RUNTIME_READ_UNVERIFIED');
+ assert.equal(denied.operationalWrites,0);
+ assert.doesNotMatch(JSON.stringify(denied),/fixture|5311|5333|nonce/i);
+});
 
 test('CI source test queue isolates separate PRs from Issue A requests',()=>{
  const workflow=fs.readFileSync(new URL('../.github/workflows/pc-process-inventory-readonly.yml',import.meta.url),'utf8');

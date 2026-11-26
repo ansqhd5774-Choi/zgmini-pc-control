@@ -1,0 +1,15 @@
+{
+  "schema": "ZGMINI_CONTROLLER_SELECTIVE_PIN_V1",
+  "installedSha": "b91340d5047daf753e1c17a5c966e4d2aecea586",
+  "targetSha": "182bb46f2838306ba40d8b4ec32bac40ab75b69a",
+  "sourceMainSha": "3f18ec9519806e579dbc20bb6d237c145918a1b2",
+  "targetBranch": "codex/issues-lifecycle-manager-20261118-63-w06-a-b913-selective",
+  "customPaths": [],
+  "allowFiles": [
+    {
+      "path": "controller/preimage-manifest-contract.mjs",
+      "sha256": "c59d5d36f0024b7a4b1781ea6eef9351f6275db33c8799bec05bf99abebbfcc1"
+    }
+  ],
+  "approvalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3783"
+}
