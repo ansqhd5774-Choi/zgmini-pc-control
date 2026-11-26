@@ -20,7 +20,7 @@ test('missing or invalid policy is a specific read-only non-authorizing result',
  assert.equal(run('false','').code,'CI_CONTROLLER_B_AUTO_POLICY_NOT_CONFIGURED');
  assert.equal(run('false','{broken').code,'CI_CONTROLLER_B_AUTO_POLICY_JSON_INVALID');
  assert.equal(run('true').code,'CI_CONTROLLER_B_ALREADY_ENABLED_STOP');
- assert.equal(run(undefined).code,'CI_CONTROLLER_B_FLAG_NOT_EXPLICITLY_DISABLED');
+ assert.equal(run(null).code,'CI_CONTROLLER_B_FLAG_NOT_EXPLICITLY_DISABLED');
  assert.equal(run('false',' '.repeat(32769)).code,'CI_CONTROLLER_B_AUTO_POLICY_SIZE_DENIED');
  for(const bad of [
   {...fixed,sourcePrNumber:0},{...fixed,authorityChangesExcluded:false},
