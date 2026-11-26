@@ -409,7 +409,8 @@ export async function runApprovedS6FailoverOnce(request,port){
  if(request?.operation!=='controller-s6-failover-once'||
     !/^pc-s6-[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(id??''))
   return result('BLOCKED','S6_ONCE_REQUEST_INVALID');
- const required=['read','attestApproval','captureBaseline','observe','claimOnce',
+ const required=['read','attestApproval','captureBaseline','observe',
+  'verifyIndependentRecovery','claimOnce',
   'persist','acquireOwnedInstallLease','pauseIntake','waitForDrain','verifyStopGuard','stopOwnTree',
   'waitForStoppedHeld',
   'resumeIntake','verifyReleaseGuard','releaseOwnedInstallLease',
@@ -447,6 +448,16 @@ export async function runApprovedS6FailoverOnce(request,port){
  };
  try{await observe('PRE_DRAIN');}
  catch(error){return result('BLOCKED',maintenanceFailureCode(error,'preDrain'));}
+ // A live Watchdog and idle seats are not a crash-safe rescue plan.
+ // If this independent receiver dies after killing the last six Runner
+ // listeners but before it releases its install lease, Watchdog is paused.
+ // A separately proven recovery path MUST exist before any durable claim,
+ // intake pause, lease acquisition, or irreversible stop.
+ let rescueReady=false;
+ try{rescueReady=await port.verifyIndependentRecovery(request,baseline)===true;}
+ catch{/* Unverifiable rescue is a hard stop before any mutation. */}
+ if(!rescueReady)
+  return result('BLOCKED','S6_ONCE_CRASH_SAFE_RECOVERY_UNVERIFIED');
  // Claim is atomic, unique and durable: an uncertain write is NEVER
  // treated as a no-effect failure, even when the exception looks harmless.
  let claimed;
