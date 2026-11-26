@@ -33,6 +33,19 @@ const safeCode=x=>/^[A-Z][A-Z0-9_]{2,100}$/.test(String(x??''))?String(x):'HANDO
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const read=p=>JSON.parse(fs.readFileSync(p,'utf8'));
 const write=(p,x)=>{const tmp=p+'.'+randomUUID()+'.tmp';fs.writeFileSync(tmp,JSON.stringify(x,null,2)+'\n',{flag:'wx'});fs.renameSync(tmp,p);};
+// Deterministic single choice: an unresolved promotion blocks BOTH candidates.
+// The second candidate is a passive fallback, never an additional elector.
+export function selectStandbyCandidate(primary,secondary,{
+ dual=false,promotionPending=null
+}={}){
+ if(promotionPending)return null;
+ for(const candidate of dual?[primary,secondary]:[primary]){
+  if(candidate?.ready===true&&candidate.promoting===false&&
+    Number.isSafeInteger(candidate.child?.pid)&&candidate.child.pid>0)
+   return candidate;
+ }
+ return null;
+}
 export function alive(pid){if(!Number.isSafeInteger(pid)||pid<=0)return null;try{process.kill(pid,0);return true;}catch(e){return e.code==='ESRCH'?false:null;}}
 export function decide({paused,owner,live,heartbeat,now=Date.now()}){
  if(paused)return 'PAUSED';
@@ -340,46 +353,73 @@ export async function main(){
  write(path.join(lease,'owner.json'),{pid:process.pid,nonce,at:new Date().toISOString()});
  let history=fs.existsSync(path.join(home,'RESTART_HISTORY.json'))?read(path.join(home,'RESTART_HISTORY.json')):[];
  let healthySince=null;
+ // The second passive candidate is opt-in via a distinct, future approved
+ // INSTALL.json generation. Existing R4 ACTIVE_1_STANDBY_1 is unchanged.
+ const standby2Mode=installed.standby?.mode==='ACTIVE_1_STANDBY_2'&&
+  installed.standby?.approved===true;
+ const standbyMode=installed.standby?.approved===true&&
+  (installed.standby?.mode==='ACTIVE_1_STANDBY_1'||standby2Mode);
+ let standby=null,secondStandby=null,standbyStarts=[],secondStandbyStarts=[];
+ let promotionPending=null;
  const status=(state,extra={})=>write(path.join(home,'STATUS.json'),{
   at:new Date().toISOString(),pid:process.pid,state,
-  ...(installed.standby?.mode==='ACTIVE_1_STANDBY_1'&&installed.standby?.approved===true?
-   {standbyRole:standby?.ready?'READY':standby?.promoting?'PROMOTING':
-    standby?'STARTING':'UNVERIFIED',standbyPid:standby?.child?.pid??null}:{}),
+  ...(standbyMode?{
+   standbyRole:standby?.ready?'READY':standby?.promoting?'PROMOTING':
+    standby?'STARTING':'UNVERIFIED',standbyPid:standby?.child?.pid??null,
+   ...(standby2Mode?{
+    secondStandbyRole:secondStandby?.ready?'READY':secondStandby?.promoting?
+     'PROMOTING':secondStandby?'STARTING':'UNVERIFIED',
+    secondStandbyPid:secondStandby?.child?.pid??null,
+    standbyReadyCount:Number(standby?.ready===true)+Number(secondStandby?.ready===true)
+   }:{})
+  }:{}),
   ...extra});
- // Standby is opt-in only after an exact approved watchdog B install
- // has written this capability to INSTALL.json. Legacy recovery stays intact.
- const standbyMode=installed.standby?.mode==='ACTIVE_1_STANDBY_1'&&installed.standby?.approved===true;
- let standby=null,standbyStarts=[];
  function ensureStandby(){
-  if(!standbyMode||standby)return;
-  standbyStarts=standbyStarts.filter(t=>Date.now()-t<3600000);
-  if(standbyStarts.length>=3)return;
-  try{
-   const host=read(path.join(control,'host.json'));
-   if(!/^[a-f0-9]{64}$/.test(host.controllerFiles?.['controller/standby.mjs']??''))
-    throw Error('STANDBY_SOURCE_NOT_ATTESTED');
-   const sourceSha=verifyController();
-   const child=spawn(node,[path.join(control,'controller/standby.mjs')],{
-    cwd:control,windowsHide:true,stdio:['ignore','ignore','ignore','ipc'],
-    env:{...process.env,ZGMINI_WATCHDOG_NONCE:nonce,
-     ZGMINI_WATCHDOG_PID:String(process.pid)}
-   });
-   standbyStarts.push(Date.now());
-   const current={child,ready:false,promoting:false,sourceSha};
-   standby=current;
-   child.on('message',message=>{
-    if(standby!==current)return;
-    if(message?.type==='READY'&&message.pid===child.pid&&
-      message.sourceSha===sourceSha)current.ready=true;
-    if(message?.type==='PROMOTION_ATTEMPTED'&&message.pid===child.pid)
-     current.promoting=true; // Stay pinned until real Supervisor owner readback.
-    if(message?.type==='PROMOTION_BLOCKED'||message?.type==='PROMOTION_FAILED'){
-     current.ready=false;current.error=message.code??'STANDBY_PROMOTION_UNVERIFIED';
-    }
-   });
-   child.once('exit',()=>{if(standby===current)standby=null;});
-   child.once('error',()=>{if(standby===current)standby=null;});
-  }catch{status('BLOCKED_STANDBY_SETUP');}
+  if(!standbyMode||promotionPending)return;
+  // One Watchdog owns BOTH children. Every slot has its own 3/hour restart
+  // budget; the existing single-Standby slot retains its old ceiling.
+  for(const slot of (standby2Mode?[1,2]:[1])){
+   if(slot===1?standby:secondStandby)continue;
+   const recent=(slot===1?standbyStarts:secondStandbyStarts)
+    .filter(t=>Date.now()-t<3600000);
+   if(slot===1)standbyStarts=recent;else secondStandbyStarts=recent;
+   if(recent.length>=3)continue;
+   try{
+    const host=read(path.join(control,'host.json'));
+    if(!/^[a-f0-9]{64}$/.test(host.controllerFiles?.['controller/standby.mjs']??''))
+     throw Error('STANDBY_SOURCE_NOT_ATTESTED');
+    const sourceSha=verifyController();
+    const child=spawn(node,[path.join(control,'controller/standby.mjs')],{
+     cwd:control,windowsHide:true,stdio:['ignore','ignore','ignore','ipc'],
+     env:{...process.env,ZGMINI_WATCHDOG_NONCE:nonce,
+      ZGMINI_WATCHDOG_PID:String(process.pid)}
+    });
+    recent.push(Date.now());
+    const current={child,ready:false,promoting:false,sourceSha,slot};
+    if(slot===1)standby=current;else secondStandby=current;
+    const currentSlot=()=>slot===1?standby:secondStandby;
+    child.on('message',message=>{
+     if(currentSlot()!==current)return;
+     if(message?.type==='READY'&&message.pid===child.pid&&
+       message.sourceSha===sourceSha)current.ready=true;
+     if(message?.type==='PROMOTION_ATTEMPTED'&&message.pid===child.pid)
+      current.promoting=true;
+     if(message?.type==='PROMOTION_BLOCKED'||message?.type==='PROMOTION_FAILED'){
+      current.ready=false;current.error=message.code??'STANDBY_PROMOTION_UNVERIFIED';
+     }
+    });
+    child.once('exit',()=>{
+     if(currentSlot()===current){
+      if(slot===1)standby=null;else secondStandby=null;
+     }
+    });
+    child.once('error',()=>{
+     if(currentSlot()===current){
+      if(slot===1)standby=null;else secondStandby=null;
+     }
+    });
+   }catch{status('BLOCKED_STANDBY_SETUP');}
+  }
  }
  async function tick(){
   try{
@@ -391,16 +431,30 @@ export async function main(){
     ||fs.readdirSync(path.join(control,'leases')).some(x=>x!=='supervisor'&&!x.startsWith('supervisor.dead-'));
    const state=decide({paused,owner,live:owner?alive(owner.pid):false,heartbeat:hb?.pid===owner?.pid?hb?.at:null});
    if(state==='HEALTHY'){
-    // Promote proof is the real Supervisor lease + fresh heartbeat, not IPC.
-    if(standbyMode&&standby?.promoting&&standby.child.pid===owner.pid)
-     standby=null; // The promoted child is Active; rearm one new passive candidate.
+    // A single pending promotion must be confirmed by the *real* Supervisor
+    // lease and fresh heartbeat before either standby slot can rearm.
+    if(standbyMode&&promotionPending){
+     if(promotionPending.child.pid!==owner.pid){
+      status('BLOCKED_STANDBY_PROMOTION_OWNER_UNVERIFIED',{
+       supervisorPid:owner.pid,heartbeatAt:hb.at});return;
+     }
+     if(promotionPending.slot===2)secondStandby=null;
+     else standby=null;
+     promotionPending=null;
+    }
     healthySince??=Date.now();
     if(Date.now()-healthySince>600000&&history.length){history=[];write(path.join(home,'RESTART_HISTORY.json'),history);}
     status(state,{supervisorPid:owner.pid,heartbeatAt:hb.at});return;
    }
    healthySince=null;
    if(state!=='RECOVER'){status(state,{supervisorPid:owner?.pid??null,heartbeatAt:hb?.at??null});return;}
-   if(standbyMode&&(!standby||!standby.ready||standby.promoting)){
+   // No fallback while an earlier promotion has an unknown outcome.
+   if(standbyMode&&promotionPending){
+    status('BLOCKED_STANDBY_PROMOTION_OUTCOME_UNKNOWN');return;
+   }
+   const candidate=standbyMode?selectStandbyCandidate(standby,secondStandby,
+    {dual:standby2Mode,promotionPending}):null;
+   if(standbyMode&&!candidate){
     status('BLOCKED_STANDBY_NOT_READY');return;
    }
    if(standbyMode&&!verifiedColdStandbyStart({owner,heartbeat:hb})&&
@@ -425,8 +479,8 @@ export async function main(){
    const archived=archiveDeadLease(path.join(control,'leases/supervisor'),alive,path.join(home,'archives','supervisor-'+Date.now()+'-'+randomUUID()));
    history.push(Date.now());write(path.join(home,'RESTART_HISTORY.json'),history);
    if(standbyMode){
-    const candidate=standby;
     candidate.promoting=true;candidate.ready=false;
+    promotionPending=candidate;
     try{
      candidate.child.send({type:'PROMOTE',oldChildrenStopped:true},error=>{
       if(error)status('BLOCKED_STANDBY_IPC_DELIVERY_UNKNOWN');
