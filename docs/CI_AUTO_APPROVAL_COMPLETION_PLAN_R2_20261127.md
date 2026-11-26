@@ -490,3 +490,24 @@
 2. **현재 필수 원인 관측:** 기존 공식 경로에서 6개 `zgmini-pc-0{1..6}` 등록·Online/Busy 및 현장 Watchdog/Supervisor S6 journal phase, 승인된 Native Scope/proof·정확 설치 SHA 확인. 운영 PC 연결이 없어 A Run 재발행/격리 Runner로 PC 실행 대체 금지.
 3. **CI 권한 활성화:** 현재 Actions vars와 실제 Owner-승인 business grant/independent B policy installer의 정확 원문을 대조한다. 이전 UI false/absent와 CI skipped를 원인 후보로 구분한다. 새 권한·보안 변경은 승인 없는 설정 변경 금지.
 4. 권한과 실행기가 검증된 효과만 자연 CI→단회 dispatch→PC A/Writer B/Controller B→JSON/TXT 원본 readback. **무인 실운영 완료 0/3**을 유지한다. 각 고유 효과는 독립적으로 다음 단계 진행.
+
+## 20. 열여섯 번째 실행 기록 — 격리 Publisher 정책 경로 불일치 확인 (2026-11-27 KST)
+
+### 근거와 실패 조건
+
+- 최신 main `5b8c751d4c8b711797c36b1a461b543abc11298e`, Native Publisher는 분리된 물리 PC의 `zgmini-handoff-ci-isolated` Runner에서 실행한다. 실적: 격리 `zgmini-handoff-ci-spare-01` C996 Job [45888855342](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45888855342) PASS.
+- 그런데 `ci-approval/native-publisher-entry.mjs::main`은 `readNativeScope(effect)`와 `readNativeInstalledProof(effect)` 기본 경로를 그대로 호출하여 **운영 PC용 `E:\\ZGmini\\data\\pc-writer\\ci-native`**를 격리 PC에서 찾는다. `docs/PC_OPERATING_SYSTEMS_CANONICAL.md` 2026-11-12 원본 실측에서 격리 장비에는 `E:\\ZGmini` 운영 루트가 없음. **현재 2026-11-27의 해당 경로가 여전히 없는지 현장 재실측은 불가**; 이전 장비 구조와 최신 소스 기본값의 불일치는 확정.
+- 실제 C급 영수증 저장소는 격리 PC의 기존 `C:\\ProgramData\\ZGMINI-CI\\ControllerBReceipts`에서 2026-11-26 승인된 독립 파일 [#3925](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3925) write 및 [#3926](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3926) 다음 Run readback PASS 이력이 있다. 이는 **CI Native 전용 scope/proof 설치나 Controller B 활성화 증명이 아니다**.
+
+### 최소 소스 수정 — PR #4089
+
+- 대상 브랜치 `codex/ci-native-isolated-policy-root-20261127`. [PR #4089](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4089), 정확 최초 HEAD `d265e6c01a82293555584f06c8ad03a13b08643f`.
+- 격리 Publisher의 Owner-B 승인 Scope/Proof read-only 위치를 **별도 사전 준비된 `ZGMINI_CI_NATIVE_SCOPE_ROOT`**로 받는다. 기존 쓰기 가능한 영구 단회 발행 영수증 `ZGMINI_CI_NATIVE_RECEIPT_ROOT`는 그대로 사용하고, 두 root의 같음·상하위 포함·symlink/reparse·실경로 치환·TEMP/Runner Checkout policy 위치를 거부. 디렉터리 자동 생성·파일 복제·새 승인 원본 생성 없음.
+- 모든 B 증명 보호(`nativePolicySha256`, 완료 영수증 `requestId/effect/actualControllerSha/protectedStateUnchanged` 일치) 및 업무 승인 byte hash, 독립 workflow/run/blob 검사는 유지. 기존 Controller/Writer 효과·Runner 라벨·실행 옵션·데이터 변경 0.
+- `tests/ci-native-publisher-entry.test.mjs`: 두 effect 격리 local scope+proof readback, 사용하지 않는 receipt root, 정책 위치 겹침·임시/미존재/root 없는 경우 거부, workflow disabled opt-in 회귀 추가. 정확 HEAD CI [Windows Source 45890326250](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45890326250), [C996 45890326238](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45890326238), [Secret Scan 45890326194](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45890326194), 최초 관측 queued/in_progress로 **병합 전**.
+
+### 다음 실제 완료 의존성
+
+1. #4089 정확 HEAD CI 3/3을 확인하여 source 실패 시 원인 최소 정정, 성공 시 main 병합 및 3파일 readback. 사전 승인 없는 runtime 설치로 해석 금지.
+2. **별도 격리 PC의 Native 읽기 전용 정책·B-installed proof 위치와 파일 바이트/권한/출처**를 실제 독립 승인 경로에서 설치하고 `ZGMINI_CI_NATIVE_SCOPE_ROOT` 설정; 새 보안 권한/수동 관리자 변경은 별도 승인 없이 자동 수행하지 않는다. 기존 receipt root 영수증 파일을 정책 원본으로 승격하지 않는다.
+3. 운영 PC 6 Runner 현재 실제 Online·Busy/Watchdog/S6 journal readback은 여전히 공식 조회 미지원, 기존 `#4080` queued 요청을 재발행하지 않음. A/Writer B/Controller B 실제 무인 종단 완료 **0/3**.
