@@ -348,3 +348,10 @@
 1. #4085와 #4086 각각 현재 정확 HEAD CI 3/3 결과 회수 및 성공 시 정규 병합 후 main readback. CI 대기는 중복 재실행·Gate 삭제 없이 원래 Run을 재조회.
 2. 실제 승인된 native policy·B 명세와 독립 설치 Scope/proof의 설치 여부를 현재 PC 정규 읽기 경로에서 확인한다. #4086의 source producer 구현은 실제 승인 manifest/정규 B 설치/현재 GitHub 변수 활성화가 아니다.
 3. 권한이 확인된 A/Writer B/Controller B의 자연 CI 무인 작업과 결과 JSON/TXT, SHA 및 중복 효과 0 검증. **실제 운영 완료율 0/3 유지**.
+
+### #4085 완료 반영 — 정확 HEAD CI 및 main 읽기 확인
+
+- #4085 HEAD `79cf7661e4e3c3fa3b6969ef4a71eea8d0e1fe54`의 C996 [45886304905](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45886304905), Windows Source [45886304836](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45886304836), Secret Scan [45886304824](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45886304824): 모두 **SUCCESS 3/3**.
+- #4085 정규 merge SHA **`f4a1152f77419a5737fd3b8ba167c3481a99a8e6`**, latest main 일치. `ci-approval/native-a-execute.mjs` blob `82980e54423bf99d65212324489d757205bfeb1f`, `tests/ci-native-a-execute.test.mjs` blob `b4584e1a06357b5d54fbd0efa6a221faee86b251` readback 완료.
+- 병합은 **A 결과 증명 소스 검증 완료**이고 native scope 설치·활성화 및 실제 PC 무인 완료가 아니다.
+- PR #4086 최신 HEAD는 `0a586c1416cf27180a9071ddd71be579ceb5cf60`. 선행 main 이동은 다른 병합을 보존하여 검증하고, 정확 HEAD CI 완료 이전 병합하지 않는다.
