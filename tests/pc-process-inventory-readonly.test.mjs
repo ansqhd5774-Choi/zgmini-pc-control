@@ -3331,3 +3331,113 @@ test('exact Controller B installed-policy CAS A uses one fixed operating-only pr
   assert.doesNotMatch(JSON.stringify(result),/PRIVATE|TOKEN|E:\//i);
  }
 });
+
+import {projectS6PreDrainInputsReadonly,inspectS6PreDrainInputsReadonly}
+ from '../tools/pc-process-inventory-readonly.mjs';
+
+test('S6 PRE_DRAIN fixed probe only authenticates operating A without custom commands or scope',()=>{
+ const e=event(),body=JSON.parse(e.issue.body),
+  probe='controller-s6-predrain-inputs-readonly';
+ const scoped={...e,issue:{...e.issue,body:JSON.stringify({...body,probe})}};
+ assert.equal(authenticateProcess(scoped,env,'operating').s6PredrainInputs,true);
+ assert.throws(()=>authenticateProcess(scoped,env,'handoff'));
+ for(const extra of [
+  {path:'E:/private'}, {requestIdTarget:'pc-s6-something'},
+  {workflow:'other.yml'},{probe:probe+';taskkill'}, {status:'queued'}
+ ]){
+  assert.throws(()=>authenticateProcess({...e,issue:{...e.issue,
+   body:JSON.stringify({...body,probe,...extra})}},env,'operating'));
+ }
+});
+
+test('S6 PRE_DRAIN A distinguishes lease and three workflow counts without granting B',()=>{
+ const check=(leases,counts)=>projectS6PreDrainInputsReadonly({
+  relatedLeaseCount:leases,workflowCounts:counts
+ },Date.parse('2026-11-27T00:00:00Z'));
+ const empty={in_progress:0,queued:0,waiting:0};
+ const idle=check(0,empty);
+ assert.equal(idle.status,'PASS');
+ assert.equal(idle.inputClearAtObservation,true);
+ assert.equal(idle.bAuthorization,false);
+ assert.equal(idle.replayAuthorized,false);
+ assert.equal(idle.historicalBlockerIdentified,false);
+ assert.equal(idle.operationalWrites,0);
+ for(const [leases,counts] of [
+  [2,empty],[0,{in_progress:1,queued:0,waiting:0}],
+  [0,{in_progress:0,queued:3,waiting:0}],
+  [0,{in_progress:0,queued:0,waiting:2}],
+  [1,{in_progress:0,queued:1,waiting:0}]
+ ]){
+  const o=check(leases,counts);
+  assert.equal(o.status,'PASS');
+  assert.equal(o.inputClearAtObservation,false);
+  assert.equal(o.relatedLeaseCount,leases);
+  assert.equal(o.pendingWorkCount,counts.in_progress+counts.queued+counts.waiting);
+ }
+ const missing=check(0,{in_progress:0,queued:0});
+ assert.equal(missing.status,'STATE_UNKNOWN');
+ assert.equal(missing.workflowCounts.waiting,null);
+ assert.equal(missing.pendingWorkCount,null);
+ assert.equal(missing.inputClearAtObservation,null);
+ assert.equal(check(null,empty).status,'STATE_UNKNOWN');
+ assert.equal(check(-1,empty).status,'STATE_UNKNOWN');
+ assert.equal(check(0,{...empty,waiting:-2}).status,'STATE_UNKNOWN');
+});
+test('S6 PRE_DRAIN A inspects only fixed lease directory and three literal API GETs',()=>{
+ const invocations=[],now=Date.parse('2026-11-27T00:00:00Z');
+ const root='E:/ZGmini/automation/pc-control/leases';
+ const fakeFs={lstatSync(p){
+  assert.equal(p,root);
+  return{isDirectory:()=>true,isSymbolicLink:()=>false};
+ },readdirSync(p){
+  assert.equal(p,root);
+  return['supervisor','supervisor.dead-2026','runner-06','w06-work'];
+ }};
+ const fakeRun=(exe,args,options)=>{
+  invocations.push({exe,args,options});
+  assert.equal(exe,'C:/Program Files/GitHub CLI/gh.exe');
+  assert.deepEqual(args.slice(0,3),['api','-X','GET']);
+  assert.equal(options.env.GH_TOKEN,'PRIVATE_GITHUB_TOKEN');
+  const state=new URL('https://github.invalid/'+args[3]).searchParams.get('status');
+  const counts={in_progress:0,queued:5,waiting:0};
+  assert.ok(Object.hasOwn(counts,state));
+  return{status:0,stdout:JSON.stringify({total_count:counts[state],workflow_runs:[]})};
+ };
+ const value=inspectS6PreDrainInputsReadonly({
+  filesystem:fakeFs,run:fakeRun,env:{GITHUB_TOKEN:'PRIVATE_GITHUB_TOKEN'},now
+ });
+ assert.equal(value.status,'PASS');
+ assert.equal(value.relatedLeaseCount,2);
+ assert.equal(value.pendingWorkCount,5);
+ assert.deepEqual(value.workflowCounts,{in_progress:0,queued:5,waiting:0});
+ assert.equal(value.inputClearAtObservation,false);
+ assert.equal(invocations.length,3);
+ assert.deepEqual(invocations.map(x=>x.args[3]),[
+  'repos/ansqhd5774-Choi/zgmini-pc-control/actions/workflows/pc-job.yml/runs?status=in_progress&per_page=1',
+  'repos/ansqhd5774-Choi/zgmini-pc-control/actions/workflows/pc-job.yml/runs?status=queued&per_page=1',
+  'repos/ansqhd5774-Choi/zgmini-pc-control/actions/workflows/pc-job.yml/runs?status=waiting&per_page=1'
+ ]);
+ assert.doesNotMatch(JSON.stringify(value),/PRIVATE_GITHUB_TOKEN|runner-06|w06-work/);
+ const missing=inspectS6PreDrainInputsReadonly({
+  filesystem:fakeFs,run:fakeRun,env:{GITHUB_TOKEN:''},now
+ });
+ assert.equal(missing.status,'STATE_UNKNOWN');
+ assert.equal(missing.relatedLeaseCount,2);
+ assert.equal(missing.pendingWorkCount,null);
+ assert.equal(missing.inputClearAtObservation,null);
+ const fail=inspectS6PreDrainInputsReadonly({
+  filesystem:{lstatSync(){throw Error('PRIVATE_PATH');}},run:()=>({
+   status:1,stdout:'SECRET_OUTPUT'
+  }),env:{GITHUB_TOKEN:'PRIVATE_GITHUB_TOKEN'},now
+ });
+ assert.equal(fail.status,'STATE_UNKNOWN');
+ assert.equal(fail.relatedLeaseCount,null);
+ assert.equal(fail.pendingWorkCount,null);
+ assert.doesNotMatch(JSON.stringify(fail),/PRIVATE_PATH|SECRET_OUTPUT|PRIVATE_GITHUB_TOKEN/);
+ const contract=fs.readFileSync(new URL('../tools/update.mjs',import.meta.url),'utf8');
+ assert.ok(contract.includes("x!=='supervisor'&&!x.startsWith('supervisor.dead-')"));
+ assert.ok(contract.includes("['in_progress','queued','waiting']"));
+ const workflow=fs.readFileSync(new URL('../.github/workflows/pc-process-inventory-readonly.yml',
+  import.meta.url),'utf8');
+ assert.match(workflow,/operating-process-snapshot:\s*permissions:\s*contents: write\s*issues: write\s*actions: read/);
+});
