@@ -716,3 +716,22 @@
 4. 세 효과 모두 승인·발행·실제 실행이 관측된 경우에만 실운영 분자를 증가시킨다. 현시점 **실제 CI 무인 종단 0/3 (0%)**. 신규 PC 운영 쓰기/보안 설정 변경/Runner 재설치/새 예약 0.
 
 **판정:** 진단으로 추가된 것은 특정 파일럿의 승인 증명 구현과 사용자 결정의 불일치다. 소스 교정·운영 설정 연결·신규 무인 실증은 각각 미완료이며, 현재 확인된 정보만으로 임의 정책을 발행하지 않는다.
+
+## 28. 스물네 번째 실행 기록 — 기존 Owner 병합 승인 경로 재확인 및 불필요한 소스 교정 제외 (2026-11-27 KST)
+
+### 실제 소스·테스트 경로 재확인 — §27의 과대 분류 정정
+
+- §27의 "`delegationPin` 요구"는 **CI가 스스로 승인 PR을 생성/병합한 경로**에만 해당한다. 이를 Controller B 자동화 전체 또는 기존 Owner 승인 B 요청의 공통 필수조건으로 표현한 것은 범위가 지나쳤다.
+- 현재 `tools/maintenance-request.mjs::submitExistingControllerApprovalFromCi`는 실제 승인 PR의 `merged_by`가 Owner로 확인되는 경우, `resolveControllerApprovalCI`를 사용해 기존 승인 source CI·정확 manifest·병합 provenance를 검증하고 **수동 Owner-native 위임 댓글/인증 pin 없이** 기존 요청 제출 경로로 진행한다. bot-merged approval PR은 별도 `readAutoApprovalContext`와 독립 `delegationPin` 검증을 유지한다. **이 구분은 신규 권한 우회가 아니다.**
+- `tests/maintenance-request.test.mjs`의 `workloadPublisherFixture` 및 첫 `CI publisher creates exact existing B request once` 테스트는 Owner-merged PR을 사용하고 `readAutoApprovalContext` 없이 `REQUEST_READBACK_VERIFIED`·단회 등록·동일 효과 `EXISTING_REQUEST_REUSED`를 검사한다. 이미 유효한 테스트이므로 새로운 동등 테스트/소스 변경을 만들지 않는다.
+- [#4038](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4038)의 수동 Owner 댓글 필수화 철회는 이 기존 Owner-merged 경로와 양립한다. bot-merged 경로의 독립 승인 검사를 단지 불편하다는 이유로 삭제하지 않는다.
+- [#4036](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4036) B는 이미 `SUCCEEDED`/원격 JSON·TXT 완료되어 **새 CI 무인 발행 실증으로 재사용하지 않는다**. 최신 [PR #4130](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4130)은 **Writer B 승인 명세 source-only `main` 병합**이다. 원본 R2 설치 경로·Owner·운영 lease는 원담당 범위에 남으며, 해당 PR 병합을 CI native Writer B 발행/설치 PASS로 계산하지 않는다.
+
+### 현재 실제 미연결과 다음 단계
+
+1. **Native A/Writer B:** 이미 완료된 [#4113](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4113) 실제 격리 조회에서 scope/receipt root 모두 미설정, 4개 opt-in 플래그 모두 유효한 활성값 없음. 설치된 독립 B receipt/승인 request·approval 원본은 루트가 없어 미관측. 먼저 **기존 인가된 설치 원본·proof가 있는지** 정규 경로에서 확인하고, 증명 없는 policy 파일 생성이나 단순 `true` 변경을 하지 않는다.
+2. **Controller B:** [#4100](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4100) 현 설치 Receiver 정책 CAS PASS 재사용. [#4117](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4117)의 독립 격리 환경은 `ENABLED=false`, 정책 empty (Job 로그 관측), 고유 JSON/TXT는 ref 경합으로 미발행. 기존 [#4125](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4125) source 수정 병합은 이 원본 결과를 소급 완료하지 않는다. 새로운 기존 승인·미실행 비즈니스 효과, 정규 CI Publisher 인증 및 독립 영구 영수증 root가 있는 경우에만 전용 변경/활성화 범위를 판단한다.
+3. **작업 선택 수정:** 이미 존재하는 Owner-merged 승인 검증 코드를 재작성하는 PR은 생성하지 않는다. 신규 CI 승인/설치/보안 권한 없이 원본이 미충족된 경우에는 그 효과에만 `AUTOMATION_BLOCKED`를 적용하고, 다른 승인 업무를 중지시키지 않는다. Owner-native 댓글 #4038의 재개, #4036/#4117 재실행, 기존 GitHub 예약 변경 금지.
+
+**현행 실제 무인 CI→발행→PC 효과→원격 영수증: A/Writer B/Controller B 0/3 (0%).** 이번 실행은 소스 경로 판별과 원장 정정이며 운영 변수·보안 설정·업무 파일/DB/D1/Task·요청 중복 생성 0건.
+
