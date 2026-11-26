@@ -37,6 +37,9 @@ export function projectW06HttpChecksReadonly(rows,{observedAtMs}={}){
   sinceInstallReadbackGapSampleCount:null,sinceInstallReadbackMedianGapSeconds:null,
   sinceInstallReadbackMaxGapSeconds:null,sinceInstallReadbackGapsOver90Seconds:null,
   sinceInstallReadbackRecentIntervalsSeconds:null,
+  sinceInstallLongGapPreviousOutcomeCounts:null,
+  sinceInstallLongGapSlowPreviousCount:null,
+  sinceInstallRecentLongGapContexts:null,
   providerCalls:0,sqliteWrites:0,d1Writes:0};
  if(!Number.isSafeInteger(observedAtMs)||observedAtMs<=CNN_ACTIVATED_UTC||
   !Array.isArray(rows)||rows.length>2)return empty;
@@ -84,6 +87,21 @@ export function projectW06HttpChecksReadonly(rows,{observedAtMs}={}){
   sortedInstallGaps.length%2?sortedInstallGaps[(sortedInstallGaps.length-1)/2]:
   (sortedInstallGaps[sortedInstallGaps.length/2-1]+
    sortedInstallGaps[sortedInstallGaps.length/2])/2:null;
+ // Identify the preceding HTTP result for every >90s gap. Correlation only:
+ // this cannot prove a cooldown, competing Task, Core lease or scheduler skip.
+ // Return bounded categorical evidence without any raw private HTTP contents.
+ const outcomes={VERIFIED:0,FETCH_FAILED:0,HTTP_FAILED:0,INVALID_OUTPUT:0};
+ let slowPrevious=0;
+ const contexts=[];
+ for(let i=0;i<installGaps.length;i++){
+  if(installGaps[i]<=90)continue;
+  const prior=installed[i],next=installed[i+1];
+  const duration=Math.round((prior.checkedAt-prior.requestedAt)/1000);
+  outcomes[prior.outcome]++;
+  if(duration>90)slowPrevious++;
+  contexts.push({intervalSeconds:installGaps[i],previousOutcome:prior.outcome,
+   previousHttpDurationSeconds:duration,nextOutcome:next.outcome});
+ }
  return {...empty,status:'READ',code:'CNN_HTTP_LOCAL_2DAY_READ',
   twoDayCount:checks.length,
   afterActivationCount:checks.filter(x=>x.checkedAt>=CNN_ACTIVATED_UTC).length,
@@ -112,7 +130,10 @@ export function projectW06HttpChecksReadonly(rows,{observedAtMs}={}){
   sinceInstallReadbackMedianGapSeconds:installMedian,
   sinceInstallReadbackMaxGapSeconds:sortedInstallGaps.at(-1)??null,
   sinceInstallReadbackGapsOver90Seconds:installGaps.filter(x=>x>90).length,
-  sinceInstallReadbackRecentIntervalsSeconds:installGaps.slice(-12)};
+  sinceInstallReadbackRecentIntervalsSeconds:installGaps.slice(-12),
+  sinceInstallLongGapPreviousOutcomeCounts:outcomes,
+  sinceInstallLongGapSlowPreviousCount:slowPrevious,
+  sinceInstallRecentLongGapContexts:contexts.slice(-12)};
 }
 export function inspectW06HttpChecksReadonly({filesystem=fs,connect=p=>
  new DatabaseSync(p,{readOnly:true,timeout:1000}),clock=Date.now}={}){
