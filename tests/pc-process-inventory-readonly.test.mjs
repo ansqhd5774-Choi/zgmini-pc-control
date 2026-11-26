@@ -3264,9 +3264,44 @@ test('S6 original receiver #3947 and distinct one-shot claim correlate without r
  assert.equal(badReader.status,'STATE_UNKNOWN');
  assert.doesNotMatch(JSON.stringify(badReader),/PRIVATE_LOCAL_PATH/);
 });
-import {projectS6OnceJournalReadonly,
+import {projectS6OnceJournalReadonly,projectS64078BacklogReadonly,
  inspectS6OnceJournalReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 
+test('S6 #4069 fixed original #4078 pause and replay status are read-only and never assert A execution',()=>{
+ const requestId='pc-s6-63afb126-72dc-4ec5-a721-4819771fa9ee';
+ const start='2026-11-26T19:12:40Z',resume='2026-11-26T19:20:11Z';
+ const backlog={schema:'ZGMINI_PC_BACKLOG_V1',requestId,
+  pausedAt:start,resumedAt:resume,
+  windows:[{pausedAt:start,resumedAt:resume}],replays:{}};
+ const proj=projectS64078BacklogReadonly(backlog);
+ assert.equal(proj.pauseWindowContainsIssueOpenedAt,true);
+ assert.equal(proj.replayLedgerStatus,'NOT_RECORDED');
+ assert.equal(proj.windowCount,1);
+ assert.equal(proj.executionEstablished,false);
+ assert.equal(projectS64078BacklogReadonly({...backlog,
+  windows:[{pausedAt:'2026-11-26T19:16:00Z',resumedAt:resume}]}).
+  pauseWindowContainsIssueOpenedAt,false);
+ assert.equal(projectS64078BacklogReadonly({...backlog,replays:{
+  '4078':{status:'POSTING',privateNonce:'SECRET_PRIVATE_DATA'}}}).
+  replayLedgerStatus,'POSTING');
+ assert.equal(projectS64078BacklogReadonly({...backlog,replays:{
+  '4078':{status:'DONE',replayIssueNumber:999999}}}).executionEstablished,false);
+ assert.equal(projectS64078BacklogReadonly({...backlog,
+  windows:[{pausedAt:start,resumedAt:null}]}).pauseWindowContainsIssueOpenedAt,null);
+ assert.equal(projectS64078BacklogReadonly({...backlog,requestId:'other'}).replayLedgerStatus,'UNVERIFIED');
+ const raw={approvalValid:true,ownerByteMatch:false,claimPresent:true,claimValid:true,
+  journal:{schema:'ZGMINI_S6_ONCE_JOURNAL_V1',requestId,phase:'RECOVERY_REQUIRED'},
+  backlog};
+ const observed=projectS6OnceJournalReadonly(raw,{scope:'CURRENT'});
+ assert.equal(observed.status,'READ_ONLY_OBSERVED');
+ assert.deepEqual(observed.backlog4078,proj);
+ assert.equal(observed.successEstablished,false);
+ assert.equal(observed.recoveryAuthorized,false);
+ assert.equal(observed.originalRequestRetried,false);
+ assert.equal(observed.operationalWrites,0);
+ assert.equal(projectS6OnceJournalReadonly(raw,{scope:'ORIGINAL'}).status,'STATE_UNKNOWN');
+ assert.doesNotMatch(JSON.stringify(observed),/SECRET_PRIVATE_DATA|nonce|token|ownerPid|privatePath/i);
+});
 test('S6 #3947 journal A uses only fixed operating scope, no arbitrary command or effect',()=>{
  const e=event(),b=JSON.parse(e.issue.body);
  const scoped={...e,issue:{...e.issue,body:JSON.stringify({...b,
