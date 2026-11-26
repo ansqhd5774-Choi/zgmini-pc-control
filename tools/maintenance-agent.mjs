@@ -281,6 +281,15 @@ export function normalizedResult(request,result,code){
     :["SUCCEEDED","FAILED","BLOCKED","UNKNOWN"].includes(from.status)
       ?from.status:"UNKNOWN";
   const inventory=safeR54SourceInventory(request,from);
+  // Delivery reconstructs the report from the durable, already normalized
+  // request ledger. Preserve only the bounded S6 state across both passes.
+  const s6Stage=from.schema==='ZGMINI_S6_ONCE_RESULT_V1'?from.status:
+    from.schema==='ZGMINI_PC_MAINTENANCE_RESULT_V1'?from.s6ExecutionStatus:null;
+  const s6State=request.operation===S6_ONCE_OPERATION&&
+    from.requestId===request.requestId&&
+    ['POSTCHECK_PENDING','RECOVERY_REQUIRED','STATE_UNKNOWN','BLOCKED'].includes(s6Stage)
+      ?s6Stage:null;
+  const s6Phase=from.s6LastPhase??from.lastPhase;
   return {
     schema:"ZGMINI_PC_MAINTENANCE_RESULT_V1",
     requestId:request.requestId,targetControllerSha:request.targetControllerSha,
@@ -303,14 +312,11 @@ export function normalizedResult(request,result,code){
       isSha(from.recoverySha)&&from.recoverySha===from.actualInstalledSha
        ?'PREVIOUS_VERSION_VERIFIED':'UNVERIFIED'}:{}),
     ...(inventory?{sourceInventory:inventory}:{}),
-    ...(request.operation===S6_ONCE_OPERATION&&
-       from.schema==='ZGMINI_S6_ONCE_RESULT_V1'&&
-       from.requestId===request.requestId&&
-       ['POSTCHECK_PENDING','RECOVERY_REQUIRED','STATE_UNKNOWN','BLOCKED'].includes(from.status)
-      ?{s6ExecutionStatus:from.status,
-        s6LeaseReleaseAcknowledged:from.leaseReleaseAcknowledged===true,
-        s6LastPhase:typeof from.lastPhase==='string'&&
-          /^[A-Z0-9_]{1,64}$/.test(from.lastPhase)?from.lastPhase:null}:{}),
+    ...(s6State?{s6ExecutionStatus:s6State,
+        s6LeaseReleaseAcknowledged:from.leaseReleaseAcknowledged===true||
+          from.s6LeaseReleaseAcknowledged===true,
+        s6LastPhase:typeof s6Phase==='string'&&
+          /^[A-Z0-9_]{1,64}$/.test(s6Phase)?s6Phase:null}:{}),
     ...((status==='SUCCEEDED'||
        (from.failureOperation==='stopOwnSupervisor'&&
         (from.code==='RUNNERS_NOT_IDLE'||from.originalFailureCode==='RUNNERS_NOT_IDLE')))
