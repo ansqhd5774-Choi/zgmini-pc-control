@@ -957,3 +957,31 @@
 
 **종료:** 실제 무인 CI→PC 효과→원격 readback **0/3 (0%)**. 소스 병합 1, 운영 승인/변경·PC 잡·B 실행·DB/D1/Reader/Writer/Runner 변경 0건.
 
+## 37. 서른세 번째 실행 기록 — Owner 승인 보류 및 R6 Supervisor 부분 장애 보호 (2026-11-27 KST)
+
+### 사용자 최신 명시 지시 — 기존 Controller B 정책 승인 보류 (이전 재개 계획 교체)
+
+- **Controller B 정책 교체의 신규 Owner 승인은 보류**. 기존 실행 B/C 승인 또는 `작업해라`를 이번 정책 전환으로 확대하지 않는다. 기존 정책·운영 설치 파일·Runner 6개·Watchdog·lease·Supervisor·Controller/Writer/DB/D1·GitHub Actions 활성화 변수는 변경 금지. 운영 PC 요청/재활성화/기존 효과 재실행 금지. `approved:true` 명세 및 승인 Issue를 생성하지 않는다.
+- 정책 검토 재개 전 3가지 **모두** 독립 Runtime 원본으로 확보: (1) Supervisor 실제 alive/fresh/children ownership 정상 복구, (2) R6 Watchdog HEALTHY·현행 owner/nonce와 fresh health 확인, (3) Standby IPC **2개 READY 2/2**. 이 조건 충족은 자동 승인이나 설치 허가가 아니며, 이후 **정확 정책 범위/현행 installed source 및 raw manifest SHA256 CAS·9개 소스·lease/backup**를 *다시 검토*하고 사용자 새 명시 B 승인을 받아야 한다.
+
+### R6 운영 증거 구분 — 원본 3건 재조회 (신규 PC A 발행 없음)
+
+- [#4157 / Run 45907705042](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45907705042), 결과 JSON Git blob `785112f22f09ca070734b90743e15f0c381c0c65`: `naturalRestartObserved=true, watchdogOwnerVerified=true`로 R6 Watchdog 신규 Owner는 관측되지만 `status=STATE_UNKNOWN,watchdogHealthState=BLOCKED_OLD_RUNNER_EXECUTABLE_UNVERIFIED,activeSupervisorVerified=false,standbyReadyCount=0`. READY 0/2은 진단의 READY 증명 실패이며 전체 Standby 프로세스 부재 증거로 해석 금지.
+- [#4158 / Run 45907709067](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45907709067), Git blob `ed5792934c81e3de80d97497f7d50c96934d9d73`: 외부 `PASS/PROCESS_INVENTORY_COLLECTED`와 무관하게 `maintenance.runtimeSignals.supervisorAlive=false,supervisorFresh=false,supervisorChildrenVerified=false,runnerSetOnline=true`; `automationState=PARTIAL_OR_UNVERIFIED`. Runner 6 Online만으로 Supervisor HEALTHY를 입증하지 않는다.
+- [#4159 / Run 45908087228](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45908087228), Git blob `9bd3f617ed9411ec9a968f7f9a3f78fb9358a9d1`: WMI Controller Listener 6개, Worker 1개, 별도 Session0 unknown path 1개로 `STATE_UNKNOWN/STANDBY_WMI_EXECUTABLE_PATH_UNVERIFIED`. 보호된 실행 파일/서비스 기원 미입증 항목을 고치려고 프로세스 종료·lease 초기화 금지.
+- [#4156](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4156) 원본 R6 Guardian 단회 ACTIVATE는 `STATE_UNKNOWN/WATCHDOG_ACTIVATION_NEW_PROCESS_NOT_CONFIRMED`; 이후 A에서 새 R6 Watchdog 관측됨. 승인 없는 повтор ACTIVATE나 동작 재시도 절대 금지. Supervisor 중단 원인/시각/인과관계는 여기서 단정하지 않는다.
+
+### 완료된 비운영 소스 작업과 보류 원장
+
+- 기존 [PR #4152](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4152) 본문에 Owner 승인 보류, Supervisor/R6/READY2 독립 증명, 재개 시 새 CAS/범위·Owner 승인 조건, 운영 불변을 명시. 정확 HEAD `b8756c349043616a8d96de2bc1735537f37ebc46`, `Draft/open/unmerged`. Production Workflow Git blob 기존 `27e48ecde81bdf6f15cccffcffd9b3e70482a5f3` 불변.
+- 현행 미승인 원본 `proposals/maintenance-handoffs/905c0b1806a3988f39400dc82536fd753b9ff764.json`은 `approved:false`. 별도 소스 브랜치 `codex/pc-automation-process-controller-b-hold-r6-20261127`와 [Draft PR #4160](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4160)에 `approvalHold.state=USER_DEFERRED,authorization=NONE` 기록. 3가지 회복 선행조건·후속 정책 재검토/Owner 승인, 변경 금지/기존 효과 재실행 금지, 원본 run 참조 포함. 기존 승인 파일 `approvals/`, 프로덕션 Workflow, B 설치 source/manifest, lease, S6 진행 원장 일체 불변.
+- 원본 test `tests/ci-controller-b-policy-only-proposal.test.mjs`에서 **두 개 source-only 회귀시험** 추가: (1) R6 복구 주장·`approvalHold=REVIEW_ELIGIBLE`를 해도 `approved:false`가 공식 인계를 `HANDOFF_APPROVAL_REQUIRED`로 거부함; (2) 기존 R6 JSON 3건을 읽어 A 수집 PASS/Runner 6 Online과 Supervisor/R6 HEALTHY/READY2를 구분함. 보호 runtime 파일/버전/산식/DB/D1/Controller 원본 수정 없음.
+- [PR #4160](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4160) exact source HEAD `540bc25f025bd559cb1ea3c28f6cdb342ae303ae`, diff **2파일**(`proposals/...json`, `tests/ci-controller-b-policy-only-proposal.test.mjs`), `Draft/open`. 신규 `Verify unapproved CI Controller B policy-only handoff candidate is non-executable` 단계 성공, Secret Scan 성공. 전체 Source/C996는 이 기록 작성 시 CI 진행 중이므로 **3/3 완료로 표시하지 않는다**.
+- 신규 PC 작업 0, 실제 B policy install 0, GitHub 변수/Workflow 변경 0, Writer/Watchdog/Runner/lease/운영 파일 변경 0. 기존 #3925/#3926 영수증 지속성 증명 재사용. **무인 A/Writer B/Controller B 실제 종단 0/3 (0%)** 유지.
+
+### 허용된 다음 작업
+
+- #4160 소스 CI의 정확 HEAD 결과만 회수하고 필요한 테스트 소스 수정/비운영 PR 정리 수행. 전용 진행 원장과 #4152 보류 상태 유지.
+- Supervisor·R6·Standby 정상 복구 증거는 관련 운영 총괄/Watchdog 담당이 확보하는 기존 독립 경로에서만 읽어 비교. 이 역할에서 새로운 PC A를 반복 발행하거나 기존 Watchdog/Runner를 조작하지 않는다.
+- 3조건의 실제 충족이 입증되고 사용자가 정책 범위·CAS 재검토를 지시할 때까지 **Controller B 정책 설치, Draft #4152 병합·활성화, Owner B 승인 원본 작성 작업은 보류**.
+
