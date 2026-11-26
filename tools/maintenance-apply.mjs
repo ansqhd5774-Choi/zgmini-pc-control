@@ -439,7 +439,7 @@ export async function runApprovedS6FailoverOnce(request,port){
  // Claim is atomic, unique and durable: an uncertain claim must not run.
  if(await port.claimOnce(request,baseline)!==true)
   return result('STATE_UNKNOWN','S6_ONCE_CLAIM_OUTCOME_UNVERIFIED');
- let phase='CLAIMED',mutationAttempted=false,leaseReleased=false;
+ let phase='CLAIMED',mutationAttempted=false,leaseReleaseAcknowledged=false;
  const journal=async(next,extra={})=>{
   phase=next;
   await port.persist({schema:'ZGMINI_S6_ONCE_JOURNAL_V1',
@@ -471,32 +471,37 @@ export async function runApprovedS6FailoverOnce(request,port){
   await journal('OWNED_LEASE_RELEASE_ATTEMPT');
   // Ownership/CAS are re-checked by the port. Do not release a peer lease.
   await port.releaseOwnedInstallLease(request,baseline);
-  leaseReleased=true;
+  leaseReleaseAcknowledged=true;
   await journal('OWNED_LEASE_RELEASED');
   // A fast promotion may skip the transient released-without-Runners state.
   // A failed observation is not a license to retry, stop or promote anyone.
-  let releaseObserved=false;
+  let releaseObserved=false,fastPromoted=false;
   try{await observe('WATCHDOG_RELEASED');releaseObserved=true;}
   catch{
-   await observe('PROMOTED');
+   // The old-Runner-empty interval may be shorter than the status probe.
+   // Do not infer promotion from a missing interval; require independent
+   // PROMOTED proof and otherwise wait read-only for its bounded outcome.
+   try{await observe('PROMOTED');fastPromoted=true;}
+   catch{/* pending or failed release evidence: read-only wait follows */}
   }
-  await journal(releaseObserved?'WATCHDOG_RELEASE_OBSERVED':'FAST_PROMOTION_OBSERVED');
-  if(releaseObserved)await port.waitForPromotion(request,baseline);
+  await journal(releaseObserved?'WATCHDOG_RELEASE_OBSERVED':
+   fastPromoted?'FAST_PROMOTION_OBSERVED':'WATCHDOG_RELEASE_OUTCOME_UNVERIFIED');
+  if(!fastPromoted)await port.waitForPromotion(request,baseline);
   await observe('PROMOTED');
   await journal('PROMOTED_READBACK_VERIFIED',{status:'POSTCHECK_PENDING'});
   // Existing A job and backlog readback must be performed separately; do not
   // counterfeit an A result or claim complete failover here.
   return result('POSTCHECK_PENDING','S6_ONCE_PROMOTION_OBSERVED_A_JOB_PENDING',{
-   lastPhase:'PROMOTED_READBACK_VERIFIED',leaseReleased:true});
+   lastPhase:'PROMOTED_READBACK_VERIFIED',leaseReleaseAcknowledged:true});
  }catch(error){
   const code=maintenanceFailureCode(error,phase);
   // No automatic rollback/retry, no lease deletion, no forced fallback.
   // Intake or stop may already have happened, even if the port timed out.
   const status=mutationAttempted?'RECOVERY_REQUIRED':'STATE_UNKNOWN';
   try{await journal('RECOVERY_REQUIRED',{status,code,failedAt:phase,
-   leaseReleased,mutationAttempted});}catch{/* original ledger may be uncertain */}
+   leaseReleaseAcknowledged,mutationAttempted});}catch{/* original ledger may be uncertain */}
   return result(status,mutationAttempted?'S6_ONCE_RUNTIME_OUTCOME_RECONCILE':
    'S6_ONCE_JOURNAL_UNVERIFIED',{
-   failedCode:code,failedAt:phase,leaseReleased,mutationAttempted});
+   failedCode:code,failedAt:phase,leaseReleaseAcknowledged,mutationAttempted});
  }
 }
