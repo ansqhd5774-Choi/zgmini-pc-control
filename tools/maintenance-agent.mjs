@@ -942,7 +942,7 @@ export function createMaintenanceAgent({
       writeOnce(packageFile,JSON.stringify({issue:request,
         manifest:JSON.parse(bytes.toString('utf8')),
         manifestRawBase64:bytes.toString('base64'),
-        issueNumber:issue.number,actor:issue.author.login},null,2)+'\\n');
+        issueNumber:issue.number,actor:issue.author.login},null,2)+'\n');
     }catch{
       return {status:'STATE_UNKNOWN',code:'S6_ONCE_PACKAGE_WRITE_UNVERIFIED',
         requestId:request.requestId,executionStarted:false};
