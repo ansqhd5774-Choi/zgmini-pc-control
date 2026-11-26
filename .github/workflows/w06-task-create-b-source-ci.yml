@@ -44,4 +44,4 @@ jobs:
         run: |
           for %%f in (task-create-b\*.mjs) do node --check "%%f"
       - name: Regress source-only owner manifest and recovery contracts
-        run: node --test tests/task-create-b.test.mjs tests/task-create-b-flow.test.mjs
+        run: node --test tests/task-create-b.test.mjs tests/task-create-b-flow.test.mjs tests/task-create-b-recovery.test.mjs
