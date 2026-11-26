@@ -1,7 +1,10 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {dispatchApprovedCiEffect} from '../ci-approval/native-dispatch.mjs';
+import {dispatchApprovedCiEffect,createCiNativeReceiptStore} from '../ci-approval/native-dispatch.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
 const repo={id:1442936296,full_name:'ansqhd5774-Choi/zgmini-pc-control',private:true};
 const hash=b=>createHash('sha256').update(b).digest('hex');
 const blob=b=>createHash('sha1').update(Buffer.from('blob '+b.length+'\0')).update(b).digest('hex');
@@ -56,3 +59,35 @@ test('durable prior receipt never reposts even if source run changes',async()=>{
 test('missing readback adapter prevents dispatch',async()=>{const x=make();delete x.ports.readInstalledReceiver;const r=await dispatchApprovedCiEffect({policy:x.policy,requestBytes:x.bytes,ports:x.ports});assert.equal(r.code,'CI_NATIVE_DISPATCH_PORT_UNAVAILABLE');assert.equal(x.dispatches.length,0);});
 
 test('policy revision change cannot dispatch an existing business effect again',async()=>{const x=make();await dispatchApprovedCiEffect({policy:x.policy,requestBytes:x.bytes,ports:x.ports});x.policy.policyRevision='d'.repeat(40);const r=await dispatchApprovedCiEffect({policy:x.policy,requestBytes:x.bytes,ports:x.ports});assert.equal(r.code,'CI_NATIVE_DISPATCH_PRIOR_EFFECT_NO_REPOST');assert.equal(x.dispatches.length,1);});
+
+
+function withRoot(fn){const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-native-ci-'));try{return fn(root)}finally{fs.rmSync(root,{recursive:true,force:true})}}
+test('native receipt is durable across independent store instances',async()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-native-ci-'));
+ try{const x=make(),store=createCiNativeReceiptStore(root);
+ x.ports.loadReceipt=store.loadReceipt;x.ports.saveReceipt=store.saveReceipt;
+ const first=await dispatchApprovedCiEffect({policy:x.policy,requestBytes:x.bytes,ports:x.ports});
+ assert.equal(first.code,'CI_NATIVE_DISPATCH_WAKEUP_ONLY');
+ const reopened=createCiNativeReceiptStore(root),persisted=reopened.loadReceipt(first.effectKey);
+ assert.equal(persisted.phase,'DISPATCH_ACCEPTED_NOT_EXECUTED');
+ x.ports.loadReceipt=reopened.loadReceipt;x.ports.saveReceipt=reopened.saveReceipt;
+ const twice=await dispatchApprovedCiEffect({policy:x.policy,requestBytes:x.bytes,ports:x.ports});
+ assert.equal(twice.code,'CI_NATIVE_DISPATCH_PRIOR_EFFECT_NO_REPOST');
+ assert.throws(()=>reopened.saveReceipt(first.effectKey,persisted,{exclusive:true}),{code:'EEXIST'});
+ assert.equal(x.dispatches.length,1);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+test('receipt root must preexist and cannot be under volatile root',()=>withRoot(root=>{
+ assert.throws(()=>createCiNativeReceiptStore(path.join(root,'absent')));
+ assert.throws(()=>createCiNativeReceiptStore(root,{volatileRoots:[os.tmpdir()]}),/CI_NATIVE_RECEIPT_ROOT_VOLATILE/);
+}));
+test('corrupt receipt cannot be treated as empty',async()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-native-ci-'));
+ try{const x=make(),store=createCiNativeReceiptStore(root);
+ x.ports.loadReceipt=store.loadReceipt;x.ports.saveReceipt=store.saveReceipt;
+ const first=await dispatchApprovedCiEffect({policy:x.policy,requestBytes:x.bytes,ports:x.ports});
+ fs.writeFileSync(path.join(root,'native-'+first.effectKey+'.json'),'{}');
+ const next=await dispatchApprovedCiEffect({policy:x.policy,requestBytes:x.bytes,ports:x.ports});
+ assert.equal(next.code,'CI_NATIVE_DISPATCH_RECEIPT_READ_UNKNOWN');assert.equal(x.dispatches.length,1);
+ }finally{fs.rmSync(root,{recursive:true,force:true})}
+});
