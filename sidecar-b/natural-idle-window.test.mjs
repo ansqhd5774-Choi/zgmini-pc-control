@@ -49,6 +49,35 @@ test('quiet never observed fails closed at bounded deadline',async()=>{
  assert.ok(reads>=3&&reads<=5);
 });
 
+test('timed-out window reports only aggregate Core/Sidecar counters',async()=>{
+ let now=0;let observed=null;
+ try{
+  await awaitNaturalSidecarIdle({
+   observe:()=>snapshot({coreQuiet:false,sidecarActive:true}),
+   pause:async ms=>{now+=ms;},clock:()=>now,
+   windowMs:10000,stepMs:5000
+  });
+ }catch(error){observed=error;}
+ assert.equal(observed?.code,'SIDECAR_B_PROBE_RESOURCE_STOP');
+ assert.deepEqual(observed.idleObservation,{
+  samples:3,coreActiveSamples:3,sidecarActiveSamples:3,
+  controllerBusySamples:0,writerBusySamples:0,windowMs:10000
+ });
+});
+test('shared owner fails immediately and records one bounded observation',async()=>{
+ let observed=null;
+ try{
+  await awaitNaturalSidecarIdle({
+   observe:()=>snapshot({controllerInstallBusy:true}),
+   pause:async()=>{throw Error('unexpected wait');},
+   clock:()=>0
+  });
+ }catch(error){observed=error;}
+ assert.equal(observed?.code,'SIDECAR_B_PROBE_RESOURCE_STOP');
+ assert.equal(observed.idleObservation.samples,1);
+ assert.equal(observed.idleObservation.controllerBusySamples,1);
+ assert.equal(observed.idleObservation.writerBusySamples,0);
+});
 test('invalid observation contract fails before any read',async()=>{
  let reads=0;
  await assert.rejects(awaitNaturalSidecarIdle({
