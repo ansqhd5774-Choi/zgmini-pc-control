@@ -1,0 +1,27 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "1fa32e7a-594a-4741-bcb4-8a905f6d701b",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "c8ed53a3991212dd1778742cda8a86ac133e0796",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "714d392ca079daa9fdb789f73762c407be3321a2",
+  "candidateSourceSha": "225a0806ce611b370a9fe451cf6c18ab78599af6",
+  "manifestSha256": "caca8cfb033e6919a332beb33f0e3cd2b3e65521c07844602e785e3fbf9ad650",
+  "baseTreeOid": "fb731794e614590f82dd2004c538e274479b131b",
+  "preparedTreeOid": "7fbec85097e6980132912d73b04e085e324983c4",
+  "provenanceSha256": "33d2061b0eece8087d99a349da8c6f9bc7cc4e2800d0e9c95463e7a6b7a77360",
+  "runId": "45866820730",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/local-cycle.mjs",
+    "scripts/pc-writer/us-breadth-paid-r2-cycle.mjs",
+    "scripts/pc-writer/us-breadth-paid-r2-stored.mjs",
+    "scripts/pc-writer/us-breadth-paid-r2-private-save.mjs",
+    "scripts/pc-writer/us-breadth-paid-r2-publisher.mjs",
+    "lib/market-breadth/us-marketparquet-paid-r2-adapter.mjs",
+    "lib/market-breadth/us-marketparquet-paid-calculator-r2.mjs",
+    "worker/us-breadth-paid-r2-contract.mjs"
+  ]
+}
