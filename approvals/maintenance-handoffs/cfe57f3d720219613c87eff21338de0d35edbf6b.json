@@ -11,7 +11,7 @@
     "tools/maintenance-apply.mjs": "745233ed111ff5dedb2d7747e7153a53a6e6a6a89c82c8a00c95f43d76f828db",
     "tools/maintenance-agent.mjs": "3e284c78d93a124b27364152057d9671942173ae295b8036cc74abccc68051da",
     "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
-    "tools/update.mjs": "4451064cd0a2c52c0ab5d5051b4d12c486f05893ff45a23bf75c3007853fd69b",
+    "tools/update.mjs": "4451064cd0a2c52c0ab5d5051b4f12c486f05893ff45a23bf75c3007853fd69b",
     "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
     "tools/source-bundle-register.mjs": "af31ab1f6a159aa1d8467d2585eb16750e8a1a293f9ecfb90b85c388d8640d70",
     "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
