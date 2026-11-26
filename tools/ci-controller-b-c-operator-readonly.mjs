@@ -2,6 +2,9 @@
 // receipt-root operator. Return only coarse account compatibility, never the
 // Windows service account, SID, raw WMI data, paths, or permissions.
 import {spawnSync} from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+
 
 const SERVICE='actions.runner.ansqhd5774-Choi-zgmini-pc-control.zgmini-handoff-ci-spare-01';
 const SCRIPT=[
@@ -46,4 +49,56 @@ export function inspectReceiptCOperatorServiceReadonly({
     result.stdout.length>100)
   return out('STATE_UNKNOWN','CI_RECEIPT_C_SERVICE_QUERY_UNAVAILABLE');
  return classifyReceiptCOperatorServiceCode(result.stdout);
+}
+
+// Physical-only C packet preflight. GitHub variable configuration is a
+// separate condition; absence of a variable must not conceal a preexisting
+// target directory. No paths, directory contents or ACLs are returned.
+const C_FIXED_DIRS=Object.freeze([
+  'C:\\', 'C:\\ProgramData', 'C:\\ProgramData\\ZGMINI-CI',
+  'C:\\ProgramData\\ZGMINI-CI\\ControllerBReceipts'
+]);
+const cPathReport=(states,code,status='PARTIAL')=>({
+ schema:'ZGMINI_CI_RECEIPT_C_FIXED_PATHS_READONLY_V1',
+ status,code,volume:states[0],programData:states[1],
+ parent:states[2],receiptRoot:states[3],
+ fixedTargetVacantObserved:states[0]==='DIRECTORY'&&
+   states[1]==='DIRECTORY'&&states[2]==='ABSENT'&&states[3]==='ABSENT',
+ actualRunnerWriteVerified:false,cOperatorApplied:false,
+ githubVariableConfiguredVerified:false,cAdminPrivilegeVerified:false,
+ operationalWrites:0,providerCalls:0,d1Writes:0
+});
+export function inspectReceiptCFixedPathsReadonly({
+ platform=process.platform,filesystem=fs
+}={}){
+ if(platform!=='win32')
+  return cPathReport(['UNVERIFIED','UNVERIFIED','UNVERIFIED','UNVERIFIED'],
+   'CI_RECEIPT_C_WINDOWS_REQUIRED','STATE_UNKNOWN');
+ const states=[];
+ for(const p of C_FIXED_DIRS){
+  try{
+   const item=filesystem.lstatSync(p);
+   if(!item.isDirectory()||item.isSymbolicLink()){
+    states.push('ALIAS_OR_NON_DIRECTORY');
+   }else{
+    const real=typeof filesystem.realpathSync?.native==='function'
+      ?filesystem.realpathSync.native(p):filesystem.realpathSync(p);
+    states.push(path.win32.normalize(real).toLowerCase()===
+      path.win32.normalize(p).toLowerCase()?'DIRECTORY':'ALIAS_OR_NON_DIRECTORY');
+   }
+  }catch(e){
+   states.push(e?.code==='ENOENT'?'ABSENT':'UNVERIFIED');
+  }
+ }
+ if(states.some(x=>x==='ALIAS_OR_NON_DIRECTORY'))
+  return cPathReport(states,'CI_RECEIPT_C_PATH_ALIAS_STOP','BLOCKED');
+ if(states.slice(0,2).some(x=>x!=='DIRECTORY')||states.includes('UNVERIFIED'))
+  return cPathReport(states,'CI_RECEIPT_C_FIXED_PATH_UNVERIFIED','STATE_UNKNOWN');
+ if(states[2]==='ABSENT'&&states[3]==='ABSENT')
+  return cPathReport(states,'CI_RECEIPT_C_TARGET_ABSENT');
+ if(states[3]==='DIRECTORY')
+  return cPathReport(states,'CI_RECEIPT_C_ROOT_ALREADY_PRESENT');
+ if(states[2]==='DIRECTORY')
+  return cPathReport(states,'CI_RECEIPT_C_PARENT_ALREADY_PRESENT');
+ return cPathReport(states,'CI_RECEIPT_C_PATH_STATE_UNVERIFIED','STATE_UNKNOWN');
 }

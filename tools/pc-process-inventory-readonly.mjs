@@ -11,7 +11,7 @@ import {uploadResultPairAtomic} from '../writer-config-b/result-pair-atomic.mjs'
 import {collectAutomationStatus} from './automation-status.mjs';
 import {installedControllerBPolicy} from './maintenance-contract.mjs';
 import {inspectCiControllerBReceiptRootReadonly} from './ci-controller-b-receipt-root-readonly.mjs';
-import {inspectReceiptCOperatorServiceReadonly} from './ci-controller-b-c-operator-readonly.mjs';
+import {inspectReceiptCOperatorServiceReadonly,inspectReceiptCFixedPathsReadonly} from './ci-controller-b-c-operator-readonly.mjs';
 import {inspectProviderActivity} from '../controller/provider-activity-runtime-readonly.mjs';
 import {inspectHttp32TwoHostCheckpoints} from '../controller/http32-two-host-checkpoints-readonly.mjs';
 import {inspectSidecarSourceGate} from '../controller/fear-greed-archive-readonly.mjs';
@@ -2786,7 +2786,8 @@ export function collect(role,ctx,env=process.env){
    filesystem:fs,platform:os.platform()});
   return {...base,status:observed.status,code:observed.code,
    ciControllerBReceiptRoot:observed,
-   ciControllerBCOperatorPreflight:inspectReceiptCOperatorServiceReadonly()};
+   ciControllerBCOperatorPreflight:inspectReceiptCOperatorServiceReadonly(),
+   ciControllerBCFixedPathPreflight:inspectReceiptCFixedPathsReadonly()};
  }
  if(ctx.watchdogR4GuardianOrigin===true){
   const proof=inspectR4GuardianOriginReadonly();
@@ -3028,6 +3029,12 @@ export function toText(r){
   ...(r.ciControllerBCOperatorPreflight?[
    'ciReceiptCOperator='+r.ciControllerBCOperatorPreflight.code,
    'ciReceiptCAccountCandidate='+r.ciControllerBCOperatorPreflight.cAccountCandidate
+  ]:[]),
+  ...(r.ciControllerBCFixedPathPreflight?[
+   'ciReceiptCFixedPath='+r.ciControllerBCFixedPathPreflight.code,
+   'ciReceiptCParent='+r.ciControllerBCFixedPathPreflight.parent,
+   'ciReceiptCRoot='+r.ciControllerBCFixedPathPreflight.receiptRoot,
+   'ciReceiptCFixedTargetVacantObserved='+r.ciControllerBCFixedPathPreflight.fixedTargetVacantObserved
   ]:[]),
   'maintenanceSourceSha='+(r.maintenance?.maintenanceSourceSha??'UNKNOWN'),
   'installLockHeld='+(r.maintenance?.installLockHeld??'UNKNOWN'),
