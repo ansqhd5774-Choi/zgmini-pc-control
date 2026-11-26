@@ -5,6 +5,8 @@
 // workflow_dispatch. The receiver MUST revalidate approval, CI provenance,
 // local installed policy, effect claim and current runtime preimage.
 import {createHash} from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control', REPO_ID=1442936296;
 const RECEIVERS=Object.freeze({
@@ -101,4 +103,74 @@ export async function dispatchApprovedCiEffect({policy,requestBytes,ports}={}){
  // response nor a GITHUB_TOKEN API success establishes receiver execution.
  return Object.freeze({state:'DISPATCH_ACCEPTED_NOT_EXECUTED',code:'CI_NATIVE_DISPATCH_WAKEUP_ONLY',
   dispatched:true,executed:false,effectKey:key});
+}
+
+
+// Durable per-effect claim store for A and Writer B only. The existing
+// Controller B receipt schema/store remains untouched. Caller supplies an
+// already provisioned trusted directory; no automatic creation or cleanup.
+export function createCiNativeReceiptStore(root,{volatileRoots=[]}={}){
+ if(typeof root!=='string'||!path.isAbsolute(root)||root.includes('\0')||
+   !Array.isArray(volatileRoots))throw Error('CI_NATIVE_RECEIPT_ROOT_INVALID');
+ const normalized=path.resolve(root);
+ const within=(parent,child)=>{
+  const rel=path.relative(path.resolve(parent),child);
+  return rel===''||(rel!=='..'&&!rel.startsWith('..'+path.sep)&&!path.isAbsolute(rel));
+ };
+ if(volatileRoots.some(p=>typeof p==='string'&&path.isAbsolute(p)&&within(p,normalized)))
+  throw Error('CI_NATIVE_RECEIPT_ROOT_VOLATILE');
+ const comparable=p=>process.platform==='win32'?path.normalize(p).toLowerCase():path.normalize(p);
+ const verify=()=>{
+  for(let cur=normalized;;){
+   const stat=fs.lstatSync(cur);
+   if(!stat.isDirectory()||stat.isSymbolicLink())throw Error('CI_NATIVE_RECEIPT_ROOT_UNVERIFIED');
+   const parent=path.dirname(cur);if(parent===cur)break;cur=parent;
+  }
+  const resolved=fs.realpathSync(normalized);
+  if(comparable(resolved)!==comparable(normalized))throw Error('CI_NATIVE_RECEIPT_ROOT_UNVERIFIED');
+  return resolved;
+ };
+ const canonical=verify();
+ const fileFor=key=>{
+  if(!hex(key,64))throw Error('CI_NATIVE_RECEIPT_KEY_INVALID');
+  if(verify()!==canonical)throw Error('CI_NATIVE_RECEIPT_ROOT_DRIFT');
+  return path.join(canonical,'native-'+key+'.json');
+ };
+ const shape=(r,key)=>{
+  if(r?.schema!=='ZGMINI_CI_NATIVE_DISPATCH_RECEIPT_V1'||r.effectKey!==key||
+    !Object.hasOwn(RECEIVERS,r.effect)||r.receiver!==RECEIVERS[r.effect]||
+    r.ref!=='main'||
+    !['CREATING','DISPATCH_OUTCOME_UNKNOWN','DISPATCH_ACCEPTED_NOT_EXECUTED'].includes(r.phase)||
+    r.inputs?.effect!==r.effect||r.inputs?.effect_key!==key||
+    !hex(r.inputs?.approval_sha256,64)||!hex(r.inputs?.request_sha256,64)||
+    !/^[1-9]\d*$/.test(r.inputs?.source_run_id??'')||
+    !/^[1-9]\d*$/.test(r.inputs?.source_attempt??''))
+   throw Error('CI_NATIVE_RECEIPT_FORMAT_UNVERIFIED');
+  return r;
+ };
+ const loadReceipt=key=>{
+  const file=fileFor(key);let st;
+  try{st=fs.lstatSync(file)}catch(e){if(e.code==='ENOENT')return null;throw e;}
+  if(!st.isFile()||st.isSymbolicLink()||st.size<=0||st.size>65536)
+   throw Error('CI_NATIVE_RECEIPT_FORMAT_UNVERIFIED');
+  let r;try{r=JSON.parse(fs.readFileSync(file,'utf8'))}catch{throw Error('CI_NATIVE_RECEIPT_FORMAT_UNVERIFIED')}
+  return shape(r,key);
+ };
+ const saveReceipt=(key,receipt,{exclusive=false}={})=>{
+  const file=fileFor(key),r=shape(receipt,key);
+  const data=JSON.stringify(r)+'\n';
+  if(Buffer.byteLength(data)>65536)throw Error('CI_NATIVE_RECEIPT_FORMAT_UNVERIFIED');
+  if(!exclusive){
+   const previous=loadReceipt(key);
+   if(!previous||previous.phase!=='CREATING'||r.phase==='CREATING'||
+      previous.effect!==r.effect||previous.receiver!==r.receiver||
+      JSON.stringify(previous.inputs)!==JSON.stringify(r.inputs))
+    throw Error('CI_NATIVE_RECEIPT_IDENTITY_DRIFT');
+  }
+  const dest=exclusive?file:file+'.'+process.pid+'.tmp';
+  const fd=fs.openSync(dest,'wx',0o600);
+  try{fs.writeFileSync(fd,data,'utf8');fs.fsyncSync(fd);}finally{fs.closeSync(fd);}
+  if(!exclusive)fs.renameSync(dest,file);
+ };
+ return Object.freeze({loadReceipt,saveReceipt});
 }
