@@ -1,0 +1,17 @@
+{
+  "schema": "ZGMINI_PC_WATCHDOG_ACTIVATION_B_MANIFEST_V6",
+  "approved": true,
+  "scope": "ONE_GUARDIAN_WATCHDOG_PROCESS_ACTIVATION_ONLY",
+  "targetSha": "8bdeca9b55457fc9c9d35585aacd7eea14af63f0",
+  "installedSha256": "8d98b99b24eef14d0577a93457832e7e7ba3459f00b65dbfa6df349efd958891",
+  "installedManifestSha256": "eba7ae6fd9928b0aab412d91f4f32691b3ea50667cdc831bb8a15b42b8c218fb",
+  "installedScope": "RUNNER_RECOVERY_AND_MAINTENANCE_HANDOFF_V1",
+  "guardianHelperSha256": "ba4890ca8c8dd7ba4d885d88aff000443a58d1a8b1c9d01f386e10b3e0aa3bbe",
+  "activationScriptSha256": "467ad6dec6d518afa90ebc46771dbe9521f68f1f06b5146e09086f637cc1b924",
+  "stageRequestId": "pc-watchdog-b-9c0ce6e4-8d8f-4ba4-9dc4-6145b9fdc930",
+  "oldStageIssueNumber": 4131,
+  "expectedControllerSha": "3c7d4cfefacf072fd35cb19706b352c64c5e4fd2",
+  "effect": "ONE_EXACT_WATCHDOG_PROCESS_EXIT_GUARDIAN_RESTART",
+  "approvalBasis": "EXISTING_SAME_PURPOSE_WATCHDOG_B_APPROVAL_AND_R6_STAGED_SOURCE",
+  "protectionPolicy": "CURRENT_CAS_WITH_HISTORICAL_KEY_PRESENCE"
+}
