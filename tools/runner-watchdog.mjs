@@ -80,11 +80,22 @@ export function classifyRunnerExecutableProof(rows,{controllerRoot=control,
  catch{return 'UNVERIFIED';}
  if(!path.win32.isAbsolute(realRoot))return 'UNVERIFIED';
  const prefix=realRoot.replace(/[\\]+$/,'')+'\\runners\\';
+ const seen=new Set();let serviceExceptions=0;
  for(const row of rows){
   if(!row||typeof row!=='object'||!Number.isSafeInteger(row.pid)||
-    row.pid<=0||!/^runner\.(listener|worker)\.exe$/i.test(row.name??'')||
-    typeof row.executablePath!=='string'||!path.win32.isAbsolute(row.executablePath))
+    row.pid<=0||seen.has(row.pid)||!/^runner\.(listener|worker)\.exe$/i.test(row.name??''))
     return 'UNVERIFIED';
+  seen.add(row.pid);
+  // Only a registered running actions.runner service's own session-0 Listener
+  // may lack ExecutablePath. An unbound/extra Listener always blocks promotion.
+  if(row.executablePath===''&&/^runner\.listener\.exe$/i.test(row.name)&&
+    row.sessionId===0&&row.serviceObservationAvailable===true&&
+    row.serviceAncestor===true){
+   if(++serviceExceptions>1)return 'UNVERIFIED';
+   continue;
+  }
+  if(typeof row.executablePath!=='string'||!path.win32.isAbsolute(row.executablePath))
+   return 'UNVERIFIED';
   let realFile;
   try{realFile=path.win32.normalize(canonicalize(row.executablePath)).toLowerCase();}
   catch{return 'UNVERIFIED';}
@@ -103,7 +114,13 @@ export function scanControllerRunnersReadOnly({run=execFileSync,systemRoot=proce
  const ps=path.win32.join(systemRoot,'System32','WindowsPowerShell','v1.0','powershell.exe');
  const script=[
   "$ErrorActionPreference='Stop'",
-  "$items=@(Get-CimInstance -ClassName Win32_Process -Filter \"Name = 'Runner.Listener.exe' OR Name = 'Runner.Worker.exe'\" -ErrorAction Stop | ForEach-Object { [pscustomobject]@{pid=[int]$_.ProcessId;name=[string]$_.Name;executablePath=[string]$_.ExecutablePath} })",
+  "$all=@(Get-CimInstance -ClassName Win32_Process -ErrorAction Stop)",
+  "if($all.Count -gt 4096){throw 'PROCESS_SCOPE_EXCEEDED'}",
+  "$byPid=@{};foreach($p in $all){$byPid[[int]$p.ProcessId]=$p}",
+  "$svc=@();$serviceObservationAvailable=$false",
+  "try{$svc=@(Get-CimInstance -ClassName Win32_Service -Filter \"Name LIKE 'actions.runner.%'\" -ErrorAction Stop | Where-Object {$_.State -eq 'Running' -and [int]$_.ProcessId -gt 0});$serviceObservationAvailable=$true}catch{}",
+  "$svcByPid=@{};foreach($sv in $svc){if([string]$sv.Name -match '(?i)^actions\\.runner\\.'){$svcByPid[[int]$sv.ProcessId]=$true}}",
+  "$items=@(foreach($p in @($all | Where-Object {$_.Name -in @('Runner.Listener.exe','Runner.Worker.exe')})){$seen=@{};$parent=[int]$p.ParentProcessId;$serviceAncestor=$svcByPid.ContainsKey([int]$p.ProcessId);for($depth=0;$depth -lt 8 -and !$serviceAncestor;$depth++){if($parent -le 0 -or $seen.ContainsKey($parent)){break};$seen[$parent]=$true;if($svcByPid.ContainsKey($parent)){$serviceAncestor=$true;break};if(!$byPid.ContainsKey($parent)){break};$next=[int]$byPid[$parent].ParentProcessId;if($next -eq $parent){break};$parent=$next};$session=if($null -eq $p.SessionId){-1}else{[int]$p.SessionId};[pscustomobject]@{pid=[int]$p.ProcessId;name=[string]$p.Name;executablePath=[string]$p.ExecutablePath;sessionId=$session;serviceAncestor=$serviceAncestor;serviceObservationAvailable=$serviceObservationAvailable}})",
   "[pscustomobject]@{rows=$items} | ConvertTo-Json -Depth 4 -Compress"
  ].join(';');
  try{
