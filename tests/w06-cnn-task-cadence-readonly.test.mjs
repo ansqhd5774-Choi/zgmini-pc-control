@@ -230,6 +230,40 @@ test('W06 HTTP request gap median measures actual fetch starts, not stale source
 });
 
 
+test('W06 post-install HTTP cadence excludes pre-install calls and never invents missing ticks',()=>{
+ const times=['17:01:30','17:03:10','17:04:12','17:06:12','17:07:12'];
+ const checks=times.map(t=>{
+  const requestedAt=Date.parse('2026-11-26T'+t+'.000Z');
+  return {requestedAt,checkedAt:requestedAt+400,httpStatus:200,
+   outcome:'VERIFIED',sourceObservedAt:'2026-11-26T01:59:59.000Z',score:15};
+ });
+ const rows=[{snapshot_key:'2026-11-26',body:JSON.stringify({
+  version:'CNN_HTTP_CHECKS_R1',date:'2026-11-26',checks})}];
+ const read=projectW06HttpChecksReadonly(rows,{
+  observedAtMs:Date.parse('2026-11-26T17:10:00.000Z')});
+ assert.equal(read.status,'READ');
+ assert.equal(read.twoDayCount,5);
+ assert.equal(read.sinceInstallReadbackCount,4);
+ assert.equal(read.sinceInstallReadbackVerifiedCount,4);
+ assert.equal(read.installedReadbackAt,'2026-11-26T17:02:17.109Z');
+ assert.equal(read.sinceInstallReadbackGapSampleCount,3);
+ assert.equal(read.sinceInstallReadbackMedianGapSeconds,62);
+ assert.equal(read.sinceInstallReadbackMaxGapSeconds,120);
+ assert.equal(read.sinceInstallReadbackGapsOver90Seconds,1);
+ assert.deepEqual(read.sinceInstallReadbackRecentIntervalsSeconds,[62,120,60]);
+ assert.equal(read.sinceInstallReadbackFirstRequestAt,'2026-11-26T17:03:10.000Z');
+ assert.equal(read.sinceInstallReadbackLastRequestAt,'2026-11-26T17:07:12.000Z');
+ assert.equal(read.requestGapSampleCount,4,'old activation-wide metric unchanged');
+ assert.doesNotMatch(JSON.stringify(read),/sourceObservedAt|score|PRIVATE|SECRET/);
+ const noPost=projectW06HttpChecksReadonly([{snapshot_key:'2026-11-26',
+  body:JSON.stringify({version:'CNN_HTTP_CHECKS_R1',date:'2026-11-26',
+   checks:[checks[0]]})}],{observedAtMs:Date.parse('2026-11-26T17:10:00.000Z')});
+ assert.equal(noPost.sinceInstallReadbackCount,0);
+ assert.equal(noPost.sinceInstallReadbackGapSampleCount,0);
+ assert.equal(noPost.sinceInstallReadbackMedianGapSeconds,null);
+ assert.deepEqual(noPost.sinceInstallReadbackRecentIntervalsSeconds,[]);
+});
+
 test('W06 fixed output 7 seconds after Task minute makes next nominal tick CACHED',()=>{
  const tick='2026-11-26T15:47:00.000Z';
  const rows=[
