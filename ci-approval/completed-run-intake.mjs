@@ -235,6 +235,125 @@ export async function publishExistingControllerApprovals(event,{getJson,ports,ru
  // This is the outcome of the publishing step, not a PC execution PASS.
  return {state:'PUBLICATION_PROCESSED',results};
 }
+
+/**
+ * A source CI can finish AFTER the already-Owner-merged approval PR's main
+ * push. The push publisher cannot validate a CI result that has not finished
+ * yet; this observer reconstructs only the original Owner-merged approval
+ * from the exact authenticated source run. The event and PR never grant rights.
+ *
+ * Source-only candidate: the currently installed CI publisher checkout and
+ * receiver workflow pin are deliberately unchanged until their exact approved
+ * B installation. This observer has no write ports or authority.
+ */
+export async function observeLateOwnerMergedControllerApproval(event,{getJson}={}){
+ if(typeof getJson!=='function')
+  return out('EVIDENCE_MISSING','AUTHENTICATED_READ_PORT_REQUIRED');
+ const observed=await observeCompletedRun(event,{
+  getRun:n=>getJson('actions/runs/'+n)});
+ if(observed.state!=='CI_COMPLETION_OBSERVED_ONLY')
+  return observed;
+ const headSha=observed.headSha,entries=[],owner='ansqhd5774-Choi';
+ const ownerId=327938088;
+ let candidates;
+ try{
+  candidates=await getJson('commits/'+headSha+'/pulls?per_page=100');
+  if(!Array.isArray(candidates)||candidates.length>=100)
+   return out('EVIDENCE_MISSING','OWNER_APPROVAL_PR_LIST_INCOMPLETE');
+ }catch{return out('EVIDENCE_MISSING','OWNER_APPROVAL_PR_LIST_UNAVAILABLE');}
+ // Avoid using arbitrary event.pull_requests: that association can disappear
+ // or change after merge. The API PR is re-fetched before inspecting files.
+ const possible=candidates.filter(pr=>id(pr?.number)&&pr?.merged_at!==null);
+ if(possible.length>12)
+  return out('EVIDENCE_MISSING','OWNER_APPROVAL_PR_LIST_UNBOUNDED');
+ for(const candidate of possible){
+  let pr,files;
+  try{
+   pr=await getJson('pulls/'+candidate.number);
+   if(pr?.number!==candidate.number||pr.merged!==true||
+      pr.merged_by?.login!==owner||pr.merged_by?.id!==ownerId||
+      pr.merged_by?.type!=='User'||pr.base?.ref!=='main'||
+      !sameRepo(pr.base.repo)||!sameRepo(pr.head?.repo)||
+      pr.head.sha!==headSha||!sha(pr.merge_commit_sha))
+    continue;
+   files=await getJson('pulls/'+pr.number+'/files?per_page=100');
+   if(!Array.isArray(files)||files.length>=100)
+    return out('EVIDENCE_MISSING','OWNER_APPROVAL_PR_FILES_INCOMPLETE');
+  }catch{return out('EVIDENCE_MISSING','OWNER_APPROVAL_PR_READ_UNAVAILABLE');}
+  for(const file of files){
+   const match=typeof file?.filename==='string'&&
+    file.filename.match(/^approvals\\/controller-updates\\/([a-f0-9]{40})\\.json$/);
+   if(!match)continue;
+   const targetSha=match[1];
+   if(file.status!=='added'||!sha(file.sha))
+    return out('EVIDENCE_MISSING','OWNER_APPROVAL_PR_FILE_CHANGED');
+   try{
+    const read=async revision=>{
+     const f=await getJson('contents/'+file.filename+'?ref='+revision);
+     if(f?.type!=='file'||f.path!==file.filename||f.encoding!=='base64'||
+        f.sha!==file.sha||typeof f.content!=='string'||f.content.length>100000)
+      throw Error('APPROVAL_UNVERIFIED');
+     const bytes=Buffer.from(f.content,'base64');
+     if(!bytes.length||bytes.length>65536||
+        createHash('sha1').update(Buffer.from('blob '+bytes.length+'\\0'))
+         .update(bytes).digest('hex')!==file.sha)
+      throw Error('APPROVAL_UNVERIFIED');
+     return bytes;
+    };
+    const [merged,current]=await Promise.all([read(pr.merge_commit_sha),read('main')]);
+    if(!merged.equals(current))
+     return out('EVIDENCE_MISSING','OWNER_APPROVAL_MAIN_BYTES_DRIFT');
+    const manifest=JSON.parse(current.toString('utf8'));
+    if(manifest?.schema!=='ZGMINI_PC_UPDATE_V1'||
+       manifest.targetSha!==targetSha||
+       manifest.purpose!=='pc-controller-maintenance'||
+       manifest.controllerOnlyInstall!==true||!manifest.selectiveSource||
+       manifest.approval?.ref!=='https://github.com/'+repo+'/pull/'+pr.number)
+     return out('EVIDENCE_MISSING','OWNER_APPROVAL_MANIFEST_UNVERIFIED');
+    entries.push({targetSha,manifestSha256:createHash('sha256')
+     .update(current).digest('hex'),approvalPrNumber:pr.number,
+     sourceRunId:observed.runId});
+    if(entries.length>8)
+     return out('EVIDENCE_MISSING','OWNER_APPROVAL_EFFECT_SET_UNBOUNDED');
+   }catch{return out('EVIDENCE_MISSING','OWNER_APPROVAL_BYTES_UNVERIFIED');}
+  }
+ }
+ return out(entries.length?'OWNER_APPROVAL_RUN_OBSERVED_ONLY':'IGNORED',
+  entries.length?'EXACT_OWNER_MERGED_SOURCE_RUN_MATCH_ONLY':
+   'NO_OWNER_MERGED_CONTROLLER_APPROVAL',{entries});
+}
+
+/**
+ * Uses the established strict B submitter for each independently matched
+ * approval. Receipt claims and prior Issue inventory prevent a second POST
+ * if the earlier main push already submitted the same effect.
+ */
+export async function publishLateOwnerMergedControllerApproval(event,{
+ getJson,ports,runId,attempt,emitReceipt
+}={}){
+ if(!id(runId)||!id(attempt)||typeof emitReceipt!=='function')
+  throw Error('CI_PUBLICATION_RUN_INVALID');
+ const seen=await observeLateOwnerMergedControllerApproval(event,{getJson});
+ if(seen.state!=='OWNER_APPROVAL_RUN_OBSERVED_ONLY')
+  return {state:seen.state,code:seen.reason,results:[]};
+ const results=[];
+ for(const entry of seen.entries){
+  try{
+   const outcome=await submitExistingControllerApprovalFromCi({
+    targetSha:entry.targetSha,approvalSha256:entry.manifestSha256,
+    runId,attempt},ports);
+   if(outcome.status==='REQUEST_READBACK_VERIFIED')
+    emitReceipt(outcome.receiptMarker);
+   const {receiptMarker,...result}=outcome;
+   results.push({targetSha:entry.targetSha,...result});
+  }catch(error){
+   const code=/^(?:MAINTENANCE|CI_PUBLICATION)_[A-Z0-9_]+$/.test(error?.message??'')
+    ?error.message:'CI_PUBLICATION_ADAPTER_FAILED';
+   results.push({targetSha:entry.targetSha,status:'STATE_UNKNOWN',code});
+  }
+ }
+ return {state:'PUBLICATION_PROCESSED',results};
+}
 // A single independently configured prepared effect, not a free-form event
 // target. Source completion and source merge can arrive in either order.
 // No subsequent bot-generated PR CI or push event is required for submission.
