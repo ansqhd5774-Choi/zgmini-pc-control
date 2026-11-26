@@ -9,6 +9,7 @@ import {authenticate,validateSeat} from './pc-host-inventory-readonly.mjs';
 import {uploadResultPairAtomic} from '../writer-config-b/result-pair-atomic.mjs';
 import {collectAutomationStatus} from './automation-status.mjs';
 import {installedControllerBPolicy} from './maintenance-contract.mjs';
+import {inspectCiControllerBReceiptRootReadonly} from './ci-controller-b-receipt-root-readonly.mjs';
 import {inspectProviderActivity} from '../controller/provider-activity-runtime-readonly.mjs';
 import {inspectHttp32TwoHostCheckpoints} from '../controller/http32-two-host-checkpoints-readonly.mjs';
 import {inspectSidecarSourceGate} from '../controller/fear-greed-archive-readonly.mjs';
@@ -55,6 +56,7 @@ const CNN_B_CORE_PROBE='cnn-sidecar-b-core-readonly';
 const MAX_BYTES=32768;
 const R3_WATCHDOG_PREIMAGE_PROBE='controller-standby-watchdog-preimage-readonly';
 const R3_WMI_PROBE='controller-standby-runner-wmi-readonly';
+const CI_RECEIPT_ROOT_PROBE='ci-controller-b-receipt-root-readonly';
 // Existing A only: observe whether the same fixed WMI process-path query
 // used by the candidate Watchdog can classify installed Runner executables.
 // This single instant is NOT an owner/child-exit proof and cannot promote Standby.
@@ -297,10 +299,17 @@ export function authenticateProcess(event,env,role){
   const isCnnBCore=withW05&&raw.probe===CNN_B_CORE_PROBE;
   const isR3Watchdog=withW05&&raw.probe===R3_WATCHDOG_PREIMAGE_PROBE;
  const isR3Wmi=withW05&&raw.probe===R3_WMI_PROBE;
+ const isCiReceiptRoot=withW05&&raw.probe===CI_RECEIPT_ROOT_PROBE;
+ const allowedOperatingProbe=isOperator||is2960||is3409||isEr1Postcheck||is3516||
+  isD05Writer||isD05PrivateReceipt||isD05Theme||isD05Registration||is3160||
+  isCnnStaticGuard||isCnnGitPredicates||isCnnBPins||isCnnBResources||
+  isCnnBCore||isR3Watchdog||isR3Wmi;
+ const acceptedProbe=(role==='operating'&&allowedOperatingProbe)||
+  (role==='handoff'&&isCiReceiptRoot);
  if(!raw||(!basic&&!withJobs&&!withW05)||
    raw.schema!==SCHEMA||raw.operation!==ROLE_OPERATION||raw.role!==role||
    (withJobs&&role!=='operating')||
-   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!is3409&&!isEr1Postcheck&&!is3516&&!isD05Writer&&!isD05PrivateReceipt&&!isD05Theme&&!isD05Registration&&!is3160&&!isCnnStaticGuard&&!isCnnGitPredicates&&!isCnnBPins&&!isCnnBResources&&!isCnnBCore&&!isR3Watchdog&&!isR3Wmi))))
+   (withW05&&!acceptedProbe))
   fail('REQUEST_SCOPE_INVALID');
  const runnerJobRefs=withJobs?validateRunnerJobRefs(raw.runnerJobRefs):null;
  const normalized=structuredClone(event);
@@ -326,7 +335,8 @@ export function authenticateProcess(event,env,role){
    ...(isCnnBResources?{cnnSidecarBResources:true}:{}),
    ...(isCnnBCore?{cnnSidecarBCore:true}:{}),
    ...(isR3Watchdog?{watchdogR3Preimage:true}:{}),
-  ...(isR3Wmi?{standbyRunnerWmi:true}:{})};
+  ...(isR3Wmi?{standbyRunnerWmi:true}:{}),
+  ...(isCiReceiptRoot?{ciControllerBReceiptRoot:true}:{})};
 }
 export function sanitizeProbe(raw){
  if(!raw||raw.schema!=='ZGMINI_PC_PROCESS_PROBE_V1')fail('PROBE_SCHEMA_INVALID');
@@ -2445,6 +2455,14 @@ export function collect(role,ctx,env=process.env){
  if(identity!=='MATCH'||(role==='operating'&&host!=='PC')){
   return {...base,status:'BLOCKED',code:identity==='MATCH'?'HOST_NOT_CANONICAL':identity};
  }
+ if(ctx.ciControllerBReceiptRoot===true){
+  const observed=inspectCiControllerBReceiptRootReadonly({
+   root:env.ZGMINI_CI_CONTROLLER_B_RECEIPT_ROOT,
+   volatileRoots:[env.RUNNER_TEMP,env.GITHUB_WORKSPACE,env.TEMP,env.TMP],
+   filesystem:fs,platform:os.platform()});
+  return {...base,status:observed.status,code:observed.code,
+   ciControllerBReceiptRoot:observed};
+ }
  if(ctx.standbyRunnerWmi===true){
   const proof=inspectR3RunnerWmiReadonly();
   return {...base,status:proof.status,code:proof.code,standbyRunnerWmi:proof};
@@ -2646,6 +2664,11 @@ export function toText(r){
    'watchdogManifestSha256='+(r.watchdogR3Preimage.manifestSha256??'UNKNOWN'),
    'watchdogSourceMatchesManifest='+r.watchdogR3Preimage.installedMatch
   ]:[]),
+  ...(r.ciControllerBReceiptRoot?[
+   'ciReceiptRoot='+r.ciControllerBReceiptRoot.code,
+   'ciReceiptRootConfigured='+r.ciControllerBReceiptRoot.configured,
+   'ciReceiptRootReadable='+r.ciControllerBReceiptRoot.readable,
+   'ciReceiptRootDurableAcrossRunsVerified=false']:[]),
   'maintenanceSourceSha='+(r.maintenance?.maintenanceSourceSha??'UNKNOWN'),
   'installLockHeld='+(r.maintenance?.installLockHeld??'UNKNOWN'),
   'c2094StageEvidence='+(r.c2094StageEvidence?.status??'NOT_APPLICABLE'),
