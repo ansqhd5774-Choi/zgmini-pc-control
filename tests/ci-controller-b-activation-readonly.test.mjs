@@ -17,7 +17,14 @@ function run(enabled='false',policy=JSON.stringify(fixed)){
  return inspect({enabled,policy});
 }
 test('missing or invalid policy is a specific read-only non-authorizing result',()=>{
- assert.equal(run('false','').code,'CI_CONTROLLER_B_AUTO_POLICY_NOT_CONFIGURED');
+ const missing=run('false','');
+ assert.equal(missing.code,'CI_CONTROLLER_B_AUTO_POLICY_NOT_CONFIGURED');
+ // Missing generated-approval policy is not an independent new gate for
+ // existing Owner-merged B approvals. The actual publisher is still disabled.
+ assert.equal(missing.ownerMergedExistingApprovalPolicyRequired,false);
+ assert.equal(missing.ciGeneratedApprovalPolicyRequired,true);
+ assert.equal(missing.ownerMergedExistingSubmissionVerified,false);
+ assert.equal(missing.activationAuthorized,false);
  assert.equal(run('false','{broken').code,'CI_CONTROLLER_B_AUTO_POLICY_JSON_INVALID');
  assert.equal(run('true').code,'CI_CONTROLLER_B_ALREADY_ENABLED_STOP');
  assert.equal(run(null).code,'CI_CONTROLLER_B_FLAG_NOT_EXPLICITLY_DISABLED');
@@ -67,6 +74,25 @@ test('existing owner handoff Issue A accepts one exact policy probe and rejects 
  assert.equal(out.ciControllerBActivation?.activationAuthorized,false);
  assert.equal(out.operationalWrites,0);
  assert.doesNotMatch(toText(out),/NEVER_PRINT|sourceBranch|bodySha256/);
+});
+test('existing Owner-approved push path is independent of generated-approval policy',()=>{
+ const workflow=readFileSync(new URL('../.github/workflows/ci-approval-controller-b.yml',import.meta.url),'utf8');
+ const publisher=readFileSync(new URL('../ci-approval/completed-run-intake.mjs',import.meta.url),'utf8');
+ const request=readFileSync(new URL('../tools/maintenance-request.mjs',import.meta.url),'utf8');
+ // The trigger requires ENABLED but does not require POLICY on push;
+ // workflow_run generated-approval path alone has that additional gate.
+ assert.match(workflow,/vars\\.ZGMINI_CI_CONTROLLER_B_ENABLED == 'true'/);
+ assert.match(workflow,/github\\.event_name == 'push' &&/);
+ assert.match(workflow,/github\\.event_name == 'workflow_run' &&\\s+vars\\.ZGMINI_CI_CONTROLLER_B_POLICY != ''/);
+ assert.match(publisher,/if\\(policy\\)\\s*\\{/);
+ assert.match(publisher,/if\\(eventName==='push'\\)return publishExistingControllerApprovals\\(event,opts\\)/);
+ assert.match(request,/if\\(ownerMerged\\)\\s*\\{\\s*await resolveControllerApprovalCI/);
+ const observed=inspect({enabled:'false',policy:''});
+ assert.equal(observed.ownerMergedExistingApprovalPolicyRequired,false);
+ assert.equal(observed.ciGeneratedApprovalPolicyRequired,true);
+ assert.equal(observed.variableEnabledVerified,true);
+ assert.equal(observed.activationAuthorized,false);
+ assert.equal(observed.controllerBPublished,false);
 });
 test('only existing read-only isolated workflow can receive policy vars',()=>{
  const y=readFileSync(new URL('../.github/workflows/pc-process-inventory-readonly.yml',import.meta.url),'utf8');
