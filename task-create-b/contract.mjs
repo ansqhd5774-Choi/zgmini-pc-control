@@ -9,6 +9,8 @@ export const APPROVAL_SCHEMA='ZGMINI_PC_TASK_CREATE_B_APPROVAL_V1';
 export const RESULT_SCHEMA='ZGMINI_PC_TASK_CREATE_B_RESULT_V1';
 export const TASK='ZGMINI-PC-CNN-Minute';
 export const INSTALLED_SOURCE='393cee0da46515ff056543173fcd1253a858b3d7';
+export const APPROVED_CANDIDATE_SOURCE='0bae713aa6df1f4c00037db908050c74ae3dd20c';
+export const APPROVED_CANDIDATE_FILE_SHA256='694474d9966ef0a06dd46bb5d5b684150c5d66b5fcf989501fc4f9aa1502a7e7';
 export const SOURCE_ROOT=String.raw`E:\ZGmini\projects\zgmini-earnings-history-pc-release`;
 export const WRAPPER=String.raw`E:\ZGmini\data\pc-writer\run-local-cnn-minute.vbs`;
 const OWNER='ansqhd5774-Choi';
@@ -52,8 +54,8 @@ export function authorizeTaskCreateB({event,manifestBytes,manifestCommitted=fals
   manifest.schema===APPROVAL_SCHEMA&&manifest.status==='APPROVED_B'&&
   manifest.scope==='W06_ONE_TASK_CREATE_AND_ENABLE_WITH_CNN_RUNTIME_EFFECTS'&&
   manifest.taskName===TASK&&manifest.installedSourceSha===INSTALLED_SOURCE&&
-  /^[a-f0-9]{40}$/.test(manifest.candidateSourceSha??'')&&
-  H64.test(manifest.candidateFileSha256??'')&&
+  manifest.candidateSourceSha===APPROVED_CANDIDATE_SOURCE&&
+  manifest.candidateFileSha256===APPROVED_CANDIDATE_FILE_SHA256&&
   manifest.sourceRoot===SOURCE_ROOT&&manifest.wrapperPath===WRAPPER&&
   H64.test(manifest.launcherSha256??'')&&
   H64.test(manifest.disabledTemplateSha256??'')&&
