@@ -1,6 +1,6 @@
 {
   "schema": "ZGMINI_PC_WATCHDOG_B_MANIFEST_V4",
-  "approved": false,
+  "approved": true,
   "scope": "SAME_HOST_ACTIVE_1_STANDBY_1_WATCHDOG_B",
   "installedSha256": "3f99ea3357c6731cc9000bde1273db915cb07ba5fa480718194deb6330c29072",
   "installedManifestSha256": "28c8017d469a0e2b13af96e01e686bae874d174b1ddac9e6a170ee2487bd6829",
