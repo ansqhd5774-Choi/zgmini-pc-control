@@ -3,8 +3,91 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+import {decodeTaskXmlBytes} from '../writer-b/windows-guards.mjs';
+import {hasOnlyApprovedMinuteTrigger,hasOnlyApprovedSingleExec} from '../task-create-b/windows-adapter.mjs';
 
 export const PROBE='w06-cnn-task-cadence-readonly';
+const TASK_B='ZGMINI-PC-CNN-Minute';
+const TASK_B_REQUEST='ce21eaa3-7768-4cb8-88d9-0911941d966c';
+const TASK_B_HOME=String.raw`E:\ZGmini\data\pc-writer`;
+const TASK_B_SOURCE=String.raw`E:\ZGmini\projects\zgmini-earnings-history-pc-release`;
+const TASK_B_WRAPPER=path.win32.join(TASK_B_HOME,'run-local-cnn-minute.vbs');
+const TASK_B_WRAPPER_SHA='73c8cf4381fd328182a9fad0a7cb5753cf9093e58524f0c9a04be4df7032d733';
+const TASK_B_CORE_SHA='dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028';
+const hex=bytes=>createHash('sha256').update(bytes).digest('hex');
+// Fixed-shape diagnostics only; never return command/arguments, account IDs,
+// XML, wrapper source, backup bytes, lock payload or provider credentials.
+export function assessW06TaskBXmlReadonly(xml,coreXml,{systemRoot=String.raw`C:\Windows`}={}){
+ const one=(src,tag)=>[...src.matchAll(new RegExp('<'+tag+'>([^<]+)<\\/'+tag+'>','gi'))]
+  .map(x=>x[1].replaceAll('&quot;','"').replaceAll('&amp;','&'));
+ const cmd=one(xml,'Command'),args=one(xml,'Arguments'),dirs=one(xml,'WorkingDirectory');
+ const user=one(xml,'UserId'),coreUser=one(coreXml,'UserId');
+ const expectedCmd=path.win32.join(systemRoot,'System32','wscript.exe');
+ const samePath=(actual,expected)=>typeof actual==='string'&&
+  path.win32.normalize(actual).toLowerCase()===path.win32.normalize(expected).toLowerCase();
+ return {
+  oneTimeTrigger:hasOnlyApprovedMinuteTrigger(xml),
+  oneExecAction:hasOnlyApprovedSingleExec(xml),
+  commandExact:cmd.length===1&&samePath(cmd[0],expectedCmd),
+  argumentsExact:args.length===1&&args[0]==='"'+TASK_B_WRAPPER+'"',
+  workingDirExact:dirs.length===1&&samePath(dirs[0],TASK_B_SOURCE),
+  principalMatchesCore:user.length===1&&coreUser.length===1&&user[0]===coreUser[0],
+  logonInteractiveToken:xml.includes('<LogonType>InteractiveToken</LogonType>'),
+  runLevelLeastPrivilege:xml.includes('<RunLevel>LeastPrivilege</RunLevel>'),
+  ignoreNew:xml.includes('<MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>'),
+  limitPT30M:xml.includes('<ExecutionTimeLimit>PT30M</ExecutionTimeLimit>'),
+  explicitSettingsEnabled:xml.match(/<Settings(?:\s[^>]*)?>[\s\S]*?<Enabled>(true|false)<\/Enabled>/i)?.[1]??'OMITTED'
+ };
+}
+const recoveryFailure=code=>({
+ status:'STATE_UNKNOWN',code,operation:'W06_TASK_B_FIXED_READ_ONLY_RECONCILIATION',
+ taskPresent:true,taskMutation:0,providerCalls:0,sqliteWrites:0,d1Writes:0
+});
+function safeReadExact(file,max=131072,filesystem=fs){
+ try{const stat=filesystem.lstatSync(file);
+  if(!stat.isFile()||stat.isSymbolicLink()||stat.size<1||stat.size>max)return null;
+  const bytes=filesystem.readFileSync(file);
+  return Buffer.isBuffer(bytes)&&bytes.length===stat.size?bytes:null;
+ }catch{return null;}
+}
+export function inspectW06TaskBRecoveryReadonly({
+ systemRoot=process.env.SystemRoot||String.raw`C:\Windows`,
+ filesystem=fs,run=spawnSync
+}={}){
+ const schtasks=path.win32.join(systemRoot,'System32','schtasks.exe');
+ const query=name=>{
+  const x=run(schtasks,['/Query','/TN',name,'/XML'],{
+   shell:false,windowsHide:true,timeout:15000,maxBuffer:262144,encoding:null});
+  if(x?.error||x?.status!==0||!Buffer.isBuffer(x?.stdout))
+   throw Error('TASK_XML_QUERY_FAILED');
+  return {bytes:x.stdout,xml:decodeTaskXmlBytes(x.stdout)};
+ };
+ try{
+  if(!filesystem.existsSync(schtasks))return recoveryFailure('W06_B_NATIVE_TASK_QUERY_UNAVAILABLE');
+  const task=query(TASK_B),core=query('ZGMINI-PC-Local-Core');
+  const dir=path.win32.join(TASK_B_HOME,'task-create-b',TASK_B_REQUEST);
+  const root=filesystem.lstatSync(dir);
+  if(!root.isDirectory()||root.isSymbolicLink())
+   return recoveryFailure('W06_B_JOURNAL_ROOT_UNSAFE');
+  const backup=safeReadExact(path.win32.join(dir,'ZGMINI-PC-Local-Core.xml'),131072,filesystem);
+  const launcher=safeReadExact(TASK_B_WRAPPER,8192,filesystem);
+  const lock=safeReadExact(path.win32.join(TASK_B_HOME,'writer-source-install.lock'),256,filesystem);
+  const journal=safeReadExact(path.win32.join(dir,'journal.jsonl'),65536,filesystem);
+  return {
+   status:'PASS',code:'W06_B_DISABLED_TASK_RECOVERY_SHAPE_READ',
+   operation:'W06_TASK_B_FIXED_READ_ONLY_RECONCILIATION',
+   taskPresent:true,taskXmlSha256:hex(task.bytes),
+   definition:assessW06TaskBXmlReadonly(task.xml,core.xml,{systemRoot}),
+   launcherPresent:launcher!==null,launcherShaMatches:launcher!==null&&hex(launcher)===TASK_B_WRAPPER_SHA,
+   journalPresent:journal!==null,coreBackupPresent:backup!==null,
+   coreBackupShaMatches:backup!==null&&hex(backup)===TASK_B_CORE_SHA,
+   lockPresent:lock!==null,lockRequestMatches:lock!==null&&lock.toString('utf8')===TASK_B_REQUEST,
+   taskMutation:0,providerCalls:0,sqliteWrites:0,d1Writes:0
+  };
+ }catch{return recoveryFailure('W06_B_RECOVERY_READBACK_UNVERIFIED');}
+}
+
 const SCRIPT=[
  "$ErrorActionPreference='Stop'",
  "$tasks=@(Get-ScheduledTask -ErrorAction Stop | Where-Object {$_.TaskName -match '(?i)^ZGMINI[-_ ]'} | Sort-Object TaskName)",
@@ -78,6 +161,11 @@ export function inspectW06TaskCadenceReadonly({platform=process.platform,
  if(observed?.error||observed?.status!==0||typeof observed?.stdout!=='string'||
    Buffer.byteLength(observed.stdout)>65536)
   return failure('W06_TASK_PROBE_UNAVAILABLE');
- try{return projectW06TaskCadence(JSON.parse(observed.stdout.replace(/^\uFEFF/,'').trim()));}
+ try{
+  const projected=projectW06TaskCadence(JSON.parse(observed.stdout.replace(/^\uFEFF/,'').trim()));
+  if(projected.tasks?.some(x=>x.name===TASK_B))
+   return {...projected,taskRecovery:inspectW06TaskBRecoveryReadonly({systemRoot})};
+  return projected;
+ }
  catch{return failure('W06_TASK_PROBE_PARSE_INVALID');}
 }
