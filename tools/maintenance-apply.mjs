@@ -410,7 +410,7 @@ export async function runApprovedS6FailoverOnce(request,port){
     !/^pc-s6-[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(id??''))
   return result('BLOCKED','S6_ONCE_REQUEST_INVALID');
  const required=['read','attestApproval','captureBaseline','observe','claimOnce',
-  'persist','pauseIntake','waitForDrain','verifyStopGuard','stopOwnTree',
+  'persist','acquireOwnedInstallLease','pauseIntake','waitForDrain','verifyStopGuard','stopOwnTree',
   'resumeIntake','verifyReleaseGuard','releaseOwnedInstallLease',
   'waitForPromotion','now'];
  if(!port||required.some(name=>typeof port[name]!=='function'))
@@ -448,14 +448,19 @@ export async function runApprovedS6FailoverOnce(request,port){
  };
  try{
   await journal('CLAIMED');
-  await journal('INTAKE_PAUSE_ATTEMPT');
+  // Owning the install lease before pausing prevents other B installs from
+  // racing the stopped Controller tree. Never inherit or clear a peer lease.
+  await journal('INSTALL_LEASE_ACQUIRE_ATTEMPT');
   mutationAttempted=true;
+  await port.acquireOwnedInstallLease(request,baseline);
+  await journal('INSTALL_LEASE_ACQUIRED');
+  await journal('INTAKE_PAUSE_ATTEMPT');
   await port.pauseIntake();
   await journal('INTAKE_PAUSED');
   await port.waitForDrain();
   await journal('DRAINED');
   // Verify the exact old owner, independent ancestry, 6 idle seats,
-  // protected before bytes, source SHA and live lease immediately before stop.
+  // protected before bytes, source SHA and live owned lease before stop.
   if(await port.verifyStopGuard(request,baseline)!==true)
    throw fail('S6_ONCE_STOP_GUARD_UNVERIFIED');
   await journal('OLD_TREE_STOP_ATTEMPT');
