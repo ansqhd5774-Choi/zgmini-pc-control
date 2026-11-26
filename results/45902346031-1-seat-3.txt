@@ -1,0 +1,9 @@
+schema=ZGMINI_PC_RESULT_V1
+jobId=run-45902346031-1-seat-3
+status=BLOCKED
+code=REQUEST_FIELDS
+lastPass=EVENT_RECEIVED
+firstFail=EVENT_OR_REQUEST_VALIDATION
+operationalWrites=0
+providerCalls=0
+d1Writes=0
