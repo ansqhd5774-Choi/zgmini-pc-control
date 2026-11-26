@@ -133,3 +133,48 @@ test('native publisher workflow is event-driven, write-scoped, opt-in only',()=>
  assert.match(source,/native-publisher-entry\.mjs/);
  assert.doesNotMatch(source,/controller\\entry\.mjs|writer-b\\windows-adapter\.mjs/);
 });
+
+
+for(const effect of ['A_READONLY','B_WRITER_SOURCE'])test(effect+' preinstalled event-bound grant binds the first actual CI run once',async()=>{
+ const x=fixture(effect);
+ delete x.policy.sourceRunId;
+ x.policy.sourceRunMode='EVENT_COMPLETION_V1';
+ const first=await publishNativeCompletion({...x,effect});
+ assert.equal(first.state,'DISPATCH_ACCEPTED_NOT_EXECUTED');
+ assert.equal(x.readCount(),1);
+ assert.equal(x.ports.readNativeScope!==undefined,true);
+ const again=await publishNativeCompletion({...x,effect});
+ assert.equal(again.code,'CI_NATIVE_DISPATCH_PRIOR_EFFECT_NO_REPOST');
+ assert.equal(x.readCount(),1);
+});
+test('event-bound publisher rejects a source-run attempt 2, unknown source SHA or unapproved policy mode',async()=>{
+ for(const change of [
+  x=>{x.event.workflow_run.run_attempt=2},
+  x=>{x.event.workflow_run.head_sha='f'.repeat(40)},
+  x=>{x.policy.sourceRunMode='UNREVIEWED'}
+ ]){
+  const x=fixture();
+  delete x.policy.sourceRunId;
+  x.policy.sourceRunMode='EVENT_COMPLETION_V1';
+  change(x);
+  const r=await publishNativeCompletion({...x,effect:'A_READONLY'});
+  assert.notEqual(r.dispatched,true);
+  assert.equal(x.readCount(),0);
+ }
+});
+test('event-bound publisher does not accept a future run from a different workflow',async()=>{
+ const x=fixture();
+ delete x.policy.sourceRunId;
+ x.policy.sourceRunMode='EVENT_COMPLETION_V1';
+ x.event.workflow_run.workflow_id=999;
+ const r=await publishNativeCompletion({...x,effect:'A_READONLY'});
+ assert.equal(r.code,'CI_NATIVE_PUBLISH_SOURCE_EVENT_NOT_TARGET');
+ assert.equal(x.readCount(),0);
+});
+test('future-run mode is explicit and cannot silently reuse a fixed-ID grant',async()=>{
+ const x=fixture();
+ x.policy.sourceRunMode='EVENT_COMPLETION_V1';
+ const r=await publishNativeCompletion({...x,effect:'A_READONLY'});
+ assert.equal(r.code,'CI_NATIVE_PUBLISH_SOURCE_EVENT_NOT_TARGET');
+ assert.equal(x.readCount(),0);
+});
