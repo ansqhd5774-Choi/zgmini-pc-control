@@ -3128,3 +3128,13 @@ test('S6 one-shot UNKNOWN journal classification preserves claim/stop uncertaint
  assert.doesNotMatch(JSON.stringify(ioFailure),/SECRET_OWNER_LOCAL_PATH/);
  assert.equal(ioFailure.operationalWrites,0);
 });
+
+test('S6 #3947 approval raw LF bytes stay pinned on Windows read-only A checkout',()=>{
+ const ref='b8fed5bebec6a473730ed0b09ede5b5dc173db53af5cfc1e619e34a45bb8aefd';
+ const attrs=fs.readFileSync(new URL('../.gitattributes',import.meta.url),'utf8');
+ assert.ok(attrs.split(/\r?\n/).includes('approvals/controller-s6/*.json text eol=lf'));
+ const approved=fs.readFileSync(new URL('../approvals/controller-s6/'+ref+'.json',import.meta.url));
+ assert.ok(approved.length>0&&approved.length<32768);
+ assert.equal(approved.includes(Buffer.from('\r\n')),false);
+ assert.equal(createHash('sha256').update(approved).digest('hex'),ref);
+});
