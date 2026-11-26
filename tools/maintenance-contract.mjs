@@ -1270,7 +1270,8 @@ export function assessS6ControllerTransition({phase,baseline,observed,now=Date.n
    return out('S6_OLD_TREE_OR_WMI_NOT_CLEARED');
   if(phase==='STOPPED_HELD'){
    if(observed.maintenanceLeaseHeld!==true||
-      observed.workflowState!=='disabled_manually')
+      observed.workflowState!=='disabled_manually'||
+      observed.watchdogPaused!==true)
     return out('S6_HELD_STOP_BOUNDARY_NOT_ATTESTED');
    // Holding the install lease legitimately blocks the Watchdog. This
    // observation does not permit promotion or release of someone else's lock.
