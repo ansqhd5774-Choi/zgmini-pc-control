@@ -2852,7 +2852,7 @@ export function inspectS6ApprovalPreimageReadonly({
   return projectS6ApprovalPreimageReadonly({
    maintainerSourceSha:maintInstall.sourceSha,
    maintainerFilesVerified:maint.maintenanceFilesVerified===true,
-   controllerFilesVerified:maint.controllerFilesVerified===true,
+   controllerFilesVerified:maint.runtimeSignals?.controllerFilesVerified===true,
    controllerSha:maint.actualControllerSha,
    installLockHeld:maint.installLockReadbackVerified===true?maint.installLockHeld:null,
    watchdogSourceSha256:wdInstall.sha256,
