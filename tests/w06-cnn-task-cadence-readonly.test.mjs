@@ -76,12 +76,12 @@ test('W06 retained disabled Task diagnostic checks exact XML semantics without s
  const task='<Task><Triggers><TimeTrigger><Repetition><Interval>PT1M</Interval></Repetition></TimeTrigger></Triggers>'+
   '<Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy><ExecutionTimeLimit>PT30M</ExecutionTimeLimit><Enabled>false</Enabled></Settings>'+
   '<Principals><Principal><UserId>SAFE_USER</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>'+
-  '<Actions><Exec><Command>C:\\\\Windows\\\\System32\\\\wscript.exe</Command>'+
-  '<Arguments>"E:\\\\ZGmini\\\\data\\\\pc-writer\\\\run-local-cnn-minute.vbs"</Arguments>'+
-  '<WorkingDirectory>E:\\\\ZGmini\\\\projects\\\\zgmini-earnings-history-pc-release</WorkingDirectory>'+
+  '<Actions><Exec><Command>C:\\Windows\\System32\\wscript.exe</Command>'+
+  '<Arguments>"E:\\ZGmini\\data\\pc-writer\\run-local-cnn-minute.vbs"</Arguments>'+
+  '<WorkingDirectory>E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release</WorkingDirectory>'+
   '</Exec></Actions></Task>';
  const core='<Task><Principals><Principal><UserId>SAFE_USER</UserId></Principal></Principals></Task>';
- const exact=assessW06TaskBXmlReadonly(task,core,{systemRoot:'C:\\\\Windows'});
+ const exact=assessW06TaskBXmlReadonly(task,core,{systemRoot:'C:\\Windows'});
  for(const key of ['oneTimeTrigger','oneExecAction','commandExact','argumentsExact',
   'workingDirExact','principalMatchesCore','logonInteractiveToken',
   'runLevelLeastPrivilege','ignoreNew','limitPT30M'])assert.equal(exact[key],true,key);
