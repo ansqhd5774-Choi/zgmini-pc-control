@@ -1097,7 +1097,9 @@ function s6Fixture(options={}){
   releaseOwnedInstallLease:async()=>{add('releaseOwnedInstallLease');
    if(options.failRelease)throw Object.assign(Error('S6_TEST_RELEASE_UNKNOWN'),{code:'S6_TEST_RELEASE_UNKNOWN'});
   },
-  waitForPromotion:async()=>{add('waitForPromotion');}
+  waitForPromotion:async()=>{add('waitForPromotion');},
+  reconcileBacklog:async()=>{add('reconcileBacklog');if(options.failBacklog)
+   throw Object.assign(Error('BACKLOG_REPLAY_OUTCOME_UNKNOWN'),{code:'BACKLOG_REPLAY_OUTCOME_UNKNOWN'});}
  };
  return {port,calls,journal};
 }
@@ -1121,9 +1123,26 @@ test('S6 coordinator keeps exact one-shot owner transitions and never marks the 
  assert.ok(calls.indexOf('resumeIntake')<calls.indexOf('verifyReleaseGuard'));
  assert.ok(calls.indexOf('verifyReleaseGuard')<calls.indexOf('releaseOwnedInstallLease'));
  assert.ok(calls.indexOf('releaseOwnedInstallLease')<calls.indexOf('waitForPromotion'));
+ assert.ok(calls.indexOf('observe:PROMOTED')<calls.indexOf('reconcileBacklog'));
+ assert.equal(calls.filter(x=>x==='reconcileBacklog').length,1);
+ assert.equal(journal.some(x=>x.phase==='BACKLOG_RECONCILED'),true);
  assert.deepEqual(journal.at(-1).phase,'PROMOTED_READBACK_VERIFIED');
  assert.equal(journal.at(-1).status,'POSTCHECK_PENDING');
 });
+test('S6 uncertain backlog POST is never repeated, and never claims A postcheck',async()=>{
+ const {port,calls,journal}=s6Fixture({failBacklog:true});
+ const r=await runApprovedS6FailoverOnce(s6Request(),port);
+ assert.equal(r.status,'RECOVERY_REQUIRED');
+ assert.equal(r.failoverTested,false);
+ assert.equal(r.leaseReleaseAcknowledged,true);
+ assert.equal(calls.filter(x=>x==='reconcileBacklog').length,1);
+ assert.equal(calls.filter(x=>x==='stopOwnTree').length,1);
+ assert.equal(journal.some(x=>x.phase==='BACKLOG_RECONCILE_ATTEMPT'),true);
+ assert.equal(journal.some(x=>x.phase==='BACKLOG_RECONCILED'),false);
+ assert.equal(journal.at(-1).phase,'RECOVERY_REQUIRED');
+ assert.equal(calls.includes('resumeIntake'),true);
+});
+
 test('S6 coordinator refuses duplicate, wrong operation, unverifiable approval or busy seats without effect',async()=>{
  for(const [request,opts,code] of [
   [{...s6Request(),operation:'controller-update'}, {}, 'S6_ONCE_REQUEST_INVALID'],
