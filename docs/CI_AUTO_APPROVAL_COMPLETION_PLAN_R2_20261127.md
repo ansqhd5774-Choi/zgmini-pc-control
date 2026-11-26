@@ -696,3 +696,23 @@
 - 우리 [PR #4126](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4126)은 최신 main과 `dirty` 충돌임을 확인해 무리한 동기화·소스 덮어쓰기/중복 병합 대신 [superseded 판정 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4126#issuecomment-7204145981)을 게시한 뒤 **closed/unmerged** 확인. 전용 브랜치 기록은 보존. 위 §26의 #4126 `queued` 상태는 최초 관측 기록이며 현재 정본은 #4125 main 구현.
 - 해당 source fix는 #4117 과거 `RESULT_PAIR_REF_CONFLICT_UNTOUCHED` 결과 0/2를 소급 복원하지 않으며, 현재 Native A/Writer B root·플래그 미설정과 Controller B `false/empty` 업무 승인 미구성도 해소하지 않는다. 사용자 C급/보안 변경 추가 승인 없이 정책·변수를 작성·활성화하지 않는다. **실제 무인 종단 A·Writer B·Controller B 0/3** 유지.
 - 다음 필수 실행: 기존 #4117 결과 미확정 보존 및 새로운 정규 승인 업무의 정확 소스/업무 원본과 독립 Owner B installed policy/proof readback. 기설치 승인·보안설정 범위가 실제로 입증된 효과부터 정규 workflow_run → 영구 단회 dispatch → PC 실행 → JSON/TXT 효과 원본을 확인. 미확인 효과를 다른 운영 프로세스의 복구 대기로 확대하지 않음.
+
+## 27. 스물세 번째 실행 기록 — 승인 근거 경로와 실제 자동 발행 구현의 불일치 확인 (2026-11-27 KST)
+
+### 원본 readback — Source PASS와 업무 승인 미연결 구분
+
+- 담당 브랜치 시작 HEAD `a6677ef9f0266d99f2db921e4e9f1321c5e12d97` 및 계획 §26을 계승. [PR #4125](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4125) 병합 `2022e2270690d83bbabda9196abcf7bc38ceeaf6`은 기존 결과 업로더의 source-only 수정이며 과거 [#4117](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4117)의 JSON/TXT 0/2를 복원하지 않는다. 원본 #4117 OPEN/결과 미발행 보존, 재실행 0.
+- Native A/Writer B 실측 [#4113](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4113) `CI_NATIVE_LOCAL_ROOTS_NOT_CONFIGURED`는 독립 scope/receipt root, 4개 플래그의 미설정 증거이며 그 안의 승인 원본 파일이 존재하지 않는다고 단정하지 않는다.
+- Controller B 현장 [#4117](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4117) 로그는 `ZGMINI_CI_CONTROLLER_B_ENABLED=false`, `ZGMINI_CI_CONTROLLER_B_POLICY` 빈 값. 설치된 Receiver 정책 CAS [#4100](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4100) PASS와 구별. 설정 false/empty를 원본 승인 부재 또는 설치 실패로 치환하지 않는다.
+- [#4038](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4038)은 `closed/not_planned`. 단일 Owner-native 수동 JSON 댓글을 기존 자동화의 필수 신규 Gate로 요구하지 않는다는 정정 댓글을 확인했다. 이를 재개하거나 사용자에게 수동 댓글을 요구하지 않는다. 다만 이 종결 자체가 운영 Publisher에게 신뢰 권한을 부여하지도 않는다.
+- **현 소스에서 실질 조건 불일치 확인:** `ci-approval/completed-run-intake.mjs`의 `createAutoApprovalContextReader`, `createConfiguredSelectivePreparer`는 `policy.delegationPin`의 issue/comment/body SHA를 필수로 요구하고; `ci-approval/controller-candidate-review.mjs::prepareSelectiveApprovalPublication`은 `collectDelegatedScope`로 수동 Owner 출처·활성 Issue 및 시간/바이트를 대조한다. `tools/maintenance-request.mjs`의 자동 Controller B 제출은 `ctx.delegation` 없이 진행하지 않는다. **이것은 현 파일럿 경로의 소스 요구조건이지 기존 사용자 승인 A/B 전체의 유일하게 적법한 증명 방식이라는 뜻이 아니다.** 검사를 삭제하거나 CI/앱 댓글을 Owner로 위장하는 수정은 금지한다.
+- [#4036](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4036)은 `SUCCEEDED / APPROVED_UPDATE_AND_DIAGNOSTIC_VERIFIED`, 실제 Controller `3c7d4cfefacf072fd35cb19706b352c64c5e4fd2`, JSON/TXT 발행이 확인된 **기존 수동 승인 운영 설치**다. 이 효과에 신규 CI 자동 발행 Issue를 제출하면 중복 실행 위험이 있으므로 최초 무인 실증에 사용하지 않는다.
+
+### 후속 필수 실행 순서
+
+1. **P1 소스 연결 최소 보완:** 기존 운영 Owner 승인·독립 설치 영수증·정확한 B manifest/업무 범위를 보호된 원본 바이트로 대조할 수 있는 경로가 있는지 확인한다. 기존 `delegationPin`만 강제하는 파일럿 경로와 별도로, 기존 수신기의 실제 인증/승인 증명을 그대로 충족하는 최소 구현이 가능할 때만 해당 코드와 범위별 거절 회귀를 추가한다. 검증 없이 위임 검사를 생략하지 않는다.
+2. Native A/Writer B는 기존 승인된 B-installed proof와 독립 scope/receipt root의 운영 실체·Owner 범위가 확보된 효과부터 정규 설정 연결을 검증한다. 단순 `ENABLED=true` 또는 빈 root 생성으로 해결하지 않는다.
+3. Controller B는 현재 설치된 정책 CAS PASS를 재사용한다. 새 **이미 승인된 미실행 업무**와 독립 업무 승인 원본, 정규 Publisher 인증·영구 receipt root가 검증될 때에만 정확 설정을 반영하고 자연 CI→단회 발행→독립 유지보수기 실행→JSON/TXT·SHA readback을 수행한다. #4036/#4117 재발행 금지.
+4. 세 효과 모두 승인·발행·실제 실행이 관측된 경우에만 실운영 분자를 증가시킨다. 현시점 **실제 CI 무인 종단 0/3 (0%)**. 신규 PC 운영 쓰기/보안 설정 변경/Runner 재설치/새 예약 0.
+
+**판정:** 진단으로 추가된 것은 특정 파일럿의 승인 증명 구현과 사용자 결정의 불일치다. 소스 교정·운영 설정 연결·신규 무인 실증은 각각 미완료이며, 현재 확인된 정보만으로 임의 정책을 발행하지 않는다.
