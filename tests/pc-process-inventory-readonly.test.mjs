@@ -425,6 +425,17 @@ test('CI installed policy readback never exposes the CI installed policy or loca
  assert.equal(absent.manifestReadable,true);
  const present=inspectCiControllerBReceiverReadOnly(fake(JSON.stringify({...base,ciControllerBPolicy:policy})));
  assert.equal(present.policyState,'PRESENT_FORMAT_ONLY');
+ assert.equal(present.approvedV2PinMatches,false);
+ const v2=inspectCiControllerBReceiverReadOnly(fake(JSON.stringify({...base,
+  sourceSha:'08c0df1c4315019d85502dca2b0e4fd980eef48a',
+  ciControllerBPolicy:{...policy,workflowBlobSha:'d3c175329a7ac955f5b45ce2b13dad78ce272d9a'}})));
+ assert.equal(v2.policyState,'PRESENT_FORMAT_ONLY');
+ assert.equal(v2.approvedV2PinMatches,true);
+ const mismatchedId=inspectCiControllerBReceiverReadOnly(fake(JSON.stringify({...base,
+  sourceSha:'08c0df1c4315019d85502dca2b0e4fd980eef48a',
+  ciControllerBPolicy:{...policy,workflowId:430972395,
+   workflowBlobSha:'d3c175329a7ac955f5b45ce2b13dad78ce272d9a'}})));
+ assert.equal(mismatchedId.approvedV2PinMatches,false);
  assert.equal(present.installedSourceIntegrityAsserted,false);
  assert.equal(present.executionAuthorized,false);
  assert.equal(present.operationalWrites,0);
