@@ -10,7 +10,7 @@ const req=(phase,sourceIssueNumber)=>({schema:'ZGMINI_CI_RECEIPT_PROOF_REQUEST_V
  operation:'ci-controller-b-receipt-proof',phase,
  requestId:phase==='write'?'658bab72-9508-4bd9-99a2-ec693159a8b3':'f2a19b3e-4e8b-49c3-b167-54e32225f194',
  ...(phase==='verify'?{sourceIssueNumber}:{})});
-const event=(number=100,phase='write',source=100)=>({action:'opened',repository,
+const event=(number=100,phase='write',source=100)=>({action:'opened',repository:{...repository},
  sender:{login:owner},issue:{number,state:'open',title:'ci-controller-b-receipt-proof',
  user:{login:owner},body:JSON.stringify(req(phase,source))}});
 const ctx=(runId=2001)=>({eventName:'issues',repository:repository.full_name,actor:owner,
