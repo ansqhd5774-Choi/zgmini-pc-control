@@ -411,6 +411,7 @@ export async function runApprovedS6FailoverOnce(request,port){
   return result('BLOCKED','S6_ONCE_REQUEST_INVALID');
  const required=['read','attestApproval','captureBaseline','observe','claimOnce',
   'persist','acquireOwnedInstallLease','pauseIntake','waitForDrain','verifyStopGuard','stopOwnTree',
+  'waitForStoppedHeld',
   'resumeIntake','verifyReleaseGuard','releaseOwnedInstallLease',
   'waitForPromotion','now'];
  if(!port||required.some(name=>typeof port[name]!=='function'))
@@ -466,6 +467,9 @@ export async function runApprovedS6FailoverOnce(request,port){
   await journal('OLD_TREE_STOP_ATTEMPT');
   await port.stopOwnTree(request,baseline); // NEVER kill from the coordinator
   await journal('OLD_TREE_STOP_SUBMITTED');
+  // Supervisor tree termination and Watchdog's next paused tick are not
+  // instantaneous. An authenticated, bounded, read-only wait is mandatory.
+  await port.waitForStoppedHeld(request,baseline);
   await observe('STOPPED_HELD');
   await journal('OLD_TREE_STOP_VERIFIED');
   await journal('INTAKE_RESUME_ATTEMPT');
