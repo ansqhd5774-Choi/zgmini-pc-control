@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {PROBE,projectW06TaskCadence,inspectW06TaskCadenceReadonly,assessW06TaskBXmlReadonly,inspectW06TaskBRecoveryReadonly,classifyW06TaskRunLevel,verifyW06RecoveryMarker} from
+import {PROBE,projectW06TaskCadence,inspectW06TaskCadenceReadonly,assessW06TaskBXmlReadonly,inspectW06TaskBRecoveryReadonly,classifyW06TaskRunLevel,verifyW06RecoveryMarker,projectW06HttpChecksReadonly,inspectW06HttpChecksReadonly} from
  '../controller/w06-cnn-task-cadence-readonly.mjs';
 
 const sample=(extra={})=>({schema:'ZGMINI_W06_CNN_TASK_CADENCE_RAW_V1',
@@ -129,4 +129,61 @@ test('W06 recovery read-only classifies exact one-shot claim and completion with
  assert.equal(verifyW06RecoveryMarker(Buffer.from(JSON.stringify({...JSON.parse(claim),requestId:'FOREIGN'}))),false);
  assert.equal(verifyW06RecoveryMarker(Buffer.from(JSON.stringify({...JSON.parse(complete),additional:'SHOULD_NOT_BE_EXPORTED'})),{complete:true}),false);
  assert.equal(verifyW06RecoveryMarker(null),false);
+});
+
+test('W06 HTTP PC read-only separates 60s attempted GET from D1 publication',()=>{
+ const now=Date.parse('2026-11-26T15:20:00.000Z');
+ const rows=[{snapshot_key:'2026-11-26',body:JSON.stringify({
+  version:'CNN_HTTP_CHECKS_R1',date:'2026-11-26',
+  checks:[
+   {requestedAt:Date.parse('2026-11-26T11:45:35.000Z'),
+    checkedAt:Date.parse('2026-11-26T11:45:35.868Z'),
+    httpStatus:200,outcome:'VERIFIED',sourceObservedAt:'2026-11-26T01:59:59.000Z',score:15},
+   {requestedAt:Date.parse('2026-11-26T15:11:10.000Z'),
+    checkedAt:Date.parse('2026-11-26T15:11:10.200Z'),
+    httpStatus:429,outcome:'HTTP_FAILED',sourceObservedAt:null,score:null},
+   {requestedAt:Date.parse('2026-11-26T15:19:10.000Z'),
+    checkedAt:Date.parse('2026-11-26T15:19:11.000Z'),
+    httpStatus:null,outcome:'FETCH_FAILED',sourceObservedAt:null,score:null}
+  ]})}];
+ const x=projectW06HttpChecksReadonly(rows,{observedAtMs:now});
+ assert.equal(x.status,'READ');
+ assert.equal(x.twoDayCount,3);
+ assert.equal(x.afterActivationCount,2);
+ assert.equal(x.recentTenMinutesCount,2);
+ assert.equal(x.verifiedCount,1);
+ assert.equal(x.verifiedAfterActivation,0);
+ assert.equal(x.http2xxCount,1);
+ assert.equal(x.http429Count,1);
+ assert.equal(x.fetchFailedCount,1);
+ assert.equal(x.latestOutcome,'FETCH_FAILED');
+ assert.doesNotMatch(JSON.stringify(x),/sourceObservedAt|score|PRIVATE|SECRET/);
+ const unsafe=projectW06HttpChecksReadonly([
+  {snapshot_key:'2026-11-26',body:JSON.stringify({
+   version:'CNN_HTTP_CHECKS_R1',date:'2026-11-26',
+   checks:[{checkedAt:'SECRET',requestedAt:now,httpStatus:200,outcome:'VERIFIED'}]})}
+ ],{observedAtMs:now});
+ assert.equal(unsafe.status,'UNVERIFIED');
+});
+test('W06 HTTP evidence uses bounded native SQLite read-only query without mutation',()=>{
+ let readOnly=false,sql='',params=[],closed=false;
+ const now=Date.parse('2026-11-26T15:20:00.000Z');
+ const v=inspectW06HttpChecksReadonly({
+  filesystem:{lstatSync:p=>{assert.match(p,/core\.sqlite$/);return {
+   isFile:()=>true,isSymbolicLink:()=>false,size:16*1024*1024}}},
+  connect:(p,opts)=>{readOnly=true;return {
+   exec:q=>{assert.equal(q,'PRAGMA query_only=ON')},
+   prepare:q=>{sql=q;return {all:(...args)=>{params=args;return []}}},
+   close:()=>{closed=true}}},clock:()=>now
+ });
+ assert.equal(readOnly,true);
+ assert.equal(v.status,'READ');
+ assert.equal(v.twoDayCount,0);
+ assert.equal(closed,true);
+ assert.match(sql,/kind='input'/);
+ assert.match(sql,/fear-greed-http-checks/);
+ assert.doesNotMatch(sql,/INSERT|UPDATE|DELETE|DROP|ALTER/i);
+ assert.deepEqual(params,['2026-11-25','2026-11-26']);
+ assert.equal(inspectW06HttpChecksReadonly({
+  filesystem:{lstatSync:()=>{throw Error('NO_DB')}}}).status,'UNVERIFIED');
 });
