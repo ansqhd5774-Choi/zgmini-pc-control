@@ -35,8 +35,8 @@ const run=(exe,args,{cwd=SOURCE_ROOT,timeout=20000}={})=>{
  return p.stdout;
 };
 const digest=b=>createHash('sha256').update(b).digest('hex');
-const nativeTask=name=>decodeTaskXmlBytes(run(BIN.schtasks,
- ['/Query','/TN',name,'/XML']));
+const nativeTaskRaw=name=>run(BIN.schtasks,['/Query','/TN',name,'/XML']);
+const nativeTask=name=>decodeTaskXmlBytes(nativeTaskRaw(name));
 function taskPresent(name){
  // A successful fixed Task inventory query proves absence; a failed per-name
  // query is NOT interpreted as Task absence (may be ACL or scheduler error).
@@ -77,10 +77,10 @@ export function createOperatingTaskCreateBPort(proof){
  let held=null,original=null,account=null,taskDefinition=null,enabledDefinition=null;
  const protectedTaskNames=[CORE,KOREA,WRITER];
  const snapshots=()=>Object.fromEntries(protectedTaskNames.map(name=>{
-  const xml=nativeTask(name);return [name,{raw:xml,hash:digest(Buffer.from(xml,'utf16le'))}];
+  const bytes=nativeTaskRaw(name);return [name,{bytes,hash:digest(bytes)}];
  }));
  const coreXml=()=>nativeTask(CORE);
- const coreHash=()=>digest(Buffer.from(coreXml(),'utf16le'));
+ const coreHash=()=>digest(nativeTaskRaw(CORE));
  const protectedProof=()=>{
   const state=installedSource();
   return state.installedSourceSha===INSTALLED_SOURCE&&
@@ -88,7 +88,7 @@ export function createOperatingTaskCreateBPort(proof){
    coreHash()===m.coreTaskXmlSha256&&
    digest(scopedFile(SIDE,131072))===m.sidecarSourceSha256&&
    (!original||protectedTaskNames.every(name=>
-    snapshots()[name].raw===original[name].raw));
+    snapshots()[name].bytes.equals(original[name].bytes)));
  };
  const taskMatches=(xml,expectedEnabled)=>{
   // Scheduler may reserialize XML. Compare the fixed execution semantics,
@@ -121,10 +121,11 @@ export function createOperatingTaskCreateBPort(proof){
    held=acquireInstallLock({journalRoot:JOURNAL,requestId,sharedLock:LOCK});
   },
   async observe(){
-   const src=installedSource(),core=coreXml();
+   const src=installedSource(),coreBytes=nativeTaskRaw(CORE);
+   const core=decodeTaskXmlBytes(coreBytes);
    account=xmlUser(core);
    return {...src,taskExists:taskPresent(TASK),wrapperExists:fs.existsSync(WRAPPER),
-    coreTaskXmlSha256:digest(Buffer.from(core,'utf16le')),
+    coreTaskXmlSha256:digest(coreBytes),
     sidecarSourceSha256:digest(scopedFile(SIDE,131072)),
     coreTaskEnabled:taskEnabled(core),unrelatedTaskMutation:false};
   },
@@ -139,8 +140,8 @@ export function createOperatingTaskCreateBPort(proof){
    // The backup is local to the previously claimed private data root.
    for(const [name,obj] of Object.entries(original)){
     const p=path.win32.join(backing,name+'.xml');
-    fs.writeFileSync(p,obj.raw,{flag:'wx'});
-    need(fs.readFileSync(p,'utf8')===obj.raw,'TASK_CREATE_B_BACKUP_READBACK_STOP');
+    fs.writeFileSync(p,obj.bytes,{flag:'wx'});
+    need(fs.readFileSync(p).equals(obj.bytes),'TASK_CREATE_B_BACKUP_READBACK_STOP');
    }
   },
   async createLauncherExclusive(dest,bytes){
