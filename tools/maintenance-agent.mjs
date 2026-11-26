@@ -371,6 +371,8 @@ function resultComment(result,uploadStatus=null){
     ...(result.originalFailureCode?[`ORIGINAL_FAILURE_CODE: ${result.originalFailureCode}`,
       `ROLLBACK_FAILURE_CODE: ${result.rollbackFailureCode??'NONE'}`]:[]),
     `PROTECTED_STATE_UNCHANGED: ${result.protectedStateUnchanged??'UNVERIFIED'}`,
+    ...(result.ciNativeEffect?[`CI_NATIVE_EFFECT: ${result.ciNativeEffect}`,
+      `CI_NATIVE_POLICY_SHA256: ${result.ciNativePolicySha256}`]:[]),
     `WORKFLOW_ENABLED: ${result.workflowEnabled??'UNVERIFIED'}`,
     ...(result.sourceInventory?.filter(row=>row.state!=='OLD').map(row=>
       `R54_SOURCE_DRIFT: ${row.path} ${row.state} ${row.actual??'MISSING'}`)??[]),
@@ -570,10 +572,25 @@ export function createMaintenanceAgent({
         throw coded("MAINTENANCE_RESULT_LEDGER_INVALID");
       // Operation comes from the newly authenticated Issue envelope, not an
       // unpinned ledger field. Older ledgers intentionally lack operation.
-      const safeResult=normalizedResult({requestId:entry.requestId,
+      let safeResult=normalizedResult({requestId:entry.requestId,
         targetControllerSha:entry.targetControllerSha,operation},entry.result,entry.result.code);
       if(safeResult.status!==entry.result.status)
         throw coded("MAINTENANCE_RESULT_LEDGER_INVALID");
+      // A successful Owner-B attestation has already been bound to its
+      // validated manifest before ledger commit. Reconstruct the exact
+      // bounded fields during crash-safe readback; normalizer drops unknown
+      // child stdout fields and must never silently strip this trusted proof.
+      const native=entry.result;
+      if(entry.actor==="ansqhd5774-Choi"&&operation==='controller-update'&&
+         entry.status==='SUCCEEDED'&&safeResult.status==='SUCCEEDED'&&
+         safeResult.actualControllerSha===entry.targetControllerSha&&
+         safeResult.protectedStateUnchanged===true&&
+         ['A_READONLY','B_WRITER_SOURCE'].includes(native.ciNativeEffect)&&
+         SHA256.test(native.ciNativePolicySha256??'')&&
+         SHA256.test(entry.bodyDigest??'')&&SHA256.test(entry.fingerprint??'')){
+        safeResult={...safeResult,ciNativeEffect:native.ciNativeEffect,
+          ciNativePolicySha256:native.ciNativePolicySha256};
+      }
       await uploadOneResult(entry.requestId,"json",JSON.stringify(safeResult,null,2)+"\n");
       await uploadOneResult(entry.requestId,"txt",resultComment(safeResult)+"\r\n");
       status="VERIFIED";code="REPORT_UPLOAD_VERIFIED";
