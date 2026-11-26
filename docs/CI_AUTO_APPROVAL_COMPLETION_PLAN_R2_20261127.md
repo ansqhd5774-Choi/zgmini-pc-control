@@ -1008,3 +1008,27 @@
 
 **종단 실제 무인 자동화 A/Writer B/Controller B 0/3 (0%) 변동 없음.**
 
+## 39. 서른다섯 번째 실행 기록 — R6 장애 보류 안전 소스 PR #4160 CI 3/3 통과 및 main 병합 (2026-11-27 KST)
+
+### 사용자 최신 경계
+
+- **Controller 담당자가 작업 완료를 알려주기 전까지** 실제 운영 R6 복구/Runtime 조회, Controller B 설치·정책 변경·활성화, Runner·Watchdog·Supervisor·lease 조작, PC A/B/C 요청을 진행하지 않는다. 사용자 승인 보류 `USER_DEFERRED`는 변경 없음. 완료 통보도 신규 Owner B 승인이 아니다.
+- Supervisor alive/fresh, R6 HEALTHY, Standby IPC READY 2/2 독립 원본의 **3조건 충족 검토 및 그 시점 정책 scope/현재 CAS 재검토**는 Controller 복구 담당 완료 통보 이후로 유예. 기존 #4157/#4158/#4159 과거 실패 관측을 새 성공으로 바꾸지 않았다.
+
+### 소스-only PR #4160 정확 HEAD 실행
+
+- 기존 [Draft PR #4160](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4160) Source HEAD **`540bc25f025bd559cb1ea3c28f6cdb342ae303ae`**가 이전 조회 시 C996 queued였으나, **이번 실제 GitHub 완료 readback에서 CI 3/3 성공**:
+  - [Controller Maintenance Source 45908757271](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45908757271) `completed/success`
+  - [ZGMINI PC Secret Scan 45908757250](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45908757250) `completed/success`
+  - [C996 R5 Readonly Source 45908757295](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45908757295) `completed/success`
+- 정확 변경 2파일로 제한됨: `proposals/maintenance-handoffs/905c0b1806a3988f39400dc82536fd753b9ff764.json`, `tests/ci-controller-b-policy-only-proposal.test.mjs`. 제안 원본은 `approved:false`·`approvalHold.state=USER_DEFERRED`·`approvalHold.authorization=NONE`, 기존 9개 SHA256 pin 보존. 회귀시험은 보류 해제를 가정하더라도 새 Owner 승인 없이 정규 설치 계약이 거부됨을 증명하고, 과거 Supervisor 중단/A 일반 수집 PASS/Runner 6 Online을 구분한다. **운영 workflows, approvals/, 설치 파일, Runner/Watchdog/lease 등에는 diff가 없다**.
+- 정확 HEAD 3/3 PASS 및 source-only 2파일임을 검증 후 PR #4160을 Draft→Ready로 전환하고 **squash merge `73c384e67e62d22ded1de528d79cafa8dee5a020`**. 실제 GitHub `main` 재조회가 정확 병합 SHA, PR `merged=true`임을 확인. `main` 원본 `proposals/` blob `798e197bfc8e920d453fd49d02580fd3568a16be` (`approved:false`, `USER_DEFERRED`), test blob `46d0a035bcd720f71c1dbd7c729345dd7ea92aee` 확인.
+- **Production `.github/workflows/ci-approval-controller-b.yml` blob `27e48ecde81bdf6f15cccffcffd9b3e70482a5f3` 유지**, [운영 후보 PR #4152](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4152) `Draft/open/unmerged`; 실행용 `approvals/maintenance-handoffs/905c0b1806a3988f39400dc82536fd753b9ff764.json`는 `main`에 **없음**. PC job 신규 요청·운영 B 설치·보안 변수·Watchdog/Runner/Supervisor/lease/DB/D1 수정 **0건**.
+
+### 다음 작업
+
+- Controller 복구 담당자의 완료 통보가 올 때까지 **모든 운영 변경 보류**. 별도 PC 재진단·R6 재활성화·B 재시도 수행 금지.
+- 승인 없이 가능한 것은 기존 원본 증거와 비운영 소스의 정합성 검토만. 복구 완료 통보 후에도 세 복구 조건 충족을 실제 원본으로 확인한 다음 새 CAS·정확 정책 범위 검토, Owner 명시적 새 승인 전 B 인계 불가.
+
+**종료: 실제 무인 A/Writer B/Controller B 종단 0/3 (0%). 비운영 Source CI/병합은 별개 완료.**
+
