@@ -1,0 +1,81 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-45864401383-1-seat-6",
+  "requestId": "pc-d11816fe-2ace-426c-873b-dabffebd3bea",
+  "startedAt": "2026-11-26T17:04:00.529Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "182bb46f2838306ba40d8b4ec32bac40ab75b69a",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "4a13569367ff0f1afc5138f971d86a8fa99c3329",
+  "sourceBranch": "main",
+  "operation": "cnn-public-d1-api-readback-readonly",
+  "seat": 6,
+  "status": "PASS",
+  "code": "CNN_SQLITE_D1_API_1D_1W_MATCHED",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": true,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-w06-post-install-public-readback-20261127",
+  "effectClass": "REGISTERED_OPERATION",
+  "pcOperationalApprovedSha": "714d392ca079daa9fdb789f73762c407be3321a2",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "CNN_SQLITE_D1_API_1D_1W_MATCHED",
+    "local": {
+      "status": "READ",
+      "date": "2026-11-26",
+      "observedCount": 1,
+      "checkedCount": 1,
+      "lastObservedAt": "2026-11-26T01:59:59.000Z",
+      "lastCheckedAt": "2026-11-26T11:45:35.868Z",
+      "currentScore": 14.9967450271248
+    },
+    "d1": {
+      "status": "MATCHED",
+      "date": "2026-11-26",
+      "observedCount": 1,
+      "checkedCount": 1,
+      "lastObservedAt": "2026-11-26T01:59:59.000Z",
+      "lastCheckedAt": "2026-11-26T11:45:35.868Z",
+      "observedStoredAt": 1795689353820,
+      "checkedStoredAt": 1795693535868,
+      "observedBodySha256": "ad62cc537d92ffd5a5710b757afa9956d5c780beca7a804be1abcb45ca48f30a",
+      "checkedBodySha256": "2b4b4d08dc808a649926a03d030d27b92a50ac044802252e777312f837d7622b"
+    },
+    "api": {
+      "status": "MATCHED",
+      "periods": {
+        "1D": {
+          "httpStatus": 200,
+          "status": "MATCHED",
+          "observedMatch": true,
+          "checksMatch": true
+        },
+        "1W": {
+          "httpStatus": 200,
+          "status": "MATCHED",
+          "observedMatch": true,
+          "checksMatch": true
+        }
+      }
+    },
+    "sameDayMatched": true,
+    "publicPeriodsMatched": true,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "operationalWrites": 0,
+    "sqliteOpened": true
+  },
+  "protectedBeforeSha256": "39cd13a192ff37cc667d9b227b9740123f9698e96d7b36c05a734bf8d8a102ca",
+  "protectedAfterSha256": "39cd13a192ff37cc667d9b227b9740123f9698e96d7b36c05a734bf8d8a102ca",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "182bb46f2838306ba40d8b4ec32bac40ab75b69a",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-26T17:04:15.446Z",
+  "durationMs": 14917
+}
