@@ -16,6 +16,22 @@ const TASK_B_WRAPPER=path.win32.join(TASK_B_HOME,'run-local-cnn-minute.vbs');
 const TASK_B_WRAPPER_SHA='73c8cf4381fd328182a9fad0a7cb5753cf9093e58524f0c9a04be4df7032d733';
 const TASK_B_CORE_SHA='dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028';
 const hex=bytes=>createHash('sha256').update(bytes).digest('hex');
+const RECOVERY_REQUEST='5b012ae0-5a2b-4fb9-92a6-72754de915c3';
+// Probes only exact known one-shot markers; never exports their contents.
+export function verifyW06RecoveryMarker(bytes,{complete=false}={}){
+ if(!Buffer.isBuffer(bytes)||bytes.length>2048)return false;
+ try{
+  const v=JSON.parse(bytes.toString('utf8'));
+  const keys=Object.keys(v).sort();
+  const fields=(complete?['schema','originRequestId','requestId','status']:
+   ['schema','originRequestId','requestId','status']).sort();
+  return JSON.stringify(keys)===JSON.stringify(fields)&&
+   v.schema===(complete?'ZGMINI_TASK_RECOVERY_COMPLETE_V1':'ZGMINI_TASK_RECOVERY_CLAIM_V1')&&
+   v.originRequestId===TASK_B_REQUEST&&v.requestId===RECOVERY_REQUEST&&
+   v.status===(complete?'VERIFIED':'CLAIMED');
+ }catch{return false}
+}
+
 // Evaluate the effective scheduler privilege independently from XML.
 // Task Scheduler may omit a default RunLevel when reserializing an XML Task.
 export function classifyW06TaskRunLevel(xml,nativeValue){
@@ -89,6 +105,10 @@ export function inspectW06TaskBRecoveryReadonly({
   const launcher=safeReadExact(TASK_B_WRAPPER,8192,filesystem);
   const lock=safeReadExact(path.win32.join(TASK_B_HOME,'writer-source-install.lock'),256,filesystem);
   const journal=safeReadExact(path.win32.join(dir,'journal.jsonl'),65536,filesystem);
+  const claimPath=path.win32.join(dir,'recovery-claim.json');
+  const completePath=path.win32.join(dir,'recovery-completed.json');
+  const claim=safeReadExact(claimPath,2048,filesystem);
+  const completed=safeReadExact(completePath,2048,filesystem);
   // Fixed, read-only TaskScheduler CIM property; never mutate the Task.
   // No principal or execution arguments leave the operating PC.
   let nativeRunLevel=null;
@@ -117,6 +137,10 @@ export function inspectW06TaskBRecoveryReadonly({
    journalPresent:journal!==null,coreBackupPresent:backup!==null,
    coreBackupShaMatches:backup!==null&&hex(backup)===TASK_B_CORE_SHA,
    lockPresent:lock!==null,lockRequestMatches:lock!==null&&lock.toString('utf8')===TASK_B_REQUEST,
+   recoveryClaimPresent:filesystem.existsSync(claimPath),
+   recoveryClaimMatches:verifyW06RecoveryMarker(claim),
+   recoveryCompletedPresent:filesystem.existsSync(completePath),
+   recoveryCompletedMatches:verifyW06RecoveryMarker(completed,{complete:true}),
    taskMutation:0,providerCalls:0,sqliteWrites:0,d1Writes:0
   };
  }catch{return recoveryFailure('W06_B_RECOVERY_READBACK_UNVERIFIED');}
