@@ -27,7 +27,7 @@ export const sha256=sha;
 const REQUEST_KEYS=['schema','requestId','operation','approvalManifestPath',
  'approvalManifestSha256'];
 const MANIFEST_KEYS=['schema','status','scope','taskName','installedSourceSha',
- 'sourceRoot','wrapperPath','launcherSha256','disabledTemplateSha256',
+ 'candidateSourceSha','candidateFileSha256','sourceRoot','wrapperPath','launcherSha256','disabledTemplateSha256',
  'enabledTemplateSha256','coreTaskXmlSha256','sidecarSourceSha256',
  'allowCnnHttpRequests','allowSqliteObservationWrites',
  'allowD1PublicProjectionWrites','allowOtherTaskChanges','runCount'];
@@ -52,6 +52,8 @@ export function authorizeTaskCreateB({event,manifestBytes,manifestCommitted=fals
   manifest.schema===APPROVAL_SCHEMA&&manifest.status==='APPROVED_B'&&
   manifest.scope==='W06_ONE_TASK_CREATE_AND_ENABLE_WITH_CNN_RUNTIME_EFFECTS'&&
   manifest.taskName===TASK&&manifest.installedSourceSha===INSTALLED_SOURCE&&
+  /^[a-f0-9]{40}$/.test(manifest.candidateSourceSha??'')&&
+  H64.test(manifest.candidateFileSha256??'')&&
   manifest.sourceRoot===SOURCE_ROOT&&manifest.wrapperPath===WRAPPER&&
   H64.test(manifest.launcherSha256??'')&&
   H64.test(manifest.disabledTemplateSha256??'')&&
