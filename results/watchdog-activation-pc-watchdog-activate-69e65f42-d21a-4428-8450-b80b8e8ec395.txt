@@ -1,0 +1,7 @@
+schema=ZGMINI_PC_WATCHDOG_ACTIVATION_B_RESULT_V1
+requestId=pc-watchdog-activate-69e65f42-d21a-4428-8450-b80b8e8ec395
+status=PASS
+code=WATCHDOG_GUARDIAN_NEW_RUNTIME_ATTESTED
+newProcessAttested=true
+watchdogFileWrites=0
+next=VERIFY_R4_ACTIVE_AND_STANDBY_RUNTIME
