@@ -3,9 +3,9 @@
   "transition": "SEVEN_TO_SEVEN",
   "installedSha": "05ef3bd6b5dc753c5abfbecccacc09375eb18d10",
   "targetSha": "cfe57f3d720219613c87eff21338de0d35edbf6b",
-  "approved": true,
+  "approved": false,
   "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
-  "approvalBasis": "CANDIDATE ONLY until independently Owner-native merged under the existing user-approved CI Controller B automatic approval source/policy work and normal independent Windows maintainer handoff contract. Approved=true is the formal receiver schema field, not a new Owner authorization, not an approval to publish a Controller B business effect and not permission to bypass fresh PC CAS, native Windows operator identity, stopped-receiver proof, leases, backup or rollback. This exact candidate replaces one maintainer runtime file (S6 unknown-result reason categorization from merged PR #3954) and rotates only CI publisher Workflow blob to the verified immutable PR #3963 merged source. Never merge or apply solely on the basis of GitHub CI.",
+  "approvalBasis": "UNAPPROVED DRAFT: Owner-native approval of the exact independent seven-to-seven maintenance source and CI receiver workflow policy effect is not on record. The actual handoff receiver enforces approved===true as execution authorization. Keep false until the exact proposed bytes, the current installed CAS, independent operator conditions, and Owner authorization are verified; only then publish an authorized approved manifest and calculate its new exact SHA-256. Workflow policy and Github Actions publication are separate and not activated by this candidate.",
   "files": {
     "tools/maintenance-contract.mjs": "d24f03ee6db54c7e176e89f31bce8eb6de9aafba082cbb48213748d0f0b9facf",
     "tools/maintenance-apply.mjs": "745233ed111ff5dedb2d7747e7153a53a6e6a6a89c82c8a00c95f43d76f828db",
@@ -49,5 +49,5 @@
     "Nine handoff source CAS, seven installed runtime file CAS, independent operator identity, stopped receiver, immutable backup/recovery path; ensure current contract's fail-closed checks run before any write",
     "Existing CI workflow approval policy and automatic publisher disabled until exact new policy readback and Owner-native business delegation; no GitHub permission changes or automatic repeats"
   ],
-  "scopeNote": "EXACT SOURCE/POLICY HANDOFF CANDIDATE ONLY. Not Owner-approved and not executable until the exact approved PR is independently Owner-native merged and the official independent Windows operator handoff contract validates current installed 05ef source, seven-file CAS, source and proposed workflow hashes, lease, backup, operator identity, rollback and postcheck. If installed source/policy differs, stop and reconcile; never replay S6 B or a completed Controller B effect. Normal Runner and web chat cannot execute a protected maintainer handoff."
+  "scopeNote": "NON-EXECUTABLE CANDIDATE (approved=false). Neither an Owner-native approval nor an executable maintenance-handoff source. The independent Windows handoff must reject this manifest with HANDOFF_APPROVAL_REQUIRED. Authorization requires a separately verified approved:true manifest, native Owner evidence for the exact effect, current installed source/7-file CAS, correct Windows handoff operator, lease/backup/rollback and postcheck. No controller business B, S6 one-shot replay or disabled GitHub publication variable change."
 }
