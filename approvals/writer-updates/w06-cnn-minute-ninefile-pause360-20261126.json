@@ -1,0 +1,239 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "codex/w06-cnn-1min-intraday-20261124",
+  "candidateSourceSha": "0f0bb62e4d4879369e061e9289ed1c79d91f0044",
+  "baseHead": "d8ac245003e7b8e006c2345382d5c639c6d5f18b",
+  "baseConfigSourceSha": "d8ac245003e7b8e006c2345382d5c639c6d5f18b",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "lib/cnn-observed-history-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "bb8e1692e4a49c28b747804f365c0576328d042ac9616df2a5a7e4c207be5e74"
+    },
+    {
+      "path": "scripts/pc-writer/cnn-observed-archive-publication-r1.mjs",
+      "change": "M",
+      "beforeSha256": "9c52d17e82483fc35c1280d53687342e9c08e727ca1712b0c1d8290d0acb3f11",
+      "afterSha256": "e93914393007cc674bd890f3f7aef09a9d77796186c6ce9ff12d708f6e6ec1fb"
+    },
+    {
+      "path": "scripts/pc-writer/collect-local.mjs",
+      "change": "M",
+      "beforeSha256": "1648a62e26157868e9d4ed43ab9d36436068e08973ba56d495b7c1751e02c62e",
+      "afterSha256": "6a750c854b18e419a5a44e6805c409a19efe9c6a9f8a416d76ea59ffa4dbdf43",
+      "candidateSha256": "e7ea297d9da916d825ae2c942e026c7271fe7277787502b88fafbed679840e59",
+      "insertions": [
+        {
+          "anchor": "  const jobArg=process.argv.find(arg=>arg.startsWith('--job='));",
+          "position": "before",
+          "text": "  // Explicit W06 CLI lane: leave legacy Core/BLS/SEC code and reports intact.\n  if(process.argv.includes('--cnn-minute')){\n   const {writeSync,existsSync}=await import('node:fs');\n   const receipt={at:new Date().toISOString(),lane:'cnn-minute',status:'FAILED'};\n   let core,hooks;\n   const originalFetch=globalThis.fetch;\n   try{\n    if(process.argv.slice(2).length!==1)throw Error('CNN_MINUTE_SCOPE_STOP');\n    const base=process.env.ZGMINI_PC_HOME??path.join(os.homedir(),'.zgmini','pc-writer');\n    const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');\n    const config=read(path.join(base,'config.json'));\n    const source=execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8',windowsHide:true}).trim();\n    if(config.enabled!==true||config.collectionTarget!=='pc'||!/^[0-9a-f]{40}$/.test(source)||config.source!==source)\n     throw Error('CNN_MINUTE_SOURCE_NOT_APPROVED');\n    if(execFileSync('git',['status','--porcelain','--untracked-files=all','--','lib','worker','scripts/pc-writer'],{cwd:root,encoding:'utf8',windowsHide:true}).trim())\n     throw Error('CNN_MINUTE_SOURCE_NOT_APPROVED');\n    const dbFile=path.join(base,'storage','core.sqlite');\n    if(!existsSync(dbFile))throw Error('CNN_MINUTE_CORE_DB_MISSING');\n    core=localDatabase(dbFile);\n    const env={DB:core,DB_CORE:core,ZGMINI_COMPUTE_TARGET:'pc'};\n    hooks=installLocalRuntime(env);\n    const quota=createQuotaFetch({base,originalFetch});\n    globalThis.fetch=quota.fetch;\n    const {collect}=await import('../../worker/feed-collectors/fear-greed.ts');\n    const {refreshPublicFeeds,observeCnnCollector}=await import('../../worker/public-feed-refresh.mjs');\n    const result=await refreshPublicFeeds({env,maxFeedsPerRun:1,cnnMinuteOnly:true,collectors:{'fear-greed':observeCnnCollector(collect)}});\n    Object.assign(receipt,{status:result.status,attempted:result.attempted??0,feeds:result.feeds?.map(({key,status})=>({key,status}))});\n   }catch(error){\n    receipt.reason=/^CNN_MINUTE_[A-Z_]+$/.test(error?.message??'')?error.message:'CNN_MINUTE_COLLECTION_FAILED';\n   }finally{\n    globalThis.fetch=originalFetch;\n    try{hooks?.deregister();}finally{core?.close();}\n   }\n   writeSync(1,JSON.stringify(receipt)+'\\n');\n   process.exit(['COMPLETE','PARTIAL','ALREADY_RUNNING'].includes(receipt.status)?0:1);\n  }\n"
+        }
+      ]
+    },
+    {
+      "path": "scripts/pc-writer/collection-publication-policy.mjs",
+      "change": "M",
+      "beforeSha256": "b8089b00c443722d64c17a1cde27200e8a77303d8030eae8015b5a2e8662a5ff",
+      "afterSha256": "79f26277edfad02eebda0b9c8b65de7a13fefc2409b7239f9c73b6699f8fb1c1"
+    },
+    {
+      "path": "scripts/pc-writer/local-cycle.mjs",
+      "change": "M",
+      "beforeSha256": "41912f24c2bdc13a9de52d2ee2b504fe90b733656a0d66827c617a5e2c6c0f4a",
+      "afterSha256": "486536024cc0bf78f449594fbe31b762cf0578545502a17dbfce1bd12c73c484",
+      "candidateSha256": "5edcd0fbae45d6a9907f0452758a05ab25175e95e42ea0690a4b192bfd55e55e",
+      "insertions": [
+        {
+          "anchor": "const file=path.join(base,'local-cycle.lock');",
+          "position": "before",
+          "text": "// Explicit CNN scope uses the existing collection and publication entries.\n// No new scheduler, global Core lock, provider loop or Core checkpoint writes.\nif(process.argv.includes('--cnn-minute')){\n if(process.argv.slice(2).length!==2||!process.argv.includes('--publish'))\n  throw Error('CNN_MINUTE_CYCLE_SCOPE_STOP');\n const runChild=(name,args)=>{\n  const child=spawnSync(process.execPath,[path.join(here,name),...args],\n   {windowsHide:true,stdio:['ignore','pipe','pipe'],encoding:'utf8',timeout:5*60000});\n  if(child.error||child.signal||!Number.isInteger(child.status))throw Error('CNN_MINUTE_CHILD_OUTCOME_UNKNOWN');\n  let receipt;try{receipt=JSON.parse(child.stdout.trim().split(/\\r?\\n/).at(-1));}catch{throw Error('CNN_MINUTE_CHILD_RECEIPT_UNKNOWN');}\n  if(child.status!==0&&receipt?.status!=='FAILED'&&receipt?.status!=='PARTIAL')\n   throw Error('CNN_MINUTE_CHILD_OUTCOME_UNKNOWN');\n  return receipt;\n };\n const {runCnnMinuteCycle}=await import('./collection-publication-policy.mjs');\n const report=await runCnnMinuteCycle({\n  collect:()=>runChild('collect-local.mjs',['--cnn-minute']),\n  publish:()=>runChild('run-local.mjs',['--cnn-minute','--publish']),\n });\n fs.writeSync(1,JSON.stringify(report)+'\\n');\n process.exit(['COMPLETE','COMPLETE_WITH_COLLECTION_GAPS','SKIPPED_ACTIVE_COLLECTION'].includes(report.status)?0:1);\n}\n"
+        }
+      ]
+    },
+    {
+      "path": "scripts/pc-writer/quota-ledger.mjs",
+      "change": "M",
+      "beforeSha256": "379f56dd94dc8df8ca6ef46331a4fd831495759bddcc9cee22b0159c65559efe",
+      "afterSha256": "68ee9e869c8bac308731c3748a67c644f37700dd038bc841ec06584fd064b2a9",
+      "candidateSha256": "6f44bbb26d91be0e7203f9ea6e4772b15fd95f9d2d31dfe3540206f48a416f97",
+      "insertions": [
+        {
+          "anchor": "import {policyForProvider,quotaWindowMs} from './quota-policy.mjs';",
+          "position": "before",
+          "text": "import {randomUUID} from 'node:crypto';\n"
+        },
+        {
+          "anchor": "export class QuotaLedger{",
+          "position": "before",
+          "text": "const ALPACA_LOCK_WAIT_MS=1_500;\nconst ALPACA_STALE_LOCK_MS=5*60_000;\nfunction withReservationLock(base,fn,{name,guard,prefix}){\n if(!fs.existsSync(base)||!fs.statSync(base).isDirectory())throw guard(Date.now()+60_000,`${prefix}_BASE_UNAVAILABLE`);\n const lock=path.join(base,name);\n const until=Date.now()+ALPACA_LOCK_WAIT_MS;\n const sleeper=new Int32Array(new SharedArrayBuffer(4));\n const ownerFile=path.join(lock,'owner.json');\n const recoverDeadOwner=()=>{\n  // Serialize reapers, then re-read the owner. Two reapers must not rename a\n  // freshly acquired directory after one has already quarantined a dead owner.\n  const recovery=`${lock}.recovery`;\n  try{fs.mkdirSync(recovery);}catch{return false;}\n  try{return recoverUnderGuard();}finally{try{fs.rmdirSync(recovery);}catch{}}\n };\n const recoverUnderGuard=()=>{\n  // Never touch the Core lock. Only reclaim this exact quota directory after\n  // proving that its owner PID has exited and it is older than five minutes.\n  let owner,metadata;\n  try{\n   metadata=fs.statSync(lock);\n   if(!metadata.isDirectory()||Date.now()-metadata.mtimeMs<ALPACA_STALE_LOCK_MS)return false;\n   owner=JSON.parse(fs.readFileSync(ownerFile,'utf8'));\n   if(!Number.isSafeInteger(owner.pid)||owner.pid<=0||!Number.isSafeInteger(owner.startedAt)||\n     Date.now()-owner.startedAt<ALPACA_STALE_LOCK_MS)return false;\n  }catch{return false;}\n  try{process.kill(owner.pid,0);return false;}\n  catch(error){if(error.code!=='ESRCH')return false;}\n  try{const names=fs.readdirSync(lock);if(names.length!==1||names[0]!=='owner.json')return false;}catch{return false;}\n  const orphan=`${lock}.stale-${process.pid}-${randomUUID()}`;\n  try{\n   fs.renameSync(lock,orphan);\n   // Quarantined directory is quota-owned and contains one bounded metadata\n   // file. Unrelated files mean unexpected state: leave it for manual review.\n   fs.unlinkSync(path.join(orphan,'owner.json'));\n   fs.rmdirSync(orphan);\n   return true;\n  }catch{return false;}\n };\n for(;;){\n  let created=false;\n  try{\n   fs.mkdirSync(lock);created=true;\n   fs.writeFileSync(ownerFile,JSON.stringify({pid:process.pid,startedAt:Date.now()}),{flag:'wx'});\n   break;\n  }\n  catch(error){\n   if(created){try{fs.unlinkSync(ownerFile);}catch{}try{fs.rmdirSync(lock);}catch{}throw guard(Date.now()+60_000,`${prefix}_LOCK_OWNER_WRITE_FAILED`);}\n   if(error.code!=='EEXIST')throw guard(Date.now()+60_000,`${prefix}_LOCK_UNAVAILABLE`);\n   if(recoverDeadOwner())continue;\n   if(Date.now()>=until)throw guard(Date.now()+60_000,`${prefix}_LOCK_BUSY`);\n   Atomics.wait(sleeper,0,0,15);\n  }\n }\n try{return fn();}finally{fs.unlinkSync(ownerFile);fs.rmdirSync(lock);}\n}\nfunction withGeneralQuotaLock(base,provider,fn){\n fs.mkdirSync(base,{recursive:true});\n const guard=(retryAt,reason)=>Object.assign(Error('PROVIDER_QUOTA_GUARD'),{\n  code:'PROVIDER_QUOTA_GUARD',provider,retryAt,reason\n });\n return withReservationLock(base,fn,{name:'quota-ledger-reservation.lock',guard,prefix:'QUOTA_LEDGER'});\n}\n\n"
+        },
+        {
+          "anchor": "  const item=this.item(provider,now);const at=nextAllowed(item,policy,now);",
+          "position": "before",
+          "text": "  return withGeneralQuotaLock(this.base,provider,()=>{\n   this.value=readQuotaLedger(this.base);\n"
+        },
+        {
+          "anchor": "  return {allowed:true,provider,guarded:false,warning:blocked?event:null};",
+          "position": "after",
+          "text": "  });\n"
+        },
+        {
+          "anchor": "  const item=this.item(provider,at);item.lastStatus=status;",
+          "position": "before",
+          "text": "  return withGeneralQuotaLock(this.base,provider,()=>{\n   this.value=readQuotaLedger(this.base);\n"
+        },
+        {
+          "anchor": "  this.persist();",
+          "position": "after",
+          "text": "  });\n"
+        },
+        {
+          "anchor": " summary(){",
+          "position": "after",
+          "text": "  this.value=readQuotaLedger(this.base);\n"
+        }
+      ]
+    },
+    {
+      "path": "scripts/pc-writer/run-local.mjs",
+      "change": "M",
+      "beforeSha256": "a96c0c7c3513fda6f9d51b35caee7d634e2a05c69ff3575d3b99c37072a60ec6",
+      "afterSha256": "92d98c3cbc115ddef3773e19c3cd200653d35c2f6d16caee495fe08e68d8a13f",
+      "candidateSha256": "b3aebce50971aef333c8c80ddeaf798f47605fa6e2db775d10720e69d5b9ae5e",
+      "insertions": [
+        {
+          "anchor": "const seed=read(path.join(base,'local-seed-progress.json'));",
+          "position": "before",
+          "text": "// Explicit saved-only W06 lane; no Core calculation, provider fetch, history DB,\n// Core ledger overwrite, or installation/scheduler effect.\nif(process.argv.includes('--cnn-minute')){\n if(!publish||process.argv.slice(2).length!==2||process.argv.slice(2).some(arg=>!['--cnn-minute','--publish'].includes(arg)))throw Error('CNN_MINUTE_PUBLICATION_SCOPE_STOP');\n if(config.source!==source)throw Error('CNN_MINUTE_SOURCE_NOT_APPROVED');\n const dirty=execFileSync('git',['status','--porcelain','--untracked-files=all','--','lib','worker','scripts/pc-writer'],{cwd:root,encoding:'utf8',windowsHide:true}).trim();\n if(dirty)throw Error('CNN_MINUTE_SOURCE_NOT_APPROVED');\n const file=path.join(base,'storage','core.sqlite');\n if(!fs.existsSync(file))throw Error('CNN_MINUTE_CORE_DB_MISSING');\n const core=localDatabase(file);\n const receipt={at:new Date().toISOString(),source,lane:'cnn-minute',providerCalls:0};\n try{\n  const minuteRemote=client(config,()=>credential(root),{onDiagnostic:diagnostic=>appendD1Diagnostic(base,{runAt:receipt.at,source},diagnostic)});\n  const {publishCnnMinute}=await import('./cnn-observed-archive-publication-r1.mjs');\n  Object.assign(receipt,await publishCnnMinute(core,minuteRemote,config.core));\n  if(receipt.status!=='VERIFIED')process.exitCode=1;\n }catch(error){\n  receipt.status='FAILED';\n  receipt.error=/^[A-Z0-9_]+$/.test(error.message??'')?error.message:'CNN_MINUTE_PUBLICATION_FAILED';\n  process.exitCode=1;\n }finally{core.close();}\n fs.writeSync(1,JSON.stringify(receipt)+'\\n');\n process.exit(receipt.status==='VERIFIED'?0:1);\n}\n"
+        },
+        {
+          "anchor": "   const existing=(await remote.query(config.core,\"SELECT body,stored_at FROM public_feed_snapshots_v1 WHERE kind='output' AND feed_key=? AND snapshot_key='current'\",[row.feed_key])).results[0];",
+          "position": "before",
+          "text": "    if(row.feed_key==='fear-greed'){\n     const {publishCnnCurrent}=await import('./cnn-observed-archive-publication-r1.mjs');\n     report.cnnCurrentPublication=await publishCnnCurrent(core,remote,config.core);\n     return;\n    }\n"
+        }
+      ]
+    },
+    {
+      "path": "worker/public-feed-refresh.mjs",
+      "change": "M",
+      "beforeSha256": "a5f11713d5089b9a5984e056f65a01c739286532c40dff12462343d734b37b4f",
+      "afterSha256": "193034cadb0dc49af3f6f435402fd23fe3e76ac085ffe270490363903bc4d052"
+    },
+    {
+      "path": "worker/public-feed-store.mjs",
+      "change": "M",
+      "beforeSha256": "b21f03057025bad7aed58c7bb1f69b2abba0f0b446c587869594eea732adfaa6",
+      "afterSha256": "dcfbf7c9665636ef60c142b39767835670cb69635ebfccbf6d1f63c57de1d667"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "lib/cnn-index.mjs",
+      "sha256": "cde0a679768aee34a994f5f73b000875478c7c536afdcb38ab9e6e806a994c1d"
+    },
+    {
+      "path": "lib/cnn-observed-archive-r1.mjs",
+      "sha256": "f9cb4c8da02e2175527c389a54563a6f45c6f2815f5af524c27b071a6059ec63"
+    },
+    {
+      "path": "lib/market-score/live-refresh.mjs",
+      "sha256": "ea4368c62e7cec7746393c2379802044c18cbc5ce3d590d1fac503e8f499c05e"
+    },
+    {
+      "path": "scripts/pc-writer/d1-diagnostics.mjs",
+      "sha256": "eb5ffbcdb56805ca15affac876493217de52b21e0f90f99976bbcff8ddc13037"
+    },
+    {
+      "path": "scripts/pc-writer/d1.mjs",
+      "sha256": "10beefecc524b569eba9abf826036fc8e069b4b6f0c3b3340a7bd6a5ab6353a5"
+    },
+    {
+      "path": "scripts/pc-writer/local-db.mjs",
+      "sha256": "0f9fae1bd16d515f83bf187bc20c4aa1222d741bba9c7f3fe945d2a1cb39f38e"
+    },
+    {
+      "path": "scripts/pc-writer/local-env.mjs",
+      "sha256": "8b5a4f388ebbc94c37d6d50478344e4666140f1bee5d70c9315dfde1e584029c"
+    },
+    {
+      "path": "scripts/pc-writer/publication-guard.mjs",
+      "sha256": "75b2ef617becd7ef3ba3d4392d9a146edffb01fb5037f1c7fd30f36a06634fb3"
+    },
+    {
+      "path": "scripts/pc-writer/quota-fetch.mjs",
+      "sha256": "5ff750e1abf607e4a207bed16c20394406ca2ba8fe4ca42e2c514a155c87818b"
+    },
+    {
+      "path": "scripts/pc-writer/quota-policy.mjs",
+      "sha256": "8559df2b2eb3fd228cbb9c825ca2bfddd01d07c30991771b64b6bc9f1aa89963"
+    },
+    {
+      "path": "worker/market-operational-store.mjs",
+      "sha256": "330b29c25dafb63e5b8fdd75ecf52e886480e7d44b40e2dc9d7d3643e952ef8b"
+    },
+    {
+      "path": "worker/public-display-freshness.mjs",
+      "sha256": "abdf00a5c1c5c7ae9e978dd27ceb1c4c572e15ac67c0378cc971204129714878"
+    },
+    {
+      "path": "worker/public-feed-input-safety.mjs",
+      "sha256": "1d4dd5e1039a538d314a9f9b122aef89bfb2f4d21867582c32a6352ff1699fa8"
+    },
+    {
+      "path": "worker/feed-collectors/fear-greed.ts",
+      "sha256": "d0422e663218ba113fb5ec2ad0167236f58337f8d6d896f8e7028b9b983fbdcb"
+    },
+    {
+      "path": "worker/public-feed-collectors.ts",
+      "sha256": "cd36fe7e754604d7df9404418e9d0dd480afd09a4d55ede937dd27dea6ca9373"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": [
+      {
+        "id": "core-launcher-archive",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+        "dependsOn": [
+          "scripts/pc-writer/local-cycle.mjs",
+          "scripts/pc-writer/run-local.mjs"
+        ]
+      },
+      {
+        "id": "original-core-launcher",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\cutover-evidence\\inflation-r37-2026-10-20T19-39-19-549Z\\run-local-core.vbs",
+        "sha256": "bb3e11c0b5c8da07162b1c824e7b52e7a7c2f987c079f29713211a2413932b01",
+        "dependsOn": [
+          "scripts/pc-writer/local-cycle.mjs"
+        ]
+      },
+      {
+        "id": "existing-archive-sidecar",
+        "kind": "SIDECAR_SOURCE",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\archive-run.mjs",
+        "sha256": "583297b451f168a32a2a5de4b0b04c9b14449aab9a041c954a420203cf04f188",
+        "dependsOn": [
+          "scripts/pc-writer/run-local.mjs",
+          "worker/public-feed-store.mjs"
+        ]
+      }
+    ]
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false,
+  "coreMaintenance": "PAUSE_NEW_STARTS_DRAIN_360S_V1"
+}
