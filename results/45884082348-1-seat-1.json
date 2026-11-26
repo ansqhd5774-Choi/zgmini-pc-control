@@ -1,0 +1,52 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-45884082348-1-seat-1",
+  "requestId": "pc-457a48ca-1337-4c5f-8c16-d7a7e5f46bc1",
+  "startedAt": "2026-11-26T21:09:38.224Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "3c7d4cfefacf072fd35cb19706b352c64c5e4fd2",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "1bd000a5218cee551efa1c1935cebc40695bfc4e",
+  "sourceBranch": "main",
+  "operation": "cnn-public-d1-api-readback-readonly",
+  "seat": 1,
+  "status": "STATE_UNKNOWN",
+  "code": "CNN_APPROVED_D1_READ_UNVERIFIED",
+  "lastPass": "ALLOWLISTED_WORKER_STARTED",
+  "firstFail": "ALLOWLISTED_OPERATION",
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": true,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-w06-r2-natural-readback-20261127-0429",
+  "effectClass": "REGISTERED_OPERATION",
+  "pcOperationalApprovedSha": "c8ed53a3991212dd1778742cda8a86ac133e0796",
+  "exitCode": 0,
+  "result": {
+    "status": "STATE_UNKNOWN",
+    "code": "CNN_APPROVED_D1_READ_UNVERIFIED",
+    "local": {
+      "status": "NOT_CHECKED"
+    },
+    "d1": {
+      "status": "NOT_CHECKED"
+    },
+    "api": {
+      "status": "NOT_CHECKED"
+    },
+    "sameDayMatched": false,
+    "publicPeriodsMatched": false,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "operationalWrites": 0,
+    "sqliteOpened": true
+  },
+  "protectedBeforeSha256": "1e04296eab72cc0397c43ac2741252af9c3e2d9f31a7b38c189093d9765a0bee",
+  "protectedAfterSha256": "1e04296eab72cc0397c43ac2741252af9c3e2d9f31a7b38c189093d9765a0bee",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "3c7d4cfefacf072fd35cb19706b352c64c5e4fd2",
+  "next": "INSPECT_FIRST_FAIL_NO_AUTOMATIC_RETRY",
+  "finishedAt": "2026-11-26T21:10:09.614Z",
+  "durationMs": 31390
+}
