@@ -483,7 +483,7 @@ const admitR6=x=>validateR6Request(x.event,x.body,x.approval,x.installed,
  x.sourceDigest,x.approvalDigest,x.installedManifestDigest);
 test('R6 exact safety-only R5 source transition pins live installed A and immutable merged source',()=>{
  const x=fixtureR6(),p=admitR6(x);
- assert.equal(R6_TARGET,'73f517b10422d79968c3e2726b942ffbf8076902');
+ assert.equal(R6_TARGET,'8bdeca9b55457fc9c9d35585aacd7eea14af63f0');
  assert.equal(R6_PREIMAGE_SHA256,R5_SOURCE_SHA256);
  assert.equal(R6_INSTALL_PREIMAGE_SHA256,
   '5cc8fa6f8b146054d68c003c4738f0dd4b961ccd9bbe0833913537303a78cc61');
@@ -493,6 +493,16 @@ test('R6 exact safety-only R5 source transition pins live installed A and immuta
   {cwd:fileURLToPath(new URL('../',import.meta.url)),encoding:null,
    timeout:15000,maxBuffer:1000000});
  assert.equal(shaR5(historicalR5),R6_PREIMAGE_SHA256);
+ const historicalR6=execFileSync('git',['show',R6_TARGET+':tools/runner-watchdog.mjs'],
+  {cwd:fileURLToPath(new URL('../',import.meta.url)),encoding:null,
+   timeout:15000,maxBuffer:1000000});
+ assert.equal(shaR5(historicalR6),R6_SOURCE_SHA256);
+ assert.equal(R6_CONTROLLER_SHA,'3c7d4cfefacf072fd35cb19706b352c64c5e4fd2');
+ assert.equal(Object.keys(R6_CONTROLLER_FILES).length,8);
+ assert.equal(R6_CONTROLLER_FILES['controller/operations.mjs'],
+  'bac7412c51c156d31b68f725f2532011cccf38359fe18e66a4d3851aa3a2b803');
+ assert.equal(R6_CONTROLLER_FILES['controller/us-breadth-r2-private-readonly.mjs'],
+  'e5f1d87626c0fb192831f4fc76fc9e13931af6105a38e503f90f7e656d180fb1');
  assert.equal(x.approval.schema,R6_MANIFEST_SCHEMA);
  assert.equal(x.approval.revision,6);
  assert.equal(x.approval.scope,R6_SCOPE);
@@ -508,7 +518,13 @@ test('R6 exact safety-only R5 source transition pins live installed A and immuta
  assert.equal(verifyR6ControllerHost(host),true);
  assert.throws(()=>verifyR6ControllerHost({...host,controllerFiles:{
   ...host.controllerFiles,'controller/standby.mjs':'f'.repeat(64)
- }}),/WATCHDOG_R5_CONTROLLER_SOURCE_NOT_ATTESTED/);
+ }}),/WATCHDOG_R6_APPROVED_CONTROLLER_R2_MISMATCH/);
+ assert.throws(()=>verifyR6ControllerHost({...host,
+  controllerSourceSha:'182bb46f2838306ba40d8b4ec32bac40ab75b69a'}),
+  /WATCHDOG_R6_APPROVED_CONTROLLER_R2_MISMATCH/);
+ assert.throws(()=>verifyR6ControllerHost({...host,controllerFiles:{
+  ...host.controllerFiles,'controller/us-breadth-r2-private-readonly.mjs':'f'.repeat(64)
+ }}),/WATCHDOG_R6_APPROVED_CONTROLLER_R2_MISMATCH/);
 });
 test('R6 rejects changed approval/preimage, invalid actor and old mode, before any B write',()=>{
  const mutations=[
