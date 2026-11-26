@@ -14,6 +14,7 @@ on:
       - '.github/workflows/ci-approval-controller-b.yml'
       - 'tests/ci-approval-shadow-decision.test.mjs'
       - 'tests/ci-native-dispatch.test.mjs'
+      - 'tests/ci-native-receiver-contract.test.mjs'
       - 'tests/ci-approval-contract-adapter.test.mjs'
       - 'tests/ci-approval-github-ci-evidence.test.mjs'
       - 'tests/ci-approval-approval-source-integrity.test.mjs'
@@ -306,6 +307,11 @@ jobs:
         run: |
           node --check ci-approval/native-dispatch.mjs
           node --test --test-concurrency=1 tests/ci-native-dispatch.test.mjs
+      - name: Verify A Writer native receiver evidence without PC execution
+        if: hashFiles('ci-approval/native-receiver-contract.mjs') != '' && hashFiles('tests/ci-native-receiver-contract.test.mjs') != ''
+        run: |
+          node --check ci-approval/native-receiver-contract.mjs
+          node --test --test-concurrency=1 tests/ci-native-receiver-contract.test.mjs
       - name: Verify deterministic scoped request previews without submission
         if: hashFiles('ci-approval/request-preview.mjs', 'tests/ci-approval-request-preview.test.mjs') != ''
         run: node --test --test-concurrency=1 tests/ci-approval-request-preview.test.mjs
