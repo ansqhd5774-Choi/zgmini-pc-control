@@ -3003,6 +3003,36 @@ const S6_JOURNAL_PHASES=new Set([
  'BACKLOG_RECONCILE_ATTEMPT','BACKLOG_RECONCILED',
  'PROMOTED_READBACK_VERIFIED','RECOVERY_REQUIRED'
 ]);
+// S6 #4069 and issue #4078 are immutable fixed targets. This is a
+// diagnostic time-window comparison only: never replay an Issue or infer
+// worker PASS from a backlog journal state.
+export function projectS64078BacklogReadonly(backlog){
+ const out={originalIssueNumber:4078,pauseWindowContainsIssueOpenedAt:null,
+  windowCount:null,replayLedgerStatus:'UNVERIFIED',executionEstablished:false};
+ if(backlog===null)return {...out,replayLedgerStatus:'BACKLOG_ABSENT'};
+ if(backlog?.schema!=='ZGMINI_PC_BACKLOG_V1'||
+    backlog.requestId!==S6_CURRENT_JOURNAL_REQUEST)return out;
+ let windows;
+ try{windows=backlogPauseWindows(backlog);}
+ catch{return out;}
+ const count=windows.length;
+ if(windows.some(w=>w.resumedAt===null))
+  return {...out,windowCount:count,replayLedgerStatus:'WINDOW_NOT_CLOSED'};
+ const issueOpened=Date.parse('2026-11-26T19:14:52Z');
+ const overlaps=windows.some(w=>issueOpened>=Date.parse(w.pausedAt)-2000&&
+   issueOpened<=Date.parse(w.resumedAt));
+ const replays=backlog.replays;
+ if(replays!==undefined&&(replays===null||typeof replays!=='object'||
+    Array.isArray(replays)))return {...out,windowCount:count,
+     pauseWindowContainsIssueOpenedAt:overlaps};
+ const record=replays?.['4078'];
+ const permitted=new Set(['POSTING','DONE','SKIPPED_RESULT_PRESENT','REJECTED_INVALID_ORIGINAL']);
+ const state=record===undefined?'NOT_RECORDED':
+  record&&typeof record==='object'&&permitted.has(record.status)?
+   record.status:'UNVERIFIED';
+ return {...out,windowCount:count,pauseWindowContainsIssueOpenedAt:overlaps,
+  replayLedgerStatus:state};
+}
 export function projectS6OnceJournalReadonly(raw,{scope='ORIGINAL'}={}){
  const fixed=s6JournalScope(scope);
  const base={schema:'ZGMINI_S6_ONCE_JOURNAL_A_V1',
@@ -3056,7 +3086,8 @@ export function projectS6OnceJournalReadonly(raw,{scope='ORIGINAL'}={}){
   leaseReleaseAcknowledged:
    typeof journal.leaseReleaseAcknowledged==='boolean'?
    journal.leaseReleaseAcknowledged:null,
-  backlogState};
+  backlogState,
+  ...(scope==='CURRENT'?{backlog4078:projectS64078BacklogReadonly(backlog)}:{})};
 }
 /**
  * Check exact immutable GitHub approval bytes in a reusable Windows checkout.
