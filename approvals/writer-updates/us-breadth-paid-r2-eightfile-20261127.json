@@ -1,0 +1,100 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "225a0806ce611b370a9fe451cf6c18ab78599af6",
+  "baseHead": "714d392ca079daa9fdb789f73762c407be3321a2",
+  "baseConfigSourceSha": "714d392ca079daa9fdb789f73762c407be3321a2",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/local-cycle.mjs",
+      "change": "M",
+      "beforeSha256": "486536024cc0bf78f449594fbe31b762cf0578545502a17dbfce1bd12c73c484",
+      "afterSha256": "f69fb3cc1a6fdb85af34054f016b10dcbc7b1dcbf76e51c32b617121fe22d05d",
+      "candidateSha256": "c290ac54acbf70973b392fbc3d3b184d3a53ef56fda5f6a35c0d1d069b03d8bf",
+      "insertions": [
+        {
+          "anchor": " const collection=spawnSync(process.execPath,[path.join(here,'collect-local.mjs'),...(lane==='korea'?['--korea']:[])],{windowsHide:true,stdio:['ignore','pipe','pipe'],timeout:30*60000});",
+          "position": "before",
+          "text": " // Paid US full-market R2 reuses the same Core lock and previously\n // authenticated stock_daily storage. No new Task, provider GET or legacy R1.\n // Never run on the Korea lane or on a read-only Core invocation.\n if(lane==='core'&&process.argv.includes('--publish')){\n  try{\n   const {runPaidUsR2StoredCycle}=await import('./us-breadth-paid-r2-cycle.mjs');\n   console.log('US_BREADTH_PAID_R2 '+JSON.stringify(\n    await runPaidUsR2StoredCycle(base,{publish:true})));\n  }catch(e){\n   const code=/^(?:US_PAID_R2_|PAID_R2_)[A-Z0-9_]+$/.test(String(e?.code??''))\n    ?e.code:'US_PAID_R2_RUNTIME_FAILED';\n   console.warn('US_BREADTH_PAID_R2 '+JSON.stringify({\n    status:'FAILED_PREVIOUS_DATA_PRESERVED',code,\n    d1Outcome:'CHECK_STORED_RESULT_BEFORE_RETRY',\n   }));\n  }\n }\n"
+        }
+      ]
+    },
+    {
+      "path": "scripts/pc-writer/us-breadth-paid-r2-cycle.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "c350c8cf90bc989abef62c6764fa4c864d8fb64d72a8c3712ab06785ef1c1a88"
+    },
+    {
+      "path": "scripts/pc-writer/us-breadth-paid-r2-stored.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "21209308df4d2704faa38481d3ee81e2a25ab255a0c9d8ec5049b460c357097e"
+    },
+    {
+      "path": "scripts/pc-writer/us-breadth-paid-r2-private-save.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "d3e9ea58cdb7e4a13466e15109e2436f7fe58bf2e67a26c50369b4fe1fe171e9"
+    },
+    {
+      "path": "scripts/pc-writer/us-breadth-paid-r2-publisher.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "c61b93710885d7d8d8d7116456ba55df7acd082d87c77b2934bce875583d58b7"
+    },
+    {
+      "path": "lib/market-breadth/us-marketparquet-paid-r2-adapter.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "e57226de01132b6376c50720483d6a538482b8fa00b811a777f8813e6a7b84f9"
+    },
+    {
+      "path": "lib/market-breadth/us-marketparquet-paid-calculator-r2.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "ae8ae62bfdff3662e27df0e8c58fce0f3340c45ed9d44c72d5d8175a892e0918"
+    },
+    {
+      "path": "worker/us-breadth-paid-r2-contract.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "8a717b97f6e94a4296a348e45a461c3e935d317b30b4adb5e2d0d7749e3588f9"
+    }
+  ],
+  "protectedFiles": [],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": [
+      {
+        "id": "existing-core-launcher",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+        "dependsOn": [
+          "scripts/pc-writer/local-cycle.mjs",
+          "scripts/pc-writer/us-breadth-paid-r2-cycle.mjs",
+          "scripts/pc-writer/us-breadth-paid-r2-stored.mjs",
+          "scripts/pc-writer/us-breadth-paid-r2-private-save.mjs",
+          "scripts/pc-writer/us-breadth-paid-r2-publisher.mjs",
+          "lib/market-breadth/us-marketparquet-paid-r2-adapter.mjs",
+          "lib/market-breadth/us-marketparquet-paid-calculator-r2.mjs",
+          "worker/us-breadth-paid-r2-contract.mjs"
+        ]
+      }
+    ]
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false,
+  "coreMaintenance": "PAUSE_NEW_STARTS_DRAIN_360S_V1"
+}
