@@ -3095,9 +3095,83 @@ function recoverR6HostOnly(requestId,packageFile,mode){
  }
 }
 
+
+/**
+ * Independent maintainer read-only S6 origin/owner preimage. Never executes
+ * a stop, changes workflow state, creates/releases a lease or updates data.
+ * An owner nonce remains local; only exact owner.json SHA-256 is returned.
+ */
+export function readS6OnceCurrentPreimage(requestId){
+ need(/^pc-s6-[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(requestId),
+  'S6_ONCE_REQUEST_ID_INVALID');
+ const current=installedManifest(),{owner}=readOwner();
+ verifyIndependent(owner.pid);
+ const installed=json(path.join(maintenanceRoot,'MAINTENANCE_INSTALL.json'));
+ need(installed.schema==='ZGMINI_PC_MAINTENANCE_INSTALL_V1'&&
+  validSha(installed.sourceSha)&&Object.keys(installed.files??{}).length===7,
+  'S6_ONCE_MAINTAINER_SOURCE_UNVERIFIED');
+ for(const [rel,digest] of Object.entries(installed.files)){
+  need(/^tools\/[a-z0-9.-]+$/.test(rel)&&/^[a-f0-9]{64}$/.test(digest)&&
+   sha256(fs.readFileSync(path.join(maintenanceRoot,rel)))===digest,
+   'S6_ONCE_MAINTAINER_BYTES_CHANGED');
+ }
+ const wdHome='E:/ZGmini/automation/pc-watchdog';
+ const wdInstall=json(path.join(wdHome,'INSTALL.json'));
+ const wdStatus=json(path.join(wdHome,'STATUS.json'));
+ const wdReceiver=json(path.join(wdHome,'receiver/owner.json'));
+ need(wdInstall.standby?.approved===true&&
+  wdInstall.standby?.mode==='ACTIVE_1_STANDBY_2'&&
+  /^[a-f0-9]{64}$/.test(wdInstall.sha256??'')&&
+  wdStatus?.state==='HEALTHY'&&wdStatus.pid===wdReceiver.pid&&
+  wdStatus.standbyRole==='READY'&&wdStatus.secondStandbyRole==='READY'&&
+  wdStatus.standbyReadyCount===2&&
+  [wdStatus.pid,wdStatus.standbyPid,wdStatus.secondStandbyPid].every(
+   p=>Number.isSafeInteger(p)&&p>0)&&
+  new Set([owner.pid,wdStatus.pid,wdStatus.standbyPid,wdStatus.secondStandbyPid]).size===4&&
+  Date.now()-Date.parse(wdStatus.at)>=0&&Date.now()-Date.parse(wdStatus.at)<45000,
+  'S6_ONCE_WATCHDOG_R5_NOT_READY');
+ // A signal of zero observes liveness only; no process is terminated.
+ for(const pid of [owner.pid,wdStatus.pid,wdStatus.standbyPid,wdStatus.secondStandbyPid]){
+  try{process.kill(pid,0);}catch{need(false,'S6_ONCE_PROCESS_LIVENESS_UNVERIFIED');}
+ }
+ need(maintenanceLockStatus(maintenanceRoot,'controller-install').held===false,
+  'S6_ONCE_INSTALL_LEASE_PRESENT');
+ const seats=requireCompleteRunnerInventory(github('actions/runners?per_page=100'));
+ need(seats.every(row=>row.status==='online'&&row.busy===false),
+  'S6_ONCE_RUNNER_BUSY_OR_UNVERIFIED');
+ need(github('actions/workflows/pc-job.yml').state==='active','S6_ONCE_INTAKE_NOT_ACTIVE');
+ const related=fs.readdirSync(path.join(controlRoot,'leases'))
+  .filter(name=>name!=='supervisor'&&!name.startsWith('supervisor.dead-'));
+ need(related.length===0,'S6_ONCE_RELATED_LEASE_PRESENT');
+ const ownerRaw=fs.readFileSync(path.join(controlRoot,'leases/supervisor/owner.json'));
+ need(JSON.parse(ownerRaw.toString('utf8')).nonce===owner.nonce,'S6_ONCE_OWNER_CAS_CHANGED');
+ const wdRaw=fs.readFileSync(path.join(wdHome,'INSTALL.json'));
+ need(JSON.parse(wdRaw.toString('utf8')).sha256===wdInstall.sha256,
+  'S6_ONCE_WATCHDOG_INSTALL_DRIFT');
+ return {
+  status:'READONLY',code:'S6_ONCE_LIVE_PREIMAGE_OBSERVED',requestId,
+  actualControllerSha:current.installedSha,installLock:{held:false},
+  installAttempted:false,operationalWrites:0,
+  s6Live:{
+   installedControllerSha:current.installedSha,
+   installedMaintainerSha:installed.sourceSha,
+   watchdogSourceSha256:wdInstall.sha256,
+   protectedSha256:sha256(JSON.stringify(protectedSnapshot())),
+   ownerSha256:sha256(ownerRaw),watchdogPid:wdStatus.pid,
+   standbyPids:[wdStatus.standbyPid,wdStatus.secondStandbyPid]
+  },
+  observedAtUtc:new Date().toISOString(),
+  oldSupervisorAlive:true,standbyReadyCount:2,sixIdleRunnersVerified:true
+ };
+}
+
 export async function command(args=process.argv.slice(2)) {
  need(args.length>=1,'MAINTENANCE_SUBCOMMAND_REQUIRED');
  const cmd=args[0],requestId=safeId(args[2]);
+ if(cmd==='s6-once-status'){
+  need(args.length===3&&args[1]==='--request-id','MAINTENANCE_ARGS');
+  return readS6OnceCurrentPreimage(requestId);
+ }
  if(cmd==='source-bundle-status'){
   need(args.length===3&&args[1]==='--request-id','MAINTENANCE_ARGS');
   return readSourceBundleStatus(requestId);
