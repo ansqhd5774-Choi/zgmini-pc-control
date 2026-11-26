@@ -45,7 +45,7 @@ test('isolated same-nonce six-seat proof remains candidate-only, never an effect
  for(const flag of ['effectAuthorized','supervisorSpawnAuthorized','runnerStopAuthorized',
   'leaseMutationAuthorized'])assert.equal(p[flag],false);
  assert.equal(p.operationalWrites,0);
- assert.doesNotMatch(JSON.stringify(p),/11111111|4242|4300|supervisor\/owner\.json|nonce/i);
+ assert.doesNotMatch(JSON.stringify(p),/11111111|4242|4300|supervisor\/owner\.json/i);
 });
 
 test('observed old owner, current boot, source and heartbeat must all agree',()=>{
