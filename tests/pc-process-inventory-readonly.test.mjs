@@ -3058,3 +3058,73 @@ test('S6 A negative evidence returns bounded stage code without raw identity or 
  assert.equal(unavailable.operationalWrites,0);
  assert.equal(projectS6ApprovalPreimageReadonly(null).code,'S6_A_ROSTER_UNAVAILABLE');
 });
+
+import {projectS6OnceJournalReadonly,
+ inspectS6OnceJournalReadonly} from '../tools/pc-process-inventory-readonly.mjs';
+
+test('S6 #3947 journal A uses only fixed operating scope, no arbitrary command or effect',()=>{
+ const e=event(),b=JSON.parse(e.issue.body);
+ const scoped={...e,issue:{...e.issue,body:JSON.stringify({...b,
+  probe:'controller-s6-once-journal-readonly'})}};
+ assert.equal(authenticateProcess(scoped,env,'operating').s6OnceJournal,true);
+ assert.throws(()=>authenticateProcess(scoped,env,'handoff'));
+ for(const extra of [
+  {...b,probe:'controller-s6-once-journal-readonly',path:'../ledger'},
+  {...b,probe:'controller-s6-once-journal-readonly',targetRequestId:'pc-s6-other'},
+  {...b,probe:'controller-s6-once-journal-readonly;stop'},
+  {...b,probe:'controller-s6-once-apply'}
+ ]){
+  assert.throws(()=>authenticateProcess({...scoped,issue:{...e.issue,
+   body:JSON.stringify(extra)}},env,'operating'));
+ }
+});
+test('S6 one-shot UNKNOWN journal classification preserves claim/stop uncertainty and redacts owner',()=>{
+ const requestId='pc-s6-d7c0a971-5219-4a3a-9dce-30b0543b0e72';
+ const base={approvalValid:true,ownerByteMatch:true,claimPresent:false,
+  journal:null,backlog:null};
+ const absent=projectS6OnceJournalReadonly(base);
+ assert.equal(absent.status,'READ_ONLY_OBSERVED');
+ assert.equal(absent.code,'S6_ONCE_CLAIM_ABSENT_AT_OBSERVATION');
+ assert.equal(absent.priorOwnerByteMatch,true);
+ assert.equal(absent.successEstablished,false);
+ assert.equal(absent.effectExecuted,null);
+ const claimed=projectS6OnceJournalReadonly({...base,claimPresent:true,claimValid:true});
+ assert.equal(claimed.status,'STATE_UNKNOWN');
+ assert.equal(claimed.code,'S6_ONCE_CLAIM_WITHOUT_JOURNAL');
+ const attempted=projectS6OnceJournalReadonly({...base,claimPresent:true,claimValid:true,
+  journal:{schema:'ZGMINI_S6_ONCE_JOURNAL_V1',requestId,
+   phase:'RECOVERY_REQUIRED',failedAt:'INTAKE_PAUSE_ATTEMPT',
+   code:'S6_PORT_INTAKE_STATE_CHANGED',mutationAttempted:true,
+   leaseReleaseAcknowledged:false},
+  backlog:{schema:'ZGMINI_PC_BACKLOG_V1',requestId,
+   pausedAt:'2026-11-27T00:00:00Z',resumedAt:null,
+   windows:[{pausedAt:'2026-11-27T00:00:00Z',resumedAt:null}]}});
+ assert.equal(attempted.status,'READ_ONLY_OBSERVED');
+ assert.equal(attempted.journalPhase,'RECOVERY_REQUIRED');
+ assert.equal(attempted.failedAt,'INTAKE_PAUSE_ATTEMPT');
+ assert.equal(attempted.failedCode,'S6_PORT_INTAKE_STATE_CHANGED');
+ assert.equal(attempted.mutationAttempted,true);
+ assert.equal(attempted.backlogState,'PAUSED');
+ assert.equal(attempted.successEstablished,false);
+ const claimedPass=projectS6OnceJournalReadonly({...base,claimPresent:true,claimValid:true,
+  journal:{schema:'ZGMINI_S6_ONCE_JOURNAL_V1',requestId,
+   phase:'PROMOTED_READBACK_VERIFIED'}});
+ assert.equal(claimedPass.successEstablished,false);
+ assert.equal(claimedPass.journalPhase,'PROMOTED_READBACK_VERIFIED');
+ assert.equal(claimedPass.effectExecuted,null);
+ assert.equal(projectS6OnceJournalReadonly({...base,claimPresent:true,claimValid:true,
+  journal:{schema:'ZGMINI_S6_ONCE_JOURNAL_V1',requestId,phase:'FAKE_PASS'}})
+  .status,'STATE_UNKNOWN');
+ assert.equal(projectS6OnceJournalReadonly({...base,approvalValid:false})
+  .status,'STATE_UNKNOWN');
+ const sample={schema:SCHEMA,role:'operating',requestId:'fixedA',status:'PASS',
+  code:'S6_ONCE_JOURNAL_PHASE_OBSERVED',s6OnceJournal:attempted};
+ assert.doesNotMatch(toText(sample),/ownerSha256|nonce|watchdogPid=|standbyPids=|ownerPid=|approvalManifest|token|secret|[a-f0-9]{64}/i);
+ const ioFailure=inspectS6OnceJournalReadonly({
+  io:{lstatSync(){throw Error('SECRET_OWNER_LOCAL_PATH');}}
+ });
+ assert.equal(ioFailure.status,'STATE_UNKNOWN');
+ assert.equal(ioFailure.code,'S6_ONCE_APPROVAL_READ_UNVERIFIED');
+ assert.doesNotMatch(JSON.stringify(ioFailure),/SECRET_OWNER_LOCAL_PATH/);
+ assert.equal(ioFailure.operationalWrites,0);
+});
