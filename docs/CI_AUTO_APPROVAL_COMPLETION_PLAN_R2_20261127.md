@@ -511,3 +511,17 @@
 1. #4089 정확 HEAD CI 3/3을 확인하여 source 실패 시 원인 최소 정정, 성공 시 main 병합 및 3파일 readback. 사전 승인 없는 runtime 설치로 해석 금지.
 2. **별도 격리 PC의 Native 읽기 전용 정책·B-installed proof 위치와 파일 바이트/권한/출처**를 실제 독립 승인 경로에서 설치하고 `ZGMINI_CI_NATIVE_SCOPE_ROOT` 설정; 새 보안 권한/수동 관리자 변경은 별도 승인 없이 자동 수행하지 않는다. 기존 receipt root 영수증 파일을 정책 원본으로 승격하지 않는다.
 3. 운영 PC 6 Runner 현재 실제 Online·Busy/Watchdog/S6 journal readback은 여전히 공식 조회 미지원, 기존 `#4080` queued 요청을 재발행하지 않음. A/Writer B/Controller B 실제 무인 종단 완료 **0/3**.
+
+### #4089 완료 증거 — 정확 HEAD CI 및 main 반영
+
+- [PR #4089](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4089) 최종 HEAD `d265e6c01a82293555584f06c8ad03a13b08643f` 원본 3 CI의 `head_sha`, `completed/success` 재검증:
+  - Windows Source [45890326250](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45890326250) **SUCCESS**, 신규 Native isolated scope/proof readback 및 경로 겹침/임시 root 차단 시험 포함
+  - C996 [45890326238](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45890326238) **SUCCESS**
+  - Secret Scan [45890326194](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45890326194) **SUCCESS**
+- **CI 3/3 후 main squash 병합 `d73340a799162eb74060374f5f43170f65b4fe76`**, PR 상태 `closed/merged`, main HEAD와 변경 3파일의 Git blob 원본 재조회:
+  - `.github/workflows/ci-native-auto-publish.yml` `4f8babf82910d3286d975bfbbb9218c193137759`
+  - `ci-approval/native-publisher-entry.mjs` `93fdf1585c10c70229fec2987b05228450f1da5b`
+  - `tests/ci-native-publisher-entry.test.mjs` `a7365b6c26f68a0767822d26fb4bf13f908411ca`
+- **기능 범위 완료:** 이전 운영-PC E: 기본경로를 별도 격리 PC Publisher에서 무조건 사용하던 source 결함 수정. `ZGMINI_CI_NATIVE_SCOPE_ROOT`는 **독립적으로 설치·관리하는 읽기 전용 B-approved 정책 루트**이고, 기존 `ZGMINI_CI_NATIVE_RECEIPT_ROOT`는 단회 발행 영수증 전용 쓰기 root로 유지. 두 path의 포함/중첩·symlink·checkout/TEMP 정책 사용 거부. 실제 Owner-B 승인 증명 및 A/Writer receiver 기존 source/실행/권한 검사 유지.
+- **운영 적용 미완료:** 해당 새 변수의 실제 등록·격리 PC 경로/ACL/정확한 Owner-approved Scope·proof 설치를 소스 변경만으로 단정하지 않는다. 정책·파일·GH 변수·Controller·Core·DB를 운영 변경한 적 없고 신규 A/B 요청도 발행하지 않았다. Native/Controller B 활성화 여부와 실제 운영 Windows Runner 6개 상태는 여전히 직접 실측하지 못했다. 운영 무인 완료율 **0/3** 유지.
+- **다음 직접 필수 실행:** 기존 독립 승인 계약에서 격리 PC의 승인 정책 root를 실제 준비/검증하고 `ZGMINI_CI_NATIVE_SCOPE_ROOT` 변수를 허가된 범위에서 연결 → 운영 PC Runner와 설치 승인 SHA 확인 → A/Writer B/Controller B의 각 실제 단회 원본 결과 JSON/TXT까지 확인. 새 관리자/보안 범위 승인이 필요하면 효과·정확 경로/해시를 분리해 처리하고 설정 변경으로 승인 증거를 대체하지 않는다.
