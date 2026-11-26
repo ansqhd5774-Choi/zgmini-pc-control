@@ -3019,7 +3019,25 @@ test('S6 A file reader reuses real nested controller integrity signal and exact 
  assert.equal(result.s6Live.watchdogSourceSha256,sha(watchBytes));
  assert.equal(result.s6Live.protectedSha256,sha(JSON.stringify({files:{},tasks:{}})));
  assert.equal(result.independentOperatorAttested,false);
+ // Production S6 target update.mjs is 213203 bytes; pinned source files
+ // must not inherit the 128 KiB status-JSON bound.
+ const largeSource='S'.repeat(213203);
+ source['tools/update.mjs']=sha(largeSource);
+ write(path.join(base,'tools/update.mjs'),largeSource);
+ write(path.join(base,'MAINTENANCE_INSTALL.json'),
+  JSON.stringify({sourceSha:target,files:source}));
+ assert.equal(inspect().code,'S6_APPROVAL_PREIMAGE_CANDIDATE_ONLY');
+ // The exception is source-only and bounded by existing 2 MB source contract.
+ const overLimit='X'.repeat(2000001);
+ source['tools/update.mjs']=sha(overLimit);
+ write(path.join(base,'tools/update.mjs'),overLimit);
+ write(path.join(base,'MAINTENANCE_INSTALL.json'),
+  JSON.stringify({sourceSha:target,files:source}));
+ assert.equal(inspect().code,'S6_A_MAINTAINER_FILES_READ_UNVERIFIED');
+ source['tools/update.mjs']=sha(largeSource);
  write(path.join(base,'tools/update.mjs'),'tampered');
+ write(path.join(base,'MAINTENANCE_INSTALL.json'),
+  JSON.stringify({sourceSha:target,files:source}));
  assert.equal(inspect().status,'STATE_UNKNOWN');
 });
 
