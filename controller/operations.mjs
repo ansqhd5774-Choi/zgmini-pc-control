@@ -24,6 +24,7 @@ import {inspectR54RuntimeBinding} from './r54-runtime-binding-readonly.mjs';
 import {inspectR47TaskActionReadonly} from './theme-r47-task-action-readonly.mjs';
 import {inspectR17Windows,R17_PATCH_TEXT} from './us-breadth-r17-preflight.mjs';
 import {inspectUsBreadthR17Runtime} from './us-breadth-r17-runtime-readonly.mjs';
+import {inspectUsBreadthR2PrivateReadonly} from './us-breadth-r2-private-readonly.mjs';
 import {inspectR17PostCancel,ONE_SHOT_DIAGNOSTIC_ID} from './r17-268-postcancel-readonly.mjs';
 import {inspectER1SavedInput} from './market-calendar-er1-saved-readonly.mjs';
 import {inspectInflationCausalSaved} from './inflation-causal-saved-readonly.mjs';
@@ -209,7 +210,9 @@ export async function runOperation(request,context){
   // Only the fixed engine's missing pre-snapshot activates this scope. The
   // outer result must remain STATE_UNKNOWN; local Core evidence is still useful.
   const partial=context.skipProtectedTaskObservation===true&&policy.mutationsEnabled===false;
-  return {status:'PASS',code:'CORE_READONLY_DIAGNOSIS',core:readCore(dataRoot,partial?{}:{queryTask,retiredTaskEvidence}),
+  const core=readCore(dataRoot,partial?{}:{queryTask,retiredTaskEvidence});
+  core.usBreadthR2=inspectUsBreadthR2PrivateReadonly(dataRoot);
+  return {status:'PASS',code:'CORE_READONLY_DIAGNOSIS',core,
    ...(partial?{taskObservation:'UNVERIFIED'}:{}),providerCalls:0,d1Writes:0,sqliteOpened:false};
  }
  if(request.operation==='d05-lineage-readonly')return summarizeD05LineageOperation(
