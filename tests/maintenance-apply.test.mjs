@@ -11,7 +11,7 @@ import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {applyApprovedUpdate,maintenanceFailureCode,reconcileInterruptedRollback,runApprovedS6FailoverOnce} from '../tools/maintenance-apply.mjs';
 import {isolatedControllerStage,recoveryOperatorProofStatus,waitForSupervisorStopIdle,
- s6PriorRequestLedgerPreserved} from '../tools/update.mjs';
+ s6PriorRequestLedgerPreserved,normalizeS6OldChildren} from '../tools/update.mjs';
 
 test('independent recovery proof keeps strict identity and returns exact sanitized failure categories',()=>{
  assert.deepEqual(recoveryOperatorProofStatus({exitCode:0,stdout:'INDEPENDENT_OPERATOR\r\n'}),{verified:true,code:'RECOVERY_OPERATOR_VERIFIED'});
@@ -1270,4 +1270,24 @@ test('S6 local readback uses actual deployed Watchdog WMI and never publishes a 
  assert.match(code,/previousOwnerFenced/);
  assert.match(code,/exactApprovalBytesAttested===true&&independentOperatorAttested===true/);
  assert.doesNotMatch(code,/taskkill|fs\.unlinkSync|fs\.renameSync|fs\.writeFileSync|spawn\(/);
+});
+
+
+test('S6 six original Runner child seats are canonicalized despite Windows Supervisor Map reinsertion',()=>{
+ const orig=Array.from({length:6},(_,i)=>({
+  seat:i+1,pid:51001+i,alive:true
+ }));
+ // Restart of seat 2 deletes/reinserts the Map entry at the end.
+ const resumed=[orig[0],...orig.slice(2),{...orig[1],pid:52002}];
+ const actual=normalizeS6OldChildren(resumed,{requireAlive:true});
+ assert.deepEqual(actual,[orig[0],{seat:2,pid:52002},...orig.slice(2)].map(x=>({
+  seat:x.seat,pid:x.pid
+ })));
+ assert.equal(normalizeS6OldChildren([...resumed.slice(0,5)],{requireAlive:true}),null);
+ assert.equal(normalizeS6OldChildren([...resumed.slice(0,5),{...orig[0]}]),null);
+ assert.equal(normalizeS6OldChildren([...resumed.slice(0,5),{seat:2,pid:51001}]),null);
+ assert.equal(normalizeS6OldChildren([...resumed.slice(0,5),{seat:7,pid:61000}]),null);
+ assert.equal(normalizeS6OldChildren([...resumed.slice(0,5),{...resumed[5],alive:false}],{
+  requireAlive:true}),null);
+ assert.notEqual(normalizeS6OldChildren(resumed),null);
 });
