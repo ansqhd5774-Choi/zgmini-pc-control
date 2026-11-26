@@ -38,5 +38,12 @@ export function evaluateShadow(request, facts) {
   }
   if(facts.resourceState==="BUSY")return result("WAIT_RESOURCE","RESOURCE_BUSY");
   if(facts.resourceState!=="READY")return result("EVIDENCE_MISSING","RESOURCE_UNCONFIRMED");
+  // A and Writer B owner-opened Issue workflows reject requests created by
+  // github-actions[bot]. A valid business approval/manifest alone cannot
+  // prove the automated sender is admitted by the actual receiver. Controller
+  // B also needs its independent CI receipt/receiver identity verification.
+  // This is still a synthetic fact, NEVER a credential or publication grant.
+  if(facts.receiverAdmissionVerified!==true)
+    return result("EVIDENCE_MISSING","CI_RECEIVER_ADMISSION_NOT_PROVEN");
   return result("WOULD_MATCH_EXISTING_AUTHORITY","SIMULATED_CONDITIONS_MATCH");
 }
