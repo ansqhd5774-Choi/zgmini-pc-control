@@ -1,4 +1,6 @@
 import test from 'node:test';
+// Source-only continuity contract: no Windows runtime owner or Runner effect.
+import './supervisor-orphan-owner-continuity.test.mjs';
 // Reuse existing standby CI; this preflight has no Windows operating effects.
 import './supervisor-orphan-readonly.test.mjs';
 import assert from 'node:assert/strict';
