@@ -1,0 +1,16 @@
+{
+  "schema": "ZGMINI_PC_MAINTENANCE_RESULT_V1",
+  "requestId": "pc-s6-2a9bae01-bb3d-435c-b952-996cef65950a",
+  "targetControllerSha": "182bb46f2838306ba40d8b4ec32bac40ab75b69a",
+  "status": "BLOCKED",
+  "code": "S6_RELATED_WORK_OR_LEASE_UNVERIFIED",
+  "lastPass": "NONE",
+  "firstFail": "NONE",
+  "actualControllerSha": "182bb46f2838306ba40d8b4ec32bac40ab75b69a",
+  "recoverySha": null,
+  "protectedStateUnchanged": null,
+  "workflowEnabled": null,
+  "s6ExecutionStatus": "BLOCKED",
+  "s6LeaseReleaseAcknowledged": false,
+  "s6LastPhase": null
+}
