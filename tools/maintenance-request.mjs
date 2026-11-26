@@ -164,10 +164,11 @@ const digest=b=>createHash('sha256').update(b).digest('hex');
 const sha40=x=>typeof x==='string'&&/^[a-f0-9]{40}$/.test(x);
 const ownerIdentity=x=>x?.login===CONTROL_ACTOR&&x.id===327938088&&x.type==='User';
 const botIdentity=x=>x?.login===CI_CONTROLLER_ACTOR&&x.id===41898282&&x.type==='Bot';
-function verifyCiIssue(expected,actual){
+function verifyCiIssue(expected,actual,{allowClosed=false}={}){
  if(!botIdentity(actual?.user))fail('MAINTENANCE_ISSUE_READBACK_ACTOR_MISMATCH');
  if(!Number.isSafeInteger(actual.number)||actual.number<=0||actual.pull_request||
-    actual.title!==TITLE||actual.body!==expected.body||actual.state!=='open'||
+    actual.title!==TITLE||actual.body!==expected.body||
+    !(allowClosed?['open','closed'].includes(actual.state):actual.state==='open')||
     !actual.labels?.some(x=>x.name===LABEL))fail('MAINTENANCE_CI_ISSUE_READBACK_MISMATCH');
  return {status:'REQUEST_READBACK_VERIFIED',requestId:requestOf(expected).requestId,
   issueNumber:actual.number,execution:'NOT_ASSERTED',next:'FOLLOW_ORIGINAL_REQUEST_ONLY'};
@@ -319,8 +320,29 @@ export async function submitExistingControllerApprovalFromCi({targetSha,approval
  // mutable chat trace. The existing receiver-side effect claim still applies.
  const effectKey=digest(JSON.stringify([CONTROL_REPOSITORY,manifest.installedSha,targetSha]));
  const old=await ports.loadReceipt(effectKey);
- if(old!==null)return {status:'STATE_UNKNOWN',code:'MAINTENANCE_CI_EXISTING_RECEIPT_NO_REPOST',effectKey,
-  issueNumber:Number.isSafeInteger(old?.issueNumber)?old.issueNumber:null,next:'RECONCILE_SAME_RECEIPT_NO_NEW_POST'};
+ if(old!==null){
+  // A second eligible CI event is not a second B effect. Only an already
+  // verified durable receipt plus a fresh, exact GitHub Issue readback may
+  // reuse the original request. This is NOT evidence of PC installation.
+  try{
+   const previous=requestOf(old.expected);
+   if(old.phase==='READBACK_VERIFIED'&&
+      Number.isSafeInteger(old.issueNumber)&&old.issueNumber>0&&
+      old.expected.repository_full_name===CONTROL_REPOSITORY&&
+      old.expected.title===TITLE&&Array.isArray(old.expected.labels)&&
+      old.expected.labels.length===1&&old.expected.labels[0]===LABEL&&
+      ['schema','operation','controlRepository','targetControllerSha','approvalManifestSha256']
+       .every(key=>previous[key]===q[key])){
+    const actual=await ports.readIssue(old.issueNumber);
+    if(actual?.number!==old.issueNumber)fail('MAINTENANCE_CI_EXISTING_RECEIPT_ISSUE_MISMATCH');
+    verifyCiIssue(old.expected,actual,{allowClosed:true});
+    return {status:'EXISTING_REQUEST_REUSED',effectKey,issueNumbers:[old.issueNumber],
+     next:'FOLLOW_ORIGINAL_REQUEST_ONLY'};
+   }
+  }catch{} // Unavailable/mismatched proof is never a new POST or a success.
+  return {status:'STATE_UNKNOWN',code:'MAINTENANCE_CI_EXISTING_RECEIPT_NO_REPOST',effectKey,
+   issueNumber:Number.isSafeInteger(old?.issueNumber)?old.issueNumber:null,next:'RECONCILE_SAME_RECEIPT_NO_NEW_POST'};
+ }
  const prior=await ports.findPriorRequests(targetSha);
  if(!Array.isArray(prior))fail('MAINTENANCE_CI_PRIOR_REQUEST_READ_UNVERIFIED');
  const matches=prior.filter(x=>{
