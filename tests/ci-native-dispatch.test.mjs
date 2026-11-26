@@ -242,3 +242,19 @@ for(const mode of ['FIXED','EVENT_COMPLETION_V1'])test('installed full native po
   assert.equal(x.claims.length,0);
  }
 });
+
+
+for(const mode of ['FIXED','EVENT_COMPLETION_V1'])test('equivalent independently installed native policy is not rejected by JSON key order in '+mode+' mode',async()=>{
+ const x=make();
+ if(mode==='EVENT_COMPLETION_V1'){
+  delete x.policy.sourceRunId;
+  x.policy.sourceRunMode=mode;
+ }
+ const installation={};
+ for(const [name,value] of Object.entries(x.policy).reverse())installation[name]=value;
+ x.ports.readInstalledReceiver=async()=>installation;
+ const current={...x.policy,...(mode==='EVENT_COMPLETION_V1'?{sourceRunId:123}:{})};
+ const r=await dispatchApprovedCiEffect({policy:current,requestBytes:x.bytes,ports:x.ports});
+ assert.equal(r.code,'CI_NATIVE_DISPATCH_WAKEUP_ONLY');
+ assert.equal(x.dispatches.length,1);
+});
