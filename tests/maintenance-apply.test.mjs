@@ -1167,7 +1167,8 @@ test('S6 fixed CLI preclaim error is bounded and does not mask effect errors',()
   [Object.assign(new Error('PRIVATE_SYSTEM_PATH'),{code:'S6_ONCE_PACKAGE_MANIFEST_PIN'}),
    'S6_ONCE_PACKAGE_MANIFEST_PIN'],
   [new Error('S6_ONCE_WATCHDOG_R5_NOT_READY'),'S6_ONCE_WATCHDOG_R5_NOT_READY'],
-  [new Error('PRIVATE_SYSTEM_PATH'),'S6_ONCE_PREFLIGHT_UNVERIFIED']
+  [new Error('PRIVATE_SYSTEM_PATH'),'S6_ONCE_PREFLIGHT_UNVERIFIED'],
+  [new Error('S6_PRIVATE_SYSTEM_PATH'),'S6_ONCE_PREFLIGHT_UNVERIFIED']
  ]){
   const r=s6OncePreclaimFailure(id,error);
   assert.equal(r.status,'BLOCKED');assert.equal(r.code,code);
