@@ -236,7 +236,7 @@
 - [PR #4077](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4077): `.github/workflows/ci-native-auto-publish.yml`에서 승인된 소스 CI `workflow_run.completed` 이벤트를 A/Writer B effect별로 독립 받아, **기존 `dispatchApprovedCiEffect`에 실제 GitHub REST 발행 포트·독립 설치 결과 대조·영구 효과 receipt**를 연결한다.
 - 정책·Scope는 이벤트나 생성된 PR에서 받지 않는다. 기존 B 설치 결과를 CI native 승인 근거로 사용할 때에는 **정확 효과와 정책 SHA가 포함된 명시적 결과 증거**가 필요하다. 과거 수동 설치 #4036의 성공만으로 새로운 Bot 권한이 생기지 않는다.
 - 기존 `GITHUB_TOKEN`은 발행 Workflow job의 `actions:write`에만 한정, 실제 flag·정규 설치 정책이 없으면 호출 불가. 외부 Runner·새 Controller·예약·PC Task/DB/D1 효과 없음.
-- 테스트 `tests/ci-native-publisher-entry.test.mjs`, 기존 Windows Source CI 단계 연결. HEAD `d5b2df2d8902a2ee899bef8580c58680c3f45f78`. 세 CI는 **검증 중**으로 아직 병합/운영 적용 아님.
+- 테스트 `tests/ci-native-publisher-entry.test.mjs`, 기존 Windows Source CI 단계 연결. 최신 HEAD `cd43e06c0f174d73fba6f28060d332792a1fc0c9`. 무관한 Source CI 완료를 `IGNORED`로 처리하고 잘못된 실패 표시/중복 POST를 방지하는 수정까지 반영했다. 정확 HEAD Controller Maintenance Source Tests [#45882290338](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45882290338) **SUCCESS**, C996 [#45882290310](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45882290310) **QUEUED**, Secret Scan [#45882290376](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45882290376) **QUEUED** (관측 시점). 아직 전체 CI/병합/운영 적용 아님.
 
 ### 다음 필수 실행
 
