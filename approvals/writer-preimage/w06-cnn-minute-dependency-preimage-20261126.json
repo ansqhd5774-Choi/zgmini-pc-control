@@ -1,0 +1,65 @@
+{
+  "schema": "ZGMINI_WRITER_PREIMAGE_SCOPE_APPROVAL_V1",
+  "status": "APPROVED_A_READONLY",
+  "scope": "PC_WRITER_APPROVED_SOURCE_PREIMAGE",
+  "sourceRoot": "projects/zgmini-earnings-history-pc-release",
+  "files": [
+    {
+      "path": "lib/cnn-index.mjs",
+      "change": "M"
+    },
+    {
+      "path": "lib/cnn-observed-archive-r1.mjs",
+      "change": "M"
+    },
+    {
+      "path": "lib/cnn-observed-history-r1.mjs",
+      "change": "M"
+    },
+    {
+      "path": "lib/market-score/live-refresh.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/d1-diagnostics.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/d1.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/local-db.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/local-env.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/publication-guard.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/quota-fetch.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/quota-policy.mjs",
+      "change": "M"
+    },
+    {
+      "path": "worker/market-operational-store.mjs",
+      "change": "M"
+    },
+    {
+      "path": "worker/public-display-freshness.mjs",
+      "change": "M"
+    },
+    {
+      "path": "worker/public-feed-input-safety.mjs",
+      "change": "M"
+    }
+  ],
+  "allowOtherPaths": false
+}
