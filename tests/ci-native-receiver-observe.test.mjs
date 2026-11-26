@@ -124,7 +124,7 @@ test('both workflow registrations remain gated and read-only',()=>{
   ['a','A_READONLY','ZGMINI_CI_NATIVE_A_ENABLED'],
   ['writer-b','B_WRITER_SOURCE','ZGMINI_CI_NATIVE_WRITER_B_ENABLED']
  ]){
-  const y=file('.github/workflows/ci-approved-'+s+'-once.yml').toString('utf8');
+  const y=file('.github/workflows/ci-approved-'+s+'-once.yml').toString('utf8').replace(/\r\n/g,'\n');
   assert.match(y,/^on:\n  workflow_dispatch:\n/m);
   assert.doesNotMatch(y,/^\s+(?:schedule:|issues:|pull_request:|workflow_run:)/m);
   assert.match(y,new RegExp("vars\\."+flag+" == 'true'"));
