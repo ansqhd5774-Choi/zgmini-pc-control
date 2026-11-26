@@ -22,7 +22,8 @@ on:
       - '.github/workflows/pc-process-inventory-readonly.yml'
 permissions: {}
 concurrency:
-  group: pc-process-inventory-${{ github.event.issue.number }}
+  # PR events have no issue.number; never share one pending queue across PRs.
+  group: pc-process-inventory-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.issue.number }}
   cancel-in-progress: false
 jobs:
   process-source-tests:

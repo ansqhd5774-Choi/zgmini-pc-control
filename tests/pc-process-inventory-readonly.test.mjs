@@ -2504,7 +2504,11 @@ test('CI B receipt-root A inspector never reports directory paths or write autho
  assert.equal(present.executionAuthorized,false);
  assert.equal(present.operationalWrites,0);
  assert.equal(JSON.stringify(present).includes(root),false);
- assert.equal(inspect({root:''}).code,'CI_RECEIPT_ROOT_NOT_CONFIGURED');
+ const notConfigured=inspect({root:''});
+ assert.equal(notConfigured.code,'CI_RECEIPT_ROOT_NOT_CONFIGURED');
+ assert.equal(notConfigured.configured,false);
+ assert.equal(notConfigured.directoryPresent,null);
+ assert.equal(notConfigured.readable,null);
  assert.equal(inspect({root:'relative'}).code,'CI_RECEIPT_ROOT_PATH_UNSAFE');
  assert.equal(inspect({root:'E:\\'}).code,'CI_RECEIPT_ROOT_PATH_UNSAFE');
  assert.equal(inspect({volatileRoots:['E:\\ZGmini']}).code,'CI_RECEIPT_ROOT_VOLATILE');
@@ -2513,7 +2517,11 @@ test('CI B receipt-root A inspector never reports directory paths or write autho
   isDirectory:()=>true,isSymbolicLink:()=>p==='E:\\ZGmini'})};
  assert.equal(inspect({filesystem:aliased}).code,'CI_RECEIPT_ROOT_PATH_ALIAS');
  const missing={...io,lstatSync:()=>{const e=Error('missing');e.code='ENOENT';throw e;}};
- assert.equal(inspect({filesystem:missing}).code,'CI_RECEIPT_ROOT_DIRECTORY_ABSENT');
+ const absent=inspect({filesystem:missing});
+ assert.equal(absent.code,'CI_RECEIPT_ROOT_DIRECTORY_ABSENT');
+ assert.equal(absent.configured,true);
+ assert.equal(absent.directoryPresent,false);
+ assert.equal(absent.readable,false);
  const unreadable={...io,readdirSync:()=>{throw Error('permission')}};
  assert.equal(inspect({filesystem:unreadable}).code,'CI_RECEIPT_ROOT_READ_UNVERIFIED');
 });
@@ -2624,4 +2632,13 @@ test('R4 fixed read-only file evidence rejects aliases and reports only safe sta
  assert.equal(denied.code,'WATCHDOG_R4_RUNTIME_READ_UNVERIFIED');
  assert.equal(denied.operationalWrites,0);
  assert.doesNotMatch(JSON.stringify(denied),/fixture|5311|5333|nonce/i);
+});
+
+test('CI source test queue isolates separate PRs from Issue A requests',()=>{
+ const workflow=fs.readFileSync(new URL('../.github/workflows/pc-process-inventory-readonly.yml',import.meta.url),'utf8');
+ // Both events have a stable GitHub number; PR numbers are absent from issue payloads.
+ assert.ok(workflow.includes(
+  'group: pc-process-inventory-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.issue.number }}'));
+ assert.match(workflow,/cancel-in-progress: false/);
+ assert.ok(!workflow.includes('group: pc-process-inventory-${{ github.event.issue.number }}'));
 });
