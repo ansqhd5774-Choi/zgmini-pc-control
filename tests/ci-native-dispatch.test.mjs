@@ -15,16 +15,16 @@ const make=(effect='A_READONLY')=>{
  const policy={schema:'ZGMINI_CI_NATIVE_DISPATCH_V1',enabled:true,effect,
    receiverWorkflowPath:path,receiverWorkflowBlobSha:blob(source),
    sourceRunId:123,sourceAttempt:1,sourceWorkflowId:416355595,
-   sourceHeadSha:'a'.repeat(40),sourceWorkflowPath:'.github/workflows/controller-maintenance-source-tests.yml',
+   sourceHeadSha:'a'.repeat(40),sourceWorkflowPath:'.github/workflows/controller-maintenance-source-tests.yml',sourceWorkflowBlobSha:blob(source),
    businessApprovalSha256:'b'.repeat(64),approvedRequestSha256:hash(bytes),policyRevision:'c'.repeat(40)};
  const run={id:123,run_attempt:1,workflow_id:416355595,path:policy.sourceWorkflowPath,
    head_sha:policy.sourceHeadSha,status:'completed',conclusion:'success',event:'pull_request',
    repository:repo,head_repository:repo};
  let claims=[],dispatches=[],old=null;
  const ports={readSourceRun:async()=>run,
+   readSourceWorkflow:async()=>({type:'file',path:policy.sourceWorkflowPath,encoding:'base64',sha:policy.sourceWorkflowBlobSha,content:source.toString('base64')}),
    readReceiverWorkflow:async()=>({type:'file',path,encoding:'base64',sha:policy.receiverWorkflowBlobSha,content:source.toString('base64')}),
-   readInstalledReceiver:async()=>({effect,enabled:true,receiverWorkflowBlobSha:policy.receiverWorkflowBlobSha,
-      policyRevision:policy.policyRevision,approvedRequestSha256:policy.approvedRequestSha256}),
+   readInstalledReceiver:async()=>({...policy,enabled:true}),
    loadReceipt:async()=>old,
    saveReceipt:async(key,r,options)=>{claims.push({key,phase:r.phase,exclusive:options?.exclusive});old=r;},
    dispatchWorkflow:async(path,payload)=>{dispatches.push({path,payload});return {status:204}}};
@@ -90,4 +90,40 @@ test('corrupt receipt cannot be treated as empty',async()=>{
  const next=await dispatchApprovedCiEffect({policy:x.policy,requestBytes:x.bytes,ports:x.ports});
  assert.equal(next.code,'CI_NATIVE_DISPATCH_RECEIPT_READ_UNKNOWN');assert.equal(x.dispatches.length,1);
  }finally{fs.rmSync(root,{recursive:true,force:true})}
+});
+
+
+test('pinned source workflow blob must match actual immutable bytes',async()=>{
+ const x=make();const original=x.ports.readSourceWorkflow;
+ x.ports.readSourceWorkflow=async()=>({...await original(),content:Buffer.from('edited workflow').toString('base64')});
+ const r=await dispatchApprovedCiEffect({policy:x.policy,requestBytes:x.bytes,ports:x.ports});
+ assert.equal(r.code,'CI_NATIVE_DISPATCH_SOURCE_BYTES_UNVERIFIED');assert.equal(x.dispatches.length,0);
+});
+test('source workflow pin mismatch must not create a receipt',async()=>{
+ const x=make();x.policy.sourceWorkflowBlobSha='f'.repeat(40);
+ const r=await dispatchApprovedCiEffect({policy:x.policy,requestBytes:x.bytes,ports:x.ports});
+ assert.equal(r.code,'CI_NATIVE_DISPATCH_SOURCE_BYTES_UNVERIFIED');assert.equal(x.claims.length,0);
+});
+test('missing independent source workflow reader prevents calling receiver',async()=>{
+ const x=make();delete x.ports.readSourceWorkflow;
+ const r=await dispatchApprovedCiEffect({policy:x.policy,requestBytes:x.bytes,ports:x.ports});
+ assert.equal(r.code,'CI_NATIVE_DISPATCH_PORT_UNAVAILABLE');assert.equal(x.dispatches.length,0);
+});
+test('caller cannot substitute approval hash absent independently installed grant',async()=>{
+ const x=make(),installed={...x.policy};x.ports.readInstalledReceiver=async()=>installed;
+ x.policy.businessApprovalSha256='f'.repeat(64);
+ const r=await dispatchApprovedCiEffect({policy:x.policy,requestBytes:x.bytes,ports:x.ports});
+ assert.equal(r.code,'CI_NATIVE_DISPATCH_RECEIVER_NOT_ATTESTED');assert.equal(x.claims.length,0);
+});
+test('caller cannot substitute source run and mint a new grant',async()=>{
+ const x=make(),installed={...x.policy};x.ports.readInstalledReceiver=async()=>installed;
+ x.policy.sourceRunId=999;x.run.id=999;
+ const r=await dispatchApprovedCiEffect({policy:x.policy,requestBytes:x.bytes,ports:x.ports});
+ assert.equal(r.code,'CI_NATIVE_DISPATCH_RECEIVER_NOT_ATTESTED');assert.equal(x.claims.length,0);
+});
+test('caller cannot substitute receiver path with another source file',async()=>{
+ const x=make(),installed={...x.policy};x.ports.readInstalledReceiver=async()=>installed;
+ x.policy.sourceWorkflowPath='.github/workflows/fake-tests.yml';x.run.path=x.policy.sourceWorkflowPath;
+ const r=await dispatchApprovedCiEffect({policy:x.policy,requestBytes:x.bytes,ports:x.ports});
+ assert.equal(r.code,'CI_NATIVE_DISPATCH_RECEIVER_NOT_ATTESTED');assert.equal(x.claims.length,0);
 });
