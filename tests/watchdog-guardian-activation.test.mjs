@@ -193,9 +193,30 @@ test('R4 exact Guardian same-purpose B admission is inert without exact authoriz
  ]){const y=structuredClone(x);mutate(y);
   assert.throws(()=>admitR4(y),/WATCHDOG_R4_GUARDIAN_/);
  }
- // This source PR prepares a validator, NOT an install authorization.
- assert.equal(fs.existsSync(path.join(root,
-  'approvals/watchdog-activations/'+R4_GUARDIAN_TARGET+'-r4.json')),false);
+ // The existing same-purpose one-PID approval is a NEW exact R4 manifest,
+ // never a reissue of the consumed R3 #1395 authorization.
+ const apPath=path.join(root,'approvals/watchdog-activations/',
+  R4_GUARDIAN_TARGET+'-r4.json');
+ const bytes=fs.readFileSync(apPath),approval=JSON.parse(bytes);
+ assert.equal(approval.approved,true);
+ assert.equal(approval.schema,R4_GUARDIAN_SCHEMA);
+ assert.equal(approval.scope,R4_GUARDIAN_SCOPE);
+ assert.equal(approval.targetSha,R4_GUARDIAN_TARGET);
+ assert.equal(approval.installedSha256,R4_GUARDIAN_SOURCE_SHA256);
+ assert.equal(approval.installedManifestSha256,
+  'a47343964fbf3668d27f77deba69dbfc9b53788775c26ea420eeb3b2509e3805');
+ assert.equal(approval.guardianHelperSha256,helperDigest);
+ assert.equal(approval.activationScriptSha256,scriptDigest);
+ assert.equal(approval.stageRequestId,R4_GUARDIAN_STAGE_REQUEST_ID);
+ assert.equal(approval.oldStageIssueNumber,R4_GUARDIAN_STAGE_ISSUE);
+ assert.equal(approval.expectedControllerSha,R4_GUARDIAN_CONTROLLER_SHA);
+ assert.equal(approval.effect,R4_GUARDIAN_EFFECT);
+ assert.equal(approval.approvalBasis,R4_GUARDIAN_BASIS);
+ const real=fixtureR4();
+ real.approval=approval;
+ real.approvalDigest=digest(bytes);
+ real.body.approvalManifestSha256=digest(bytes);
+ assert.equal(admitR4(real).requestId,R4_GUARDIAN_REQUEST_ID);
 });
 test('R4 Guardian old process must be healthy, pre-stage and WMI-identity attributable',()=>{
  const x=r4Stage();
