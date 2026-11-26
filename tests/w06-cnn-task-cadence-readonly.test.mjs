@@ -157,6 +157,14 @@ test('W06 HTTP PC read-only separates 60s attempted GET from D1 publication',()=
  assert.equal(x.http429Count,1);
  assert.equal(x.fetchFailedCount,1);
  assert.equal(x.latestOutcome,'FETCH_FAILED');
+ assert.equal(x.requestGapSampleCount,1);
+ assert.equal(x.minRequestGapSeconds,480);
+ assert.equal(x.medianRequestGapSeconds,480);
+ assert.equal(x.maxRequestGapSeconds,480);
+ assert.equal(x.gapsOver90Seconds,1);
+ assert.deepEqual(x.recentRequestIntervalsSeconds,[480]);
+ assert.equal(x.afterActivationFirstRequestAt,'2026-11-26T15:11:10.000Z');
+ assert.equal(x.afterActivationLastRequestAt,'2026-11-26T15:19:10.000Z');
  assert.doesNotMatch(JSON.stringify(x),/sourceObservedAt|score|PRIVATE|SECRET/);
  const unsafe=projectW06HttpChecksReadonly([
   {snapshot_key:'2026-11-26',body:JSON.stringify({
@@ -186,4 +194,34 @@ test('W06 HTTP evidence uses bounded native SQLite read-only query without mutat
  assert.deepEqual(params,['2026-11-25','2026-11-26']);
  assert.equal(inspectW06HttpChecksReadonly({
   filesystem:{lstatSync:()=>{throw Error('NO_DB')}}}).status,'UNVERIFIED');
+});
+
+test('W06 HTTP request gap median measures actual fetch starts, not stale source timestamps',()=>{
+ const times=['15:05:00','15:06:00','15:08:00','15:12:00'];
+ const checks=times.map(t=>{
+  const ms=Date.parse('2026-11-26T'+t+'.000Z');
+  return {requestedAt:ms,checkedAt:ms+500,httpStatus:200,
+   outcome:'VERIFIED',sourceObservedAt:'2026-11-26T01:59:59.000Z',score:15};
+ });
+ const rows=[{snapshot_key:'2026-11-26',body:JSON.stringify({
+  version:'CNN_HTTP_CHECKS_R1',date:'2026-11-26',checks})}];
+ const out=projectW06HttpChecksReadonly(rows,{
+  observedAtMs:Date.parse('2026-11-26T15:15:00.000Z')});
+ assert.equal(out.status,'READ');
+ assert.equal(out.afterActivationCount,4);
+ assert.equal(out.requestGapSampleCount,3);
+ assert.equal(out.minRequestGapSeconds,60);
+ assert.equal(out.medianRequestGapSeconds,120);
+ assert.equal(out.maxRequestGapSeconds,240);
+ assert.equal(out.gapsOver90Seconds,2);
+ assert.deepEqual(out.recentRequestIntervalsSeconds,[60,120,240]);
+ assert.doesNotMatch(JSON.stringify(out),/sourceObservedAt|score|PRIVATE|SECRET/);
+ const single=projectW06HttpChecksReadonly([
+  {snapshot_key:'2026-11-26',body:JSON.stringify({version:'CNN_HTTP_CHECKS_R1',
+   date:'2026-11-26',checks:[checks[0]]})}
+ ],{observedAtMs:Date.parse('2026-11-26T15:15:00.000Z')});
+ assert.equal(single.requestGapSampleCount,0);
+ assert.equal(single.minRequestGapSeconds,null);
+ assert.equal(single.medianRequestGapSeconds,null);
+ assert.deepEqual(single.recentRequestIntervalsSeconds,[]);
 });
