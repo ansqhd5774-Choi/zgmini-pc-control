@@ -2967,6 +2967,38 @@ test('S6 private A candidate does not approve B, attest independent maintainer o
  assert.equal(currentProof.status,'PASS');
  assert.equal(currentProof.s6Live.installedMaintainerSha,
   '20a2939d419675ede3e8ab38a3ea3b70756981ac');
+ // #4024 installed a policy-only 7-to-7 handoff; all nine file digests
+ // (seven runtime files) remain identical. Accept both approved source pins,
+ // but not any unapproved source or a failed seven-file readback.
+ const policyOnly={...current,maintainerSourceSha:
+  '5a85f803fd9cb280561395f88a3544ee8e7d4660'};
+ const policyProof=projectS6ApprovalPreimageReadonly(policyOnly,
+  {now:at,sourceVersion:'CURRENT'});
+ assert.equal(policyProof.status,'PASS');
+ assert.equal(policyProof.s6Live.installedMaintainerSha,
+  '5a85f803fd9cb280561395f88a3544ee8e7d4660');
+ assert.equal(policyProof.bAuthorization,false);
+ assert.equal(policyProof.promotionApproved,false);
+ assert.equal(projectS6ApprovalPreimageReadonly(policyOnly,{now:at}).code,
+  'S6_A_MAINTAINER_SOURCE_UNVERIFIED');
+ assert.equal(projectS6ApprovalPreimageReadonly({...policyOnly,
+  maintainerSourceSha:'f'.repeat(40)},{now:at,sourceVersion:'CURRENT'}).code,
+  'S6_A_MAINTAINER_SOURCE_UNVERIFIED');
+ assert.equal(projectS6ApprovalPreimageReadonly({...policyOnly,
+  maintainerFilesVerified:false},{now:at,sourceVersion:'CURRENT'}).code,
+  'S6_A_MAINTAINER_SOURCE_UNVERIFIED');
+ const sourceFile=JSON.parse(fs.readFileSync(new URL(
+  '../approvals/maintenance-handoffs/5a85f803fd9cb280561395f88a3544ee8e7d4660.json',
+  import.meta.url),'utf8'));
+ const earlier=JSON.parse(fs.readFileSync(new URL(
+  '../approvals/maintenance-handoffs/20a2939d419675ede3e8ab38a3ea3b70756981ac.json',
+  import.meta.url),'utf8'));
+ assert.equal(sourceFile.approved,true);
+ assert.equal(sourceFile.installedSha,earlier.targetSha);
+ assert.equal(sourceFile.targetSha,policyOnly.maintainerSourceSha);
+ assert.deepEqual(sourceFile.files,earlier.files);
+ assert.deepEqual(sourceFile.runtimeChangedFiles,[]);
+ assert.notDeepEqual(sourceFile.ciControllerBPolicy,earlier.ciControllerBPolicy);
  assert.equal(currentProof.bAuthorization,false);
  assert.equal(currentProof.promotionApproved,false);
  assert.equal(projectS6ApprovalPreimageReadonly(current,{now:at}).code,
