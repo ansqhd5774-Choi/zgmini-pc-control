@@ -357,9 +357,25 @@ test('R5 exact Guardian B requires independent version and approved raw source',
  ]){const t=structuredClone(x);mutate(t);
   assert.throws(()=>admitR5(t),/WATCHDOG_R5_GUARDIAN_/);
  }
- // Approval awaits byte-for-byte source hash and exact CI of this PR.
- assert.equal(fs.existsSync(path.join(root,'approvals/watchdog-activations/',
-  R5_GUARDIAN_TARGET+'-r5.json')),false);
+ // New exact one-time R5 Guardian manifest is allowed only after R5
+ // STAGED #3842 and the immutable on-disk A #3844 raw SHA readback.
+ const file=path.join(root,'approvals/watchdog-activations/',
+  R5_GUARDIAN_TARGET+'-r5.json');
+ const bytes=fs.readFileSync(file),actual=JSON.parse(bytes);
+ const real=fixtureR5();
+ real.approval=actual;
+ real.approvalDigest=digest(bytes);
+ real.body.approvalManifestSha256=digest(bytes);
+ assert.equal(actual.approved,true);
+ assert.equal(actual.schema,R5_GUARDIAN_SCHEMA);
+ assert.equal(actual.installedSha256,R5_GUARDIAN_SOURCE_SHA256);
+ assert.equal(actual.installedManifestSha256,R5_GUARDIAN_INSTALL_RAW_SHA256);
+ assert.equal(actual.activationScriptSha256,scriptDigest);
+ assert.equal(actual.guardianHelperSha256,helperDigest);
+ assert.equal(actual.stageRequestId,R5_GUARDIAN_STAGE_REQUEST_ID);
+ assert.equal(actual.oldStageIssueNumber,R5_GUARDIAN_STAGE_ISSUE);
+ assert.equal(actual.expectedControllerSha,R5_GUARDIAN_CONTROLLER_SHA);
+ assert.equal(admitR5(real).requestId,R5_GUARDIAN_REQUEST_ID);
 });
 test('R5 Guardian rejects staged source if previous R4 1+1 READY not proven',()=>{
  const x=r5Stage();assert.equal(verifyR5GuardianPrecheck(x),true);

@@ -1,0 +1,14 @@
+{
+  "schema": "ZGMINI_CNN_SIDECAR_B_RESULT_V1",
+  "requestId": "a7e845b2-39d3-4e52-8500-71c818b37d9f",
+  "status": "SIDECAR_B_APPLIED_VERIFIED",
+  "code": "SIDECAR_B_EXACT_FILE_READBACK_PASS",
+  "applied": true,
+  "changedFileCount": 1,
+  "controlSha": "e481f867cc538da0e6f272dd207719d2bd5f36f0",
+  "manifestSha256": "f4ffaeaba492ae49be0dbcf9ef126c7bf14fc158960115f6315a17110ee3e1d9",
+  "beforeSha256": "583297b451f168a32a2a5de4b0b04c9b14449aab9a041c954a420203cf04f188",
+  "afterSha256": "eb3c43bf8fba6ea4e51f3e84b77f9ec13000db9d9e38077ffd914950d7080b6b",
+  "backupVerified": true,
+  "retry": "READ_ONLY_RECONCILE_NO_REPLAY"
+}
