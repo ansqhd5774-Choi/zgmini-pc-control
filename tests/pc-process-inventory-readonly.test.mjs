@@ -29,6 +29,21 @@ function event(role='operating'){
 }
 const env={GITHUB_REPOSITORY:REPO,GITHUB_ACTOR:'ansqhd5774-Choi',
  GITHUB_EVENT_NAME:'issues',GITHUB_RUN_ID:'43110000000',GITHUB_RUN_ATTEMPT:'1'};
+test('W06 fixed task cadence scope accepts operating-only request and no arbitrary args',()=>{
+ const original=event(),body=JSON.parse(original.issue.body);
+ const scoped={...original,issue:{...original.issue,body:JSON.stringify({...body,
+  probe:'w06-cnn-task-cadence-readonly'})}};
+ assert.equal(authenticateProcess(scoped,env,'operating').w06TaskCadence,true);
+ assert.throws(()=>authenticateProcess(scoped,env,'handoff'));
+ for(const bad of ['w06-cnn-task-cadence-readonly;cmd',
+  'w06-cnn-task-cadence-list-all']){
+  const altered={...scoped,issue:{...scoped.issue,body:JSON.stringify({...body,probe:bad})}};
+  assert.throws(()=>authenticateProcess(altered,env,'operating'));
+ }
+ assert.throws(()=>authenticateProcess({...scoped,issue:{...scoped.issue,
+  body:JSON.stringify({...body,probe:'w06-cnn-task-cadence-readonly',
+   taskName:'SECRET'})}},env,'operating'));
+});
 test('exact read-only schema, owner, roles and run provenance',()=>{
  assert.equal(authenticateProcess(event(),env,'operating').role,'operating');
  assert.equal(authenticateProcess(event('handoff'),env,'handoff').role,'handoff');
