@@ -3420,7 +3420,7 @@ export async function readS6OncePhaseReadback({phase,baseline,
  * children and controller Runner executables must be proven absent. */
 export function s6OwnedLeaseReleaseReadback(snapshot,baseline,{now=Date.now()}={}){
  const at=Date.parse(snapshot?.observedAtUtc??'');
- return baseline&&snapshot&&snapshot.requestId===baseline.requestId&&
+ return Boolean(baseline&&snapshot&&snapshot.requestId===baseline.requestId&&
   snapshot.controllerSha===baseline.controllerSha&&
   snapshot.protectedSha256===baseline.protectedSha256&&
   snapshot.watchdogPid===baseline.watchdogPid&&
@@ -3437,7 +3437,7 @@ export function s6OwnedLeaseReleaseReadback(snapshot,baseline,{now=Date.now()}={
   snapshot.workflowState==='active'&&
   snapshot.controllerDraining===false&&
   snapshot.relatedLeasesAbsent===true&&
-  snapshot.existingRequestLedgerPreserved===true;
+  snapshot.existingRequestLedgerPreserved===true);
 }
 
 /**
