@@ -607,7 +607,7 @@ export async function main({eventPath=process.env.GITHUB_EVENT_PATH,token=proces
    if(result.state!=='IGNORED')return result;
   }
   if(eventName==='push')return publishExistingControllerApprovals(event,opts);
-  return {state:'IGNORED',code:'NO_CONFIGURED_SOURCE_EVENT',results:[]};
+  return publishLateOwnerMergedControllerApproval(event,opts);
  }
  if(eventName==='push')return observePublishedControllerApprovals(event,{getJson});
  return observeCompletedRun(event,{getRun:async runId=>{
