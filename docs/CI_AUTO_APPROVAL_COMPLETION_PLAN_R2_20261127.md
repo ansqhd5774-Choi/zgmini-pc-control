@@ -602,3 +602,37 @@
 1. #4107 정확 HEAD CI 실제 결과 회수, 관련 시험 실패면 최소 수정 후 재검증. 3/3 성공 시 최신 main 및 동시 작업 원문 보존해 병합·변경 blob 확인.
 2. 기존 정규 Owner A로 격리 PC fixed probe 1회 Issue→실행→JSON/TXT 원본 readback, 현재 Native 설정과 설치된 파일의 존재·동등성 대조. 중복 Job 생성 금지.
 3. 별도 검증된 B 승인 원본·독립 설치 영수증·원자 단회 receipt 및 실제 Owner 범위가 정확히 갖춰진 효과만 자동 CI 발행/PC 실행으로 연결. 현행 운영 종단 0/3 유지; 새 보안 권한/승인 원본/설치 파일을 진단 결과로 자동 생성하지 않는다.
+
+## 24. 스무 번째 실행 기록 — #4107 병합 및 격리 PC 실제 Native 설치 경로 판정 (2026-11-27 KST)
+
+### 정확 HEAD 소스·CI 통합
+
+- [PR #4107](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4107) 최종 HEAD `48fa90d729e5bad1a5de4ce558d85138328bde76`: 세 개의 실제 GitHub Actions Run이 같은 `head_sha`에서 `completed/success`인 것을 확인.
+  - [C996 Run 45897985931](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45897985931) SUCCESS
+  - [Process Source Run 45897985942](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45897985942) SUCCESS (기존 고정 A 검증 및 신규 Native 격리 정책 진단 회귀시험 포함)
+  - [Secret Scan Run 45897985992](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45897985992) SUCCESS.
+- 정규 squash **main 병합 `524dd05f42fa921ff80a09b2a9a65d4ee729b99e`**. PR closed/merged·main HEAD 및 4개 파일 Git blob readback 완료:
+  - `.github/workflows/pc-process-inventory-readonly.yml` `cec9d983dec0bcc816ada5f063a8aa21315cce50`
+  - `tools/ci-native-publisher-local-readonly.mjs` `c77c0f58d78827634a8e66a3181e1f5e332168ee`
+  - `tools/pc-process-inventory-readonly.mjs` `4340c884dd3ca1e0c06b3ba8031a695ad5c4c88a`
+  - `tests/ci-native-publisher-local-readonly.test.mjs` `0795f629dd1775e85bb5c8c75cbafb059ab9415`.
+- 동시 S6 Watchdog #4095 main 변경 및 별도 S6 조회 #4098 작업 보존. 기존 Writer/Controller 코드·정책/DB/설치 파일/실제 GitHub vars 변경 없음.
+
+### 운영 격리 PC 단회 A 실측 — #4113
+
+- [Issue #4113](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4113), 인증된 기존 `process-inventory-readonly`, `role=handoff`, 고정 `probe=ci-native-publisher-local-readonly`, requestId `4f9a148f-674d-4b35-a60e-2f1da75b15bd` **1회 생성**.
+- 실제 [Run 45898829611](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45898829611) source HEAD `b441848f5295484b34e1141b8471e57cdb1be865`에서 격리 `zgmini-handoff-ci-spare-01` Job 140179327278 실행. 관측 `2026-11-26T21:33:18.936Z`.
+- 원격 **2/2 원본 readback**: `results/pc-process-inventory-45898829611-1-handoff.json` blob `b2dda9cf0fc370f4ba92993d7a70cfee53f50e8f`, 대응 TXT blob `801ce188e9fe14d029a23fa41b6c8af91ab17b4e`. 해당 고유 Issue 댓글 [7203838960](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4113#issuecomment-7203838960)이 동일 result stem을 확인함.
+- 실제 Native 관측 `READ_ONLY_OBSERVED / CI_NATIVE_LOCAL_ROOTS_NOT_CONFIGURED`:
+  - `scopeRootConfigured=false`, `receiptRootConfigured=false`, `independentRootsVerified=false`.
+  - Publisher A/Writer B, execution A/Writer B 4개 opt-in 모두 `UNSET_OR_INVALID`.
+  - A와 Writer B의 `scopeFormatObserved=false`, `installedProofFormatObserved=false`, `policyBytesMatched=false`; 이들은 **Root 미설정으로 아직 관측하지 않은 상태**이지 파일 손상을 입증한 값이 아님.
+  - `independentGitHubInstallationReceiptVerified=false`, `canPublish/canExecute/canInstall=false`, `operationalWrites=0`, 재시도 0. 실효과 실행/새 승인 없음.
+- Workflow는 `completed/failure`이며 Job의 `Collect read-only runtime process snapshot on isolated handoff PC`가 `failure`. 로그 `PROCESS_INVENTORY_VERIFIED role=handoff status=READ_ONLY_OBSERVED code=CI_NATIVE_LOCAL_ROOTS_NOT_CONFIGURED` 이후 `exit code 2`. 원본/댓글 업로드 실패가 아니라 기존 `tools/pc-process-inventory-readonly.mjs`의 `status !== 'PASS'`이면 2로 fail-closed하는 계약의 정상 차단 동작. 안전 검사 완화나 가짜 PASS 처리하지 않음.
+- 해당 A 진단 고유 결과 및 차단 범위를 [#4113 판정 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4113#issuecomment-7203853496)에 기록하고, 읽기 진단 Issue #4113을 **closed/completed**. 실제 자동화 승인 활성화가 완료된 것으로 표시하지 않음.
+
+### 남은 실행
+
+1. 격리 PC Native read-only scope 정책/독립 B-installed proof, 영구 단회 receipt root는 현재 Workflow 환경에서 모두 **미설정**. 기존 Owner 업무 승인 원본과 정확한 B 설치 proof 및 격리 PC 실제 Root/ACL preimage가 따로 증명되는지 확인하고, 기존 정규 설치/설정 변경 권한이 있는 범위에 한해서만 연결. 신뢰 root나 승인 원본을 GitHub Source fixture, 타 효과 영수증, CI 성공만으로 생성하지 않는다.
+2. 실제 설정이 검증된 효과만 **Native A / Writer B** 자연 CI → 단회 발행 → 정규 Windows Receiver 실행 및 원본 JSON/TXT 확인. Controller B는 독립 #4100 CAS PASS를 유지하되 자동 발행 정책(#4029 미구성 당시)과 업무 Owner proof는 별도 검증.
+3. 현재 Native/Controller B 실제 무인 종단 **0/3**. Runner 6/6 복구와 원래 S6 과거 UNKNOWN을 분리 유지. 이번 소스 CI/고정 A 발행 성공을 3개 무인 효과로 계산하지 않는다.
