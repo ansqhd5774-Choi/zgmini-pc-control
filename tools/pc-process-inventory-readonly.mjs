@@ -3097,8 +3097,9 @@ export function projectS6ReceiverLedgerReadonly(receiver,port){
    ||receiver.actor!=='ansqhd5774-Choi')
   return fail('S6_RECEIVER_LEDGER_IDENTITY_OR_RESULT_UNVERIFIED');
  if(!port||port.requestId!==S6_JOURNAL_REQUEST||
-    port.status!=='READ_ONLY_OBSERVED'||port.claimPresent!==false||
-    port.priorOwnerByteMatch!==true)
+    port.status!=='READ_ONLY_OBSERVED'||
+    port.code!=='S6_ONCE_CLAIM_ABSENT_AT_OBSERVATION'||
+    port.claimPresent!==false||port.priorOwnerByteMatch!==true)
   return {...base,receiverClaimPresent:true,
    receiverResultStatus:'UNKNOWN',receiverResultCode:'S6_ONCE_OUTCOME_UNKNOWN',
    receiverUploadVerified:receiver.reportUploadStatus==='VERIFIED',
@@ -3112,7 +3113,8 @@ export function projectS6ReceiverLedgerReadonly(receiver,port){
   receiverClaimPresent:true,receiverResultStatus:'UNKNOWN',
   receiverResultCode:'S6_ONCE_OUTCOME_UNKNOWN',
   receiverUploadVerified:receiver.reportUploadStatus==='VERIFIED',
-  portClaimPresent:false,portStatus:port.status,portCode:port.code,
+  portClaimPresent:false,portStatus:'READ_ONLY_OBSERVED',
+  portCode:'S6_ONCE_CLAIM_ABSENT_AT_OBSERVATION',
   portOwnerByteMatch:true};
 }
 export function inspectS6ReceiverLedgerReadonly({

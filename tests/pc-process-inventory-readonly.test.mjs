@@ -3118,6 +3118,10 @@ test('S6 original receiver #3947 and distinct one-shot claim correlate without r
  }
  assert.equal(projectS6ReceiverLedgerReadonly(receiver,{...port,claimPresent:true}).status,
   'STATE_UNKNOWN');
+ const spoofed=projectS6ReceiverLedgerReadonly(receiver,{...port,
+  code:'SECRET_PRIVATE_PORT_LEDGER'});
+ assert.equal(spoofed.status,'STATE_UNKNOWN');
+ assert.doesNotMatch(JSON.stringify(spoofed),/SECRET_PRIVATE_PORT_LEDGER/);
  assert.equal(projectS6ReceiverLedgerReadonly(null,port).receiverClaimPresent,null);
  assert.doesNotMatch(JSON.stringify(good),/ownerPid|nonce|fingerprint|bodyDigest|SECRET|[a-f0-9]{64}/i);
  const filename=path.join('E:/ZGmini/automation/pc-maintenance','requests',
