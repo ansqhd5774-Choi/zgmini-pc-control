@@ -1,0 +1,48 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "9a0378ffb96aa9f1403f74c189d3c39b30e4604e",
+  "targetSha": "7d70161c454f0242afdc08ffd52841689b308d2b",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "User's 2026-11-26 ZGMINI automatic-approval-system remaining-work execution directive R1 explicitly authorizes the necessary independent maintenance-receiver V2 policy handoff for already approved work. This is a maintainer-only existing-source 7-to-7 effect and not a new business approval, GitHub Owner-native standing delegation, new Controller B work, or permission to enable the GitHub publisher. Source/host CAS and operator-only handoff are still mandatory.",
+  "files": {
+    "tools/maintenance-contract.mjs": "a850c66bfa4251798ad79e7d452dad93d6d3f5ed65cd0549fd335b0bb2524787",
+    "tools/maintenance-apply.mjs": "a99c6a51a024deaf4e3c6aa806182e73aeb4049604636db7dbd65614a40eb51e",
+    "tools/maintenance-agent.mjs": "ab19c890e21b3c2a605291374f8ebeae8ea8e9188b04131a5c7873543165fc37",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "2b9938f1327a8c148ab9b11b8c1fd0101682f123b9723d944916ab476bd8cf9d",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "af31ab1f6a159aa1d8467d2585eb16750e8a1a293f9ecfb90b85c388d8640d70",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "8c256f95c133456e2ec60cb9fb4c4940711bf292b923bebd906e7e56e48095ce"
+  },
+  "ciControllerBPolicy": {
+    "schema": "ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V1",
+    "enabled": true,
+    "workflowId": 430972394,
+    "workflowBlobSha": "c1d8dfe618d9d24fde39191e85d639b0db63b822",
+    "workflowPath": ".github/workflows/ci-approval-controller-b.yml"
+  },
+  "checks": {
+    "sourceCi": "PENDING: review this manifest and relevant source CI on immutable target 7d70161c454f0242afdc08ffd52841689b308d2b; no unverified PASS claimed.",
+    "installedWindowsEvidence": "Operating PC read-only #3755 / Run 45724887752 at 2026-11-25T23:55:43.907Z: maintainer source 9a0378ffb96aa9f1403f74c189d3c39b30e4604e; receiver LISTENING, HEALTHY, install lock absent, installed CI policy ABSENT_IN_INSTALLED_MANIFEST. This observation is not the live pre-install CAS.",
+    "exactBytePlan": "Nine source files independently SHA-256 hashed at immutable main ancestor 7d70161c454f0242afdc08ffd52841689b308d2b. Prior installed snapshot matches 9/9 raw source bytes at 9a0378ffb96aa9f1403f74c189d3c39b30e4604e. Exactly three of seven installed maintainer runtime file hashes change: tools/maintenance-contract.mjs, tools/maintenance-agent.mjs, tools/update.mjs; the additional handoff-maintenance.mjs source tool changes but is not installed runtime. All nine checkout source hashes, live 7-file installed CAS, startup bytes, owner proof, lease, backup and rollback must be independently checked on the PC.",
+    "targetMainCommit": "7d70161c454f0242afdc08ffd52841689b308d2b (immutable main ancestor); exact target runtime source bytes and CI workflow blob pinned; a later unrelated main commit does not expand the target.",
+    "windowsHandoffExecuted": false
+  },
+  "runtimeChangedFiles": [
+    "tools/maintenance-contract.mjs",
+    "tools/maintenance-agent.mjs",
+    "tools/update.mjs"
+  ],
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "preserve": [
+    "Current installed Controller, Supervisor and six dedicated Runner seats",
+    "Existing PC Controller intake, Core/Writer scheduled tasks, original SQLite/Writer/data, D1 and DNS",
+    "Existing maintenance/Controller/source ledgers, owner markers, leases, rollback backups and issue history",
+    "No automatic replay of past B installs; CI publisher ENABLED remains false until independent owner authorization and real business target are pinned"
+  ],
+  "scopeNote": "Exact three installed maintenance runtime files transition with one immutable CI Controller B receiver policy pin, under the already supported V2 independent operator-only handoff. This approval is limited to the receiver/maintainer software and does not grant a new B business effect or authorize GitHub variables, first automated submission or PC Controller installation. A handoff may legitimately block on fresh preimage, receiver, operator, CI or resource conditions."
+}
