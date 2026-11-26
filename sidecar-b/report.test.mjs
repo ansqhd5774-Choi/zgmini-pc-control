@@ -38,6 +38,36 @@ test('failure and recovery statuses never become applied',()=>{
   assert.equal(r.retry,'READ_ONLY_RECONCILE_NO_REPLAY');
  }
 });
+test('whitelisted resource evidence survives failed result without arbitrary keys',()=>{
+ const x={windowMs:240000,samples:49,coreActiveSamples:47,
+  sidecarActiveSamples:32,controllerBusySamples:0,writerBusySamples:0,
+  rawCommandLine:'SECRET-MUST-NOT-BE-PUBLISHED'};
+ const raw={...success,status:'SIDECAR_B_PREFLIGHT_OR_RUNTIME_STOP',
+  code:'SIDECAR_B_PROBE_RESOURCE_STOP',applied:false,idleObservation:x};
+ const out=call(raw);
+ assert.equal(out.applied,false);
+ assert.equal(out.idleObservation.samples,49);
+ assert.equal(JSON.stringify(out).includes('SECRET-MUST-NOT-BE-PUBLISHED'),false);
+ assert.equal(call({...raw,idleObservation:{...x,samples:-1}}).idleObservation,undefined);
+ assert.equal(call({...raw,code:'SIDECAR_B_BACKUP_STOP'}).idleObservation,undefined);
+});
+test('resource failure reporter atomically publishes only validated bounded counters',async()=>{
+ const fixture=createGitPairFixture();
+ const x={windowMs:240000,samples:49,coreActiveSamples:47,
+  sidecarActiveSamples:32,controllerBusySamples:0,writerBusySamples:0,
+  pid:1234};
+ const raw={...success,status:'SIDECAR_B_PREFLIGHT_OR_RUNTIME_STOP',
+  code:'SIDECAR_B_PROBE_RESOURCE_STOP',applied:false,idleObservation:x};
+ const result=await publishSidecarBReport({event,env:e,raw:JSON.stringify(raw),
+  fetchApi:fixture.fetchApi,readCurrent:()=>after});
+ assert.equal(result.verified,2);
+ const prefix='results/cnn-sidecar-b-'+id;
+ const json=fixture.files.get(prefix+'.json').toString('utf8');
+ const txt=fixture.files.get(prefix+'.txt').toString('utf8');
+ assert.match(txt,/IDLE_coreActiveSamples=47/);
+ assert.equal(json.includes('"pid"'),false);
+ assert.equal(JSON.parse(json).idleObservation.sidecarActiveSamples,32);
+});
 test('untrusted status, code or missing result is state unknown',()=>{
  for(const raw of [null,{}, {...success,code:'BAD'},
   {...success,applied:true,status:'SIDECAR_B_RECOVERY_REQUIRED'}]){
