@@ -2884,6 +2884,39 @@ test('R5 dual Standby A verifies one Active and TWO distinct live passive READY 
  assert.equal(r.operationalWrites,0);
  assert.doesNotMatch(JSON.stringify(r),/5311|5322|5333|5344|nonce|commandLine/i);
 });
+test('R5 A admits exact #4036 approved R2 Controller but never promotes or writes',()=>{
+ const x=r5RuntimeFixture();
+ x.controllerHost.controllerSourceSha='3c7d4cfefacf072fd35cb19706b352c64c5e4fd2';
+ x.controllerHost.controllerFiles['controller/operations.mjs']=
+  'bac7412c51c156d31b68f725f2532011cccf38359fe18e66a4d3851aa3a2b803';
+ x.controllerHost.controllerFiles['controller/us-breadth-r2-private-readonly.mjs']=
+  'e5f1d87626c0fb192831f4fc76fc9e13931af6105a38e503f90f7e656d180fb1';
+ const valid=r5Assess(x);
+ assert.equal(valid.status,'PASS');
+ assert.equal(valid.code,'WATCHDOG_R5_ACTIVE_HEALTHY_TWO_STANDBY_IPC_READY');
+ assert.equal(valid.controllerTargetMatch,true);
+ assert.equal(valid.failoverTested,false);
+ assert.equal(valid.promotionApproved,false);
+ assert.equal(valid.operationalWrites,0);
+ const reject=[
+  v=>{v.controllerHost.controllerSourceSha='f'.repeat(40);},
+  v=>{v.controllerHost.controllerFiles['controller/operations.mjs']='d4a76910806cba861b3253f5fd24eccc8968fcbaa66133999483034b2f661cd3';},
+  v=>{delete v.controllerHost.controllerFiles['controller/us-breadth-r2-private-readonly.mjs'];},
+  v=>{v.controllerHost.controllerFiles['controller/us-breadth-r2-private-readonly.mjs']='0'.repeat(64);},
+  v=>{delete v.controllerHost.controllerFiles['controller/standby.mjs'];}
+ ];
+ for(const change of reject){
+  const bad=structuredClone(x);change(bad);
+  const r=r5Assess(bad);
+  assert.equal(r.status,'STATE_UNKNOWN');
+  assert.equal(r.code,'WATCHDOG_R5_STAGE_OR_CONTROLLER_SOURCE_UNVERIFIED');
+  assert.equal(r.promotionApproved,false);
+ }
+ const stale=structuredClone(x);
+ stale.status.at='2026-11-25T01:00:00Z';
+ assert.equal(r5Assess(stale).code,'WATCHDOG_R5_HEALTH_STATUS_UNVERIFIED');
+});
+
 test('R5 A fails closed on missing second slot, stale status, source or controller drift',()=>{
  const changes=[
   [x=>{x.status.secondStandbyRole='STARTING';},'WATCHDOG_R5_SECOND_STANDBY_IPC_UNVERIFIED'],
