@@ -1308,3 +1308,113 @@ export function assessS6ControllerTransition({phase,baseline,observed,now=Date.n
  if(!seatsOk(false))return out('S6_PROMOTED_SIX_RUNNERS_NOT_VERIFIED');
  return out('S6_PROMOTION_READBACK_OBSERVED_NOT_PROVEN',true);
 }
+
+
+// An S6 fault injection is a new B operational effect, not a Controller
+// install and not a re-use of the Watchdog Guardian one-PID approval.
+// No Issue/CI/workflow can activate this without independently pinned,
+// exact current operating-PC evidence and a distinct reviewed B manifest.
+export const S6_ONCE_ISSUE_TITLE='pc-controller-s6-once';
+export const S6_ONCE_OPERATION='controller-s6-failover-once';
+export const S6_ONCE_MANIFEST_SCHEMA='ZGMINI_PC_S6_ONCE_B_APPROVAL_V1';
+const S6_ONCE_SCOPE='EXACT_ONE_SUPERVISOR_TREE_STOP_WITH_WATCHDOG_AUTO_PROMOTION';
+const S6_EFFECT=Object.freeze({
+ mode:'SINGLE_S6_FAILOVER',
+ stop:'OLD_OWNED_SUPERVISOR_TREE_ONLY',
+ promotion:'EXISTING_WATCHDOG_ONE_READY_STANDBY',
+ independentMaintainer:true,
+ noArbitraryCommands:true,
+ noAutomaticRetry:true,
+ noForcedRollback:true,
+ preserveWorkersAndLedger:true,
+ preserveProtectedSourceAndDb:true,
+ postcheck:'EXISTING_A_JOB_WITH_READBACK'
+});
+const s6Record=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
+const s6Exact=(value,keys)=>s6Record(value)&&
+ Object.keys(value).sort().join(',')===[...keys].sort().join(',');
+const s6Sha40=x=>typeof x==='string'&&/^[a-f0-9]{40}$/.test(x);
+const s6Sha256=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
+const s6Pid=x=>Number.isSafeInteger(x)&&x>0;
+const s6Uuid=x=>typeof x==='string'&&
+ /^pc-s6-[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(x);
+
+/** Owner-only request admission; CI bots and unknown operations are excluded. */
+export function validateS6OnceIssueEnvelope(request,{
+ actor=null,allowedActors=[CONTROL_ACTOR],
+ controlRepository=CONTROL_REPOSITORY
+}={}){
+ if(controlRepository!==CONTROL_REPOSITORY||
+    actor!==CONTROL_ACTOR||!Array.isArray(allowedActors)||
+    !allowedActors.includes(CONTROL_ACTOR))
+  throw Error('S6_ONCE_ACTOR_OR_REPOSITORY_DENIED');
+ requireKeys(request,ISSUE_KEYS,'S6_ONCE_ISSUE_FIELDS_INVALID');
+ if(request.schema!==MAINTENANCE_ISSUE_SCHEMA||
+    request.controlRepository!==CONTROL_REPOSITORY||
+    request.operation!==S6_ONCE_OPERATION||
+    !s6Uuid(request.requestId))
+  throw Error('S6_ONCE_ISSUE_CONTRACT_DENIED');
+ requireString(request.chatId,CHAT_ID,'S6_ONCE_CHAT_ID_INVALID');
+ requireSha(request.targetControllerSha,'S6_ONCE_TARGET_SHA_INVALID');
+ requireDigest(request.approvalManifestSha256,'S6_ONCE_APPROVAL_PIN_INVALID');
+ return Object.freeze({...request});
+}
+
+/**
+ * Pure S6 approval gate. 'live' is independently observed by the installed
+ * maintainer, NEVER parsed from Issue/approval JSON. Even a PASS only admits
+ * a candidate; it cannot release a lease, stop a process, or grant B approval.
+ * Exact approved manifest bytes must be a separately reviewed main file,
+ * pinned by the original Issue SHA-256 and matched again under owned CAS.
+ */
+export function validateS6OnceBManifest(request,bytes,{
+ actor=null,allowedActors=[CONTROL_ACTOR],controlRepository=CONTROL_REPOSITORY,
+ live=null
+}={}){
+ const issue=validateS6OnceIssueEnvelope(request,{actor,allowedActors,controlRepository});
+ if(!(Buffer.isBuffer(bytes)||typeof bytes==='string')||
+    Buffer.byteLength(bytes)<1||Buffer.byteLength(bytes)>32768)
+  throw Error('S6_ONCE_MANIFEST_BYTES_INVALID');
+ if(createHash('sha256').update(bytes).digest('hex')!==issue.approvalManifestSha256)
+  throw Error('S6_ONCE_MANIFEST_BYTES_DRIFT');
+ let approved;try{approved=JSON.parse(Buffer.from(bytes).toString('utf8'));}
+ catch{throw Error('S6_ONCE_MANIFEST_JSON_INVALID');}
+ const keys=['schema','operation','requestId','installedControllerSha',
+  'installedMaintainerSha','watchdogSourceSha256','protectedSha256',
+  'ownerSha256','watchdogPid','standbyPids','approval','effect'];
+ if(!s6Exact(approved,keys)||approved.schema!==S6_ONCE_MANIFEST_SCHEMA||
+    approved.operation!==S6_ONCE_OPERATION||approved.requestId!==issue.requestId||
+    approved.installedControllerSha!==issue.targetControllerSha||
+    !s6Sha40(approved.installedControllerSha)||
+    !s6Sha40(approved.installedMaintainerSha)||
+    !s6Sha256(approved.watchdogSourceSha256)||
+    !s6Sha256(approved.protectedSha256)||
+    !s6Sha256(approved.ownerSha256)||
+    !s6Pid(approved.watchdogPid)||!Array.isArray(approved.standbyPids)||
+    approved.standbyPids.length!==2||
+    !approved.standbyPids.every(s6Pid)||
+    new Set([approved.watchdogPid,...approved.standbyPids]).size!==3)
+  throw Error('S6_ONCE_MANIFEST_PREIMAGE_INVALID');
+ const approval=approved.approval;
+ if(!s6Exact(approval,['approved','grade','ref','scope'])||
+    approval.approved!==true||approval.grade!=='B'||approval.scope!==S6_ONCE_SCOPE||
+    !/^https:\/\/github\.com\/ansqhd5774-Choi\/zgmini-pc-control\/pull\/[1-9]\d*$/.test(approval.ref??''))
+  throw Error('S6_ONCE_NEW_B_APPROVAL_REQUIRED');
+ if(!s6Exact(approved.effect,Object.keys(S6_EFFECT))||
+    Object.entries(S6_EFFECT).some(([key,value])=>approved.effect[key]!==value))
+  throw Error('S6_ONCE_EFFECT_SCOPE_DENIED');
+ // Current independent-source, Watchdog, owner, protected bytes and precise
+ // standby identities are re-read on the operating PC (and again under lease).
+ if(!s6Record(live)||live.installedControllerSha!==approved.installedControllerSha||
+    live.installedMaintainerSha!==approved.installedMaintainerSha||
+    live.watchdogSourceSha256!==approved.watchdogSourceSha256||
+    live.protectedSha256!==approved.protectedSha256||
+    live.ownerSha256!==approved.ownerSha256||
+    live.watchdogPid!==approved.watchdogPid||
+    !Array.isArray(live.standbyPids)||
+    live.standbyPids.length!==2||
+    live.standbyPids.some((pid,i)=>pid!==approved.standbyPids[i]))
+  throw Error('S6_ONCE_LIVE_CAS_UNVERIFIED');
+ return Object.freeze({request:issue,manifest:Object.freeze(approved),
+  authorization:false,operationalEffectExecuted:false});
+}
