@@ -91,3 +91,33 @@ test('B: Task backup and candidate writes are durable without changing source or
  assert.match(source,/writeDurableOnce\(file,Buffer\.concat/);
  assert.doesNotMatch(source,/\b(?:unlink|rm)Sync\(CONFIG\)/);
 });
+
+test('user-approved W06 B manifest authorizes only fixed Task, candidate and explicit effects',()=>{
+ const path=fileURLToPath(new URL('../approvals/task-create-b/w06-cnn-minute-20261126.json',import.meta.url));
+ const approvedBytes=fs.readFileSync(path),approved=JSON.parse(approvedBytes);
+ const proposed=JSON.parse(fs.readFileSync(fileURLToPath(new URL(
+  '../task-create-b/w06-cnn-minute-proposal.json',import.meta.url)),'utf8'));
+ assert.deepEqual({...approved,status:'PROPOSED_B'},proposed);
+ assert.equal(approved.status,'APPROVED_B');
+ assert.equal(approved.taskName,'ZGMINI-PC-CNN-Minute');
+ assert.equal(approved.allowOtherTaskChanges,false);
+ assert.equal(approved.allowCnnHttpRequests,true);
+ assert.equal(approved.allowSqliteObservationWrites,true);
+ assert.equal(approved.allowD1PublicProjectionWrites,true);
+ assert.equal(approved.runCount,1);
+ const request={schema:'ZGMINI_PC_TASK_CREATE_B_REQUEST_V1',
+  requestId:'abec1087-3a25-4452-a5a8-a45218f05c37',
+  operation:'task-create-once',
+  approvalManifestPath:'approvals/task-create-b/w06-cnn-minute-20261126.json',
+  approvalManifestSha256:createHash('sha256').update(approvedBytes).digest('hex')};
+ const event={action:'opened',issue:{title:ISSUE_TITLE,
+  user:{login:'ansqhd5774-Choi'},labels:[{name:ISSUE_LABEL}],
+  body:JSON.stringify(request)}};
+ const proof=authorizeTaskCreateB({event,manifestBytes:approvedBytes,manifestCommitted:true});
+ assert.equal(proof.manifest.candidateSourceSha,'0bae713aa6df1f4c00037db908050c74ae3dd20c');
+ assert.throws(()=>authorizeTaskCreateB({event,
+  manifestBytes:Buffer.from(JSON.stringify({...approved,allowOtherTaskChanges:true})),
+  manifestCommitted:true}),e=>e.code==='TASK_CREATE_B_REQUEST_SCOPE_STOP');
+ assert.throws(()=>authorizeTaskCreateB({event,manifestBytes:approvedBytes,
+  manifestCommitted:false}),e=>e.code==='TASK_CREATE_B_OWNER_OR_COMMIT_STOP');
+});
