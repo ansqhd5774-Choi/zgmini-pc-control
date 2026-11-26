@@ -77,3 +77,16 @@ test('W06 proposed manifest contains exact pins but cannot authorize any Task in
   manifestBytes:Buffer.from(JSON.stringify(proposed)),manifestCommitted:true}),
   e=>e.code==='TASK_CREATE_B_APPROVAL_SCOPE_STOP');
 });
+
+test('B: Task backup and candidate writes are durable without changing source or DB',()=>{
+ const source=fs.readFileSync(fileURLToPath(new URL(
+  '../task-create-b/windows-adapter.mjs',import.meta.url)),'utf8');
+ assert.match(source,/function writeDurableOnce\(file,bytes\)/);
+ assert.match(source,/fs\.openSync\(file,'wx'\)/);
+ assert.match(source,/fs\.fsyncSync\(fd\)/);
+ assert.match(source,/fs\.readFileSync\(file\)\.equals\(bytes\)/);
+ assert.match(source,/writeDurableOnce\(p,obj\.bytes\)/);
+ assert.match(source,/writeDurableOnce\(dest,bytes\)/);
+ assert.match(source,/writeDurableOnce\(file,Buffer\.concat/);
+ assert.doesNotMatch(source,/\b(?:unlink|rm)Sync\(CONFIG\)/);
+});
