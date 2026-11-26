@@ -26,6 +26,8 @@ function memory(){
  writeFileSync(fd,bytes){assert.equal(fd,17);writes++;files.set(opened,Buffer.from(bytes));},
  fsyncSync(fd){assert.equal(fd,17);fsyncs++;},
  closeSync(fd){assert.equal(fd,17);opened=null;},
+ lstatSync(p){if(!files.has(p)){const e=Error('missing');e.code='ENOENT';throw e;}
+  return {isFile:()=>true,isSymbolicLink:()=>false,size:files.get(p).length};},
  readFileSync(p){if(!files.has(p)){const e=Error('missing');e.code='ENOENT';throw e;}return Buffer.from(files.get(p));}
  };
 }
