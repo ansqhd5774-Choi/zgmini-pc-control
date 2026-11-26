@@ -19,7 +19,7 @@ const hex=bytes=>createHash('sha256').update(bytes).digest('hex');
 // Evaluate the effective scheduler privilege independently from XML.
 // Task Scheduler may omit a default RunLevel when reserializing an XML Task.
 export function classifyW06TaskRunLevel(xml,nativeValue){
- const raw=[...String(xml).matchAll(/<RunLevel>([^<]{1,64})<\\/RunLevel>/gi)]
+ const raw=[...String(xml).matchAll(/<RunLevel>([^<]{1,64})<\/RunLevel>/gi)]
   .map(m=>m[1].trim());
  const xmlLevel=raw.length===0?'OMITTED':raw.length!==1?'AMBIGUOUS':
   raw[0]==='LeastPrivilege'?'LEAST_PRIVILEGE':
