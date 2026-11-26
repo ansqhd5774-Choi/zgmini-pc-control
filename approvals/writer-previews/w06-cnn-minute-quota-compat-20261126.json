@@ -1,0 +1,44 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "baseHead": "d8ac245003e7b8e006c2345382d5c639c6d5f18b",
+  "filePath": "scripts/pc-writer/quota-ledger.mjs",
+  "beforeSha256": "379f56dd94dc8df8ca6ef46331a4fd831495759bddcc9cee22b0159c65559efe",
+  "insertions": [
+    {
+      "anchor": "import {policyForProvider,quotaWindowMs} from './quota-policy.mjs';",
+      "position": "before",
+      "text": "import {randomUUID} from 'node:crypto';\n"
+    },
+    {
+      "anchor": "export class QuotaLedger{",
+      "position": "before",
+      "text": "const ALPACA_LOCK_WAIT_MS=1_500;\nconst ALPACA_STALE_LOCK_MS=5*60_000;\nfunction withReservationLock(base,fn,{name,guard,prefix}){\n if(!fs.existsSync(base)||!fs.statSync(base).isDirectory())throw guard(Date.now()+60_000,`${prefix}_BASE_UNAVAILABLE`);\n const lock=path.join(base,name);\n const until=Date.now()+ALPACA_LOCK_WAIT_MS;\n const sleeper=new Int32Array(new SharedArrayBuffer(4));\n const ownerFile=path.join(lock,'owner.json');\n const recoverDeadOwner=()=>{\n  // Serialize reapers, then re-read the owner. Two reapers must not rename a\n  // freshly acquired directory after one has already quarantined a dead owner.\n  const recovery=`${lock}.recovery`;\n  try{fs.mkdirSync(recovery);}catch{return false;}\n  try{return recoverUnderGuard();}finally{try{fs.rmdirSync(recovery);}catch{}}\n };\n const recoverUnderGuard=()=>{\n  // Never touch the Core lock. Only reclaim this exact quota directory after\n  // proving that its owner PID has exited and it is older than five minutes.\n  let owner,metadata;\n  try{\n   metadata=fs.statSync(lock);\n   if(!metadata.isDirectory()||Date.now()-metadata.mtimeMs<ALPACA_STALE_LOCK_MS)return false;\n   owner=JSON.parse(fs.readFileSync(ownerFile,'utf8'));\n   if(!Number.isSafeInteger(owner.pid)||owner.pid<=0||!Number.isSafeInteger(owner.startedAt)||\n     Date.now()-owner.startedAt<ALPACA_STALE_LOCK_MS)return false;\n  }catch{return false;}\n  try{process.kill(owner.pid,0);return false;}\n  catch(error){if(error.code!=='ESRCH')return false;}\n  try{const names=fs.readdirSync(lock);if(names.length!==1||names[0]!=='owner.json')return false;}catch{return false;}\n  const orphan=`${lock}.stale-${process.pid}-${randomUUID()}`;\n  try{\n   fs.renameSync(lock,orphan);\n   // Quarantined directory is quota-owned and contains one bounded metadata\n   // file. Unrelated files mean unexpected state: leave it for manual review.\n   fs.unlinkSync(path.join(orphan,'owner.json'));\n   fs.rmdirSync(orphan);\n   return true;\n  }catch{return false;}\n };\n for(;;){\n  let created=false;\n  try{\n   fs.mkdirSync(lock);created=true;\n   fs.writeFileSync(ownerFile,JSON.stringify({pid:process.pid,startedAt:Date.now()}),{flag:'wx'});\n   break;\n  }\n  catch(error){\n   if(created){try{fs.unlinkSync(ownerFile);}catch{}try{fs.rmdirSync(lock);}catch{}throw guard(Date.now()+60_000,`${prefix}_LOCK_OWNER_WRITE_FAILED`);}\n   if(error.code!=='EEXIST')throw guard(Date.now()+60_000,`${prefix}_LOCK_UNAVAILABLE`);\n   if(recoverDeadOwner())continue;\n   if(Date.now()>=until)throw guard(Date.now()+60_000,`${prefix}_LOCK_BUSY`);\n   Atomics.wait(sleeper,0,0,15);\n  }\n }\n try{return fn();}finally{fs.unlinkSync(ownerFile);fs.rmdirSync(lock);}\n}\nfunction withGeneralQuotaLock(base,provider,fn){\n fs.mkdirSync(base,{recursive:true});\n const guard=(retryAt,reason)=>Object.assign(Error('PROVIDER_QUOTA_GUARD'),{\n  code:'PROVIDER_QUOTA_GUARD',provider,retryAt,reason\n });\n return withReservationLock(base,fn,{name:'quota-ledger-reservation.lock',guard,prefix:'QUOTA_LEDGER'});\n}\n\n"
+    },
+    {
+      "anchor": "  const item=this.item(provider,now);const at=nextAllowed(item,policy,now);",
+      "position": "before",
+      "text": "  return withGeneralQuotaLock(this.base,provider,()=>{\n   this.value=readQuotaLedger(this.base);\n"
+    },
+    {
+      "anchor": "  return {allowed:true,provider,guarded:false,warning:blocked?event:null};",
+      "position": "after",
+      "text": "  });\n"
+    },
+    {
+      "anchor": "  const item=this.item(provider,at);item.lastStatus=status;",
+      "position": "before",
+      "text": "  return withGeneralQuotaLock(this.base,provider,()=>{\n   this.value=readQuotaLedger(this.base);\n"
+    },
+    {
+      "anchor": "  this.persist();",
+      "position": "after",
+      "text": "  });\n"
+    },
+    {
+      "anchor": " summary(){",
+      "position": "after",
+      "text": "  this.value=readQuotaLedger(this.base);\n"
+    }
+  ]
+}
