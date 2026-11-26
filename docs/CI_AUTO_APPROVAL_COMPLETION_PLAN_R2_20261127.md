@@ -761,3 +761,14 @@
 - 운영 승인·GitHub variables·독립 scope/receipt roots·기존 maintenance 정책·PC 데이터/DB/D1/Task·예약 변경 **0건**. **무인 자동화 실제 효과 A/Writer B/Controller B 0/3(0%)**, 신규 요청 중복 0.
 - 다음 직접 필수 실행은 효과별 **실제 B-installed 독립 정책/업무 원본·영구 claim root 확인**과 기존 허가된 실행 연결이다. Controller B는 이 수정을 이유로 수동 Owner 댓글을 새로 요구하거나 정책 변수를 강제 생성하지 않는다. 활성화 권한은 source-only PR과 별개.
 
+### #4138 실제 격리 PC 신규 읽기 증거 및 라벨 오류 정정
+
+- [Issue #4138](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4138) 새 고유 `process-inventory-readonly` handoff A (`requestId=a220a19d-e81c-4b60-b875-18d90866fe14`)는 PR #4136의 새 소스·기존 #4125 원격 결과 저장 구현이 main에 병합된 후 등록. 과거 #4117 동일 고유 요청 재실행이 아님.
+- 정규 [Run 45902346176](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45902346176) `handoff-process-snapshot`, 격리 `DESKTOP-N62L0NG`/`zgmini-handoff-ci-spare-01`; 원격 `results/pc-process-inventory-45902346176-1-handoff.json` Git blob `e69e150e94120b91aa841fa5be850f3d98dc5635` 및 동명 TXT blob `d3a04f071ec16e7add91b2bc010b8ca8d416f8eb` **2/2 readback**. 2026-11-26T22:05:17.143Z 관측.
+- 실제 응답 `PARTIAL/CI_CONTROLLER_B_AUTO_POLICY_NOT_CONFIGURED`: `variableEnabledVerified=true` (false 구성 확인), `policyConfigured=false`, `ownerMergedExistingApprovalPolicyRequired=false`, `ciGeneratedApprovalPolicyRequired=true`, `ownerMergedExistingSubmissionVerified=false`; `activationAuthorized=false`, operationalWrites/retries/provider/D1 모두 0. Workflow Job `completed/failure`는 PARTIAL 상태 시 기존 읽기 runner가 nonzero 종료하는 계약으로, **JSON/TXT 2/2 업로드 실패나 운영 B 실패가 아님**. 이 신규 영수증은 #4117 과거 결과 0/2를 소급 복원하지 않는다.
+- **요청 생성 단계에서 제 책임인 범위 오류:** #4138에 불필요한 `pc-job` 라벨을 붙여 범용 [Run 45902346031](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45902346031)도 동시에 트리거. 이 요청은 정상적으로 `BLOCKED/REQUEST_FIELDS`(다른 스키마)로 거절됐고 operationalWrites 0. 해당 라벨을 곧바로 제거. 고정 process-inventory 워크플로는 **title·body로 접수하며 pc-job 라벨이 필요 없음**. 이후 같은 종류 요청에 라벨을 추가하지 않는다. 스키마 안전 검증을 완화하거나 재발행하지 않았다.
+- 원본 [#4138 정정·종결 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4138#issuecomment-7204358435)에 두 실행 분리와 원격 blob 증거 연결; Issue `closed/completed`는 **읽기 진단 2/2 완료**를 뜻하며 자동 Publisher 활성화/설치 성공 아님.
+- **실제 무인 CI 자동 발행→PC 효력→결과 대조: A/Writer B/Controller B 0/3 (0%)**. 새로운 보안 설정/승인 원본/운영 B 설치/Controller·Writer 교체/DB·D1/Task 변경 없음.
+
+**다음 필수 실행:** 이미 확인된 Controller B Receiver CAS #4100 재사용, 기존 승인된 아직 실행되지 않은 업무의 원본·독립 영수증 저장 루트/인가된 opt-in 변경 경로가 실제로 확인될 때만 `push` 기반 기존 Owner 승인 업무의 CI 자동 발행 검증 진행. 별도 native A/Writer B의 #4113 루트·proof 미구성은 독립 대상이며 기존 원본 없이는 정책이나 `true`를 제조하지 않음. #4117 기존 실패는 개별 OPEN 원장으로 보존.
+
