@@ -400,6 +400,21 @@ test('CI publisher never records identity for wrong issue readback',async()=>{
  assert.equal(result.code,'MAINTENANCE_CREATED_ISSUE_NOT_VERIFIED');assert.equal(result.receiptMarker,undefined);assert.equal(f.posts,1);
 });
 
+test('CI effect claim rejects volatile runner directories before creating any receipt',t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-ci-volatile-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ for(const candidate of [root,path.dirname(root)]){
+  assert.throws(()=>createCiEffectReceiptStore(root,{volatileRoots:[candidate]}),
+   /MAINTENANCE_CI_RECEIPT_ROOT_VOLATILE/);
+ }
+ // A similarly named but unrelated path must not suppress a durable root.
+ assert.doesNotThrow(()=>createCiEffectReceiptStore(root,{
+  volatileRoots:[root+'-unrelated',path.join(root,'child')]}));
+ const entry=fs.readFileSync(new URL('../ci-approval/completed-run-intake.mjs',import.meta.url),'utf8');
+ assert.match(entry,/volatileRoots:\[process\.env\.RUNNER_TEMP,process\.env\.GITHUB_WORKSPACE,/);
+ assert.match(entry,/process\.env\.TEMP,process\.env\.TMP\]/);
+});
+
 test('durable effect receipt survives independent submitter instances and preserves original POST',async t=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-ci-effect-test-'));
  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
