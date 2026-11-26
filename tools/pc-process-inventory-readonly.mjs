@@ -380,7 +380,8 @@ export function assessR5StandbyRuntimeSnapshot(snapshot,{
   manifest.sha256==='9137447231d354d9999cdadbbb5b2a6dee7f0bf869df61881742902ac445128f'&&
   x.sourceSha256===manifest.sha256&&
   manifest.scope==='RUNNER_RECOVERY_AND_MAINTENANCE_HANDOFF_V1';
- // Require ONLY the exact W06 installed Controller roster, not its predecessor.
+ // Read-only diagnosis accepts only verified installed Controller rosters.
+ // R5 B's historical approval pin remains immutable in standby-r5-contract.mjs.
  const w06ControllerFiles={
   'controller/common.mjs':'91e4ceb5d26412893cc047670a420338aa8ef293e95498f852ac0a2f5edd6cc6',
   'controller/engine.mjs':'6112b5a357d6ecba2ffb299857c2649ee51ca97e1e7755162efd69337976769f',
@@ -390,11 +391,23 @@ export function assessR5StandbyRuntimeSnapshot(snapshot,{
   'controller/standby.mjs':'e18c09b7e9b90fc483d5200e1e0c4741d2e4f93e049328566d710e37c21be7e7',
   'controller/preimage-manifest-contract.mjs':'c59d5d36f0024b7a4b1781ea6eef9351f6275db33c8799bec05bf99abebbfcc1'
  };
- const controllerTargetMatch=
-  host?.controllerSourceSha==='182bb46f2838306ba40d8b4ec32bac40ab75b69a'&&
+ // #4036: the independently approved R2 Controller update replaced exactly
+ // operations.mjs and added a private read-only module. Check every pinned
+ // digest; no generic future Controller SHA, missing file or weakened IPC gate.
+ const breadthR2ControllerFiles={
+  ...w06ControllerFiles,
+  'controller/operations.mjs':'bac7412c51c156d31b68f725f2532011cccf38359fe18e66a4d3851aa3a2b803',
+  'controller/us-breadth-r2-private-readonly.mjs':'e5f1d87626c0fb192831f4fc76fc9e13931af6105a38e503f90f7e656d180fb1'
+ };
+ const fixedControllerRosters={
+  '182bb46f2838306ba40d8b4ec32bac40ab75b69a':w06ControllerFiles,
+  '3c7d4cfefacf072fd35cb19706b352c64c5e4fd2':breadthR2ControllerFiles
+ };
+ const roster=fixedControllerRosters[host?.controllerSourceSha];
+ const controllerTargetMatch=!!roster&&
   !!host.controllerFiles&&typeof host.controllerFiles==='object'&&
   !Array.isArray(host.controllerFiles)&&
-  Object.entries(w06ControllerFiles).every(([name,digest])=>
+  Object.entries(roster).every(([name,digest])=>
    host.controllerFiles[name]===digest);
  if(!installedMatch||!controllerTargetMatch)
   return result('WATCHDOG_R5_STAGE_OR_CONTROLLER_SOURCE_UNVERIFIED',{
