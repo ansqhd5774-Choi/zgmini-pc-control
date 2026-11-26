@@ -70,6 +70,17 @@ const S6_JOURNAL_PROBE='controller-s6-once-journal-readonly';
 const S6_RECEIVER_LEDGER_PROBE='controller-s6-once-receiver-ledger-readonly';
 const S6_JOURNAL_REQUEST='pc-s6-d7c0a971-5219-4a3a-9dce-30b0543b0e72';
 const S6_JOURNAL_APPROVAL_SHA='b8fed5bebec6a473730ed0b09ede5b5dc173db53af5cfc1e619e34a45bb8aefd';
+// Second exact S6 B outcome (#4069) needs its own read-only local claim/phase.
+// Reuse the original inspection contract; never accept an Issue-selected target.
+const S6_CURRENT_JOURNAL_PROBE='controller-s6-4069-journal-readonly';
+const S6_CURRENT_JOURNAL_REQUEST='pc-s6-63afb126-72dc-4ec5-a721-4819771fa9ee';
+const S6_CURRENT_JOURNAL_APPROVAL_SHA='1fceeba061f7f8731811220b27cac245bd91d44e87d68935cd8475117f094141';
+const S6_JOURNAL_SCOPES=Object.freeze({
+ ORIGINAL:Object.freeze({requestId:S6_JOURNAL_REQUEST,approvalSha:S6_JOURNAL_APPROVAL_SHA}),
+ CURRENT:Object.freeze({requestId:S6_CURRENT_JOURNAL_REQUEST,approvalSha:S6_CURRENT_JOURNAL_APPROVAL_SHA})
+});
+const s6JournalScope=scope=>Object.hasOwn(S6_JOURNAL_SCOPES,scope)?
+ S6_JOURNAL_SCOPES[scope]:null;
 const S6_INSTALLED_MAINTAINER='05ef3bd6b5dc753c5abfbecccacc09375eb18d10';
 // Both source IDs have identical authorized 7 runtime file bytes; the later
 // 7-to-7 handoff changed CI B policy only. Never accept an arbitrary SHA.
@@ -650,6 +661,7 @@ export function authenticateProcess(event,env,role){
  const isS6NextPreimage=withW05&&raw.probe===S6_NEXT_PREIMAGE_PROBE;
  const isS6Predrain=withW05&&raw.probe===S6_PREDRAIN_INPUTS_PROBE;
  const isS6Journal=withW05&&raw.probe===S6_JOURNAL_PROBE;
+ const isS6CurrentJournal=withW05&&raw.probe===S6_CURRENT_JOURNAL_PROBE;
  const isS6ReceiverLedger=withW05&&raw.probe===S6_RECEIVER_LEDGER_PROBE;
  const isR4GuardianOrigin=withW05&&raw.probe===R4_GUARDIAN_ORIGIN_PROBE;
  const isCiReceiptRoot=withW05&&raw.probe===CI_RECEIPT_ROOT_PROBE;
@@ -658,7 +670,7 @@ export function authenticateProcess(event,env,role){
  const allowedOperatingProbe=isOperator||is2960||is3409||isEr1Postcheck||is3516||
   isD05Writer||isD05PrivateReceipt||isD05Theme||isD05Registration||is3160||
   isCnnStaticGuard||isCnnGitPredicates||isCnnBPins||isCnnBResources||
-  isCnnBCore||isW06Task||isR3Watchdog||isR3Wmi||isR4Runtime||isR5Runtime||isS6Preimage||isS6NextPreimage||isS6Predrain||isS6Journal||isS6ReceiverLedger||isR4GuardianOrigin||isCiPolicyCas;
+  isCnnBCore||isW06Task||isR3Watchdog||isR3Wmi||isR4Runtime||isR5Runtime||isS6Preimage||isS6NextPreimage||isS6Predrain||isS6Journal||isS6CurrentJournal||isS6ReceiverLedger||isR4GuardianOrigin||isCiPolicyCas;
  const acceptedProbe=(role==='operating'&&allowedOperatingProbe)||
   (role==='handoff'&&(isCiReceiptRoot||isCiActivation));
  if(!raw||(!basic&&!withJobs&&!withW05)||
@@ -698,6 +710,7 @@ export function authenticateProcess(event,env,role){
    ...(isS6NextPreimage?{s6NextPreimage:true}:{}),
    ...(isS6Predrain?{s6PredrainInputs:true}:{}),
    ...(isS6Journal?{s6OnceJournal:true}:{}),
+   ...(isS6CurrentJournal?{s6CurrentJournal:true}:{}),
    ...(isS6ReceiverLedger?{s6ReceiverLedger:true}:{}),
   ...(isR4GuardianOrigin?{watchdogR4GuardianOrigin:true}:{}),
   ...(isCiReceiptRoot?{ciControllerBReceiptRoot:true}:{}),
@@ -2990,9 +3003,10 @@ const S6_JOURNAL_PHASES=new Set([
  'BACKLOG_RECONCILE_ATTEMPT','BACKLOG_RECONCILED',
  'PROMOTED_READBACK_VERIFIED','RECOVERY_REQUIRED'
 ]);
-export function projectS6OnceJournalReadonly(raw){
+export function projectS6OnceJournalReadonly(raw,{scope='ORIGINAL'}={}){
+ const fixed=s6JournalScope(scope);
  const base={schema:'ZGMINI_S6_ONCE_JOURNAL_A_V1',
-  requestId:S6_JOURNAL_REQUEST,status:'STATE_UNKNOWN',
+  requestId:fixed?.requestId??null,status:'STATE_UNKNOWN',
   code:'S6_ONCE_JOURNAL_UNVERIFIED',claimPresent:null,
   journalPhase:null,failedAt:null,failedCode:null,
   mutationAttempted:null,leaseReleaseAcknowledged:null,
@@ -3001,6 +3015,7 @@ export function projectS6OnceJournalReadonly(raw){
   recoveryAuthorized:false,originalRequestRetried:false,
   operationalWrites:0,providerCalls:0,d1Writes:0};
  const invalid=(code)=>({...base,code});
+  if(!fixed)return invalid('S6_ONCE_FIXED_SCOPE_DENIED');
  if(raw?.approvalValid!==true||typeof raw.ownerByteMatch!=='boolean')
   return invalid('S6_ONCE_APPROVAL_OR_OWNER_CAS_UNVERIFIED');
  const owner={priorOwnerByteMatch:raw.ownerByteMatch};
@@ -3018,7 +3033,7 @@ export function projectS6OnceJournalReadonly(raw){
    code:'S6_ONCE_CLAIM_WITHOUT_JOURNAL',
    backlogState:raw.backlog===null?'ABSENT':'UNVERIFIED'};
  if(journal?.schema!=='ZGMINI_S6_ONCE_JOURNAL_V1'||
-    journal.requestId!==S6_JOURNAL_REQUEST||
+    journal.requestId!==fixed.requestId||
     !S6_JOURNAL_PHASES.has(journal.phase))
   return invalid('S6_ONCE_JOURNAL_IDENTITY_UNVERIFIED');
  const failedAt=typeof journal.failedAt==='string'&&
@@ -3027,7 +3042,7 @@ export function projectS6OnceJournalReadonly(raw){
   /^S6_[A-Z0-9_]{1,90}$/.test(journal.code)?journal.code:null;
  const backlog=raw.backlog;
  if(backlog!==null&&(backlog.schema!=='ZGMINI_PC_BACKLOG_V1'||
-    backlog.requestId!==S6_JOURNAL_REQUEST||
+    backlog.requestId!==fixed.requestId||
     !Array.isArray(backlog.windows)||backlog.windows.length<1||
     typeof backlog.pausedAt!=='string'))
   return invalid('S6_ONCE_BACKLOG_IDENTITY_UNVERIFIED');
@@ -3050,10 +3065,11 @@ export function projectS6OnceJournalReadonly(raw){
  * and only when the original approved SHA-256 then matches exactly.
  * This is read-only diagnostic evidence, NOT an alternate B authorization.
  */
-export function s6OncePinnedApprovalCheckoutBytes(raw){
- if(!Buffer.isBuffer(raw)||raw.length<1||raw.length>32768)return null;
+export function s6OncePinnedApprovalCheckoutBytes(raw,{scope='ORIGINAL'}={}){
+ const fixed=s6JournalScope(scope);
+ if(!fixed||!Buffer.isBuffer(raw)||raw.length<1||raw.length>32768)return null;
  const digest=b=>createHash('sha256').update(b).digest('hex');
- if(digest(raw)===S6_JOURNAL_APPROVAL_SHA)return raw;
+ if(digest(raw)===fixed.approvalSha)return raw;
  const canonical=[];
  let changed=false;
  for(let i=0;i<raw.length;i++){
@@ -3067,15 +3083,18 @@ export function s6OncePinnedApprovalCheckoutBytes(raw){
  }
  if(!changed)return null;
  const bytes=Buffer.from(canonical);
- return digest(bytes)===S6_JOURNAL_APPROVAL_SHA?bytes:null;
+ return digest(bytes)===fixed.approvalSha?bytes:null;
 }
 
 export function inspectS6OnceJournalReadonly({
  io=fs,maintenanceHome='E:/ZGmini/automation/pc-maintenance',
  controllerHome='E:/ZGmini/automation/pc-control',
- sourceRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..')
+ sourceRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),
+  scope='ORIGINAL'
 }={}){
- const unknown=code=>({...projectS6OnceJournalReadonly(null),code});
+ const fixed=s6JournalScope(scope);
+  const unknown=code=>({...projectS6OnceJournalReadonly(null,{scope}),code});
+  if(!fixed)return unknown('S6_ONCE_FIXED_SCOPE_DENIED');
  let stage='APPROVAL';
  try{
   const file=(p,max=32768)=>{
@@ -3089,14 +3108,14 @@ export function inspectS6OnceJournalReadonly({
   };
   const read=p=>JSON.parse(file(p).toString('utf8'));
   const approvalFile=path.join(sourceRoot,'approvals/controller-s6',
-   S6_JOURNAL_APPROVAL_SHA+'.json');
-  const bytes=s6OncePinnedApprovalCheckoutBytes(file(approvalFile));
+   fixed.approvalSha+'.json');
+  const bytes=s6OncePinnedApprovalCheckoutBytes(file(approvalFile),{scope});
   const sha=x=>createHash('sha256').update(x).digest('hex');
   if(bytes===null)
    return unknown('S6_ONCE_APPROVAL_BYTES_UNVERIFIED');
   const approved=JSON.parse(bytes.toString('utf8'));
   if(approved.schema!=='ZGMINI_PC_S6_ONCE_B_APPROVAL_V1'||
-     approved.requestId!==S6_JOURNAL_REQUEST||
+     approved.requestId!==fixed.requestId||
      approved.approval?.approved!==true||
      !/^[a-f0-9]{64}$/.test(approved.ownerSha256??''))
    return unknown('S6_ONCE_APPROVAL_IDENTITY_UNVERIFIED');
@@ -3108,13 +3127,13 @@ export function inspectS6OnceJournalReadonly({
   const ls=io.lstatSync(ledger);
   if(!ls.isDirectory()||ls.isSymbolicLink())
    return unknown('S6_ONCE_LEDGER_ROOT_UNVERIFIED');
-  const owned=path.join(ledger,'S6_ONCE_'+S6_JOURNAL_REQUEST);
+  const owned=path.join(ledger,'S6_ONCE_'+fixed.requestId);
   let dir;
   try{dir=io.lstatSync(owned);}
   catch(error){
    if(error?.code==='ENOENT')
     return projectS6OnceJournalReadonly({approvalValid:true,
-     ownerByteMatch,claimPresent:false,journal:null,backlog:null});
+     ownerByteMatch,claimPresent:false,journal:null,backlog:null},{scope});
    throw error;
   }
   if(!dir.isDirectory()||dir.isSymbolicLink())
@@ -3122,7 +3141,7 @@ export function inspectS6OnceJournalReadonly({
   stage='CLAIM';
   const claim=read(path.join(owned,'claim.json'));
   const claimValid=claim.schema==='ZGMINI_S6_CLAIM_V1'&&
-   claim.requestId===S6_JOURNAL_REQUEST&&
+   claim.requestId===fixed.requestId&&
    typeof claim.nonce==='string'&&/^[0-9a-f-]{36}$/.test(claim.nonce);
   const optional=(name,stageName)=>{
    stage=stageName;
@@ -3132,7 +3151,7 @@ export function inspectS6OnceJournalReadonly({
   const journal=optional('journal.json','JOURNAL');
   const backlog=optional('backlog.json','BACKLOG');
   return projectS6OnceJournalReadonly({approvalValid:true,
-   ownerByteMatch,claimPresent:true,claimValid,journal,backlog});
+   ownerByteMatch,claimPresent:true,claimValid,journal,backlog},{scope});
  }catch{return unknown('S6_ONCE_'+stage+'_READ_UNVERIFIED');}
 }
 
@@ -3345,7 +3364,12 @@ export function collect(role,ctx,env=process.env){
   return {...base,status:evidence.status,code:evidence.code,
    s6OnceJournal:evidence};
  }
- if(ctx.s6PredrainInputs===true){
+ if(ctx.s6CurrentJournal===true){
+   const evidence=inspectS6OnceJournalReadonly({scope:'CURRENT'});
+   return {...base,status:evidence.status,code:evidence.code,
+    s6CurrentJournal:evidence};
+  }
+  if(ctx.s6PredrainInputs===true){
   const proof=inspectS6PreDrainInputsReadonly({env});
   return {...base,status:proof.status,code:proof.code,s6PredrainInputs:proof};
  }
@@ -3580,6 +3604,12 @@ export function toText(r){
    's6JournalPhase='+(r.s6OnceJournal.journalPhase??'UNVERIFIED'),
    's6BacklogState='+r.s6OnceJournal.backlogState,
    's6SuccessEstablished=false']:[]),
+   ...(r.s6CurrentJournal?[
+    's6CurrentJournal='+r.s6CurrentJournal.code,
+    's6CurrentClaimPresent='+r.s6CurrentJournal.claimPresent,
+    's6CurrentJournalPhase='+(r.s6CurrentJournal.journalPhase??'UNVERIFIED'),
+    's6CurrentBacklogState='+r.s6CurrentJournal.backlogState,
+    's6CurrentSuccessEstablished=false']:[]),
   ...(r.s6ApprovalPreimage?[
    's6ApprovalPreimage='+r.s6ApprovalPreimage.code,
    's6ApprovalCandidateOnly='+r.s6ApprovalPreimage.status,
