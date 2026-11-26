@@ -97,6 +97,11 @@ export function verifyR4GuardianPostcheck({install,sourceDigest,oldOwner,newOwne
   statusAt=Date.parse(status?.at),stageAt=Date.parse(install?.upgradedAt);
  if(install?.sha256!==R4_GUARDIAN_SOURCE_SHA256||
     sourceDigest!==R4_GUARDIAN_SOURCE_SHA256||
+    install.scope!==FINAL_SCOPE||
+    install.approvedTargetSourceSha!==R4_GUARDIAN_TARGET||
+    !exact(install.standby,['mode','approved'])||
+    install.standby.mode!=='ACTIVE_1_STANDBY_1'||
+    install.standby.approved!==true||
     !Number.isFinite(newAt)||!Number.isFinite(signalAt)||
     !Number.isFinite(statusAt)||!Number.isFinite(stageAt)||
     newAt<stageAt||newAt<signalAt||statusAt<newAt||
