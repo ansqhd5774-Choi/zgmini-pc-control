@@ -88,3 +88,52 @@ test('new policy cannot change independent identity or silently become a no-op',
  assert.match(proposal.checks.installedWindowsEvidence,/45905232182/);
  assert.match(proposal.checks.preflight,/Owner|Windows|source/);
 });
+
+
+test('R6 held policy proposal is non-executable even if a future recovery is claimed',()=>{
+ const h=proposal.approvalHold;
+ assert.equal(h.state,'USER_DEFERRED');
+ assert.equal(h.effectiveDate,'2026-11-27');
+ assert.equal(h.authorization,'NONE');
+ assert.equal(proposal.approved,false);
+ assert.equal(h.resumeReviewOnlyAfter.length,5);
+ assert.equal(h.prohibitedEffects.length,4);
+ assert.match(h.resumeReviewOnlyAfter[0],/Supervisor alive/);
+ assert.match(h.resumeReviewOnlyAfter[1],/HEALTHY/);
+ assert.match(h.resumeReviewOnlyAfter[2],/READY.*2\/2/);
+ assert.match(h.resumeReviewOnlyAfter[3],/CAS|manifest SHA256/);
+ assert.match(h.resumeReviewOnlyAfter[4],/Owner/);
+ assert.match(proposal.scopeNote,/USER_DEFERRED/);
+ const reviewed={...proposal,approvalHold:{...h,state:'REVIEW_ELIGIBLE'}};
+ assert.equal(reviewed.approved,false);
+ assert.throws(()=>requireHandoffApproval(reviewed,candidateSha,installedSha),
+  /HANDOFF_APPROVAL_REQUIRED/);
+});
+
+test('original post-R6 Windows evidence does not establish Supervisor, HEALTHY and READY2',()=>{
+ const result=name=>JSON.parse(readFileSync(
+  new URL('../results/'+name,import.meta.url),'utf8'));
+ const r6=result('pc-process-inventory-45907705042-1-operating.json');
+ const pc=result('pc-process-inventory-45907709067-1-operating.json');
+ const wmi=result('pc-process-inventory-45908087228-1-operating.json');
+ assert.equal(r6.runId,proposal.approvalHold.evidence.r6Run);
+ assert.equal(r6.watchdogR6Runtime.code,'WATCHDOG_R6_HEALTH_STATUS_UNVERIFIED');
+ assert.equal(r6.watchdogR6Runtime.naturalRestartObserved,true);
+ assert.equal(r6.watchdogR6Runtime.watchdogOwnerVerified,true);
+ assert.equal(r6.watchdogR6Runtime.watchdogHealthState,
+  'BLOCKED_OLD_RUNNER_EXECUTABLE_UNVERIFIED');
+ assert.equal(r6.watchdogR6Runtime.standbyReadyCount,0);
+ assert.equal(r6.watchdogR6Runtime.activeSupervisorVerified,false);
+ assert.equal(pc.runId,proposal.approvalHold.evidence.supervisorRun);
+ assert.equal(pc.status,'PASS'); // The collection succeeded, not the Supervisor.
+ assert.equal(pc.maintenance.runtimeSignals.supervisorAlive,false);
+ assert.equal(pc.maintenance.runtimeSignals.supervisorFresh,false);
+ assert.equal(pc.maintenance.runtimeSignals.supervisorChildrenVerified,false);
+ assert.equal(pc.maintenance.runtimeSignals.runnerSetOnline,true);
+ assert.equal(pc.maintenance.automationState,'PARTIAL_OR_UNVERIFIED');
+ assert.equal(wmi.runId,proposal.approvalHold.evidence.controllerListenerWmiRun);
+ assert.equal(wmi.standbyRunnerWmi.controllerListenerCount,6);
+ assert.equal(wmi.standbyRunnerWmi.status,'STATE_UNKNOWN');
+ assert.equal(wmi.standbyRunnerWmi.promotionApproved,false);
+ assert.equal(proposal.approved,false);
+});
