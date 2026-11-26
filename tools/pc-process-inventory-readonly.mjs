@@ -74,6 +74,7 @@ const S6_CURRENT_MAINTAINER='20a2939d419675ede3e8ab38a3ea3b70756981ac';
 const R4_GUARDIAN_ORIGIN_PROBE='controller-standby-r4-guardian-origin-readonly';
 const CI_RECEIPT_ROOT_PROBE='ci-controller-b-receipt-root-readonly';
 const CI_CONTROLLER_B_ACTIVATION_PROBE='ci-controller-b-activation-readonly';
+const CI_CONTROLLER_B_POLICY_CAS_PROBE='ci-controller-b-policy-cas-readonly';
 // Existing A only: observe whether the same fixed WMI process-path query
 // used by the candidate Watchdog can classify installed Runner executables.
 // This single instant is NOT an owner/child-exit proof and cannot promote Standby.
@@ -619,10 +620,11 @@ export function authenticateProcess(event,env,role){
  const isR4GuardianOrigin=withW05&&raw.probe===R4_GUARDIAN_ORIGIN_PROBE;
  const isCiReceiptRoot=withW05&&raw.probe===CI_RECEIPT_ROOT_PROBE;
  const isCiActivation=withW05&&raw.probe===CI_CONTROLLER_B_ACTIVATION_PROBE;
+ const isCiPolicyCas=withW05&&raw.probe===CI_CONTROLLER_B_POLICY_CAS_PROBE;
  const allowedOperatingProbe=isOperator||is2960||is3409||isEr1Postcheck||is3516||
   isD05Writer||isD05PrivateReceipt||isD05Theme||isD05Registration||is3160||
   isCnnStaticGuard||isCnnGitPredicates||isCnnBPins||isCnnBResources||
-  isCnnBCore||isW06Task||isR3Watchdog||isR3Wmi||isR4Runtime||isR5Runtime||isS6Preimage||isS6NextPreimage||isS6Journal||isS6ReceiverLedger||isR4GuardianOrigin;
+  isCnnBCore||isW06Task||isR3Watchdog||isR3Wmi||isR4Runtime||isR5Runtime||isS6Preimage||isS6NextPreimage||isS6Journal||isS6ReceiverLedger||isR4GuardianOrigin||isCiPolicyCas;
  const acceptedProbe=(role==='operating'&&allowedOperatingProbe)||
   (role==='handoff'&&(isCiReceiptRoot||isCiActivation));
  if(!raw||(!basic&&!withJobs&&!withW05)||
@@ -664,7 +666,8 @@ export function authenticateProcess(event,env,role){
    ...(isS6ReceiverLedger?{s6ReceiverLedger:true}:{}),
   ...(isR4GuardianOrigin?{watchdogR4GuardianOrigin:true}:{}),
   ...(isCiReceiptRoot?{ciControllerBReceiptRoot:true}:{}),
-  ...(isCiActivation?{ciControllerBActivation:true}:{})};
+  ...(isCiActivation?{ciControllerBActivation:true}:{}),
+  ...(isCiPolicyCas?{ciControllerBPolicyCas:true}:{})};
 }
 export function sanitizeProbe(raw){
  if(!raw||raw.schema!=='ZGMINI_PC_PROCESS_PROBE_V1')fail('PROBE_SCHEMA_INVALID');
@@ -1426,6 +1429,31 @@ export function compactD05WriterResult(base,status){
   code:status?.code??'D05_WRITER_CHECKPOINT_UNVERIFIED',
   d05WriterCheckpoint:status??{status:'STATE_UNKNOWN',
    code:'D05_WRITER_CHECKPOINT_UNVERIFIED',recoveryEligible:false}};
+}
+
+// Narrow existing operating-PC A probe for the exact prior installed-policy CAS.
+// Returns only validated fixed identifiers and raw-manifest hash; never policy
+// bytes, arbitrary filesystem paths, execution authority, or owner information.
+export function inspectCiControllerBPolicyCasReadonly(filesystem=fs){
+ const unavailable={schema:'ZGMINI_CI_CONTROLLER_B_POLICY_CAS_READONLY_V1',
+  status:'STATE_UNKNOWN',code:'CI_POLICY_CAS_NOT_VERIFIED',policyCas:null,
+  executionAuthorized:false,operationalWrites:0,providerCalls:0,d1Writes:0};
+ try{
+  const fixed='E:/ZGmini/automation/pc-maintenance/MAINTENANCE_INSTALL.json';
+  const stat=filesystem.lstatSync(fixed);
+  if(!stat.isFile()||stat.isSymbolicLink()||stat.size<1||stat.size>131072)
+   return unavailable;
+  const bytes=filesystem.readFileSync(fixed);
+  if(!Buffer.isBuffer(bytes)||bytes.length!==stat.size)return unavailable;
+  const installed=JSON.parse(bytes.toString('utf8'));
+  const policy=installedControllerBPolicy(installed);
+  if(!policy)return unavailable;
+  return {...unavailable,status:'PASS',code:'CI_POLICY_CAS_READONLY_OBSERVED',
+   policyCas:{sourceSha:installed.sourceSha,
+    installedManifestSha256:createHash('sha256').update(bytes).digest('hex'),
+    workflowId:policy.workflowId,workflowBlobSha:policy.workflowBlobSha,
+    fixedWorkflowPathVerified:true,enabledShapeVerified:true}};
+ }catch{return unavailable;}
 }
 
 // Fixed existing install-root A readback. Never returns policy bytes, filesystem
@@ -3175,6 +3203,11 @@ export function collect(role,ctx,env=process.env){
  if(ctx.w06TaskCadence===true){
   const observed=inspectW06TaskCadenceReadonly();
   return {...base,status:observed.status,code:observed.code,w06TaskCadence:observed};
+ }
+ if(ctx.ciControllerBPolicyCas===true){
+  const observed=inspectCiControllerBPolicyCasReadonly();
+  return {...base,status:observed.status,code:observed.code,
+   ciControllerBPolicyCas:observed};
  }
  if(ctx.ciControllerBActivation===true){
   const observed=inspectCiControllerBActivationReadonly({
