@@ -31,7 +31,7 @@
     "installedWindowsEvidence": "#4148 Run 45905232182 A read-only PASS, observedAtUtc 2026-11-26T22:33:47.585Z: installed sourceSha b08f3a482e9bb39523f47675ae06bc6e02e01d2d, MAINTENANCE_INSTALL.json SHA256 0b4a38f82a32021c358220c8a8fe49b11eb17c3752d55810fb2180bbea7ee378, workflowId 430972394, workflowBlobSha 27e48ecde81bdf6f15cccffcffd9b3e70482a5f3. HISTORICAL; recheck actual current CAS immediately before B.",
     "policyScope": "If later separately approved, ONLY independent installed Receiver CI Controller B workflow policy SHA1 changes to a31972f47badcd35b0ffffa61721a93308d23067; installed files unchanged, workflowId/path/enabled shape unchanged; never change GitHub Actions ENABLED flag by this handoff.",
     "preflight": "Owner exact approval, manifest original SHA256, immutable source/9 files, current Windows installed source and manifest SHA256, startup/WMI origin, path alias/lease/overlap check, protected byte backup/rollback, independent non-Runner C operator mandatory. Do not claim current host equals previous #4148 without fresh read.",
-    "rollout": "Approve exact scope then perform one authorized 7→7 handoff with immutable source target 905c0b... and installed policy readback; only THEN merge Workflow Draft #4152; activation is separately gated. Do not replay #4146."
+    "rollout": "HOLD: Owner explicitly deferred Controller B policy approval while Supervisor is down and R6 Watchdog HEALTHY/Standby 2 READY are unverified. Only source-only tests/manifest review. After independent verified recovery, re-review exact scope and fresh CAS; then obtain distinct explicit Owner B authorization before any C-grade handoff. Draft Workflow #4152 must stay unmerged. Do not replay #4146 or #4156."
   },
   "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
   "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
@@ -44,5 +44,35 @@
     "Controller/Watchdog/Supervisor/Runners/Writer/Core/Task/SQLite/D1/Cloudflare/DNS state",
     "Installed recovery records, lease ownership, receipt root/previous unique Issues and backups"
   ],
-  "scopeNote": "Stored ONLY under proposals/, never approvals/; approved=false. Not read by existing Windows B handoff. An Owner scope review and separate exact approved manifest in approvals/ are required before any operational effect."
+  "scopeNote": "UNAPPROVED / USER_DEFERRED: stored ONLY under proposals/, approved=false. Not read by existing Windows B handoff. R6 recovery and READY2 are prerequisites for later scope/CAS review, not automatic approval or permission to install.",
+  "approvalHold": {
+    "state": "USER_DEFERRED",
+    "effectiveDate": "2026-11-27",
+    "authorization": "NONE",
+    "meaning": "Controller B policy change approval expressly withheld; this proposal is source review only. R6 recovery evidence does not automatically activate or authorize this proposal.",
+    "evidence": {
+      "r6Run": "45907705042",
+      "r6Code": "WATCHDOG_R6_HEALTH_STATUS_UNVERIFIED",
+      "r6Health": "BLOCKED_OLD_RUNNER_EXECUTABLE_UNVERIFIED",
+      "supervisorRun": "45907709067",
+      "supervisorAlive": false,
+      "supervisorFresh": false,
+      "controllerListenerWmiRun": "45908087228",
+      "controllerListenerCount": 6,
+      "caveat": "Runner 6 online and WMI Listener 6 do not prove Supervisor HEALTHY. R6 standbyReadyCount 0 is unverified readiness, not proof of zero live processes."
+    },
+    "resumeReviewOnlyAfter": [
+      "Separate operating evidence proves Supervisor alive, fresh, controller child ownership and safe health without changing preserved six Runners",
+      "Independent R6 Watchdog runtime evidence reports HEALTHY with verified current owner/nonce and fresh health status",
+      "Both Standby IPC endpoints independently report READY (2/2), not inferred from Runner Online or previous probes",
+      "After all three, independently re-review exact policy scope and contemporaneous installed source, manifest SHA256, protected 9-file pins, workflow blob, receiver ownership, leases and backup/rollback",
+      "New explicit Owner policy-change approval is still required after review; do not auto-resume or reuse this held proposal as authorization"
+    ],
+    "prohibitedEffects": [
+      "No Controller B policy installation or approval promotion into approvals/; keep approved:false",
+      "No merge of Draft PR #4152; no GitHub Actions ENABLED variable or CI policy enabling",
+      "No changes to installed policies or files, Runner, Watchdog, Supervisor, Controller, lease, task, SQLite or D1",
+      "No retry or replay of R6 Watchdog activation #4156 or earlier B/S6 requests, no process kills, lease deletion or startup promotion"
+    ]
+  }
 }
