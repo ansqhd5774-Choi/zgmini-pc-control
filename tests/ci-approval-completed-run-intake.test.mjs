@@ -159,8 +159,9 @@ test('late-run source is inert until existing Controller B receiver pin is separ
  const y=readFileSync(new URL('../.github/workflows/ci-approval-controller-b.yml',import.meta.url),'utf8');
  const publisher=readFileSync(new URL('../ci-approval/completed-run-intake.mjs',import.meta.url),'utf8');
  assert.match(y,/vars\.ZGMINI_CI_CONTROLLER_B_ENABLED == 'true'/);
- assert.match(y,/vars\.ZGMINI_CI_CONTROLLER_B_POLICY != ''/);
- assert.match(y,/ref: cfe57f3d720219613c87eff21338de0d35edbf6b/);
+ assert.doesNotMatch(y,/vars\.ZGMINI_CI_CONTROLLER_B_POLICY != ''/);
+ assert.match(y,/ZGMINI_CI_CONTROLLER_B_POLICY: \$\{\{ vars\.ZGMINI_CI_CONTROLLER_B_POLICY \}\}/);
+ assert.match(y,/ref: fcbbf12cd662544ee308295c13076d4ca2f4aeba/);
  assert.match(publisher,/return publishLateOwnerMergedControllerApproval\(event,opts\)/);
  assert.doesNotMatch(y,/workflow_dispatch:|schedule:/);
 });
@@ -285,18 +286,35 @@ test('submission workflow is activation-gated, source-event driven and pinned to
  assert.match(y,/vars\.ZGMINI_CI_CONTROLLER_B_ENABLED == 'true'/);
  assert.match(y,/name: submit-controller-b/);
  assert.match(y,/name: Record Controller B request receipt/);
- // Only the fixed PR #3963 3/3-green merged publisher source is a candidate.
- // Activation requires an independently installed exact workflow policy pin.
- assert.match(y,/ref: cfe57f3d720219613c87eff21338de0d35edbf6b\s+persist-credentials: false/);
+ // Only the exact merged #4147 3/3-green publisher source is referenced.
+ // This candidate MUST NOT be merged before the independently installed B
+ // Receiver policy pins the new workflow blob and the Owner scope is approved.
+ assert.match(y,/ref: fcbbf12cd662544ee308295c13076d4ca2f4aeba\s+persist-credentials: false/);
  assert.match(y,/run: node ci-approval\/completed-run-intake\.mjs --publish-existing/);
  assert.match(y,/cancel-in-progress: false/);
  assert.match(y,/github\.event\.workflow_run\.conclusion == 'success'/);
  assert.match(y,/github\.event\.workflow_run\.head_repository\.id == 1442936296/);
- assert.match(y,/vars\.ZGMINI_CI_CONTROLLER_B_POLICY != ''/);
+ assert.doesNotMatch(y,/vars\.ZGMINI_CI_CONTROLLER_B_POLICY != ''/);
+ assert.match(y,/ZGMINI_CI_CONTROLLER_B_POLICY: \$\{\{ vars\.ZGMINI_CI_CONTROLLER_B_POLICY \}\}/);
  assert.match(y,/ZGMINI_CI_CONTROLLER_B_POLICY: \$\{\{ vars\.ZGMINI_CI_CONTROLLER_B_POLICY \}\}/);
  assert.match(y,/contents: write/);
  assert.match(y,/pull-requests: write/);
  assert.doesNotMatch(y,/id-token: write|administration: write|persist-credentials: true/);
+});
+
+test('late Owner completion workflow remains opt-in and cannot mint B approval policy',()=>{
+ const y=readFileSync(new URL('../.github/workflows/ci-approval-controller-b.yml',import.meta.url),'utf8');
+ const source=readFileSync(new URL('../ci-approval/completed-run-intake.mjs',import.meta.url),'utf8');
+ assert.match(y,/vars\\.ZGMINI_CI_CONTROLLER_B_ENABLED == 'true'/);
+ assert.match(y,/github\\.event\\.workflow_run\\.conclusion == 'success'/);
+ assert.match(y,/github\\.event\\.workflow_run\\.event == 'pull_request'/);
+ assert.match(y,/github\\.event\\.workflow_run\\.head_repository\\.id == 1442936296/);
+ assert.doesNotMatch(y,/vars\\.ZGMINI_CI_CONTROLLER_B_POLICY != ''/);
+ assert.match(y,/ZGMINI_CI_CONTROLLER_B_POLICY: \\$\\{\\{ vars\\.ZGMINI_CI_CONTROLLER_B_POLICY \\}\\}/);
+ assert.match(source,/if\\(policy\\)\\{/);
+ assert.match(source,/return publishLateOwnerMergedControllerApproval\\(event,opts\\)/);
+ assert.match(source,/MAINTENANCE_CI_AUTO_APPROVAL_CONTEXT_REQUIRED|CI_PUBLICATION_AUTO_POLICY_UNVERIFIED/);
+ assert.doesNotMatch(y,/workflow_dispatch:|schedule:|id-token: write|administration: write/);
 });
 
 test('configured source merge becomes eligible on first main push containing it',async()=>{
