@@ -332,6 +332,29 @@ export function normalizedResult(request,result,code){
         observedBusy:from.supervisorIdleWait.observedBusy}}:{}),
   };
 }
+// Publish a CI-native installation attestation only from an explicitly
+// Owner-approved B manifest AND a verified successful original updater result.
+// Do not trust extra fields supplied by the child stdout, Issue or CI bot.
+export function attachApprovedNativeBReceipt(result,validated,actor){
+ const pin=validated?.manifest?.ciNativeApproval;
+ if(!pin)return result;
+ if(actor!=="ansqhd5774-Choi"||
+    validated?.request?.operation!=='controller-update'||
+    validated.request.requestId!==result?.requestId||
+    validated.request.targetControllerSha!==result.targetControllerSha||
+    validated.manifest.purpose!=='pc-controller-maintenance'||
+    validated.manifest.controllerOnlyInstall!==true||
+    !validated.manifest.selectiveSource||
+    pin.schema!=='ZGMINI_CI_NATIVE_B_POLICY_APPROVAL_V1'||
+    !['A_READONLY','B_WRITER_SOURCE'].includes(pin.effect)||
+    !SHA256.test(pin.nativePolicySha256)||
+    result.status!=='SUCCEEDED'||
+    result.actualControllerSha!==validated.request.targetControllerSha||
+    result.protectedStateUnchanged!==true)
+  return result;
+ return {...result,ciNativeEffect:pin.effect,
+  ciNativePolicySha256:pin.nativePolicySha256};
+}
 function resultComment(result,uploadStatus=null){
   return [commentMarker(result.requestId),
     "ZGMINI PC maintenance result (out-of-band)",
@@ -1144,6 +1167,9 @@ export function createMaintenanceAgent({
       const executed=parseJsonOutput(await updater([command,"--request-id",request.requestId,
         "--manifest-file",packageFile]),"UPDATE_OUTPUT_INVALID");
       result=normalizedResult(request,executed,executed.code);
+      // Owner-pinned policy effect can be carried only on an actual
+      // verified B success; old installations remain unprivileged.
+      result=attachApprovedNativeBReceipt(result,approved,issue.author.login);
     }catch(error){
       // Never retry an ambiguous apply. Query the independent updater ledger.
       let status=null;
