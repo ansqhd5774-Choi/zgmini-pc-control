@@ -59,7 +59,8 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
   uploadFailure=null,uploadAfterCommitError=null,installLock={held:false},
   verifyInstalledSource=()=>{},statusFaults={},preexistingLedger=null,
   extraIssueSummaries=[],extraIssueDetails=[],progressError=null,
-  s6RawManifest=null,s6Status=null,s6ApplyResult=null,s6ApplyError=null}={}){
+  s6RawManifest=null,s6Status=null,s6ApplyResult=null,s6ApplyError=null,
+  s6ApplyRaw=null}={}){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),"zgmini-maintainer-agent-test-"));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const leaseRoot=path.join(root,"leases");fs.mkdirSync(leaseRoot);
@@ -173,6 +174,7 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
       assert.equal(pkg.manifestRawBase64,Buffer.from(s6RawManifest).toString('base64'));
       assert.deepEqual(pkg.manifest,JSON.parse(Buffer.from(s6RawManifest).toString('utf8')));
       if(s6ApplyError)throw s6ApplyError;
+      if(s6ApplyRaw!==null)return {stdout:s6ApplyRaw};
       return {stdout:JSON.stringify(s6ApplyResult??{
         schema:'ZGMINI_S6_ONCE_RESULT_V1',status:'POSTCHECK_PENDING',
         code:'S6_ONCE_PROMOTION_OBSERVED_A_JOB_PENDING',
@@ -924,6 +926,35 @@ test('S6 lost updater response remains unknown without automatic retry',async t=
  const result=await f.agent.processIssue(f.issue);
  assert.equal(result.status,'UNKNOWN');
  assert.equal(result.code,'S6_ONCE_OUTCOME_UNKNOWN');
+ assert.equal(f.agent.loadLedger(s6.request.requestId).result.firstFail,
+  'S6_ONCE_UPDATER_RESPONSE_UNKNOWN');
+ assert.equal((await f.agent.processIssue(f.issue)).code,'DUPLICATE_REQUEST_SUPPRESSED');
+ assert.equal(f.stats.applies,1);
+});
+test('S6 malformed child stdout preserves uncertain one-shot and parser category',async t=>{
+ const s6=s6AgentCase();
+ const f=fixture(t,{title:'pc-controller-s6-once',
+  issuePatch:{body:JSON.stringify(s6.request)},s6RawManifest:s6.raw,s6Status:s6.status,
+  s6ApplyRaw:'not-json'});
+ const result=await f.agent.processIssue(f.issue);
+ const recorded=f.agent.loadLedger(s6.request.requestId).result;
+ assert.equal(result.status,'UNKNOWN');
+ assert.equal(result.code,'S6_ONCE_OUTCOME_UNKNOWN');
+ assert.equal(recorded.firstFail,'S6_ONCE_OUTPUT_INVALID');
+ assert.equal((await f.agent.processIssue(f.issue)).code,'DUPLICATE_REQUEST_SUPPRESSED');
+ assert.equal(f.stats.applies,1);
+});
+test('S6 invalid structured result preserves uncertain one-shot and schema category',async t=>{
+ const s6=s6AgentCase();
+ const f=fixture(t,{title:'pc-controller-s6-once',
+  issuePatch:{body:JSON.stringify(s6.request)},s6RawManifest:s6.raw,s6Status:s6.status,
+  s6ApplyResult:{schema:'ZGMINI_S6_ONCE_RESULT_V1',status:'SUCCEEDED',
+   requestId:s6.request.requestId,failoverTested:false,promotionApproved:false}});
+ const result=await f.agent.processIssue(f.issue);
+ const recorded=f.agent.loadLedger(s6.request.requestId).result;
+ assert.equal(result.status,'UNKNOWN');
+ assert.equal(result.code,'S6_ONCE_OUTCOME_UNKNOWN');
+ assert.equal(recorded.firstFail,'S6_ONCE_RESULT_UNVERIFIED');
  assert.equal((await f.agent.processIssue(f.issue)).code,'DUPLICATE_REQUEST_SUPPRESSED');
  assert.equal(f.stats.applies,1);
 });
