@@ -1,0 +1,53 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "05ef3bd6b5dc753c5abfbecccacc09375eb18d10",
+  "targetSha": "cfe57f3d720219613c87eff21338de0d35edbf6b",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "CANDIDATE ONLY until independently Owner-native merged under the existing user-approved CI Controller B automatic approval source/policy work and normal independent Windows maintainer handoff contract. Approved=true is the formal receiver schema field, not a new Owner authorization, not an approval to publish a Controller B business effect and not permission to bypass fresh PC CAS, native Windows operator identity, stopped-receiver proof, leases, backup or rollback. This exact candidate replaces one maintainer runtime file (S6 unknown-result reason categorization from merged PR #3954) and rotates only CI publisher Workflow blob to the verified immutable PR #3963 merged source. Never merge or apply solely on the basis of GitHub CI.",
+  "files": {
+    "tools/maintenance-contract.mjs": "d24f03ee6db54c7e176e89f31bce8eb6de9aafba082cbb48213748d0f0b9facf",
+    "tools/maintenance-apply.mjs": "745233ed111ff5dedb2d7747e7153a53a6e6a6a89c82c8a00c95f43d76f828db",
+    "tools/maintenance-agent.mjs": "3e284c78d93a124b27364152057d9671942173ae295b8036cc74abccc68051da",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "4451064cd0a2c52c0ab5d5051b4d12c486f05893ff45a23bf75c3007853fd69b",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "af31ab1f6a159aa1d8467d2585eb16750e8a1a293f9ecfb90b85c388d8640d70",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "23f3709ed0387cfb0132d9546f0fd6e2f10eabfad4212a67a170d5201a4a5de0"
+  },
+  "ciControllerBPolicy": {
+    "schema": "ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V1",
+    "enabled": true,
+    "workflowId": 430972394,
+    "workflowBlobSha": "27e48ecde81bdf6f15cccffcffd9b3e70482a5f3",
+    "workflowPath": ".github/workflows/ci-approval-controller-b.yml"
+  },
+  "runtimeChangedFiles": [
+    "tools/maintenance-agent.mjs"
+  ],
+  "checks": {
+    "sourceCi": "CI for PR #3954 source reporter fix HEAD 76875d57: C996 45853972842, Secret Scan 45853972846, Controller Source Tests 45853972887 all SUCCESS. PR #3963 publisher replay fix HEAD 8835d07f: C996 45857591993, Secret 45857591997, Controller Source Tests 45857592035 all SUCCESS. Draft #3970 pin candidate HEAD d8abac88: C996 45859503413, Secret 45859503362, Controller Source Tests 45859503583 all SUCCESS. These are source-only checks, NOT Windows handoff or Owner approval.",
+    "installedWindowsEvidence": "Existing independent Windows handoff #3914 PASS/STOPPED_RECEIVER_HANDOFF_AND_WINDOWS_ORIGIN_VERIFIED to 05ef3bd6b5dc753c5abfbecccacc09375eb18d10; independent read-only A #3917 Run 45843942160 2026-11-26T14:56:40Z confirms maintenanceSourceSha=05ef3bd6..., maintenanceFilesVerified=true, receiver LISTENING, install lease not held. Previous observation only; immediately prior to any future authorized handoff read live installed source SHA, complete seven runtime CAS, workflow policy manifest, original receiver identity and no conflicting lease.",
+    "exactBytePlan": "The immutable target cfe57f3d... is a main ancestor. Independently recalculated SHA-256 over all nine GitHub source file UTF-8 bytes using a SHA-256 implementation checked against abc=ba7816bf...; eight of nine bytes equal the prior approved installed #3914 manifest exactly. Only tools/maintenance-agent.mjs changes: installed 9cd06c1ca7d35b7d81d9e0bfa7318a5fd6acc86543329858f461c6ea8c66dc8c -> proposed 3e284c78d93a124b27364152057d9671942173ae295b8036cc74abccc68051da. Runtime write scope is exactly one file plus the existing protected install manifest/startup if required by handoff contract; no other six runtime files change.",
+    "sourceAncestry": "Target cfe57f3d720219613c87eff21338de0d35edbf6b is 110 commits after installed 05ef3bd6b5dc753c5abfbecccacc09375eb18d10; latest checked main 389856e90a92fdd66e9260adee774959fcf3a1c3 is 11 commits after target with no differences in the nine handoff source files or CI Controller B Workflow.",
+    "workflowPinEvidence": "Draft PR #3970 HEAD d8abac88cd87f5d6bcaefc86bfd7f56968a9b5b5 source-only CI 3/3 PASS; proposed Workflow Git blob SHA-1 27e48ecde81bdf6f15cccffcffd9b3e70482a5f3, source checkout ref cfe57f3d720219613c87eff21338de0d35edbf6b. Installed main Workflow blob b568bbc5de05b2d6fff75419b88322b3e2de020c. DO NOT merge the Draft before independent installed policy pin and full before/after readback.",
+    "windowsHandoffExecuted": false,
+    "ciControllerBEnabled": false,
+    "ownerNativeEffectApproved": false
+  },
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "effects": [
+    "One narrowly scoped seven-to-seven independent maintenance receiver handoff, exactly one changed runtime source file tools/maintenance-agent.mjs plus verified protected manifest/startup metadata; do not change Controller, Supervisor, Watchdog, Runner, provider or database state",
+    "Rotate only the installed CI Controller B receiver policy Workflow blob to the exact proposed Draft #3970 workflow SHA, leaving workflowId, enabled field and path unchanged. The GitHub Actions publication variable stays disabled. Never submit any Controller B business effect under this handoff."
+  ],
+  "preserve": [
+    "Installed Controller SHA 182bb46f2838306ba40d8b4ec32bac40ab75b69a as last observed, active R5 Watchdog, Supervisor and existing six dedicated Runner registrations",
+    "Existing local SQLite, Writer source/Task, S6 one-shot Issue #3947 uncertain journal, PC Job records and leases, provider source, Cloudflare D1, Cloudflare DNS, approved R13 absence",
+    "Nine handoff source CAS, seven installed runtime file CAS, independent operator identity, stopped receiver, immutable backup/recovery path; ensure current contract's fail-closed checks run before any write",
+    "Existing CI workflow approval policy and automatic publisher disabled until exact new policy readback and Owner-native business delegation; no GitHub permission changes or automatic repeats"
+  ],
+  "scopeNote": "EXACT SOURCE/POLICY HANDOFF CANDIDATE ONLY. Not Owner-approved and not executable until the exact approved PR is independently Owner-native merged and the official independent Windows operator handoff contract validates current installed 05ef source, seven-file CAS, source and proposed workflow hashes, lease, backup, operator identity, rollback and postcheck. If installed source/policy differs, stop and reconcile; never replay S6 B or a completed Controller B effect. Normal Runner and web chat cannot execute a protected maintainer handoff."
+}
