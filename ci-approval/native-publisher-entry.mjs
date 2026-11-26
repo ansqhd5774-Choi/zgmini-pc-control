@@ -57,7 +57,7 @@ export function readNativeInstalledProof(effect,{root='E:\\ZGmini\\data\\pc-writ
 // taken from an event, PR, Issue, or repository checkout.
 export function createNativePublisherLocalPolicyPorts({scopeRoot,receiptRoot,volatileRoots=[]}={}){
  const checkedRoot=root=>{
-  if(typeof root!=='string'||!path.isAbsolute(root)||root.includes('\\0'))
+  if(typeof root!=='string'||!path.isAbsolute(root)||root.includes(String.fromCharCode(0)))
    fail('CI_NATIVE_PUBLISH_LOCAL_ROOT_DENIED');
   const full=path.resolve(root);
   for(let cur=full;;){
