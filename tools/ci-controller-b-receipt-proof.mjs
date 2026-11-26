@@ -96,6 +96,10 @@ export function runCiReceiptProof({
   }finally{if(fd!==undefined){try{filesystem.closeSync(fd);}catch{}}}
  }
  try{
+  // Do not follow a leaf alias even if every receipt-root parent is safe.
+  const entry=filesystem.lstatSync(target);
+  if(!entry.isFile()||entry.isSymbolicLink()||entry.size<=0||entry.size>512)
+   return result('BLOCKED','CI_RECEIPT_PROOF_RECORD_INVALID');
   const bytes=filesystem.readFileSync(target);
   if(!Buffer.isBuffer(bytes)||bytes.length>512||bytes.length===0)
    return result('BLOCKED','CI_RECEIPT_PROOF_RECORD_INVALID');
