@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {readCommittedTaskCreateB} from '../task-create-b/trusted-approval.mjs';
 import {
  authorizeTaskCreateB,verifyTaskCreateBPreimage,verifyTaskCreateBCandidate,
  TASK,INSTALLED_SOURCE,SOURCE_ROOT,WRAPPER,APPROVAL_SCHEMA,
@@ -148,4 +152,32 @@ test('B: failed pre-enable rollback retains lease and claim for reconciliation',
  assert.equal(result.status,'TASK_CREATE_B_RECOVERY_REQUIRED');
  assert.equal(result.code,'TASK_CREATE_B_ROLLBACK_UNVERIFIED');
  assert.equal(log.includes('release'),false);
+});
+
+
+test('B: committed approval reader denies dirty/non-owner/unsafe paths',()=>{
+ const {event,raw}=proofSetup();
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'w06-task-create-b-'));
+ try{
+  const dir=path.join(root,'approvals','task-create-b');
+  fs.mkdirSync(dir,{recursive:true});
+  const file=path.join(dir,'w06-cnn-minute-20261126.json');
+  fs.writeFileSync(file,raw);
+  const env={GITHUB_REPOSITORY:'ansqhd5774-Choi/zgmini-pc-control',
+   GITHUB_SHA:'c'.repeat(40)};
+  const gitOk=(_root,args)=>({status:0,
+   stdout:args[0]==='rev-parse'?env.GITHUB_SHA+'\n':''});
+  const authorized=readCommittedTaskCreateB({controlRoot:root,event,env,runGit:gitOk});
+  assert.equal(verifyTaskCreateBPreimage(authorized,proofSetup().original),true);
+  const gitDirty=(_root,args)=>({status:args[0]==='diff'?1:0,
+   stdout:args[0]==='rev-parse'?env.GITHUB_SHA+'\n':''});
+  assert.throws(()=>readCommittedTaskCreateB({controlRoot:root,event,env,runGit:gitDirty}),
+   e=>e.code==='TASK_CREATE_B_APPROVAL_COMMIT_STOP');
+  assert.throws(()=>readCommittedTaskCreateB({controlRoot:root,event,
+   env:{...env,GITHUB_SHA:'0'.repeat(40)},runGit:gitOk}),
+   e=>e.code==='TASK_CREATE_B_CONTROL_HEAD_STOP');
+  assert.throws(()=>readCommittedTaskCreateB({controlRoot:root,event:{
+   ...event,issue:{...event.issue,body:'{"approvalManifestPath":"../secret.json"}'}},
+   env,runGit:gitOk}),e=>e.code==='TASK_CREATE_B_APPROVAL_PATH_STOP');
+ }finally{fs.rmSync(root,{recursive:true,force:true})}
 });
