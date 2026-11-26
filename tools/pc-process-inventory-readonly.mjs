@@ -29,6 +29,7 @@ import {inspectW03PaidPrivateReadonly,inspectD05PaidThemeFinalOutputsReadonly,in
 import {validateRunnerJobRefs,inspectRunnerJobHistory} from './runner-job-history-readonly.mjs';
 import {inspectW06TaskCadenceReadonly,PROBE as W06_TASK_CADENCE_PROBE} from '../controller/w06-cnn-task-cadence-readonly.mjs';
 import {inspectW043409SourcePreflightReadonly} from './w04-3409-source-preflight-readonly.mjs';
+import {inspectOrphanSeatMapReadonly} from './supervisor-orphan-seat-readonly.mjs';
 import {inspect3409ArchivedReceiptReadonly} from './w04-3409-archive-receipt-readonly.mjs';
 import {inspect3516ArchivedReceiptReadonly} from './w04-3516-archive-receipt-readonly.mjs';
 import {inspect3409OperatorFileSafetyReadonly} from './w04-3409-operator-file-safety-readonly.mjs';
@@ -63,6 +64,7 @@ const W06_FIXED_TASK_PROBE=W06_TASK_CADENCE_PROBE;
 const MAX_BYTES=32768;
 const R3_WATCHDOG_PREIMAGE_PROBE='controller-standby-watchdog-preimage-readonly';
 const R3_WMI_PROBE='controller-standby-runner-wmi-readonly';
+const ORPHAN_SEAT_MAP_PROBE='controller-orphan-seat-map-readonly';
 const R4_RUNTIME_PROBE='controller-standby-r4-runtime-readonly';
 const R5_RUNTIME_PROBE='controller-standby-r5-runtime-readonly';
 const R6_RUNTIME_PROBE='controller-standby-r6-runtime-readonly';
@@ -779,6 +781,7 @@ export function authenticateProcess(event,env,role){
    const isW06Task=withW05&&raw.probe===W06_FIXED_TASK_PROBE;
   const isR3Watchdog=withW05&&raw.probe===R3_WATCHDOG_PREIMAGE_PROBE;
  const isR3Wmi=withW05&&raw.probe===R3_WMI_PROBE;
+ const isOrphanSeatMap=withW05&&raw.probe===ORPHAN_SEAT_MAP_PROBE;
  const isR4Runtime=withW05&&raw.probe===R4_RUNTIME_PROBE;
  const isR5Runtime=withW05&&raw.probe===R5_RUNTIME_PROBE;
  const isR6Runtime=withW05&&raw.probe===R6_RUNTIME_PROBE;
@@ -796,7 +799,7 @@ export function authenticateProcess(event,env,role){
  const allowedOperatingProbe=isOperator||is2960||is3409||isEr1Postcheck||is3516||
   isD05Writer||isD05PrivateReceipt||isD05Theme||isD05Registration||is3160||
   isCnnStaticGuard||isCnnGitPredicates||isCnnBPins||isCnnBResources||
-  isCnnBCore||isW06Task||isR3Watchdog||isR3Wmi||isR4Runtime||isR5Runtime||isR6Runtime||isS6Preimage||isS6NextPreimage||isS6Predrain||isS6Journal||isS6CurrentJournal||isS6ReceiverLedger||isR4GuardianOrigin||isCiPolicyCas;
+  isCnnBCore||isW06Task||isR3Watchdog||isR3Wmi||isOrphanSeatMap||isR4Runtime||isR5Runtime||isR6Runtime||isS6Preimage||isS6NextPreimage||isS6Predrain||isS6Journal||isS6CurrentJournal||isS6ReceiverLedger||isR4GuardianOrigin||isCiPolicyCas;
  const acceptedProbe=(role==='operating'&&allowedOperatingProbe)||
   (role==='handoff'&&(isCiReceiptRoot||isCiActivation||isCiNativeLocal));
  if(!raw||(!basic&&!withJobs&&!withW05)||
@@ -830,6 +833,7 @@ export function authenticateProcess(event,env,role){
     ...(isW06Task?{w06TaskCadence:true}:{}),
    ...(isR3Watchdog?{watchdogR3Preimage:true}:{}),
   ...(isR3Wmi?{standbyRunnerWmi:true}:{}),
+   ...(isOrphanSeatMap?{orphanSeatMap:true}:{}),
   ...(isR4Runtime?{watchdogR4Runtime:true}:{}),
   ...(isR5Runtime?{watchdogR5Runtime:true}:{}),
   ...(isR6Runtime?{watchdogR6Runtime:true}:{}),
@@ -3559,6 +3563,10 @@ export function collect(role,ctx,env=process.env){
   const proof=inspectR4StandbyRuntimeReadonly();
   return {...base,status:proof.status,code:proof.code,watchdogR4Runtime:proof};
  }
+ if(ctx.orphanSeatMap===true){
+  const proof=inspectOrphanSeatMapReadonly();
+  return {...base,status:proof.status,code:proof.code,orphanSeatMap:proof};
+ }
  if(ctx.standbyRunnerWmi===true){
   const proof=inspectR3RunnerWmiReadonly();
   return {...base,status:proof.status,code:proof.code,standbyRunnerWmi:proof};
@@ -3746,6 +3754,11 @@ export function toText(r){
   ...(r.c3160LocalPreflight?[
    'c3160LocalApproval='+r.c3160LocalPreflight.localApproval,
    'c3160RecoveryClaim='+r.c3160LocalPreflight.recoveryClaim]:[]),
+  ...(r.orphanSeatMap?[
+   'orphanSeatMap='+r.orphanSeatMap.code,
+   'orphanControllerListenerCount='+(r.orphanSeatMap.controllerListenerCount??'UNKNOWN'),
+   'orphanControllerWorkerCount='+(r.orphanSeatMap.controllerWorkerCount??'UNKNOWN'),
+   'orphanRecoveryAuthorized=false']:[]),
   ...(r.standbyRunnerWmi?[
    'standbyRunnerWmi='+r.standbyRunnerWmi.code,
    'wmiControllerListenerCount='+(r.standbyRunnerWmi.controllerListenerCount??'UNKNOWN'),
