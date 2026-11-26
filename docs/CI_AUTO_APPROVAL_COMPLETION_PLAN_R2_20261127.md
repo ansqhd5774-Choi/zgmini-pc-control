@@ -568,3 +568,12 @@
 1. **기존 #4100 Run 45897081642** 완료를 확인해 소진된 A의 JSON/TXT·source SHA·raw manifest SHA와 #4025를 대조하고 변경이면 원본 설치 계약으로만 분기한다.
 2. Controller B Publisher: 기존 owner-approved business grant와 정확 GitHub 변수 및 격리 PC 정책 구성의 readback을 공식 승인 경로로 확인, 새 효과/보안 권한을 임의 생성하지 않는다.
 3. Native A/Writer B: 격리 PC read-only 정책/설치 proof/claim roots의 실제 preimage가 확보된 뒤에만 독립 실행 권한 평가; 동일 Run 재발행 금지. 각 효과별 자동 CI→단회 발행→Windows 실행→JSON/TXT 결과가 실제로 성립할 때에만 운영 0/3을 올린다.
+
+### #4100 최종 영수증 — S6 이후 설치된 승인 정책 불변 입증
+
+- 단회 [Issue #4100](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4100) / [Run 45897081642](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45897081642) Job `operating-process-snapshot` `completed/success`; 실제 `zgmini-pc-04`, observedAtUtc `2026-11-26T21:19:57.158Z`.
+- `results/pc-process-inventory-45897081642-1-operating.json` blob `cd2606983db3726538bb693acdef4f55bad5ee29`, 동일 stem TXT blob `8cbc04bc3657d2310af7d301d64daa76995bbfc7`. 실제 `PASS / CI_POLICY_CAS_READONLY_OBSERVED`, 0 operational writes/retries/provider calls.
+- `sourceSha=5a85f803fd9cb280561395f88a3544ee8e7d4660`, `installedManifestSha256=0e1903fd9052b1e2c72812fde07c6338a79287e673a4cd9e715dedf23883f589`, `workflowId=430972394`, `workflowBlobSha=27e48ecde81bdf6f15cccffcffd9b3e70482a5f3`, fixed Workflow path/설치 정책 형식 PASS. 기존 S6 전 [#4025](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4025)의 **동일 4개 값과 현재 설치 정책 manifest SHA까지 정확 일치**. 현재 main Workflow blob과 승인된 #4024 B manifest pin도 일치.
+- **검증 결론:** 이 범위에 한해 S6 이후 Controller B 독립 설치 정책을 다시 B로 설치할 필요 없음. `ciControllerBReceiver.approvedV2PinMatches=false`는 구형 두 설치의 비교 필드일 뿐이고 현재 설치 무결성 위반이 아님. `executionAuthorized=false`는 A 읽기 응답 고정값이므로 Publisher에 실제 business grant가 있는지 판단하지 못함.
+- [Issue #4100 결론 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4100#issuecomment-7203640152) 게시 후 `closed/completed` 확인. 기존 요청을 반복 발행하지 않는다.
+- **남은 실제 자동화 범위:** 격리 CI Controller B의 `ZGMINI_CI_CONTROLLER_B_POLICY`와 `ENABLED` 변수는 기존 #4029에서 미구성/비활성이고 현재 재설정 증거 없음. 새 Owner 업무 위임·실제 A/B 후보 승인·본래 business effect가 독립적으로 검증된 경우에만 정규 자동 발행을 할 수 있다. Native A/Writer B의 Owner-B-installed scope/proof root도 현장 확인되지 않았다. **A·Writer B·Controller B 실제 무인 종단 완료율 0/3 유지**. S6 0/1도 과거 journal 원본 보존.
