@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {preflightTaskCreateB} from '../task-create-b/preflight.mjs';
 import {sanitizeTaskCreateB} from '../task-create-b/report.mjs';
-import {ISSUE_TITLE,ISSUE_LABEL,TASK,RESULT_SCHEMA}
+import {ISSUE_TITLE,ISSUE_LABEL,TASK,RESULT_SCHEMA,authorizeTaskCreateB}
  from '../task-create-b/contract.mjs';
 
 const fixture=()=>({request:{requestId:'abec1087-3a25-4452-a5a8-a45218f05c37'},
@@ -47,4 +48,32 @@ test('W06 reuses exact owner-scoped Writer B workflow without adding Cron',()=>{
  assert.doesNotMatch(source,/^\s*schedule\s*:/m);
  assert.equal(ISSUE_TITLE,'pc-writer-task-create-once');
  assert.equal(ISSUE_LABEL,'pc-writer-b-install');
+});
+
+test('W06 proposed manifest contains exact pins but cannot authorize any Task installation',()=>{
+ const file=fileURLToPath(new URL('../task-create-b/w06-cnn-minute-proposal.json',import.meta.url));
+ const proposed=JSON.parse(fs.readFileSync(file,'utf8'));
+ assert.equal(proposed.status,'PROPOSED_B');
+ assert.equal(proposed.taskName,TASK);
+ assert.equal(proposed.installedSourceSha,'393cee0da46515ff056543173fcd1253a858b3d7');
+ assert.equal(proposed.candidateSourceSha,'b59930202eefc7f598ea9839fe24a7a0425e46b7');
+ assert.equal(proposed.candidateFileSha256,'4b9a22d064cb4b489d3fc07c6cc2cfa1595770bd7011862a5879a5a8ce7550c9');
+ assert.equal(proposed.coreTaskXmlSha256,'dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028');
+ assert.equal(proposed.sidecarSourceSha256,'eb3c43bf8fba6ea4e51f3e84b77f9ec13000db9d9e38077ffd914950d7080b6b');
+ assert.equal(proposed.allowCnnHttpRequests,true);
+ assert.equal(proposed.allowSqliteObservationWrites,true);
+ assert.equal(proposed.allowD1PublicProjectionWrites,true);
+ assert.equal(proposed.allowOtherTaskChanges,false);
+ const request={schema:'ZGMINI_PC_TASK_CREATE_B_REQUEST_V1',
+  requestId:'abec1087-3a25-4452-a5a8-a45218f05c37',
+  operation:'task-create-once',
+  approvalManifestPath:'approvals/task-create-b/w06-cnn-minute-20261126.json',
+  approvalManifestSha256:createHash('sha256').update(
+   Buffer.from(JSON.stringify(proposed))).digest('hex')};
+ const fakeEvent={action:'opened',issue:{title:ISSUE_TITLE,
+  user:{login:'ansqhd5774-Choi'},labels:[{name:ISSUE_LABEL}],
+  body:JSON.stringify(request)}};
+ assert.throws(()=>authorizeTaskCreateB({event:fakeEvent,
+  manifestBytes:Buffer.from(JSON.stringify(proposed)),manifestCommitted:true}),
+  e=>e.code==='TASK_CREATE_B_APPROVAL_SCOPE_STOP');
 });
