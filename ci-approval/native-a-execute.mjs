@@ -121,6 +121,13 @@ export async function runNativeAReadOnly({observation,scope,host,controllerPolic
  if(report.status==='PASS'&&
     (report.operationalWrites!==0||report.providerCalls!==0||report.d1Writes!==0))
   return failed('CI_NATIVE_A_UNEXPECTED_WRITE_OR_PROVIDER_EFFECT');
+ // A PASS must be tied to this exact installed Controller and this one-shot
+ // run. A fabricated, stale or partial engine result cannot certify runtime.
+ if(report.status==='PASS'&&
+    (report.actualExecutionSha!==host.controllerSourceSha||
+     report.protectedStateUnchanged!==true||
+     report.jobId!=='run-'+admission.runId+'-'+admission.attempt+'-seat-'+admission.seat))
+  return failed('CI_NATIVE_A_PASS_PROVENANCE_UNVERIFIED');
  return Object.freeze({state:report.status,code:report.code,
   canExecute:false,operationalWrites:report.operationalWrites??0,
   sanitized:Object.freeze({
