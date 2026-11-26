@@ -1,0 +1,48 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "b08f3a482e9bb39523f47675ae06bc6e02e01d2d",
+  "targetSha": "905c0b1806a3988f39400dc82536fd753b9ff764",
+  "approved": false,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "PROPOSED_NOT_APPROVED — source-only candidate. A second independent Owner B authorization is required for exact installed Controller B policy workflow SHA1 27e48ecde81bdf6f15cccffcffd9b3e70482a5f3 -> a31972f47badcd35b0ffffa61721a93308d23067. No GitHub CI publisher activation, business Controller B effect, Native A/Writer B grant or operational installation is authorized by this draft.",
+  "files": {
+    "tools/maintenance-contract.mjs": "3e35f49ea0003998853f5f0f41d253c426e3da9904082ae47bb86c3cd0044a27",
+    "tools/maintenance-apply.mjs": "cf0d9c82fa25c343c0d540b6c432c3e6d090c9924474851c22c277867d841096",
+    "tools/maintenance-agent.mjs": "401699eadbd6dfde45ae27cd6c139a1e1f7e54f2b2638df2f398836b709a3d0f",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "9ebd662cf1fca0ddc1438260f4ece29d1abea5511a0be2e83fc45f49cda04fa6",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "af31ab1f6a159aa1d8467d2585eb16750e8a1a293f9ecfb90b85c388d8640d70",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "23f3709ed0387cfb0132d9546f0fd6e2f10eabfad4212a67a170d5201a4a5de0"
+  },
+  "ciControllerBPolicy": {
+    "schema": "ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V1",
+    "enabled": true,
+    "workflowId": 430972394,
+    "workflowBlobSha": "a31972f47badcd35b0ffffa61721a93308d23067",
+    "workflowPath": ".github/workflows/ci-approval-controller-b.yml"
+  },
+  "runtimeChangedFiles": [],
+  "checks": {
+    "sourceCi": "Workflow Draft #4152 HEAD b8756c349043616a8d96de2bc1735537f37ebc46 succeeded source 45906181531, C996 45906181522, Secret Scan 45906181496. Source CI only.",
+    "byteProvenance": "Compared immutable b08f3a482e9bb39523f47675ae06bc6e02e01d2d to 905c0b1806a3988f39400dc82536fd753b9ff764 (ahead 1): only result JSON/TXT added; 9 of 9 source file Git blob hashes identical. Source 9 SHA-256 values preserved from approved b08... handoff.",
+    "installedWindowsEvidence": "#4148 Run 45905232182 A read-only PASS, observedAtUtc 2026-11-26T22:33:47.585Z: installed sourceSha b08f3a482e9bb39523f47675ae06bc6e02e01d2d, MAINTENANCE_INSTALL.json SHA256 0b4a38f82a32021c358220c8a8fe49b11eb17c3752d55810fb2180bbea7ee378, workflowId 430972394, workflowBlobSha 27e48ecde81bdf6f15cccffcffd9b3e70482a5f3. HISTORICAL; recheck actual current CAS immediately before B.",
+    "policyScope": "If later separately approved, ONLY independent installed Receiver CI Controller B workflow policy SHA1 changes to a31972f47badcd35b0ffffa61721a93308d23067; installed files unchanged, workflowId/path/enabled shape unchanged; never change GitHub Actions ENABLED flag by this handoff.",
+    "preflight": "Owner exact approval, manifest original SHA256, immutable source/9 files, current Windows installed source and manifest SHA256, startup/WMI origin, path alias/lease/overlap check, protected byte backup/rollback, independent non-Runner C operator mandatory. Do not claim current host equals previous #4148 without fresh read.",
+    "rollout": "Approve exact scope then perform one authorized 7→7 handoff with immutable source target 905c0b... and installed policy readback; only THEN merge Workflow Draft #4152; activation is separately gated. Do not replay #4146."
+  },
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "effects": [
+    "PROPOSED_ONLY: CI B installed policy Workflow blob exact rotation, no executable file writes",
+    "PROPOSED_ONLY: installed source metadata b08f3a... -> immutable 905c0b..., protected 9/9 unchanged",
+    "NO new CI publisher variable/Controller B business effect/Native A or Writer B grant"
+  ],
+  "preserve": [
+    "Controller/Watchdog/Supervisor/Runners/Writer/Core/Task/SQLite/D1/Cloudflare/DNS state",
+    "Installed recovery records, lease ownership, receipt root/previous unique Issues and backups"
+  ],
+  "scopeNote": "Stored ONLY under proposals/, never approvals/; approved=false. Not read by existing Windows B handoff. An Owner scope review and separate exact approved manifest in approvals/ are required before any operational effect."
+}
