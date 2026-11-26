@@ -13,6 +13,11 @@ export const PREIMAGE_MANIFEST_PREFIX='approvals/writer-preimage/';
 export const PREIMAGE_SOURCE_ROOT='projects/zgmini-earnings-history-pc-release';
 const SCOPE_PATH=/^approvals\/writer-preimage\/[a-z0-9][a-z0-9-]{3,79}\.json$/;
 const RELATIVE_FILE=/^(?:lib|worker|scripts\/pc-writer)\/[a-zA-Z0-9][a-zA-Z0-9_./-]{0,150}\.mjs$/;
+// Only these two W06 .ts dependencies may be attested by the A preimage scope.
+const CNN_TS_DEPENDENCIES=new Set([
+ 'worker/feed-collectors/fear-greed.ts',
+ 'worker/public-feed-collectors.ts',
+]);
 const STAGED_SCHEMA='ZGMINI_WRITER_PREIMAGE_STAGED_V1';
 const APPROVAL_SCHEMA='ZGMINI_WRITER_PREIMAGE_SCOPE_APPROVAL_V1';
 const STAGE_CODES=new Set(['PREIMAGE_STAGE_AUTH_UNAVAILABLE','PREIMAGE_STAGE_FETCH_STOP',
@@ -21,7 +26,7 @@ const STAGE_CODES=new Set(['PREIMAGE_STAGE_AUTH_UNAVAILABLE','PREIMAGE_STAGE_FET
  'PREIMAGE_STAGE_SOURCE_NOT_ATTESTED']);
 
 export function isSafePreimagePath(value){
- return typeof value==='string'&&RELATIVE_FILE.test(value)&&value.length<=180&&
+ return typeof value==='string'&&(RELATIVE_FILE.test(value)||CNN_TS_DEPENDENCIES.has(value))&&value.length<=180&&
   !value.split('/').some(s=>!s||s==='.'||s==='..');
 }
 export function validatePreimageApproval(bytes,{expectedSha256,manifestPath}={}){
