@@ -979,9 +979,16 @@ export function createMaintenanceAgent({
           'PROMOTED_READBACK_VERIFIED':'NONE',
         firstFail:executed.status==='RECOVERY_REQUIRED'?
           (executed.failedCode??executed.code):'NONE'},executed.code);
-    }catch{
+    }catch(error){
+      // The one-shot operation may have started. Never retry or downgrade
+      // UNKNOWN based on a missing/malformed response. Preserve only a fixed
+      // failure category, not the child error, stdout, or host details.
+      const firstFail=error?.code==='S6_ONCE_OUTPUT_INVALID'
+        ?'S6_ONCE_OUTPUT_INVALID'
+        :error?.code==='S6_ONCE_RESULT_UNVERIFIED'
+        ?'S6_ONCE_RESULT_UNVERIFIED':'S6_ONCE_UPDATER_RESPONSE_UNKNOWN';
       result=normalizedResult(request,{status:'UNKNOWN',
-        firstFail:'S6_ONCE_OUTCOME_UNKNOWN'},'S6_ONCE_OUTCOME_UNKNOWN');
+        firstFail},'S6_ONCE_OUTCOME_UNKNOWN');
     }
     const stored=await deliverReports(persistResult(held.entry,result),request.operation);
     await commentOnceAndRecord(stored);
