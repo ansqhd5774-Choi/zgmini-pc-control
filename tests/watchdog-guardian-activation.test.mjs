@@ -370,12 +370,16 @@ test('R5 exact Guardian B requires independent version and approved raw source',
  assert.equal(actual.schema,R5_GUARDIAN_SCHEMA);
  assert.equal(actual.installedSha256,R5_GUARDIAN_SOURCE_SHA256);
  assert.equal(actual.installedManifestSha256,R5_GUARDIAN_INSTALL_RAW_SHA256);
- assert.equal(actual.activationScriptSha256,scriptDigest);
+ // The R5 activation request was consumed before R6 was introduced. Its
+ // signed script digest is immutable, rather than rewritten to current HEAD.
+ assert.equal(actual.activationScriptSha256,
+  '8e5f2a27876bc5ec88a0b6f035edc0cfe56d56c3da00ef64567203f2e2f85439');
+ assert.notEqual(actual.activationScriptSha256,scriptDigest);
  assert.equal(actual.guardianHelperSha256,helperDigest);
  assert.equal(actual.stageRequestId,R5_GUARDIAN_STAGE_REQUEST_ID);
  assert.equal(actual.oldStageIssueNumber,R5_GUARDIAN_STAGE_ISSUE);
  assert.equal(actual.expectedControllerSha,R5_GUARDIAN_CONTROLLER_SHA);
- assert.equal(admitR5(real).requestId,R5_GUARDIAN_REQUEST_ID);
+ assert.throws(()=>admitR5(real),/WATCHDOG_R5_GUARDIAN_APPROVAL_INVALID/);
 });
 test('R5 Guardian rejects staged source if previous R4 1+1 READY not proven',()=>{
  const x=r5Stage();assert.equal(verifyR5GuardianPrecheck(x),true);
