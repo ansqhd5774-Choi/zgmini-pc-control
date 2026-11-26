@@ -22,7 +22,8 @@ const candidate=()=>{
 const approval=bytes=>({
  schema:APPROVAL_SCHEMA,status:'APPROVED_B',
  scope:'W06_ONE_TASK_CREATE_AND_ENABLE_WITH_CNN_RUNTIME_EFFECTS',
- taskName:TASK,installedSourceSha:INSTALLED_SOURCE,sourceRoot:SOURCE_ROOT,
+ taskName:TASK,installedSourceSha:INSTALLED_SOURCE,
+ candidateSourceSha:'f'.repeat(40),candidateFileSha256:'e'.repeat(64),sourceRoot:SOURCE_ROOT,
  wrapperPath:WRAPPER,launcherSha256:digest(bytes.launcher),
  disabledTemplateSha256:normalizedW06TaskTemplate(bytes.disabledXml),enabledTemplateSha256:normalizedW06TaskTemplate(bytes.enabledXml),
  coreTaskXmlSha256:'d'.repeat(64),sidecarSourceSha256:'e'.repeat(64),
