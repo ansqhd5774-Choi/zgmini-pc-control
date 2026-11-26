@@ -69,7 +69,9 @@ export function classifyR3RunnerWmiRows(raw,{
   controllerListenerCount:null,controllerWorkerCount:null,unknownPathCount:null,
   unknownListenerCount:null,unknownWorkerCount:null,
   missingWmiPathCount:null,nonAbsoluteWmiPathCount:null,
-  canonicalizationFailedCount:null});
+  canonicalizationFailedCount:null,
+  unknownSession0Count:null,unknownServiceAncestorCount:null,
+  unknownSession0ServiceAncestorCount:null,serviceObservationUnavailableCount:null});
  if(!raw||!Array.isArray(raw.rows)||raw.rows.length>256)
   return unknown('STANDBY_WMI_ROWS_UNVERIFIED');
  let root;
@@ -81,7 +83,14 @@ export function classifyR3RunnerWmiRows(raw,{
  const seen=new Set();let listeners=0,workers=0,unknownPaths=0;
  let unknownListenerCount=0,unknownWorkerCount=0;
  let missingWmiPathCount=0,nonAbsoluteWmiPathCount=0,canonicalizationFailedCount=0;
- const uncertain=(name,kind)=>{
+ let unknownSession0Count=0,unknownServiceAncestorCount=0;
+ let unknownSession0ServiceAncestorCount=0,serviceObservationUnavailableCount=0;
+ const uncertain=(name,kind,row)=>{
+  const session0=row.sessionId===0,serviceAncestor=row.serviceAncestor===true;
+  if(session0)unknownSession0Count++;
+  if(serviceAncestor)unknownServiceAncestorCount++;
+  if(session0&&serviceAncestor)unknownSession0ServiceAncestorCount++;
+  if(row.serviceObservationAvailable!==true)serviceObservationUnavailableCount++;
   unknownPaths++;
   if(name==='runner.listener.exe')unknownListenerCount++;
   else unknownWorkerCount++;
@@ -96,15 +105,15 @@ export function classifyR3RunnerWmiRows(raw,{
    return unknown('STANDBY_WMI_PROCESS_SHAPE_INVALID');
   seen.add(row.pid);
   if(typeof row.executablePath!=='string'||!row.executablePath){
-   uncertain(name,'MISSING');continue;
+   uncertain(name,'MISSING',row);continue;
   }
   if(!path.win32.isAbsolute(row.executablePath)){
-   uncertain(name,'NON_ABSOLUTE');continue;
+   uncertain(name,'NON_ABSOLUTE',row);continue;
   }
   let exe;
   try{exe=path.win32.normalize(canonicalize(row.executablePath)).toLowerCase();}
-  catch{uncertain(name,'CANONICALIZATION');continue;}
-  if(!path.win32.isAbsolute(exe)){uncertain(name,'NON_ABSOLUTE');continue;}
+  catch{uncertain(name,'CANONICALIZATION',row);continue;}
+  if(!path.win32.isAbsolute(exe)){uncertain(name,'NON_ABSOLUTE',row);continue;}
   if(exe.startsWith(prefix)){
    if(name==='runner.listener.exe')listeners++;
    else workers++;
@@ -113,11 +122,15 @@ export function classifyR3RunnerWmiRows(raw,{
  if(unknownPaths)return {...base,status:'STATE_UNKNOWN',code:'STANDBY_WMI_EXECUTABLE_PATH_UNVERIFIED',
   controllerListenerCount:listeners,controllerWorkerCount:workers,unknownPathCount:unknownPaths,
   unknownListenerCount,unknownWorkerCount,missingWmiPathCount,
-  nonAbsoluteWmiPathCount,canonicalizationFailedCount};
+  nonAbsoluteWmiPathCount,canonicalizationFailedCount,
+  unknownSession0Count,unknownServiceAncestorCount,
+  unknownSession0ServiceAncestorCount,serviceObservationUnavailableCount};
  return {...base,status:'PASS',code:'STANDBY_WMI_EXECUTABLE_PATHS_CLASSIFIED',
   controllerListenerCount:listeners,controllerWorkerCount:workers,unknownPathCount:0,
   unknownListenerCount:0,unknownWorkerCount:0,missingWmiPathCount:0,
-  nonAbsoluteWmiPathCount:0,canonicalizationFailedCount:0};
+  nonAbsoluteWmiPathCount:0,canonicalizationFailedCount:0,
+  unknownSession0Count:0,unknownServiceAncestorCount:0,
+  unknownSession0ServiceAncestorCount:0,serviceObservationUnavailableCount:0};
 }
 export function inspectR3RunnerWmiReadonly({
  run=spawnSync,filesystem=fs,env=process.env,
@@ -130,6 +143,8 @@ export function inspectR3RunnerWmiReadonly({
   controllerListenerCount:null,controllerWorkerCount:null,unknownPathCount:null,
   unknownListenerCount:null,unknownWorkerCount:null,missingWmiPathCount:null,
   nonAbsoluteWmiPathCount:null,canonicalizationFailedCount:null,
+  unknownSession0Count:null,unknownServiceAncestorCount:null,
+  unknownSession0ServiceAncestorCount:null,serviceObservationUnavailableCount:null,
   operationalWrites:0,providerCalls:0,d1Writes:0});
  if(process.platform!=='win32'||typeof env.SystemRoot!=='string'||
    !/^[a-z]:[\\/]windows$/i.test(env.SystemRoot))
@@ -139,7 +154,13 @@ export function inspectR3RunnerWmiReadonly({
  catch{return unknown('STANDBY_WMI_POWERSHELL_UNAVAILABLE');}
  const cmd=[
   "$ErrorActionPreference='Stop'",
-  "$rows=@(Get-CimInstance -ClassName Win32_Process -Filter \"Name = 'Runner.Listener.exe' OR Name = 'Runner.Worker.exe'\" -ErrorAction Stop | ForEach-Object { [pscustomobject]@{pid=[int]$_.ProcessId;name=[string]$_.Name;executablePath=[string]$_.ExecutablePath} })",
+  "$all=@(Get-CimInstance -ClassName Win32_Process -ErrorAction Stop)",
+  "if($all.Count -gt 4096){throw 'PROCESS_SCOPE_EXCEEDED'}",
+  "$byPid=@{};foreach($p in $all){$byPid[[int]$p.ProcessId]=$p}",
+  "$svc=@();$serviceObservationAvailable=$false",
+  "try{$svc=@(Get-CimInstance -ClassName Win32_Service -Filter \"Name LIKE 'actions.runner.%'\" -ErrorAction Stop | Where-Object {$_.State -eq 'Running' -and [int]$_.ProcessId -gt 0});$serviceObservationAvailable=$true}catch{}",
+  "$svcByPid=@{};foreach($sv in $svc){if([string]$sv.Name -match '(?i)^actions\\.runner\\.'){$svcByPid[[int]$sv.ProcessId]=$true}}",
+  "$rows=@(foreach($p in $all | Where-Object {$_.Name -in @('Runner.Listener.exe','Runner.Worker.exe')}){$seen=@{};$parent=[int]$p.ParentProcessId;$serviceAncestor=$false;for($depth=0;$depth -lt 8;$depth++){if($parent -le 0 -or $seen.ContainsKey($parent)){break};$seen[$parent]=$true;if($svcByPid.ContainsKey($parent)){$serviceAncestor=$true;break};if(!$byPid.ContainsKey($parent)){break};$next=[int]$byPid[$parent].ParentProcessId;if($next -eq $parent){break};$parent=$next};$session=if($null -eq $p.SessionId){-1}else{[int]$p.SessionId};[pscustomobject]@{pid=[int]$p.ProcessId;name=[string]$p.Name;executablePath=[string]$p.ExecutablePath;sessionId=$session;serviceAncestor=$serviceAncestor;serviceObservationAvailable=$serviceObservationAvailable}})",
   "[pscustomobject]@{rows=$rows}|ConvertTo-Json -Compress -Depth 4"
  ].join(';');
  let result;
@@ -2614,6 +2635,10 @@ export function toText(r){
    'wmiMissingPathCount='+(r.standbyRunnerWmi.missingWmiPathCount??'UNKNOWN'),
    'wmiNonAbsolutePathCount='+(r.standbyRunnerWmi.nonAbsoluteWmiPathCount??'UNKNOWN'),
    'wmiCanonicalizationFailedCount='+(r.standbyRunnerWmi.canonicalizationFailedCount??'UNKNOWN'),
+   'wmiUnknownSession0Count='+(r.standbyRunnerWmi.unknownSession0Count??'UNKNOWN'),
+   'wmiUnknownServiceAncestorCount='+(r.standbyRunnerWmi.unknownServiceAncestorCount??'UNKNOWN'),
+   'wmiUnknownSession0ServiceAncestorCount='+(r.standbyRunnerWmi.unknownSession0ServiceAncestorCount??'UNKNOWN'),
+   'wmiServiceObservationUnavailableCount='+(r.standbyRunnerWmi.serviceObservationUnavailableCount??'UNKNOWN'),
    'standbyPromotionApproved=false']:[]),
   ...(r.watchdogR3Preimage?[
    'watchdogR3Preimage='+r.watchdogR3Preimage.code,
