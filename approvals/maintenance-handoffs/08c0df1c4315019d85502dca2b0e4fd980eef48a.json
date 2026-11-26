@@ -1,0 +1,45 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "7d70161c454f0242afdc08ffd52841689b308d2b",
+  "targetSha": "08c0df1c4315019d85502dca2b0e4fd980eef48a",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "2026-11-26 user instruction to complete the already approved ZGMINI CI automatic approval system, together with the prior approved maintenance receiver V2 policy handoff scope. This grants only the exact independent, operator-gated existing Controller B receiver CI workflow pin rotation. Owner-native merged approval and all installed source/host CAS, live lease, startup, backups, rollback and independent origin proof remain mandatory. It does not grant new business effects, admin privileges, GitHub variable activation or a standing-delegation approval.",
+  "files": {
+    "tools/maintenance-contract.mjs": "a850c66bfa4251798ad79e7d452dad93d6d3f5ed65cd0549fd335b0bb2524787",
+    "tools/maintenance-apply.mjs": "a99c6a51a024deaf4e3c6aa806182e73aeb4049604636db7dbd65614a40eb51e",
+    "tools/maintenance-agent.mjs": "ab19c890e21b3c2a605291374f8ebeae8ea8e9188b04131a5c7873543165fc37",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "2b9938f1327a8c148ab9b11b8c1fd0101682f123b9723d944916ab476bd8cf9d",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "af31ab1f6a159aa1d8467d2585eb16750e8a1a293f9ecfb90b85c388d8640d70",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "23f3709ed0387cfb0132d9546f0fd6e2f10eabfad4212a67a170d5201a4a5de0"
+  },
+  "ciControllerBPolicy": {
+    "schema": "ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V1",
+    "enabled": true,
+    "workflowId": 430972394,
+    "workflowBlobSha": "d3c175329a7ac955f5b45ce2b13dad78ce272d9a",
+    "workflowPath": ".github/workflows/ci-approval-controller-b.yml"
+  },
+  "checks": {
+    "sourceCi": "Exact 9-file raw SHA-256 verified against immutable main-ancestor target 08c0df1c4315019d85502dca2b0e4fd980eef48a. Policy-only handoff implementation was merged as PR #3816; its exact-source PR HEAD 1f0e4e2a464d3eafe011cb427fc5b875f2bd25b8 passed C996 45801034418 and Secret Scan 45801034472 (2/2 SUCCESS); new policy-only regression directly ran in C996. Target merge 08c0df1c4315019d85502dca2b0e4fd980eef48a read back in main.",
+    "installedWindowsEvidence": "Last available read-only operating PC evidence #3779 / Run 45730212178 at 2026-11-26T00:40:53.890Z reported maintenanceSourceSha=7d70161c454f0242afdc08ffd52841689b308d2b, maintenanceFilesVerified=true, CI policy PRESENT_FORMAT_ONLY. This is historical and does NOT replace fresh live source CAS/lease/receiver identity prior to the V2 handoff.",
+    "exactBytePlan": "All nine handoff source files independently fetched at immutable target 08c0df1c4315019d85502dca2b0e4fd980eef48a and SHA-256 hashed. Previous approved target 7d70161c454f0242afdc08ffd52841689b308d2b has identical 8/9 raw SHA-256; only the source handoff helper tools/handoff-maintenance.mjs changed. All seven actually installed maintainer runtime files retain exact approved bytes: runtimeChangedFiles=[] and filePlan.writes=[]; the approved sourceSha metadata and exact CI policy blob pin change. The helper source file is not an installed runtime write. Actual fresh PC manifest CAS, startup bytes, original seven files, owner proof, lease, backup/rollback and new receiver origin are independently mandatory.",
+    "workflowPinEvidence": "New exact workflow Git blob d3c175329a7ac955f5b45ce2b13dad78ce272d9a verified from pending Draft PR #3813 head ce134761eb1bbd38827aa0ed828d7a5fb1a9eb2b (Controller 45800168896, C996 45800168899, Secret Scan 45800168918 all SUCCESS). Current live main workflow Git blob c1d8dfe618d9d24fde39191e85d639b0db63b822. Draft #3813 must not merge until independent maintenance receiver policy is successfully rotated. This exact SHA refers to the reviewed future workflow and is not permission to change unrelated workflow inputs.",
+    "windowsHandoffExecuted": false
+  },
+  "runtimeChangedFiles": [],
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "preserve": [
+    "Existing installed Controller, Supervisor, six dedicated Runner seats and operating PC files outside the seven-file maintenance receiver contract",
+    "Original maintenance files, source manifests, startup, leases, backup and receiver origin evidence",
+    "Original local SQLite, Writer, PC jobs, provider data, D1, DNS and all CI approval ledgers",
+    "GitHub Actions publisher activation remains disabled until receipt root and independent policy readback succeed",
+    "No replay of previously completed Controller B work or artificial B jobs; reservation/schedule verification is only a later follow-up"
+  ],
+  "scopeNote": "Approved exact CI Controller B independent receiver workflow pin rotation only, no new installed executable file writes. The observed previously installed sourceSha 7d70161c454f0242afdc08ffd52841689b308d2b must be revalidated via live CAS. New source metadata at immutable target 08c0df1c4315019d85502dca2b0e4fd980eef48a enables existing separately approved policy-only seven-to-seven handoff. This manifest is ineffective until independently owner-merged and all existing operator-gated Windows B checks pass. It is not an automatic workflow update, GitHub Actions variables grant or business approval."
+}
