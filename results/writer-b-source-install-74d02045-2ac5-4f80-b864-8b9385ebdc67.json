@@ -1,0 +1,20 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "74d02045-2ac5-4f80-b864-8b9385ebdc67",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "714d392ca079daa9fdb789f73762c407be3321a2",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "393cee0da46515ff056543173fcd1253a858b3d7",
+  "candidateSourceSha": "4a13569367ff0f1afc5138f971d86a8fa99c3329",
+  "manifestSha256": "50d06508fb28ffa49dc2ae53befa22a7bdc50fd164a895240e42cd8a40152e15",
+  "baseTreeOid": "517718bc9f5d6935262b890b539360173f7d0e96",
+  "preparedTreeOid": "fb731794e614590f82dd2004c538e274479b131b",
+  "provenanceSha256": "97957ed0bc47684a67aa6944db9645f3765488d3c31da2f338566ac780cf34e4",
+  "runId": "45863542119",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "worker/public-feed-refresh.mjs"
+  ]
+}
