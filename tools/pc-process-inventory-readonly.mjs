@@ -427,7 +427,20 @@ export function assessR5StandbyRuntimeSnapshot(snapshot,{
    typeof owner.nonce!=='string'||owner.nonce.length<16||
    status?.pid!==owner.pid||pidAlive(owner.pid)!==true)
   return result('WATCHDOG_R5_PROCESS_OWNER_UNVERIFIED',base);
- const own={...base,watchdogOwnerVerified:true};
+ // Fixed, non-sensitive state names from the installed R5 Watchdog only.
+ // Emit this classification after verifying its live owner. Never publish a
+ // raw, unrecognized state, PID, path, owner nonce or heartbeat timestamp.
+ const knownStates=new Set([
+  'HEALTHY','PAUSED','PAUSED_WORKFLOW','STARTING',
+  'BLOCKED_LIVE_OR_UNKNOWN','BLOCKED_STANDBY_SETUP',
+  'BLOCKED_STANDBY_PROMOTION_OUTCOME_UNKNOWN','BLOCKED_STANDBY_NOT_READY',
+  'BLOCKED_OLD_RUNNER_CHILD_UNVERIFIED','BLOCKED_OLD_RUNNER_EXECUTABLE_UNVERIFIED',
+  'BLOCKED_RESTART_LIMIT','BLOCKED_STANDBY_IPC_DELIVERY_UNKNOWN',
+  'BLOCKED_SPAWN_ERROR','BLOCKED'
+ ]);
+ const watchdogHealthState=!statusFresh?'STALE_OR_UNVERIFIED':
+  knownStates.has(status.state)?status.state:'UNRECOGNIZED';
+ const own={...base,watchdogOwnerVerified:true,watchdogHealthState};
  if(!statusFresh||status.state!=='HEALTHY')
   return result('WATCHDOG_R5_HEALTH_STATUS_UNVERIFIED',own);
  if(!Number.isSafeInteger(status.supervisorPid)||status.supervisorPid<=0||
