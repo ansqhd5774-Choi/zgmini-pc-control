@@ -78,6 +78,27 @@ test('shared owner fails immediately and records one bounded observation',async(
  assert.equal(observed.idleObservation.controllerBusySamples,1);
  assert.equal(observed.idleObservation.writerBusySamples,0);
 });
+test('read-only wait may find an actual Core and Sidecar quiet gap after four minutes',async()=>{
+ let t=0,reads=0;
+ await awaitNaturalSidecarIdle({
+  observe:()=>{reads++;return t<305_000?
+   snapshot({coreQuiet:false,sidecarActive:true}):snapshot();},
+  pause:async ms=>{t+=ms;},
+  clock:()=>t,
+ });
+ assert.equal(t,305_000);
+ assert.equal(reads,62);
+});
+test('seven-minute timeout remains a hard fail closed with no operational side effects',async()=>{
+ let t=0,reads=0;
+ await assert.rejects(awaitNaturalSidecarIdle({
+  observe:()=>{reads++;return snapshot({coreQuiet:false,sidecarActive:true});},
+  pause:async ms=>{t+=ms;},clock:()=>t,
+ }),code('SIDECAR_B_PROBE_RESOURCE_STOP'));
+ assert.equal(t,420_000);
+ assert.ok(reads>=84&&reads<=86);
+});
+
 test('invalid observation contract fails before any read',async()=>{
  let reads=0;
  await assert.rejects(awaitNaturalSidecarIdle({
