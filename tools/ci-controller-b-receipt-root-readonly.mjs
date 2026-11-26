@@ -6,7 +6,7 @@ import path from 'node:path';
 
 const base=Object.freeze({
  schema:'ZGMINI_CI_CONTROLLER_B_RECEIPT_ROOT_READONLY_V1',
- configured:false,directoryPresent:false,readable:false,
+ configured:false,directoryPresent:null,readable:null,
  writableVerified:false,durableAcrossRunsVerified:false,
  executionAuthorized:false,operationalWrites:0,providerCalls:0,d1Writes:0,
 });
@@ -53,6 +53,8 @@ export function inspectCiControllerBReceiptRootReadonly({
  }catch(error){
   return result('STATE_UNKNOWN',
    error?.code==='ENOENT'?'CI_RECEIPT_ROOT_DIRECTORY_ABSENT':
-   'CI_RECEIPT_ROOT_READ_UNVERIFIED',{configured:true});
+   'CI_RECEIPT_ROOT_READ_UNVERIFIED',error?.code==='ENOENT'
+   ?{configured:true,directoryPresent:false,readable:false}
+   :{configured:true});
  }
 }
