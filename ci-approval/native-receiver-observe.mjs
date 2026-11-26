@@ -91,7 +91,7 @@ export async function observeNativeReceiver({event,env,effect,ports}={}){
  // future CI run ID. This field is never written back into installed scope.
  const eventBound=installed.sourceRunMode==='EVENT_COMPLETION_V1';
  const supplied=event?.inputs?.source_run_id;
- const boundId=typeof supplied==='string'&&/^[1-9]\\d*$/.test(supplied)
+ const boundId=typeof supplied==='string'&&/^[1-9]\d*$/.test(supplied)
   ?Number(supplied):null;
  if(eventBound&&(Object.hasOwn(installed,'sourceRunId')||
     !id(boundId)||String(boundId)!==supplied||installed.sourceAttempt!==1))
