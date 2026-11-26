@@ -96,14 +96,23 @@ export function createOperatingTaskCreateBPort(proof){
   const settings=xml.match(/<Settings(?:\s[^>]*)?>([\s\S]*?)<\/Settings>/i)?.[1]??'';
   const commands=[...xml.matchAll(/<Command>([^<]+)<\/Command>/gi)];
   const args=[...xml.matchAll(/<Arguments>([^<]+)<\/Arguments>/gi)];
+  const working=[...xml.matchAll(/<WorkingDirectory>([^<]+)<\/WorkingDirectory>/gi)];
+  const decoded=t=>t.replaceAll('&quot;','"').replaceAll('&amp;','&');
+  const cmd=commands.length===1?decoded(commands[0][1]):'';
+  const argumentsText=args.length===1?decoded(args[0][1]):'';
+  const workingDir=working.length===1?decoded(working[0][1]):'';
+  const expectedCommand=path.win32.join(process.env.SystemRoot??String.raw`C:\Windows`,
+   'System32','wscript.exe');
   return xml.includes('<Interval>PT1M</Interval>')&&
    xml.includes('<MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>')&&
    xml.includes('<ExecutionTimeLimit>PT30M</ExecutionTimeLimit>')&&
    (xml.match(/<TimeTrigger\b/gi)??[]).length===1&&
    (xml.match(/<Exec\b/gi)??[]).length===1&&
-   commands.length===1&&args.length===1&&
-   commands[0][1].toLowerCase().endsWith('\\wscript.exe')&&
-   args[0][1].includes(WRAPPER)&&xmlUser(xml)===account&&
+   commands.length===1&&args.length===1&&working.length===1&&
+   path.win32.normalize(cmd).toLowerCase()===path.win32.normalize(expectedCommand).toLowerCase()&&
+   argumentsText==='"'+WRAPPER+'"'&&
+   path.win32.normalize(workingDir).toLowerCase()===path.win32.normalize(SOURCE_ROOT).toLowerCase()&&
+   xmlUser(xml)===account&&
    taskEnabled(xml)===expectedEnabled&&settings.length>0;
  };
  const backing=path.win32.join(JOURNAL,proof.request.requestId);
