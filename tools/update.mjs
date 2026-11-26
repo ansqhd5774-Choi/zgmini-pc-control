@@ -3629,7 +3629,11 @@ export function makeS6OnceOwnedOperatingPort({request,approvedBytes,
    need(github('actions/workflows/pc-job.yml').state==='disabled_manually'&&
     noLeases()&&pending()===0&&sixIdle(),'S6_PORT_STOP_GUARD_CHANGED');
    // The original exact six-child Supervisor PID only; never another tree.
-   execFileSync('taskkill.exe',['/PID',String(baseline.oldSupervisorPid),
+   const systemRoot=process.env.SystemRoot;
+   need(typeof systemRoot==='string'&&/^[a-z]:\\windows$/i.test(systemRoot),
+    'S6_PORT_SYSTEMROOT_UNVERIFIED');
+   const taskkill=path.win32.join(systemRoot,'System32','taskkill.exe');
+   execFileSync(taskkill,['/PID',String(baseline.oldSupervisorPid),
     '/T','/F'],{windowsHide:true,stdio:'ignore',timeout:15000});
   },
   waitForStoppedHeld:async()=>{
