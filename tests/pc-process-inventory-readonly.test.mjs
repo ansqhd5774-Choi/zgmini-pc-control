@@ -2524,3 +2524,13 @@ test('CI B receipt-root A inspector never reports directory paths or write autho
  const unreadable={...io,readdirSync:()=>{throw Error('permission')}};
  assert.equal(inspect({filesystem:unreadable}).code,'CI_RECEIPT_ROOT_READ_UNVERIFIED');
 });
+
+
+test('CI source test queue isolates separate PRs from Issue A requests',()=>{
+ const workflow=fs.readFileSync(new URL('../.github/workflows/pc-process-inventory-readonly.yml',import.meta.url),'utf8');
+ // Both events have a stable GitHub number; PR numbers are absent from issue payloads.
+ assert.ok(workflow.includes(
+  'group: pc-process-inventory-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.issue.number }}'));
+ assert.match(workflow,/cancel-in-progress: false/);
+ assert.ok(!workflow.includes('group: pc-process-inventory-${{ github.event.issue.number }}'));
+});
