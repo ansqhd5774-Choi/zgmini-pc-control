@@ -1,0 +1,13 @@
+{
+  "schema": "ZGMINI_PC_MAINTENANCE_RESULT_V1",
+  "requestId": "pc-s6-d7c0a971-5219-4a3a-9dce-30b0543b0e72",
+  "targetControllerSha": "182bb46f2838306ba40d8b4ec32bac40ab75b69a",
+  "status": "UNKNOWN",
+  "code": "S6_ONCE_OUTCOME_UNKNOWN",
+  "lastPass": "NONE",
+  "firstFail": "S6_ONCE_OUTCOME_UNKNOWN",
+  "actualControllerSha": null,
+  "recoverySha": null,
+  "protectedStateUnchanged": null,
+  "workflowEnabled": null
+}
