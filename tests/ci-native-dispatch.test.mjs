@@ -127,3 +127,35 @@ test('caller cannot substitute receiver path with another source file',async()=>
  const r=await dispatchApprovedCiEffect({policy:x.policy,requestBytes:x.bytes,ports:x.ports});
  assert.equal(r.code,'CI_NATIVE_DISPATCH_RECEIVER_NOT_ATTESTED');assert.equal(x.claims.length,0);
 });
+
+test('200 with verified workflow run ID is recorded without asserting execution',async()=>{
+ const x=make(),id=928392;
+ x.ports.dispatchWorkflow=async()=>({status:200,workflow_run_id:id,
+  run_url:'https://api.github.com/repos/ansqhd5774-Choi/zgmini-pc-control/actions/runs/'+id,
+  html_url:'https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/'+id});
+ const r=await dispatchApprovedCiEffect({policy:x.policy,requestBytes:x.bytes,ports:x.ports});
+ assert.equal(r.code,'CI_NATIVE_DISPATCH_WAKEUP_ONLY');assert.equal(r.downstreamRunId,id);
+ assert.equal(r.executed,false);assert.equal(x.getOld().downstreamRunId,id);
+});
+test('200 without valid run details remains unknown and does not repost',async()=>{
+ const x=make();
+ x.ports.dispatchWorkflow=async()=>({status:200,workflow_run_id:928392,
+   run_url:'https://untrusted.example/actions/runs/928392'});
+ const r=await dispatchApprovedCiEffect({policy:x.policy,requestBytes:x.bytes,ports:x.ports});
+ assert.equal(r.code,'CI_NATIVE_DISPATCH_POST_OUTCOME_UNKNOWN');
+ assert.equal(x.getOld().phase,'DISPATCH_OUTCOME_UNKNOWN');
+ const next=await dispatchApprovedCiEffect({policy:x.policy,requestBytes:x.bytes,ports:x.ports});
+ assert.equal(next.code,'CI_NATIVE_DISPATCH_PRIOR_EFFECT_NO_REPOST');
+});
+test('200 response survives exact durable receipt readback',async()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-native-ci-'));
+ try{
+  const x=make(),store=createCiNativeReceiptStore(root),id=928394;
+  x.ports.loadReceipt=store.loadReceipt;x.ports.saveReceipt=store.saveReceipt;
+  x.ports.dispatchWorkflow=async()=>({status:200,workflow_run_id:id,
+   run_url:'https://api.github.com/repos/ansqhd5774-Choi/zgmini-pc-control/actions/runs/'+id,
+   html_url:'https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/'+id});
+  const r=await dispatchApprovedCiEffect({policy:x.policy,requestBytes:x.bytes,ports:x.ports});
+  assert.equal(r.downstreamRunId,id);assert.equal(store.loadReceipt(r.effectKey).downstreamRunId,id);
+ }finally{fs.rmSync(root,{recursive:true,force:true})}
+});
