@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {DatabaseSync} from 'node:sqlite';
+import {inspectW06NextTickGateReadonly,inspectW06TaskEventsReadonly} from './w06-cnn-minute-tick-evidence-readonly.mjs';
 import {createHash} from 'node:crypto';
 import {decodeTaskXmlBytes} from '../writer-b/windows-guards.mjs';
 import {hasOnlyApprovedMinuteTrigger,hasOnlyApprovedSingleExec} from '../task-create-b/windows-adapter.mjs';
@@ -322,7 +323,11 @@ export function inspectW06TaskCadenceReadonly({platform=process.platform,
  try{
   const projected=projectW06TaskCadence(JSON.parse(observed.stdout.replace(/^\uFEFF/,'').trim()));
   if(projected.tasks?.some(x=>x.name===TASK_B))
-   return {...projected,taskRecovery:inspectW06TaskBRecoveryReadonly({systemRoot}),cnnHttpChecks:inspectW06HttpChecksReadonly()};
+   return {...projected,taskRecovery:inspectW06TaskBRecoveryReadonly({systemRoot}),
+    cnnHttpChecks:inspectW06HttpChecksReadonly(),
+    nextMinuteGate:inspectW06NextTickGateReadonly(
+     projected.tasks.find(x=>x.name===TASK_B)?.nextRunUtc),
+    taskEvent322:inspectW06TaskEventsReadonly({systemRoot})};
   return projected;
  }
  catch{return failure('W06_TASK_PROBE_PARSE_INVALID');}
