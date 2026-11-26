@@ -632,7 +632,8 @@ const s6Snapshot=()=>({
  protectedSha256:s6Baseline().protectedSha256,
  independentOperatorAttested:true,exactApprovalBytesAttested:true,
  observedAtUtc:new Date(S6_NOW-1000).toISOString(),
- watchdogPid:31002,oldOwnerIdentityMatched:true,
+ watchdogPid:31002,oldSupervisorNonce:s6Baseline().oldSupervisorNonce,
+ oldOwnerIdentityMatched:true,
  relatedLeasesAbsent:true,pendingWorkCount:0,
  workflowState:'active',maintenanceLeaseHeld:false,
  watchdogPaused:false,controllerDraining:false,
@@ -682,6 +683,7 @@ test('S6 phase evidence refuses malformed provenance, missing independent attest
  for(const patch of [
   {requestId:'pc-s6-other'},{controllerSha:'d'.repeat(40)},
   {protectedSha256:'d'.repeat(64)},{oldOwnerIdentityMatched:false},
+  {oldSupervisorNonce:'99999999-2222-4333-8444-555555555555'},
   {watchdogPid:31005}
  ])assert.equal(s6('PRE_DRAIN',{...snap,...patch}).code,
   'S6_IDENTITY_OR_PROTECTION_CHANGED');
@@ -751,7 +753,8 @@ test('S6 release is blocked by live old Runner, unknown WMI or shared pause',()=
 
 test('S6 promoted readback needs unique new owner, fencing, preserved ledger and six online seats',()=>{
  const good={...s6Snapshot(),oldSupervisorAlive:false,
-  activeSupervisorPid:31009,activeOwnerNonceChanged:true,
+  activeSupervisorPid:31003,activeOwnerNonceChanged:true,
+  newOwnerNonce:'77777777-2222-4333-8444-555555555555',
   watchdogStatusHealthy:true,previousOwnerFenced:true,
   existingRequestLedgerPreserved:true,standbyReadyCount:1};
  const observed=s6('PROMOTED',good);
@@ -760,6 +763,8 @@ test('S6 promoted readback needs unique new owner, fencing, preserved ledger and
  assert.equal(observed.failoverTested,false); // real independent receipt still required
  for(const patch of [
   {activeSupervisorPid:31001},{activeSupervisorPid:null},
+  {activeSupervisorPid:31009},{newOwnerNonce:null},
+  {newOwnerNonce:s6Baseline().oldSupervisorNonce},
   {activeOwnerNonceChanged:false},{heartbeatFresh:false},
   {watchdogStatusHealthy:false},{standbyReadyCount:0},
   {previousOwnerFenced:false},{existingRequestLedgerPreserved:false}
@@ -769,4 +774,9 @@ test('S6 promoted readback needs unique new owner, fencing, preserved ledger and
   'S6_PROMOTED_SIX_RUNNERS_NOT_VERIFIED');
  assert.equal(s6('PROMOTED',{...good,workflowState:'disabled_manually'}).code,
   'S6_PROMOTED_CONTROL_NOT_OPEN');
+ // Valid newly accepted A work must not turn a successfully recovered runtime
+ // into a false failure just because a seat became busy after intake resumed.
+ const busy={...good,relatedLeasesAbsent:false,pendingWorkCount:1,
+  runnerSeats:good.runnerSeats.map((x,i)=>i===2?{...x,busy:true}:x)};
+ assert.equal(s6('PROMOTED',busy).status,'OBSERVED');
 });
