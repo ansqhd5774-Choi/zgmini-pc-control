@@ -9,6 +9,8 @@ on:
       - 'controller/w06-cnn-task-cadence-readonly.mjs'
       - 'tests/w06-cnn-task-cadence-readonly.test.mjs'
       - 'tools/ci-controller-b-receipt-root-readonly.mjs'
+      - 'tools/ci-controller-b-c-operator-readonly.mjs'
+      - 'tests/ci-controller-b-c-operator-readonly.test.mjs'
       - 'tools/w03-paid-private-readonly.mjs'
       - 'tools/w03-paid-source-coverage-readonly.mjs'
       - 'tests/w03-paid-source-coverage-readonly.test.mjs'
@@ -50,6 +52,9 @@ jobs:
           node-version: '22'
       - name: Verify process discovery excludes commands and secrets
         run: node --test tests/pc-process-inventory-readonly.test.mjs tests/w06-cnn-task-cadence-readonly.test.mjs tests/runner-job-history-readonly.test.mjs tests/w03-paid-private-readonly.test.mjs tests/w03-paid-source-coverage-readonly.test.mjs tests/cnn-r10-guard-replay-readonly.test.mjs writer-config-b/result-pair-atomic.test.mjs
+      - name: Check C operator service account preflight remains readonly
+        if: hashFiles('tests/ci-controller-b-c-operator-readonly.test.mjs') != ''
+        run: node --test tests/ci-controller-b-c-operator-readonly.test.mjs
   operating-process-snapshot:
     permissions:
       contents: write
