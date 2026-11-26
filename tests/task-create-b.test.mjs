@@ -11,6 +11,7 @@ import {
  REQUEST_SCHEMA,ISSUE_TITLE,ISSUE_LABEL,sha256,normalizedW06TaskTemplate
 } from '../task-create-b/contract.mjs';
 import {applyTaskCreateB} from '../task-create-b/transaction.mjs';
+import {hasOnlyApprovedMinuteTrigger} from '../task-create-b/windows-adapter.mjs';
 
 const reqId='abec1087-3a25-4452-a5a8-a45218f05c37';
 const digest=value=>createHash('sha256').update(value).digest('hex');
@@ -70,6 +71,24 @@ function port(original,{disabledReadback=true,enabledReadback=true,throwOnEnable
  };
  return {io,log};
 }
+
+
+test('B: Task readback rejects additional scheduled triggers beside approved minute TimeTrigger',()=>{
+ const single='<Task><Triggers><TimeTrigger><StartBoundary>2026-11-26T12:35:00Z</StartBoundary>'+
+  '<Repetition><Interval>PT1M</Interval></Repetition></TimeTrigger></Triggers></Task>';
+ assert.equal(hasOnlyApprovedMinuteTrigger(single),true);
+ const extra=['BootTrigger','CalendarTrigger','LogonTrigger','EventTrigger',
+  'IdleTrigger','RegistrationTrigger','SessionStateChangeTrigger'];
+ for(const name of extra){
+  const altered=single.replace('</Triggers>','<'+name+'><Enabled>true</Enabled></'+name+'></Triggers>');
+  assert.equal(hasOnlyApprovedMinuteTrigger(altered),false,name);
+ }
+ assert.equal(hasOnlyApprovedMinuteTrigger(single.replace('</Triggers>',
+  '<TimeTrigger><Enabled>true</Enabled></TimeTrigger></Triggers>')),false);
+ assert.equal(hasOnlyApprovedMinuteTrigger(single.replace('</Task>',
+  '<Triggers><BootTrigger/></Triggers></Task>')),false);
+ assert.equal(hasOnlyApprovedMinuteTrigger('<Task><BootTrigger/></Task>'),false);
+});
 
 test('B: fixed template digest is independent of private principal and minute',()=>{
  const bytes=candidate();
