@@ -254,11 +254,12 @@ test('R4 projected B stage changes only approved Watchdog fields, never input',(
 });
 
 
-test('R4 disabled service-proof successor binds exact Watchdog and all six Controller bytes',()=>{
- const candidate=JSON.parse(fs.readFileSync(
-  new URL('../approvals/watchdog-upgrades/'+R4_TARGET+'.json',import.meta.url),'utf8'));
+test('R4 exact approved service-proof successor binds six Controller bytes and raw manifest',()=>{
+ const manifestBytes=fs.readFileSync(
+  new URL('../approvals/watchdog-upgrades/'+R4_TARGET+'.json',import.meta.url));
+ const candidate=JSON.parse(manifestBytes.toString('utf8'));
  assert.equal(candidate.schema,R4_MANIFEST_SCHEMA);
- assert.equal(candidate.approved,false);
+ assert.equal(candidate.approved,true);
  assert.equal(candidate.targetSha,R4_TARGET);
  assert.equal(candidate.targetSha256,R4_SOURCE_SHA256);
  assert.equal(candidate.installedSha256,R4_PREIMAGE_SHA256);
@@ -269,7 +270,18 @@ test('R4 disabled service-proof successor binds exact Watchdog and all six Contr
   'd4a76910806cba861b3253f5fd24eccc8968fcbaa66133999483034b2f661cd3');
  assert.deepEqual(candidate.expectedControllerFiles,R4_CONTROLLER_FILES);
  const fixture=fixtureR4();fixture.approval=candidate;
- assert.throws(()=>admitR4(fixture),/WATCHDOG_R4_APPROVAL_OR_SOURCE_MISMATCH/);
+ const digest=rawSha256(manifestBytes);
+ fixture.body.approvalManifestSha256=digest;
+ fixture.approvalDigest=digest;
+ assert.deepEqual(admitR4(fixture),{
+  requestId:fixture.body.requestId,issueNumber:fixture.event.issue.number,
+  targetSha:R4_TARGET,oldSha:R4_PREIMAGE_SHA256,newSha:R4_SOURCE_SHA256,
+  oldManifestSha:R4_INSTALL_PREIMAGE_SHA256,
+  expectedControllerSha:R4_CONTROLLER_TARGET
+ });
+ const invalid=fixtureR4();invalid.approval={...candidate,approved:false};
+ invalid.approvalDigest=digest;invalid.body.approvalManifestSha256=digest;
+ assert.throws(()=>admitR4(invalid),/WATCHDOG_R4_APPROVAL_OR_SOURCE_MISMATCH/);
  assert.equal(fs.existsSync(new URL(
   '../approvals/watchdog-upgrades/c0c4dcff6c8071b1318cca956e43ba82718c4975.json',
   import.meta.url)),false);
