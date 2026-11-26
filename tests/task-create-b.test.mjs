@@ -94,6 +94,13 @@ test('B: Task readback rejects additional scheduled triggers beside approved min
   '<Repetition><Interval>PT1M</Interval></Repetition></TimeTrigger></Triggers></Task>';
  assert.equal(hasOnlyApprovedMinuteTrigger(single),true);
 
+ const disabledMinute=single.replace('</TimeTrigger>',
+  '<Enabled>false</Enabled></TimeTrigger>');
+ assert.equal(hasOnlyApprovedMinuteTrigger(disabledMinute),false);
+ const explicitlyEnabled=single.replace('</TimeTrigger>',
+  '<Enabled>true</Enabled></TimeTrigger>');
+ assert.equal(hasOnlyApprovedMinuteTrigger(explicitlyEnabled),true);
+
  // A global PT1M token must not mask an actual PT5M TimeTrigger.
  const foreignMinute=single.replace('<Interval>PT1M</Interval>','<Interval>PT5M</Interval>')
   .replace('</Task>','<Meta><Interval>PT1M</Interval></Meta></Task>');
