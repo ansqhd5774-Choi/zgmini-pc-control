@@ -927,7 +927,7 @@ test('S6 updater exit 2 with exact RECOVERY_REQUIRED JSON preserves failed bound
   failedAt:'INTAKE_PAUSED',leaseReleaseAcknowledged:false,
   token:'MUST_NOT_LEAK',ownerPid:3244};
  const error=Object.assign(Error('child exited with code 2'),{
-  code:2,stdout:JSON.stringify(raw)+'\\n',stderr:'private path',killed:false,signal:null
+  code:2,stdout:JSON.stringify(raw)+'\n',stderr:'private path',killed:false,signal:null
  });
  const bounded=parseS6NonzeroRecoveryReport(error,s6.request.requestId);
  assert.equal(bounded?.status,'RECOVERY_REQUIRED');
