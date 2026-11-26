@@ -39,7 +39,7 @@ test('failure and recovery statuses never become applied',()=>{
  }
 });
 test('whitelisted resource evidence survives failed result without arbitrary keys',()=>{
- const x={windowMs:240000,samples:49,coreActiveSamples:47,
+ const x={windowMs:420000,samples:49,coreActiveSamples:47,
   sidecarActiveSamples:32,controllerBusySamples:0,writerBusySamples:0,
   rawCommandLine:'SECRET-MUST-NOT-BE-PUBLISHED'};
  const raw={...success,status:'SIDECAR_B_PREFLIGHT_OR_RUNTIME_STOP',
@@ -53,7 +53,7 @@ test('whitelisted resource evidence survives failed result without arbitrary key
 });
 test('resource failure reporter atomically publishes only validated bounded counters',async()=>{
  const fixture=createGitPairFixture();
- const x={windowMs:240000,samples:49,coreActiveSamples:47,
+ const x={windowMs:420000,samples:49,coreActiveSamples:47,
   sidecarActiveSamples:32,controllerBusySamples:0,writerBusySamples:0,
   pid:1234};
  const raw={...success,status:'SIDECAR_B_PREFLIGHT_OR_RUNTIME_STOP',
