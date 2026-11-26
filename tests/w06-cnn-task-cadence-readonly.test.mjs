@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {PROBE,projectW06TaskCadence,inspectW06TaskCadenceReadonly,assessW06TaskBXmlReadonly,inspectW06TaskBRecoveryReadonly,classifyW06TaskRunLevel} from
+import {PROBE,projectW06TaskCadence,inspectW06TaskCadenceReadonly,assessW06TaskBXmlReadonly,inspectW06TaskBRecoveryReadonly,classifyW06TaskRunLevel,verifyW06RecoveryMarker} from
  '../controller/w06-cnn-task-cadence-readonly.mjs';
 
 const sample=(extra={})=>({schema:'ZGMINI_W06_CNN_TASK_CADENCE_RAW_V1',
@@ -112,4 +112,21 @@ test('W06 RunLevel diagnostic distinguishes omitted XML default from effective n
  const inconsistent=classifyW06TaskRunLevel('<Task><RunLevel>LeastPrivilege</RunLevel></Task>','Highest');
  assert.equal(inconsistent.nativeLeastPrivilege,false);
  assert.doesNotMatch(JSON.stringify(inconsistent),/PRIVATE|SECRET|C:\\\\Users/);
+});
+
+test('W06 recovery read-only classifies exact one-shot claim and completion without exposing marker bytes',()=>{
+ const id='5b012ae0-5a2b-4fb9-92a6-72754de915c3';
+ const origin='ce21eaa3-7768-4cb8-88d9-0911941d966c';
+ const claim=Buffer.from(JSON.stringify({schema:'ZGMINI_TASK_RECOVERY_CLAIM_V1',
+  requestId:id,originRequestId:origin,status:'CLAIMED'}));
+ const complete=Buffer.from(JSON.stringify({schema:'ZGMINI_TASK_RECOVERY_COMPLETE_V1',
+  requestId:id,originRequestId:origin,status:'VERIFIED'}));
+ assert.equal(verifyW06RecoveryMarker(claim),true);
+ assert.equal(verifyW06RecoveryMarker(complete,{complete:true}),true);
+ assert.equal(verifyW06RecoveryMarker(claim,{complete:true}),false);
+ assert.equal(verifyW06RecoveryMarker(complete),false);
+ assert.equal(verifyW06RecoveryMarker(Buffer.from('PRIVATE_BAD_JSON')),false);
+ assert.equal(verifyW06RecoveryMarker(Buffer.from(JSON.stringify({...JSON.parse(claim),requestId:'FOREIGN'}))),false);
+ assert.equal(verifyW06RecoveryMarker(Buffer.from(JSON.stringify({...JSON.parse(complete),additional:'SHOULD_NOT_BE_EXPORTED'})),{complete:true}),false);
+ assert.equal(verifyW06RecoveryMarker(null),false);
 });
