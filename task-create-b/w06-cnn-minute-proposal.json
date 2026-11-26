@@ -1,0 +1,21 @@
+{
+  "schema": "ZGMINI_PC_TASK_CREATE_B_APPROVAL_V1",
+  "status": "PROPOSED_B",
+  "scope": "W06_ONE_TASK_CREATE_AND_ENABLE_WITH_CNN_RUNTIME_EFFECTS",
+  "taskName": "ZGMINI-PC-CNN-Minute",
+  "installedSourceSha": "393cee0da46515ff056543173fcd1253a858b3d7",
+  "candidateSourceSha": "b59930202eefc7f598ea9839fe24a7a0425e46b7",
+  "candidateFileSha256": "4b9a22d064cb4b489d3fc07c6cc2cfa1595770bd7011862a5879a5a8ce7550c9",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "wrapperPath": "E:\\ZGmini\\data\\pc-writer\\run-local-cnn-minute.vbs",
+  "launcherSha256": "f55c0267ca029dea0d7c10a91a4df63bc67ac0b5c93d64446bf859a5a7d5fe1b",
+  "disabledTemplateSha256": "afdc7ebf437091fa1d20770d2346f2174f1dcb6991c14670e5854c56cc6d1b69",
+  "enabledTemplateSha256": "d7d027664b426e5bd9c8c77da2532fedd25b81863320ac676965e2986d31e957",
+  "coreTaskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+  "sidecarSourceSha256": "eb3c43bf8fba6ea4e51f3e84b77f9ec13000db9d9e38077ffd914950d7080b6b",
+  "allowCnnHttpRequests": true,
+  "allowSqliteObservationWrites": true,
+  "allowD1PublicProjectionWrites": true,
+  "allowOtherTaskChanges": false,
+  "runCount": 1
+}
