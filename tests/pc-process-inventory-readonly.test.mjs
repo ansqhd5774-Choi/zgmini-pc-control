@@ -19,6 +19,7 @@ import {inspectR3WatchdogPreimageReadonly} from '../tools/pc-process-inventory-r
 import {classifyR3RunnerWmiRows,inspectR3RunnerWmiReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 import {assessR4StandbyRuntimeSnapshot,inspectR4StandbyRuntimeReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 import {assessR5StandbyRuntimeSnapshot,inspectR5StandbyRuntimeReadonly} from '../tools/pc-process-inventory-readonly.mjs';
+import {assessR6StandbyRuntimeSnapshot,inspectR6StandbyRuntimeReadonly} from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
  const request={schema:SCHEMA,operation:ROLE_OPERATION,role,
@@ -3622,4 +3623,83 @@ test('S6 PRE_DRAIN A inspects only fixed lease directory and three literal API G
  const workflow=fs.readFileSync(new URL('../.github/workflows/pc-process-inventory-readonly.yml',
   import.meta.url),'utf8');
  assert.match(workflow,/operating-process-snapshot:\s*permissions:\s*contents: write\s*issues: write\s*actions: read/);
+});
+
+test('R6 watchdog A permits fixed operating probe only; never gives effect authority',()=>{
+ const e=event(),raw=JSON.parse(e.issue.body);
+ const scoped={...e,issue:{...e.issue,body:JSON.stringify({
+  ...raw,probe:'controller-standby-r6-runtime-readonly'})}};
+ assert.equal(authenticateProcess(scoped,env,'operating').watchdogR6Runtime,true);
+ assert.throws(()=>authenticateProcess(scoped,env,'handoff'));
+ for(const patch of [
+  {probe:'controller-standby-r6-runtime-readonly;taskkill'},
+  {probe:'controller-standby-r6-runtime-upgrade'},
+  {command:'restart-watchdog'},
+  {approval:'true'}]){
+  const bad={...e,issue:{...e.issue,body:JSON.stringify({
+   ...raw,probe:'controller-standby-r6-runtime-readonly',...patch})}};
+  assert.throws(()=>authenticateProcess(bad,env,'operating'));
+ }
+});
+const r6RuntimeFixture=()=>{
+ const x=r5RuntimeFixture();
+ x.sourceSha256='8d98b99b24eef14d0577a93457832e7e7ba3459f00b65dbfa6df349efd958891';
+ x.install.sha256=x.sourceSha256;
+ x.install.approvedTargetSourceSha='8bdeca9b55457fc9c9d35585aacd7eea14af63f0';
+ x.controllerHost.controllerSourceSha='3c7d4cfefacf072fd35cb19706b352c64c5e4fd2';
+ x.controllerHost.controllerFiles['controller/operations.mjs']='bac7412c51c156d31b68f725f2532011cccf38359fe18e66a4d3851aa3a2b803';
+ x.controllerHost.controllerFiles['controller/us-breadth-r2-private-readonly.mjs']='e5f1d87626c0fb192831f4fc76fc9e13931af6105a38e503f90f7e656d180fb1';
+ return x;
+};
+const r6Assess=x=>assessR6StandbyRuntimeSnapshot(x,{now:r4Now,pidAlive:()=>true});
+test('R6 active status requires exact R2 eight-file pins and fresh live two-Standby owner',()=>{
+ const proof=r6Assess(r6RuntimeFixture());
+ assert.equal(proof.status,'PASS');
+ assert.equal(proof.code,'WATCHDOG_R6_ACTIVE_HEALTHY_TWO_STANDBY_IPC_READY');
+ for(const key of ['installedMatch','controllerTargetMatch','naturalRestartObserved',
+  'statusFresh','watchdogOwnerVerified','firstStandbyIpcReady','secondStandbyIpcReady',
+  'activeSupervisorVerified'])assert.equal(proof[key],true);
+ assert.equal(proof.standbyReadyCount,2);
+ assert.equal(proof.failoverTested,false);
+ assert.equal(proof.promotionApproved,false);
+ assert.equal(proof.operationalWrites,0);
+ assert.doesNotMatch(JSON.stringify(proof),/5311|5322|5333|5344|nonce|commandLine|privatePath/i);
+});
+test('R6 STAGED source is not live until later Guardian process with matching owner',()=>{
+ const stage=r6RuntimeFixture();
+ stage.install.upgradedAt='2026-11-26T01:10:50Z';
+ const proof=r6Assess(stage);
+ assert.equal(proof.code,'WATCHDOG_R6_NATURAL_RESTART_PENDING');
+ assert.equal(proof.installedMatch,true);
+ assert.equal(proof.naturalRestartObserved,false);
+ assert.equal(proof.status,'STATE_UNKNOWN');
+});
+test('R6 read-only refuses SHA drift, malformed Owner, stale heartbeat or partial standby',()=>{
+ const cases=[
+  [x=>x.sourceSha256='0'.repeat(64),'WATCHDOG_R6_STAGE_OR_CONTROLLER_SOURCE_UNVERIFIED'],
+  [x=>x.install.approvedTargetSourceSha='45807c661ee7f5f11a20b5780e6fd31116b24f84','WATCHDOG_R6_STAGE_OR_CONTROLLER_SOURCE_UNVERIFIED'],
+  [x=>x.controllerHost.controllerSourceSha='182bb46f2838306ba40d8b4ec32bac40ab75b69a','WATCHDOG_R6_STAGE_OR_CONTROLLER_SOURCE_UNVERIFIED'],
+  [x=>delete x.controllerHost.controllerFiles['controller/us-breadth-r2-private-readonly.mjs'],'WATCHDOG_R6_STAGE_OR_CONTROLLER_SOURCE_UNVERIFIED'],
+  [x=>x.controllerHost.controllerFiles['controller/operations.mjs']='0'.repeat(64),'WATCHDOG_R6_STAGE_OR_CONTROLLER_SOURCE_UNVERIFIED'],
+  [x=>x.status.pid=999,'WATCHDOG_R6_PROCESS_OWNER_UNVERIFIED'],
+  [x=>x.status.state='BLOCKED','WATCHDOG_R6_HEALTH_STATUS_UNVERIFIED'],
+  [x=>x.status.at='2026-11-26T01:10:35Z','WATCHDOG_R6_HEALTH_STATUS_UNVERIFIED'],
+  [x=>x.status.supervisorPid=x.owner.pid,'WATCHDOG_R6_ACTIVE_SUPERVISOR_UNVERIFIED'],
+  [x=>x.status.standbyRole='STARTING','WATCHDOG_R6_STANDBY_IPC_UNVERIFIED'],
+  [x=>x.status.secondStandbyPid=x.status.standbyPid,'WATCHDOG_R6_SECOND_STANDBY_IPC_UNVERIFIED'],
+  [x=>x.status.secondStandbyRole='UNVERIFIED','WATCHDOG_R6_SECOND_STANDBY_IPC_UNVERIFIED']
+ ];
+ for(const [edit,code] of cases){
+  const x=r6RuntimeFixture();edit(x);
+  const result=r6Assess(x);
+  assert.equal(result.status,'STATE_UNKNOWN',code);
+  assert.equal(result.code,code);
+  assert.equal(result.operationalWrites,0);
+ }
+ assert.equal(assessR6StandbyRuntimeSnapshot(r6RuntimeFixture(),{
+  now:r4Now,pidAlive:pid=>pid!==5344}).code,'WATCHDOG_R6_SECOND_STANDBY_IPC_UNVERIFIED');
+ const missing=inspectR6StandbyRuntimeReadonly({watchdogHome:'E:/ZGmini/absent',
+  controllerHome:'E:/ZGmini/absent'});
+ assert.equal(missing.status,'STATE_UNKNOWN');
+ assert.equal(missing.code,'WATCHDOG_R6_RUNTIME_READ_UNVERIFIED');
 });
