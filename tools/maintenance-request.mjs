@@ -178,11 +178,32 @@ function verifyCiIssue(expected,actual){
 // creation, TTL, deletion, or relocation of unresolved claims.
 export function createCiEffectReceiptStore(root){
  if(typeof root!=='string'||!path.isAbsolute(root))fail('MAINTENANCE_CI_RECEIPT_ROOT_UNVERIFIED');
- const stat=fs.lstatSync(root);
- if(!stat.isDirectory()||stat.isSymbolicLink())fail('MAINTENANCE_CI_RECEIPT_ROOT_UNVERIFIED');
- const resolved=fs.realpathSync(root);
- const sameRoot=()=>{if(fs.realpathSync(root)!==resolved||!fs.lstatSync(root).isDirectory()||
-   fs.lstatSync(root).isSymbolicLink())fail('MAINTENANCE_CI_RECEIPT_ROOT_DRIFT');};
+ // Match the isolated Runner's existing read-only directory safety check.
+ // A real final directory beneath a symlink/junction parent is not a safe
+ // durable effect ledger even when lstat(root) itself reports a directory.
+ const verifyRoot=()=>{
+  const normalized=path.resolve(root);
+  for(let current=normalized;;){
+   const st=fs.lstatSync(current);
+   if(!st.isDirectory()||st.isSymbolicLink())fail('MAINTENANCE_CI_RECEIPT_ROOT_UNVERIFIED');
+   const parent=path.dirname(current);
+   if(parent===current)break;
+   current=parent;
+  }
+  const real=fs.realpathSync(root);
+  const comparable=p=>process.platform==='win32'?path.normalize(p).toLowerCase():path.normalize(p);
+  if(comparable(real)!==comparable(normalized))fail('MAINTENANCE_CI_RECEIPT_ROOT_UNVERIFIED');
+  return real;
+ };
+ const resolved=verifyRoot();
+ const sameRoot=()=>{
+  try{if(verifyRoot()!==resolved)fail('MAINTENANCE_CI_RECEIPT_ROOT_DRIFT');}
+  catch(error){
+   if(error?.message==='MAINTENANCE_CI_RECEIPT_ROOT_UNVERIFIED')
+    fail('MAINTENANCE_CI_RECEIPT_ROOT_DRIFT');
+   throw error;
+  }
+ };
  const fileFor=effectKey=>{
   if(typeof effectKey!=='string'||!/^[a-f0-9]{64}$/.test(effectKey))fail('MAINTENANCE_CI_EFFECT_KEY_INVALID');
   sameRoot();return path.join(resolved,effectKey+'.json');
