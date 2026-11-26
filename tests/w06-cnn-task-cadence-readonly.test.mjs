@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {PROBE,projectW06TaskCadence,inspectW06TaskCadenceReadonly,assessW06TaskBXmlReadonly,inspectW06TaskBRecoveryReadonly,classifyW06TaskRunLevel,verifyW06RecoveryMarker,projectW06HttpChecksReadonly,inspectW06HttpChecksReadonly} from
  '../controller/w06-cnn-task-cadence-readonly.mjs';
+import {classifyW06NextTickGate,inspectW06NextTickGateReadonly,
+ projectW06Event322Readonly,inspectW06TaskEventsReadonly}
+ from '../controller/w06-cnn-minute-tick-evidence-readonly.mjs';
 
 const sample=(extra={})=>({schema:'ZGMINI_W06_CNN_TASK_CADENCE_RAW_V1',
  observedAtUtc:'2026-11-26T11:49:19.000Z',tasks:[{
@@ -224,4 +227,113 @@ test('W06 HTTP request gap median measures actual fetch starts, not stale source
  assert.equal(single.minRequestGapSeconds,null);
  assert.equal(single.medianRequestGapSeconds,null);
  assert.deepEqual(single.recentRequestIntervalsSeconds,[]);
+});
+
+
+test('W06 fixed output 7 seconds after Task minute makes next nominal tick CACHED',()=>{
+ const tick='2026-11-26T15:47:00.000Z';
+ const rows=[
+  {kind:'output',stored_at:Date.parse('2026-11-26T15:46:07.000Z'),attempt_body:null},
+  {kind:'attempt',stored_at:Date.parse('2026-11-26T15:46:01.000Z'),attempt_body:'{"status":"ATTEMPTED"}'}];
+ const q=classifyW06NextTickGate(rows,{
+  nextRunUtc:tick,observedAtMs:Date.parse('2026-11-26T15:46:15.000Z')});
+ assert.equal(q.status,'READ');
+ assert.equal(q.predictedGate,'CACHED');
+ assert.equal(q.millisecondsUntilEligible,7000);
+ assert.equal(q.lastOutputStoredAt,'2026-11-26T15:46:07.000Z');
+ assert.doesNotMatch(JSON.stringify(q),/raw|PRIVATE|TOKEN|SCORE|SECRET/);
+ const tooLate=classifyW06NextTickGate(rows,{
+  nextRunUtc:tick,observedAtMs:Date.parse('2026-11-26T15:48:00.000Z')});
+ assert.equal(tooLate.status,'UNVERIFIED');
+ assert.equal(tooLate.code,'CNN_NEXT_TICK_TIME_UNVERIFIED');
+});
+
+test('W06 next tick retry and previous attempt gates remain distinct',()=>{
+ const at=Date.parse('2026-11-26T15:46:15Z');
+ const nextRunUtc='2026-11-26T15:47:00.000Z';
+ const past={kind:'output',stored_at:Date.parse('2026-11-26T15:44:01.000Z'),attempt_body:null};
+ const retry={kind:'attempt',stored_at:Date.parse('2026-11-26T15:44:31Z'),
+  attempt_body:JSON.stringify({status:'ATTEMPTED',retryAt:Date.parse('2026-11-26T15:49:00Z')})};
+ const recent={...retry,stored_at:Date.parse('2026-11-26T15:46:41Z'),
+  attempt_body:'{"status":"ATTEMPTED"}'};
+ const get=rows=>classifyW06NextTickGate(rows,{nextRunUtc,observedAtMs:at});
+ assert.equal(get([past,retry]).predictedGate,'COOLDOWN_RETRY_AFTER');
+ assert.equal(get([past,retry]).millisecondsUntilEligible,120000);
+ // A later stored-at timestamp than the snapshot is invalid and never attested.
+ assert.equal(get([past,recent]).status,'UNVERIFIED');
+ const later=classifyW06NextTickGate([past,recent],{nextRunUtc,
+  observedAtMs:Date.parse('2026-11-26T15:46:45Z')});
+ assert.equal(later.predictedGate,'COOLDOWN_LAST_ATTEMPT');
+ assert.equal(later.millisecondsUntilEligible,41000);
+ assert.equal(get([past]).predictedGate,'ELIGIBLE');
+ assert.equal(get([past,{...retry,kind:'output'}]).status,'UNVERIFIED');
+});
+
+test('W06 minute gate uses a bounded native SQLite query-only read transaction',()=>{
+ const now=Date.parse('2026-11-26T15:46:15Z');
+ let closed=false,sql=null,steps=[];
+ const result=inspectW06NextTickGateReadonly('2026-11-26T15:47:00.000Z',{
+  filesystem:{lstatSync:p=>{assert.match(p,/core\.sqlite$/);return {
+   isFile:()=>true,isSymbolicLink:()=>false,size:4096}}},
+  connect:(p,options)=>{assert.equal(options.readOnly,true);return {
+   exec:command=>steps.push(command),
+   prepare:query=>{sql=query;return {all:()=>[
+    {kind:'output',stored_at:now-8000,attempt_body:null},
+    {kind:'attempt',stored_at:now-14000,attempt_body:'{"status":"ATTEMPTED"}'}
+   ]}},
+   close:()=>{closed=true}
+  }},
+  clock:()=>now
+ });
+ assert.equal(result.sqliteOpened,true);
+ assert.equal(result.status,'READ');
+ assert.equal(result.predictedGate,'CACHED');
+ assert.deepEqual(steps,['PRAGMA query_only=ON']);
+ assert.match(sql,/feed_key='fear-greed'/);
+ assert.match(sql,/kind IN \('output','attempt'\)/);
+ assert.match(sql,/LIMIT 2/);
+ assert.doesNotMatch(sql,/INSERT|UPDATE|DELETE|DROP|ALTER/i);
+ assert.equal(closed,true);
+ assert.equal(inspectW06NextTickGateReadonly('2026-11-26T15:47:00Z',{
+  filesystem:{lstatSync:()=>{throw Error('NOT_PRESENT')}}}).status,'UNVERIFIED');
+});
+
+test('W06 TaskScheduler channel-disabled state never claims zero ignored launches',()=>{
+ const runs=[];
+ const call=(exe,args,options)=>{runs.push(args);
+  assert.equal(options.shell,false);
+  return {status:0,stdout:Buffer.from('enabled: false\n', 'utf8')}};
+ const out=inspectW06TaskEventsReadonly({platform:'win32',
+  systemRoot:'C:\\Windows',filesystem:{existsSync:()=>true},run:call});
+ assert.equal(out.status,'READ');
+ assert.equal(out.code,'CNN_TASK_EVENT_CHANNEL_DISABLED');
+ assert.equal(out.channelEnabled,false);
+ assert.equal(out.recent90mIgnoredLaunches,null);
+ assert.equal(runs.length,1);
+ assert.equal(runs[0][0],'gl');
+ assert.equal(inspectW06TaskEventsReadonly({platform:'linux'}).status,'UNVERIFIED');
+});
+
+test('W06 TaskScheduler Event322 count is restricted to one exact Task and 90 minutes',()=>{
+ const now=Date.parse('2026-11-26T15:46:45Z');
+ const xml=(task,time)=>'<Event><System><EventID>322</EventID>'+
+  '<TimeCreated SystemTime="'+time+'"/></System><EventData>'+
+  '<Data Name="TaskName">'+task+'</Data></EventData></Event>';
+ const source=xml('\\ZGMINI-PC-CNN-Minute','2026-11-26T15:43:00.000Z')+
+  xml('\\ZGMINI-PC-CNN-Minute','2026-11-26T13:43:00.000Z')+
+  xml('\\ZGMINI-PC-Local-Core','2026-11-26T15:44:00.000Z');
+ const projected=projectW06Event322Readonly(source,{nowMs:now});
+ assert.equal(projected.status,'READ');
+ assert.equal(projected.recent90mIgnoredLaunches,1);
+ assert.equal(projected.latestIgnoredAt,'2026-11-26T15:43:00.000Z');
+ assert.equal(projected.eventsExamined,3);
+ assert.doesNotMatch(JSON.stringify(projected),/ZGMINI-PC-|PRIVATE|Account|Command/);
+ let calls=0;
+ const seen=inspectW06TaskEventsReadonly({platform:'win32',
+  systemRoot:'C:\\Windows',filesystem:{existsSync:()=>true},clock:()=>now,
+  run:(exe,args,opts)=>{calls++;return {status:0,
+   stdout:Buffer.from(calls===1?'enabled: true\n':source,'utf8')}}});
+ assert.equal(calls,2);
+ assert.equal(seen.recent90mIgnoredLaunches,1);
+ assert.equal(seen.channelEnabled,true);
 });
