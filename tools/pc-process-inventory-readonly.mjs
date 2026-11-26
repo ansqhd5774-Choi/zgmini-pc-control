@@ -11,6 +11,7 @@ import {uploadResultPairAtomic} from '../writer-config-b/result-pair-atomic.mjs'
 import {collectAutomationStatus} from './automation-status.mjs';
 import {installedControllerBPolicy} from './maintenance-contract.mjs';
 import {inspectCiControllerBReceiptRootReadonly} from './ci-controller-b-receipt-root-readonly.mjs';
+import {inspectReceiptCOperatorServiceReadonly} from './ci-controller-b-c-operator-readonly.mjs';
 import {inspectProviderActivity} from '../controller/provider-activity-runtime-readonly.mjs';
 import {inspectHttp32TwoHostCheckpoints} from '../controller/http32-two-host-checkpoints-readonly.mjs';
 import {inspectSidecarSourceGate} from '../controller/fear-greed-archive-readonly.mjs';
@@ -2784,7 +2785,8 @@ export function collect(role,ctx,env=process.env){
    volatileRoots:[env.RUNNER_TEMP,env.GITHUB_WORKSPACE,env.TEMP,env.TMP],
    filesystem:fs,platform:os.platform()});
   return {...base,status:observed.status,code:observed.code,
-   ciControllerBReceiptRoot:observed};
+   ciControllerBReceiptRoot:observed,
+   ciControllerBCOperatorPreflight:inspectReceiptCOperatorServiceReadonly()};
  }
  if(ctx.watchdogR4GuardianOrigin===true){
   const proof=inspectR4GuardianOriginReadonly();
@@ -3023,6 +3025,10 @@ export function toText(r){
    'ciReceiptRootConfigured='+r.ciControllerBReceiptRoot.configured,
    'ciReceiptRootReadable='+r.ciControllerBReceiptRoot.readable,
    'ciReceiptRootDurableAcrossRunsVerified=false']:[]),
+  ...(r.ciControllerBCOperatorPreflight?[
+   'ciReceiptCOperator='+r.ciControllerBCOperatorPreflight.code,
+   'ciReceiptCAccountCandidate='+r.ciControllerBCOperatorPreflight.cAccountCandidate
+  ]:[]),
   'maintenanceSourceSha='+(r.maintenance?.maintenanceSourceSha??'UNKNOWN'),
   'installLockHeld='+(r.maintenance?.installLockHeld??'UNKNOWN'),
   'c2094StageEvidence='+(r.c2094StageEvidence?.status??'NOT_APPLICABLE'),
