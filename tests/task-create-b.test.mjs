@@ -4,17 +4,17 @@ import {createHash} from 'node:crypto';
 import {
  authorizeTaskCreateB,verifyTaskCreateBPreimage,verifyTaskCreateBCandidate,
  TASK,INSTALLED_SOURCE,SOURCE_ROOT,WRAPPER,APPROVAL_SCHEMA,
- REQUEST_SCHEMA,ISSUE_TITLE,ISSUE_LABEL,sha256
+ REQUEST_SCHEMA,ISSUE_TITLE,ISSUE_LABEL,sha256,normalizedW06TaskTemplate
 } from '../task-create-b/contract.mjs';
 import {applyTaskCreateB} from '../task-create-b/transaction.mjs';
 
 const reqId='abec1087-3a25-4452-a5a8-a45218f05c37';
 const digest=value=>createHash('sha256').update(value).digest('hex');
 const candidate=()=>{
- const text='<Task><Triggers><TimeTrigger><Repetition><Interval>PT1M</Interval></Repetition></TimeTrigger></Triggers>'+
+ const text='<Task><Triggers><TimeTrigger><StartBoundary>2026-11-26T12:35:00.000Z</StartBoundary><Repetition><Interval>PT1M</Interval></Repetition></TimeTrigger></Triggers>'+
   '<Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>'+
   '<Enabled>true</Enabled><ExecutionTimeLimit>PT30M</ExecutionTimeLimit></Settings>'+
-  '<Actions><Exec><Arguments>run-local-cnn-minute.vbs</Arguments></Exec></Actions></Task>';
+  '<Principals><Principal><UserId>PC\\\\test</UserId></Principal></Principals><Actions><Exec><Arguments>run-local-cnn-minute.vbs</Arguments></Exec></Actions></Task>';
  const off=text.replace('<Enabled>true</Enabled>','<Enabled>false</Enabled>');
  return {launcher:Buffer.from('local-cycle.mjs --cnn-minute --publish','utf8'),
   enabledXml:Buffer.from(text,'utf16le'),disabledXml:Buffer.from(off,'utf16le')};
@@ -24,7 +24,7 @@ const approval=bytes=>({
  scope:'W06_ONE_TASK_CREATE_AND_ENABLE_WITH_CNN_RUNTIME_EFFECTS',
  taskName:TASK,installedSourceSha:INSTALLED_SOURCE,sourceRoot:SOURCE_ROOT,
  wrapperPath:WRAPPER,launcherSha256:digest(bytes.launcher),
- disabledXmlSha256:digest(bytes.disabledXml),enabledXmlSha256:digest(bytes.enabledXml),
+ disabledTemplateSha256:normalizedW06TaskTemplate(bytes.disabledXml),enabledTemplateSha256:normalizedW06TaskTemplate(bytes.enabledXml),
  coreTaskXmlSha256:'d'.repeat(64),sidecarSourceSha256:'e'.repeat(64),
  allowCnnHttpRequests:true,allowSqliteObservationWrites:true,
  allowD1PublicProjectionWrites:true,allowOtherTaskChanges:false,runCount:1
@@ -66,6 +66,18 @@ function port(original,{disabledReadback=true,enabledReadback=true,throwOnEnable
  return {io,log};
 }
 
+test('B: fixed template digest is independent of private principal and minute',()=>{
+ const bytes=candidate();
+ const replace=data=>Buffer.from(data,'utf16le');
+ const alternate=replace(bytes.enabledXml.toString('utf16le')
+  .replace('2026-11-26T12:35:00.000Z','2026-11-27T00:01:00.000Z')
+  .replace('PC\\\\test','OTHER\\\\name'));
+ assert.equal(normalizedW06TaskTemplate(bytes.enabledXml),
+  normalizedW06TaskTemplate(alternate));
+ const tampered=replace(bytes.enabledXml.toString('utf16le').replace('PT1M','PT5M'));
+ assert.notEqual(normalizedW06TaskTemplate(bytes.enabledXml),
+  normalizedW06TaskTemplate(tampered));
+});
 test('B: authentic owner, committed raw manifest and explicit HTTP/SQLite/D1 effects',()=>{
  const {event,raw,proof,bytes,original}=proofSetup();
  assert.equal(verifyTaskCreateBPreimage(proof,original),true);
