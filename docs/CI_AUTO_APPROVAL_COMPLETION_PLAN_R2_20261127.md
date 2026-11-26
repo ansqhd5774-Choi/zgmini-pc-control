@@ -213,11 +213,11 @@
 - `ci-approval/native-receiver-observe.mjs`: 실제 이벤트 바이트와 독립 설치된 **고정 경로**의 로컬 읽기 전용 Scope, 과거 Source Run, 원본 Workflow 및 현재 Receiver Workflow Git blob을 읽어 기존 `inspectNativeReceiver`에 전달. 응답은 `CONTRACT_MATCH_ONLY` 또는 실패 상태일 뿐 PC 실행·설치·추가 Github POST 권한이 아니다.
 - `tests/ci-native-receiver-observe.test.mjs`와 기존 Windows Source CI 단계 연결. 위조 Bot, Source/Receiver 경로 변조, 설치 Scope 누락, symlink, CRLF Workflow 검증을 포함한다.
 - 최초 HEAD `d5b91b5b4210ec953ee2b64cd9e533f667b56b6b`의 C996는 Windows CRLF 줄바꿈을 고려하지 않은 **시험 코드 오판**으로 실패했다. 소스/권한 완화 없이 정적시험의 CRLF 정규화만 수정해 새 HEAD `831a2c0ef8f65ae1291a1f37ae0dd05f5253da94`로 교체. 최초 실패 증거는 보존한다.
-- 신규 HEAD의 GitHub CI: C996 [#45881264817](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45881264817) **SUCCESS**, Source Tests [#45881264798](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45881264798) **미완료**, Secret Scan [#45881264858](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45881264858) **미완료** (본 원장 기록 시점). 최종 CI와 병합은 증거 후 업데이트한다.
+- 신규 HEAD의 GitHub CI: C996 [#45881264817](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45881264817), Source Tests [#45881264798](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45881264798), Secret Scan [#45881264858](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45881264858) **정확 HEAD 모두 SUCCESS (3/3)**. [PR #4070](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4070) **`main` 병합 SHA `dea24f5a3b91dc088a1273c25f6e9d25ace2fe8c`**. 실제 `main`의 수신기 observer blob `70ff3dc091cecfd33e042a4b00d08a8ac4581863`, A Workflow `56d9b02df7c3157009afefad646077fdd9257c36`, Writer Workflow `18aff117556598da8a4ce77d42c20240a9c07419`, 시험 `38ea39f79cb17e7c2db5dc6247156deae82acb99` readback 완료.
 
 ### 정확한 이후 작업
 
-1. #4070 정확 HEAD의 Windows Source + Secret 결과를 확인하고, 실패 항목은 원인 수정·동일 변경 검증 후 안전하게 병합한다.
+1. #4070 소스 CI·병합은 완료. **다음 직접 구현:** GitHub CI 발행자 → 신규 수신 Workflow의 인증된 호출 및 설치 증거를 사용한 PC 실행 어댑터. 수신기 관측 PASS만으로 실제 PC 실행 완료로 계산하지 않는다.
 2. 기존 인증된 운영 PC에 정확한 설치/원본 권한/CAS가 실제 존재하는지를 확인한다. **새 Scope 파일 생성·GitHub 변수 활성화·PC 실행은 별도 정규 승인 범위와 실제 해시/영수증 확인 전까지 하지 않는다.**
 3. 수신기의 실제 PC A 작업·Writer B 설치 실행 인계에는 독립 인증/효과 claim/Engine 안전 계약을 구현한다. 검증 Workflow가 깨어나는 것을 기능 종단 성공으로 세지 않는다.
 4. Controller B는 기존 CI 자동 발행 정책·인증 신뢰근거의 정확한 미구성을 분리해 정상 경로로 해결한다. 종결한 #4038 수동 댓글 요구는 복원하지 않는다.
