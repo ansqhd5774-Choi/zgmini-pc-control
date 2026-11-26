@@ -1379,7 +1379,8 @@ test('S6 live operating-port entry is not available to CI or Runner and has no d
  }
 
  assert.match(body,/acquireMaintenanceLock\(maintenanceRoot,'controller-install'\)/);
- assert.match(body,/taskkill\.exe/);
+ assert.match(body,/path\.win32\.join\(systemRoot,'System32','taskkill\.exe'\)/);
+ assert.match(body,/S6_PORT_SYSTEMROOT_UNVERIFIED/);
  assert.match(body,/s6OwnedLeaseReleaseReadback\(snap,baseline\)/);
  assert.match(body,/case.*claim|claimOnce:/);
  assert.doesNotMatch(src.slice(e),/if\(cmd==='s6-once-apply'\)/);
