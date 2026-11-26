@@ -447,11 +447,20 @@ test('CI installed policy readback never exposes the CI installed policy or loca
   ciControllerBPolicy:{...policy,workflowBlobSha:'d3c175329a7ac955f5b45ce2b13dad78ce272d9a'}})));
  assert.equal(v2.policyState,'PRESENT_FORMAT_ONLY');
  assert.equal(v2.approvedV2PinMatches,true);
+ assert.equal(v2.approvedReceiptGuardPinMatches,false);
+ const receiptGuard=inspectCiControllerBReceiverReadOnly(fake(JSON.stringify({...base,
+  sourceSha:'73f70de98b030d4bac0af48ac50023ec1bd7ce1f',
+  ciControllerBPolicy:{...policy,workflowBlobSha:'b568bbc5de05b2d6fff75419b88322b3e2de020c'}})));
+ assert.equal(receiptGuard.policyState,'PRESENT_FORMAT_ONLY');
+ assert.equal(receiptGuard.approvedReceiptGuardPinMatches,true);
+ assert.equal(receiptGuard.approvedV2PinMatches,false);
  const mismatchedId=inspectCiControllerBReceiverReadOnly(fake(JSON.stringify({...base,
   sourceSha:'08c0df1c4315019d85502dca2b0e4fd980eef48a',
   ciControllerBPolicy:{...policy,workflowId:430972395,
    workflowBlobSha:'d3c175329a7ac955f5b45ce2b13dad78ce272d9a'}})));
  assert.equal(mismatchedId.approvedV2PinMatches,false);
+ assert.equal(mismatchedId.approvedReceiptGuardPinMatches,false);
+ assert.equal(present.approvedReceiptGuardPinMatches,false);
  assert.equal(present.installedSourceIntegrityAsserted,false);
  assert.equal(present.executionAuthorized,false);
  assert.equal(present.operationalWrites,0);
