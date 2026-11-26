@@ -1,0 +1,34 @@
+{
+  "schema": "ZGMINI_PC_WATCHDOG_B_MANIFEST_V6",
+  "approved": true,
+  "scope": "SAME_HOST_ACTIVE_1_STANDBY_2_WATCHDOG_B",
+  "installedSha256": "9137447231d354d9999cdadbbb5b2a6dee7f0bf869df61881742902ac445128f",
+  "installedManifestSha256": "5cc8fa6f8b146054d68c003c4738f0dd4b961ccd9bbe0833913537303a78cc61",
+  "targetSha": "8bdeca9b55457fc9c9d35585aacd7eea14af63f0",
+  "targetSha256": "8d98b99b24eef14d0577a93457832e7e7ba3459f00b65dbfa6df349efd958891",
+  "fromScope": "RUNNER_RECOVERY_AND_MAINTENANCE_HANDOFF_V1",
+  "toScope": "RUNNER_RECOVERY_AND_MAINTENANCE_HANDOFF_V1",
+  "allowedFiles": [
+    "pc-watchdog/runner-watchdog.mjs",
+    "pc-watchdog/INSTALL.json"
+  ],
+  "operation": "watchdog-b-upgrade",
+  "approvalBasis": "2026-11-27_OWNER_POST_S6_SAFETY_REPAIR_SAME_SCOPE",
+  "revision": 6,
+  "expectedControllerSha": "3c7d4cfefacf072fd35cb19706b352c64c5e4fd2",
+  "expectedControllerFiles": {
+    "controller/common.mjs": "91e4ceb5d26412893cc047670a420338aa8ef293e95498f852ac0a2f5edd6cc6",
+    "controller/engine.mjs": "6112b5a357d6ecba2ffb299857c2649ee51ca97e1e7755162efd69337976769f",
+    "controller/operations.mjs": "bac7412c51c156d31b68f725f2532011cccf38359fe18e66a4d3851aa3a2b803",
+    "controller/entry.mjs": "407ea8693ab48a03b04ec77fe63f86d05537a37661b42c9ddcd55f5b36aa01d7",
+    "controller/supervisor.mjs": "5ec0952872adcaa16eb14adec614f024bac7264deb5b59fb68b9080f0edb0344",
+    "controller/standby.mjs": "e18c09b7e9b90fc483d5200e1e0c4741d2e4f93e049328566d710e37c21be7e7",
+    "controller/preimage-manifest-contract.mjs": "c59d5d36f0024b7a4b1781ea6eef9351f6275db33c8799bec05bf99abebbfcc1",
+    "controller/us-breadth-r2-private-readonly.mjs": "e5f1d87626c0fb192831f4fc76fc9e13931af6105a38e503f90f7e656d180fb1"
+  },
+  "protectionPolicy": "CURRENT_CAS_WITH_HISTORICAL_KEY_PRESENCE",
+  "standby": {
+    "mode": "ACTIVE_1_STANDBY_2",
+    "approved": true
+  }
+}
