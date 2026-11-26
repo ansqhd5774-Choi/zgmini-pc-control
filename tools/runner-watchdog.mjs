@@ -45,6 +45,100 @@ export function decide({paused,owner,live,heartbeat,now=Date.now()}){
  }
  return 'RECOVER';
 }
+// A stale or partial heartbeat is not a complete inventory of children.
+// A crashed Supervisor can leave Runner.Listeners alive after its own PID dies.
+// Standby promotion is allowed only if the last exact six-seat inventory is
+// present, tied to the old owner, and every recorded child is proven exited.
+// Other active Workers remain protected by their existing request/seat leases.
+export function provenOldRunnerExit({owner,heartbeat,pidAlive=alive}={}){
+ // A lease may be absent after a clean Supervisor exit. In that case the
+ // previous heartbeat PID itself must be proven dead; a missing heartbeat
+ // or a recycled/live PID is never a clean-start witness.
+ const oldPid=owner?.pid??heartbeat?.pid;
+ if(!Number.isSafeInteger(oldPid)||oldPid<=0||
+   heartbeat?.pid!==oldPid||!Array.isArray(heartbeat.children)||
+   heartbeat.children.length!==6||
+   (owner==null&&pidAlive(oldPid)!==false))return false;
+ const seen=new Set(),pids=new Set();
+ for(const child of heartbeat.children){
+  if(!Number.isSafeInteger(child?.seat)||child.seat<1||child.seat>6||
+    seen.has(child.seat)||!Number.isSafeInteger(child.pid)||child.pid<=0||
+    pids.has(child.pid)||pidAlive(child.pid)!==false)return false;
+  seen.add(child.seat);pids.add(child.pid);
+ }
+ return seen.size===6;
+}
+// The Supervisor's six child PIDs can be cmd.exe wrappers, not the actual
+// Runner.Listener/Worker executables. Dead wrappers alone do not prove the
+// child process tree was stopped. This bounded, read-only WMI result is a
+// SECOND required proof. Never publish raw executable paths or process ids.
+export function classifyRunnerExecutableProof(rows,{controllerRoot=control,
+ canonicalize=fs.realpathSync.native}={}){
+ if(!Array.isArray(rows)||rows.length>256)return 'UNVERIFIED';
+ let realRoot;
+ try{realRoot=path.win32.normalize(canonicalize(controllerRoot)).toLowerCase();}
+ catch{return 'UNVERIFIED';}
+ if(!path.win32.isAbsolute(realRoot))return 'UNVERIFIED';
+ const prefix=realRoot.replace(/[\\]+$/,'')+'\\runners\\';
+ const seen=new Set();let serviceExceptions=0;
+ for(const row of rows){
+  if(!row||typeof row!=='object'||!Number.isSafeInteger(row.pid)||
+    row.pid<=0||seen.has(row.pid)||!/^runner\.(listener|worker)\.exe$/i.test(row.name??''))
+    return 'UNVERIFIED';
+  seen.add(row.pid);
+  // Only a registered running actions.runner service's own session-0 Listener
+  // may lack ExecutablePath. An unbound/extra Listener always blocks promotion.
+  if(row.executablePath===''&&/^runner\.listener\.exe$/i.test(row.name)&&
+    row.sessionId===0&&row.serviceObservationAvailable===true&&
+    row.serviceAncestor===true){
+   if(++serviceExceptions>1)return 'UNVERIFIED';
+   continue;
+  }
+  if(typeof row.executablePath!=='string'||!path.win32.isAbsolute(row.executablePath))
+   return 'UNVERIFIED';
+  let realFile;
+  try{realFile=path.win32.normalize(canonicalize(row.executablePath)).toLowerCase();}
+  catch{return 'UNVERIFIED';}
+  if(!path.win32.isAbsolute(realFile))return 'UNVERIFIED';
+  if(realFile.startsWith(prefix))return 'ACTIVE_RUNNER_PROCESS';
+ }
+ return 'NO_CONTROLLER_RUNNER_PROCESS';
+}
+// Fixed Windows-only observation. Uses the same WMI API as the existing
+// process inventory. No command lines, environment variables, or identities
+// leave this function. Query failures conservatively block only promotion.
+export function scanControllerRunnersReadOnly({run=execFileSync,systemRoot=process.env.SystemRoot,
+ controllerRoot=control,canonicalize=fs.realpathSync.native}={}){
+ if(process.platform!=='win32'||typeof systemRoot!=='string'||
+   !/^[a-z]:\\windows$/i.test(systemRoot))return 'UNVERIFIED';
+ const ps=path.win32.join(systemRoot,'System32','WindowsPowerShell','v1.0','powershell.exe');
+ const script=[
+  "$ErrorActionPreference='Stop'",
+  "$all=@(Get-CimInstance -ClassName Win32_Process -ErrorAction Stop)",
+  "if($all.Count -gt 4096){throw 'PROCESS_SCOPE_EXCEEDED'}",
+  "$byPid=@{};foreach($p in $all){$byPid[[int]$p.ProcessId]=$p}",
+  "$svc=@();$serviceObservationAvailable=$false",
+  "try{$svc=@(Get-CimInstance -ClassName Win32_Service -Filter \"Name LIKE 'actions.runner.%'\" -ErrorAction Stop | Where-Object {$_.State -eq 'Running' -and [int]$_.ProcessId -gt 0});$serviceObservationAvailable=$true}catch{}",
+  "$svcByPid=@{};foreach($sv in $svc){if([string]$sv.Name -match '(?i)^actions\\.runner\\.'){$svcByPid[[int]$sv.ProcessId]=$true}}",
+  "$items=@(foreach($p in @($all | Where-Object {$_.Name -in @('Runner.Listener.exe','Runner.Worker.exe')})){$seen=@{};$parent=[int]$p.ParentProcessId;$serviceAncestor=$svcByPid.ContainsKey([int]$p.ProcessId);for($depth=0;$depth -lt 8 -and !$serviceAncestor;$depth++){if($parent -le 0 -or $seen.ContainsKey($parent)){break};$seen[$parent]=$true;if($svcByPid.ContainsKey($parent)){$serviceAncestor=$true;break};if(!$byPid.ContainsKey($parent)){break};$next=[int]$byPid[$parent].ParentProcessId;if($next -eq $parent){break};$parent=$next};$session=if($null -eq $p.SessionId){-1}else{[int]$p.SessionId};[pscustomobject]@{pid=[int]$p.ProcessId;name=[string]$p.Name;executablePath=[string]$p.ExecutablePath;sessionId=$session;serviceAncestor=$serviceAncestor;serviceObservationAvailable=$serviceObservationAvailable}})",
+  "[pscustomobject]@{rows=$items} | ConvertTo-Json -Depth 4 -Compress"
+ ].join(';');
+ try{
+  const out=run(ps,['-NoLogo','-NoProfile','-NonInteractive','-Command',script],
+   {windowsHide:true,timeout:15000,maxBuffer:65536,encoding:'utf8'});
+  if(typeof out!=='string'||Buffer.byteLength(out)>65536)return 'UNVERIFIED';
+  const parsed=JSON.parse(out);
+  return classifyRunnerExecutableProof(parsed?.rows,{controllerRoot,canonicalize});
+ }catch{return 'UNVERIFIED';}
+}
+
+// An initial installation has no previous Supervisor and no heartbeat.
+// This is different from a malformed/missing owner *with a prior heartbeat*.
+// WMI executable absence and the real atomic Supervisor lease are separate
+// mandatory checks before any candidate may start new Runner listeners.
+export function verifiedColdStandbyStart({owner,heartbeat}={}){
+ return owner===null&&heartbeat===null;
+}
 export function archiveDeadLease(directory,isAlive=alive,destination=null){
  if(!fs.existsSync(directory))return null;
  const original=fs.readFileSync(path.join(directory,'owner.json'));
@@ -246,7 +340,47 @@ export async function main(){
  write(path.join(lease,'owner.json'),{pid:process.pid,nonce,at:new Date().toISOString()});
  let history=fs.existsSync(path.join(home,'RESTART_HISTORY.json'))?read(path.join(home,'RESTART_HISTORY.json')):[];
  let healthySince=null;
- const status=(state,extra={})=>write(path.join(home,'STATUS.json'),{at:new Date().toISOString(),pid:process.pid,state,...extra});
+ const status=(state,extra={})=>write(path.join(home,'STATUS.json'),{
+  at:new Date().toISOString(),pid:process.pid,state,
+  ...(installed.standby?.mode==='ACTIVE_1_STANDBY_1'&&installed.standby?.approved===true?
+   {standbyRole:standby?.ready?'READY':standby?.promoting?'PROMOTING':
+    standby?'STARTING':'UNVERIFIED',standbyPid:standby?.child?.pid??null}:{}),
+  ...extra});
+ // Standby is opt-in only after an exact approved watchdog B install
+ // has written this capability to INSTALL.json. Legacy recovery stays intact.
+ const standbyMode=installed.standby?.mode==='ACTIVE_1_STANDBY_1'&&installed.standby?.approved===true;
+ let standby=null,standbyStarts=[];
+ function ensureStandby(){
+  if(!standbyMode||standby)return;
+  standbyStarts=standbyStarts.filter(t=>Date.now()-t<3600000);
+  if(standbyStarts.length>=3)return;
+  try{
+   const host=read(path.join(control,'host.json'));
+   if(!/^[a-f0-9]{64}$/.test(host.controllerFiles?.['controller/standby.mjs']??''))
+    throw Error('STANDBY_SOURCE_NOT_ATTESTED');
+   const sourceSha=verifyController();
+   const child=spawn(node,[path.join(control,'controller/standby.mjs')],{
+    cwd:control,windowsHide:true,stdio:['ignore','ignore','ignore','ipc'],
+    env:{...process.env,ZGMINI_WATCHDOG_NONCE:nonce,
+     ZGMINI_WATCHDOG_PID:String(process.pid)}
+   });
+   standbyStarts.push(Date.now());
+   const current={child,ready:false,promoting:false,sourceSha};
+   standby=current;
+   child.on('message',message=>{
+    if(standby!==current)return;
+    if(message?.type==='READY'&&message.pid===child.pid&&
+      message.sourceSha===sourceSha)current.ready=true;
+    if(message?.type==='PROMOTION_ATTEMPTED'&&message.pid===child.pid)
+     current.promoting=true; // Stay pinned until real Supervisor owner readback.
+    if(message?.type==='PROMOTION_BLOCKED'||message?.type==='PROMOTION_FAILED'){
+     current.ready=false;current.error=message.code??'STANDBY_PROMOTION_UNVERIFIED';
+    }
+   });
+   child.once('exit',()=>{if(standby===current)standby=null;});
+   child.once('error',()=>{if(standby===current)standby=null;});
+  }catch{status('BLOCKED_STANDBY_SETUP');}
+ }
  async function tick(){
   try{
    const ownerFile=path.join(control,'leases/supervisor/owner.json');
@@ -257,12 +391,30 @@ export async function main(){
     ||fs.readdirSync(path.join(control,'leases')).some(x=>x!=='supervisor'&&!x.startsWith('supervisor.dead-'));
    const state=decide({paused,owner,live:owner?alive(owner.pid):false,heartbeat:hb?.pid===owner?.pid?hb?.at:null});
    if(state==='HEALTHY'){
+    // Promote proof is the real Supervisor lease + fresh heartbeat, not IPC.
+    if(standbyMode&&standby?.promoting&&standby.child.pid===owner.pid)
+     standby=null; // The promoted child is Active; rearm one new passive candidate.
     healthySince??=Date.now();
     if(Date.now()-healthySince>600000&&history.length){history=[];write(path.join(home,'RESTART_HISTORY.json'),history);}
     status(state,{supervisorPid:owner.pid,heartbeatAt:hb.at});return;
    }
    healthySince=null;
    if(state!=='RECOVER'){status(state,{supervisorPid:owner?.pid??null,heartbeatAt:hb?.at??null});return;}
+   if(standbyMode&&(!standby||!standby.ready||standby.promoting)){
+    status('BLOCKED_STANDBY_NOT_READY');return;
+   }
+   if(standbyMode&&!verifiedColdStandbyStart({owner,heartbeat:hb})&&
+     !provenOldRunnerExit({owner,heartbeat:hb})){
+    // A partial/ambiguous past owner needs full six-seat exit evidence.
+    // A verified first start (no owner AND no historical heartbeat) is
+    // handled separately, still requiring the independent WMI check below.
+    status('BLOCKED_OLD_RUNNER_CHILD_UNVERIFIED');return;
+   }
+   if(standbyMode&&scanControllerRunnersReadOnly()!=='NO_CONTROLLER_RUNNER_PROCESS'){
+    // A dead cmd.exe launcher does not prove its Runner.Listener.exe exited.
+    // Unknown WMI process attribution must not create a second Runner owner.
+    status('BLOCKED_OLD_RUNNER_EXECUTABLE_UNVERIFIED');return;
+   }
    if(!workflowActive()){status('PAUSED_WORKFLOW');return;}
    history=history.filter(x=>Date.now()-x<3600000);
    if(history.length>=3){status('BLOCKED_RESTART_LIMIT');return;}
@@ -272,6 +424,18 @@ export async function main(){
    fs.mkdirSync(path.join(home,'archives'),{recursive:true});
    const archived=archiveDeadLease(path.join(control,'leases/supervisor'),alive,path.join(home,'archives','supervisor-'+Date.now()+'-'+randomUUID()));
    history.push(Date.now());write(path.join(home,'RESTART_HISTORY.json'),history);
+   if(standbyMode){
+    const candidate=standby;
+    candidate.promoting=true;candidate.ready=false;
+    try{
+     candidate.child.send({type:'PROMOTE',oldChildrenStopped:true},error=>{
+      if(error)status('BLOCKED_STANDBY_IPC_DELIVERY_UNKNOWN');
+     });
+    }catch{status('BLOCKED_STANDBY_IPC_DELIVERY_UNKNOWN');return;}
+    // No active/pass claim until the next tick verifies real owner+heartbeat.
+    status('STARTING',{standbyPid:candidate.child.pid,sourceSha,archivedLease:archived});
+    return;
+   }
    const out=fs.openSync(path.join(home,'SUPERVISOR_OUTPUT.log'),'a');
    try{
     const child=spawn(node,[path.join(control,'controller/supervisor.mjs')],{cwd:control,windowsHide:true,detached:true,stdio:['ignore',out,out],env:{...process.env}});
@@ -377,7 +541,7 @@ export async function main(){
      status:'BLOCKED',code:c,issueNumber});
   }finally{handoffActive=false;}
  }
- await tick();setInterval(tick,15000);
+ ensureStandby();await tick();setInterval(()=>{ensureStandby();void tick();},15000);
  void pollHandoff();setInterval(()=>{void pollHandoff();},60000);
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)main().catch(()=>{process.exitCode=1;});

@@ -1,5 +1,5 @@
 import fs from 'node:fs';import path from 'node:path';import {spawn,execFileSync} from 'node:child_process';import {fileURLToPath} from 'node:url';
-import {digest,need,validateRequest,writeJson,exclusive,errorCode} from './common.mjs';import {protectedState,readCore,nativeTaskXml,nativeRetiredIranEvidence,
+import {digest,need,validateRequest,writeJson,exclusive,errorCode,assertSupervisorOwner} from './common.mjs';import {protectedState,readCore,nativeTaskXml,nativeRetiredIranEvidence,
  CORE_STATUS_STAGES} from './operations.mjs';
 import {memoryAdmissionMinimum,waitForMemoryAdmission} from './memory-admission.mjs';
 import {R6_READONLY_STAGES} from './employment-r6-collection-evidence-readonly.mjs';
@@ -94,7 +94,9 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
    ...(request.operation==='core-status'&&before?{protectedTaskHashes:before.tasks}:{}),
    ...(request.operation==='d05-lineage-readonly'?{d05ApprovedSourceSha:report.pcOperationalApprovedSha}:{})}});
   const ms=policy.operations[request.operation].timeoutSeconds*1000;
-  preflightOperation='WORKER_EXECUTION';const childResult=await new Promise(resolve=>{
+  // Revalidate owner after memory admission, immediately before Worker spawn.
+   preflightOperation='SUPERVISOR_OWNERSHIP';assertSupervisorOwner(root,host);
+   preflightOperation='WORKER_EXECUTION';const childResult=await new Promise(resolve=>{
    const env={SystemRoot:process.env.SystemRoot,ComSpec:process.env.ComSpec,PATH:path.dirname(process.execPath),TEMP:workspace,TMP:workspace};
    const child=spawn(process.execPath,[worker,input,output],{env,cwd:workspace,windowsHide:true,stdio:'ignore'});let timedOut=false,settled=false,grace;
    const timer=setTimeout(()=>{timedOut=true;grace=setTimeout(()=>{if(!settled){settled=true;child.unref();resolve({code:null,timedOut:true,terminationUnknown:true,pid:child.pid});}},terminationGraceMs);if(child.pid){if(terminateTree)try{terminateTree(child.pid);}catch{}else if(process.platform==='win32')try{execFileSync('taskkill.exe',['/PID',String(child.pid),'/T','/F'],{windowsHide:true,stdio:'ignore',timeout:10000});}catch{}else child.kill('SIGKILL');}},ms);

@@ -28,6 +28,27 @@ export function exclusive(root,id,io=fs){
  }
  return ()=>{const f=path.join(p,'owner.json');need(JSON.parse(io.readFileSync(f)).nonce===nonce,'LEASE_OWNER_CHANGED');io.unlinkSync(f);io.rmdirSync(p);};
 }
+// R3 same-host standby: the existing supervisor owner is the only authority
+// to start *new* work. Historical installations without the attested standby
+// source keep their original entry contract until a separately approved B install.
+export function assertSupervisorOwner(root,host,environment=process.env,io=fs){
+ if(!Object.hasOwn(host?.controllerFiles??{},'controller/standby.mjs'))
+  return 'LEGACY_CONTROLLER_UNCHANGED';
+ const token=environment.ZGMINI_SUPERVISOR_NONCE;
+ need(typeof token==='string'&&/^[0-9a-f-]{36}$/i.test(token),
+  'SUPERVISOR_OWNERSHIP_UNVERIFIED');
+ let owner;
+ try{owner=JSON.parse(io.readFileSync(path.join(root,'leases/supervisor/owner.json'),'utf8'));}
+ catch{need(false,'SUPERVISOR_OWNERSHIP_UNVERIFIED');}
+ const bootAt=Date.now()-os.uptime()*1000;
+ need(owner?.nonce===token&&Number.isSafeInteger(owner.pid)&&owner.pid>0&&
+  Number.isFinite(owner.bootAt)&&Math.abs(owner.bootAt-bootAt)<10000,
+  'SUPERVISOR_OWNERSHIP_LOST');
+ try{process.kill(owner.pid,0);}
+ catch{need(false,'SUPERVISOR_OWNERSHIP_LOST');}
+ return 'SUPERVISOR_OWNERSHIP_VERIFIED';
+}
+
 export function validateRequest(request,policy){
  need(request&&typeof request==='object'&&!Array.isArray(request),'REQUEST_OBJECT');
  const keys=['schema','requestId','chatId','operation','sourceRepository','sourceBranch','sourceSha'];
