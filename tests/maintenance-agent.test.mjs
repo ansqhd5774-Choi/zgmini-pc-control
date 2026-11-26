@@ -58,7 +58,8 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
   applyError=null,applyResult=null,afterTimeout=null,commentError=null,
   uploadFailure=null,uploadAfterCommitError=null,installLock={held:false},
   verifyInstalledSource=()=>{},statusFaults={},preexistingLedger=null,
-  extraIssueSummaries=[],extraIssueDetails=[],progressError=null}={}){
+  extraIssueSummaries=[],extraIssueDetails=[],progressError=null,
+  s6RawManifest=null,s6Status=null}={}){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),"zgmini-maintainer-agent-test-"));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const leaseRoot=path.join(root,"leases");fs.mkdirSync(leaseRoot);
@@ -91,6 +92,12 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
         return {stdout:JSON.stringify(extraIssueDetails.find(row=>row.number===number)??issue)};
       }
       if(args[0]==="api"){
+        if(args[1].includes("/contents/approvals/controller-s6/")){
+          stats.manifestReads++;
+          if(s6RawManifest===null)throw Error('HTTP_404');
+          return {stdout:JSON.stringify({type:'file',encoding:'base64',
+            content:Buffer.from(s6RawManifest).toString('base64')})};
+        }
         if(args[1].includes("/contents/results/maintenance-")){
           const resource=args[1].split("?")[0];
           stats.uploadReads+=args.includes("--method")?0:1;
@@ -142,6 +149,11 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
     assert.equal(options.env.GITHUB_ACTIONS,undefined);
     assert.equal(options.env.GITHUB_TOKEN,undefined);
     assert.equal(options.env.ZGMINI_PC_MAINTENANCE_MODE,"OUT_OF_BAND");
+    if(args[1]==="s6-once-status"){
+      stats.statusQueries++;
+      if(s6Status===null)throw Error('S6_ONCE_STATUS_NOT_AVAILABLE');
+      return {stdout:JSON.stringify(s6Status)};
+    }
     if(args[1]==="status"){
       stats.statusQueries++;
       return {stdout:JSON.stringify({status:"STATUS",actualControllerSha:INSTALLED,
