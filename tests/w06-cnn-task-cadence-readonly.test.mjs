@@ -177,7 +177,7 @@ test('W06 HTTP PC read-only separates 60s attempted GET from D1 publication',()=
  assert.equal(unsafe.status,'UNVERIFIED');
 });
 test('W06 gap attribution distinguishes failed fetch, slow HTTP and unexplained verified predecessor without asserting causality',()=>{
- const time=value=>Date.parse('2026-11-26T'+value+':00.000Z');
+ const time=value=>Date.parse('2026-11-26T'+(value.length===5?value+':00':value)+'.000Z');
  const sample=(at,checked,outcome)=>({requestedAt:time(at),checkedAt:time(checked),
   httpStatus:outcome==='FETCH_FAILED'?null:200,outcome,
   sourceObservedAt:outcome==='VERIFIED'?'2026-11-26T01:59:59.000Z':null,
