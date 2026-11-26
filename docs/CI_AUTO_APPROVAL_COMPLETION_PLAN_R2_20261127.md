@@ -140,10 +140,10 @@
 ### 소스 변경 및 범위
 
 - 새 소스 브랜치: `codex/ci-a-writer-native-dispatch-20261127`, 최신 당시 main `aed6469b65940d59813daf290106c819cd2737ba` 기준.
-- [PR #4050](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4050): `ci-approval/native-dispatch.mjs`에 **A·Writer B 전용, 정확한 수신 workflow_dispatch 호출 계약**을 분리 구현. 임의 경로·C 효과 제외, 소스 Run/수신 workflow Blob/설치된 독립 수신 정책 대조 후 기존 효과 영구 원장에 배타 claim → 단회 API 호출 → 204 확인. POST 상태 불명은 재발행 금지. **PC 설치나 승인 판정은 하지 않는다.**
+- [PR #4050](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4050): `ci-approval/native-dispatch.mjs`에 **A·Writer B 전용, 정확한 수신 workflow_dispatch 호출 계약**을 분리 구현. 임의 경로·C 효과 제외, 소스 Run/수신 workflow Blob/설치된 독립 수신 정책 대조 후 A·Writer B 전용 영구 효과 원장에 배타 claim → 단회 API 호출 → 204 확인. 독립 저장기 재생성·손상 원장·volatile 경로를 구분하며 Controller B 원장 스키마는 변경하지 않는다. POST 상태 불명은 재발행 금지. **PC 설치나 승인 판정은 하지 않는다.**
 - 현행 Owner-only 운영 Workflow, A 실행기, Writer 설치기, Controller B 정책, GitHub 변수, PC Runtime, DB·D1·예약 **변경 0**.
-- 정책 Revision 변경에도 동일 승인 효과를 재발행하지 않도록 효과 키를 `effect + businessApprovalSha256 + approvedRequestSha256`로 고정. 추가한 단일 회귀까지 로컬 Node 시험 **19/19 PASS**.
-- HEAD `6f017cc091e4a2ad56b8409e504da80c6d8eeca0`; PR 실제 CI는 **별도 Run 확인 전 대기/미확인**, 현재 소스 PR 작성이 운영 적용은 아니다.
+- 정책 Revision 변경에도 동일 승인 효과를 재발행하지 않도록 효과 키를 `effect + businessApprovalSha256 + approvedRequestSha256`로 고정. 추가한 단일 회귀까지 로컬 Node 시험 **22/22 PASS**.
+- HEAD `e0c68781f10e5b66908285778a357dde88507fe6`; 해당 HEAD의 CI Run: Controller Maintenance `45877724129`, C996 `45877724163`, Secret Scan `45877724130` (**최종 결과 확인 전 QUEUED/PENDING**), 현재 소스 PR 작성이 운영 적용은 아니다.
 
 ### 다음 필수 실행
 
