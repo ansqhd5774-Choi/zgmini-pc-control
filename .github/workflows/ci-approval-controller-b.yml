@@ -11,6 +11,9 @@ permissions: {}
 jobs:
   submit-controller-b:
     name: submit-controller-b
+    # A late source CI for an Owner-merged approval can be observed without the
+    # independently configured CI-generated approval policy. Both paths keep
+    # their actual authorization checks inside the immutable publisher.
     # Operational activation remains separate from source review and CI PASS.
     # Keep this candidate unmerged until an independent B Receiver installed
     # policy is approved for its exact Git blob and read back from Windows.
@@ -25,10 +28,6 @@ jobs:
         github.event.forced == false &&
         github.event.deleted == false) ||
        (github.event_name == 'workflow_run' &&
-        # Existing Owner-merged approval may finish source CI after its main push.
-        # The pinned publisher independently checks actual Owner merge, source
-        # CI, immutable manifest bytes, B receiver policy and durable receipt.
-        # CI-generated approvals STILL require a configured exact policy in code.
         github.event.workflow_run.event == 'pull_request' &&
         github.event.workflow_run.conclusion == 'success' &&
         github.event.workflow_run.head_repository.id == 1442936296))
