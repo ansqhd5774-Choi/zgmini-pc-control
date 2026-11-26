@@ -5,6 +5,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {sha256,TARGET} from './contract.mjs';
 import {TITLE,LABEL,REQUEST_SCHEMA} from './admission.mjs';
+import {uploadResultPairAtomic} from '../writer-config-b/result-pair-atomic.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const OWNER='ansqhd5774-Choi';
@@ -77,16 +78,6 @@ const apiHeaders=token=>({
  'x-github-api-version':'2022-11-28',
  'content-type':'application/json',
  'user-agent':'zgmini-cnn-sidecar-b'});
-async function readback(fetchApi,url,headers,expected){
- try{
-  const rsp=await fetchApi(url+'?ref=main',{headers});
-  if(rsp.status!==200)return false;
-  const doc=await rsp.json();
-  return doc?.encoding==='base64'&&
-   Buffer.from(doc.content.replace(/\s/g,''),'base64')
-    .equals(Buffer.from(expected));
- }catch{return false;}
-}
 export async function publishSidecarBReport({
  event,env,raw,fetchApi=fetch,readCurrent=()=>{
   try{return sha256(fs.readFileSync(TARGET));}catch{return null;}
@@ -99,19 +90,14 @@ export async function publishSidecarBReport({
   (()=>{try{return JSON.parse(raw);}catch{return null;}})():null;
  const result=sanitizeSidecarBReport({raw:parsed,request,env,readCurrent});
  const headers=apiHeaders(env.GITHUB_TOKEN),root='https://api.github.com/repos/'+REPO;
- let created=0,verified=0;
- for(const [ext,content] of [
-  ['json',JSON.stringify(result,null,2)+'\n'],
-  ['txt',asText(result)] ]){
-  const url=root+'/contents/results/cnn-sidecar-b-'+request.requestId+'.'+ext;
-  try{
-   const rsp=await fetchApi(url,{method:'PUT',headers,
-    body:JSON.stringify({message:'report: exact CNN Sidecar B one-file outcome',
-     content:Buffer.from(content).toString('base64')})});
-   if(rsp.status===201)created++;
-  }catch{/* Unknown remote outcome; never automatically retry. */}
-  if(await readback(fetchApi,url,headers,content))verified++;
- }
+ // One Git ref CAS binds JSON and TXT atomically. A partial or unknown remote
+ // outcome remains STATE_UNKNOWN; never re-run the Sidecar installation.
+ const prefix='results/cnn-sidecar-b-'+request.requestId;
+ const pair=await uploadResultPairAtomic({fetchApi,headers,
+  message:'chore(sidecar-b): one-shot sanitized result pair',
+  outputs:[[prefix+'.json',JSON.stringify(result,null,2)+'\n'],
+   [prefix+'.txt',asText(result)]]});
+ const {created,verified}=pair;
  const ok=verified===2;
  const body='<!-- cnn-sidecar-b:'+request.requestId+' -->\n'+
   'CNN Sidecar B verified result pair: '+(ok?result.status:'STATE_UNKNOWN')+
