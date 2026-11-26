@@ -1,0 +1,106 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-45897231398-1-seat-6",
+  "requestId": "ed9734a1-2826-4d75-b5ce-eb97ad228645",
+  "startedAt": "2026-11-26T21:19:27.129Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "3c7d4cfefacf072fd35cb19706b352c64c5e4fd2",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "f7ea89305df8471ffb1827d974fc2e0c223d0b09",
+  "sourceBranch": "main",
+  "operation": "core-runtime-source-readonly",
+  "seat": 6,
+  "status": "PASS",
+  "code": "CORE_RUNTIME_SOURCE_VERIFIED",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-usbreadthr2-core-lock-owner-20261127",
+  "effectClass": "FIXED_READONLY_NO_PROVIDER_NO_DB",
+  "pcOperationalApprovedSha": "c8ed53a3991212dd1778742cda8a86ac133e0796",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "CORE_RUNTIME_SOURCE_VERIFIED",
+    "evidenceLevel": "TASK_ENGINE_WMI_PROCESS_CHAIN",
+    "runtimeSourceVerified": true,
+    "activeCoreSourceVerified": true,
+    "activeCoreRoot": "e:\\zgmini\\projects\\zgmini-earnings-history-pc-release",
+    "relativeEntrypoint": "scripts/pc-writer/local-cycle.mjs",
+    "runningTaskInstances": 1,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "sqliteOpened": false,
+    "operationalWrites": 0,
+    "sourceFileHashesVerified": true,
+    "sourceFileHashCode": null,
+    "beforeFileSha256": [
+      {
+        "path": "lib/earnings-api-calendar.mjs",
+        "sha256": "e48d4ea5da65d2b72b070e54bb41103486e730c38b8c040215388a9b57af39cb"
+      },
+      {
+        "path": "scripts/pc-writer/earnings-api-local.mjs",
+        "sha256": "a686bf736c9a5ae274cd2dc69dd169e93ddab90f72ae273c45e765c788226ce8"
+      },
+      {
+        "path": "scripts/pc-writer/release-calendar.mjs",
+        "sha256": "16e9ecc9692c67addceeb9dd8eb479d2d973e25f3c86db4e6872b96f29c85545"
+      }
+    ],
+    "lockOwner": {
+      "status": "VERIFIED_ACTIVE_CORE",
+      "code": "CORE_LOCK_TASK_LINKED_OWNER_VERIFIED"
+    },
+    "sourceIdentity": {
+      "status": "VERIFIED",
+      "sourceSha": "c8ed53a3991212dd1778742cda8a86ac133e0796",
+      "approvedSourceSha": "c8ed53a3991212dd1778742cda8a86ac133e0796",
+      "files": [
+        {
+          "path": "scripts/pc-writer/local-cycle.mjs",
+          "sha256": "f69fb3cc1a6fdb85af34054f016b10dcbc7b1dcbf76e51c32b617121fe22d05d",
+          "gitBlobSha256": "f69fb3cc1a6fdb85af34054f016b10dcbc7b1dcbf76e51c32b617121fe22d05d",
+          "bytePolicy": "EXACT_GIT_BLOB"
+        },
+        {
+          "path": "scripts/pc-writer/collect-local.mjs",
+          "sha256": "6a750c854b18e419a5a44e6805c409a19efe9c6a9f8a416d76ea59ffa4dbdf43",
+          "gitBlobSha256": "6a750c854b18e419a5a44e6805c409a19efe9c6a9f8a416d76ea59ffa4dbdf43",
+          "bytePolicy": "EXACT_GIT_BLOB"
+        },
+        {
+          "path": "scripts/pc-writer/run-local.mjs",
+          "sha256": "92d98c3cbc115ddef3773e19c3cd200653d35c2f6d16caee495fe08e68d8a13f",
+          "gitBlobSha256": "92d98c3cbc115ddef3773e19c3cd200653d35c2f6d16caee495fe08e68d8a13f",
+          "bytePolicy": "EXACT_GIT_BLOB"
+        },
+        {
+          "path": "scripts/pc-writer/collection-events.mjs",
+          "sha256": "0085ea065382b8530fe3b45000d12bdb961801e183f5bd161ad897e2c53ad2ba",
+          "gitBlobSha256": "74f836aff846268b6cb905f2dfaada3a83324fafc7891f93a5b6eac6d0bdf901",
+          "bytePolicy": "GIT_CRLF_CHECKOUT"
+        }
+      ]
+    },
+    "taskOrigin": {
+      "method": "TASK_SERVICE_INCLUDE_HIDDEN_EXACT_PATH",
+      "taskInstanceIds": [
+        "{4a1aefb6-2f6a-4a89-821b-97a37434203e}"
+      ]
+    },
+    "collectionWriterSameCycleVerified": false,
+    "resultLineage": "LIVE_SOURCE_PROVEN_CHECKPOINT_CYCLE_LINK_NOT_ATTESTED"
+  },
+  "protectedBeforeSha256": "1e04296eab72cc0397c43ac2741252af9c3e2d9f31a7b38c189093d9765a0bee",
+  "protectedAfterSha256": "1e04296eab72cc0397c43ac2741252af9c3e2d9f31a7b38c189093d9765a0bee",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "3c7d4cfefacf072fd35cb19706b352c64c5e4fd2",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-26T21:19:51.419Z",
+  "durationMs": 24290
+}
