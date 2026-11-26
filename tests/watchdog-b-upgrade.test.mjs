@@ -330,9 +330,23 @@ test('R5 admission pins exact R4 staged raw bytes and dual-passive target',()=>{
   newSha:R5_SOURCE_SHA256,oldManifestSha:R5_INSTALL_PREIMAGE_SHA256,
   expectedControllerSha:R5_CONTROLLER_SHA
  });
- // No approval manifest is issued from this source-only readiness contract.
- assert.equal(fs.existsSync(new URL(
-  '../approvals/watchdog-upgrades/'+R5_TARGET+'.json',import.meta.url)),false);
+ // R4 READY was confirmed by the operating A #3838 (11:08 UTC).
+ // The R5 approval is pinned to the exact R4 on-disk source and raw manifest
+ // preimage; it must be accepted byte-for-byte, not by synthesized objects.
+ const bytes=fs.readFileSync(new URL(
+  '../approvals/watchdog-upgrades/'+R5_TARGET+'.json',import.meta.url));
+ const actual=JSON.parse(bytes);
+ const candidate=fixtureR5();
+ candidate.approval=actual;
+ candidate.approvalDigest=shaR5(bytes);
+ candidate.body.approvalManifestSha256=shaR5(bytes);
+ assert.equal(actual.approved,true);
+ assert.equal(actual.revision,5);
+ assert.deepEqual(actual.standby,{mode:'ACTIVE_1_STANDBY_2',approved:true});
+ assert.deepEqual(actual.expectedControllerFiles,R5_CONTROLLER_FILES);
+ assert.equal(actual.installedManifestSha256,R5_INSTALL_PREIMAGE_SHA256);
+ assert.equal(actual.targetSha256,R5_SOURCE_SHA256);
+ assert.equal(admitR5(candidate).newSha,R5_SOURCE_SHA256);
 });
 
 test('R5 is blocked on every unapproved effect, hash, source or actor drift',()=>{
