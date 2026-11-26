@@ -11,7 +11,8 @@ import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {applyApprovedUpdate,maintenanceFailureCode,reconcileInterruptedRollback,runApprovedS6FailoverOnce} from '../tools/maintenance-apply.mjs';
 import {isolatedControllerStage,recoveryOperatorProofStatus,waitForSupervisorStopIdle,
- s6PriorRequestLedgerPreserved,normalizeS6OldChildren} from '../tools/update.mjs';
+ s6PriorRequestLedgerPreserved,normalizeS6OldChildren,
+ s6WatchdogPinMatches} from '../tools/update.mjs';
 
 test('independent recovery proof keeps strict identity and returns exact sanitized failure categories',()=>{
  assert.deepEqual(recoveryOperatorProofStatus({exitCode:0,stdout:'INDEPENDENT_OPERATOR\r\n'}),{verified:true,code:'RECOVERY_OPERATOR_VERIFIED'});
@@ -1290,4 +1291,26 @@ test('S6 six original Runner child seats are canonicalized despite Windows Super
  assert.equal(normalizeS6OldChildren([...resumed.slice(0,5),{...resumed[5],alive:false}],{
   requireAlive:true}),null);
  assert.notEqual(normalizeS6OldChildren(resumed),null);
+});
+
+
+test('S6 Watchdog approval pin rejects replaced source, receiver nonce and recycled PID',()=>{
+ const baseline={watchdogSourceSha256:'a'.repeat(64),
+  watchdogReceiverNonce:'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',watchdogPid:21001};
+ const install={sha256:baseline.watchdogSourceSha256};
+ const receiver={pid:baseline.watchdogPid,nonce:baseline.watchdogReceiverNonce};
+ const status={pid:baseline.watchdogPid,state:'HEALTHY'};
+ const good={baseline,install,receiver,status,sourceSha256:install.sha256};
+ assert.equal(s6WatchdogPinMatches(good),true);
+ for(const altered of [
+  {install:{sha256:'b'.repeat(64)}},
+  {sourceSha256:'b'.repeat(64)},
+  {receiver:{...receiver,nonce:'ffffffff-bbbb-4ccc-8ddd-eeeeeeeeeeee'}},
+  {receiver:{...receiver,pid:21009}},
+  {status:{...status,pid:21009}},
+  {baseline:{...baseline,watchdogSourceSha256:'invalid'}},
+  {baseline:{...baseline,watchdogReceiverNonce:'invalid'}},
+  {baseline:{...baseline,watchdogPid:null}}
+ ])assert.equal(s6WatchdogPinMatches({...good,...altered}),false,
+  JSON.stringify(altered));
 });
