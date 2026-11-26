@@ -31,8 +31,8 @@ const valid=()=>({
 
 test('six live seats and registered service listener are diagnostic only',()=>{
  const result=assessOrphanRunnerPreflight(valid());
- assert.equal(result.status,'READ_ONLY_CANDIDATE');
- assert.equal(result.code,'ORPHAN_SIX_CONTROLLER_LISTENERS_PRESERVED');
+ assert.equal(result.status,'OBSERVED_ONLY');
+ assert.equal(result.code,'ORPHAN_SIX_LISTENERS_REQUIRE_NONCE_REBIND');
  assert.equal(result.controllerListenerCount,6);
  assert.equal(result.workerCount,1);
  assert.equal(result.serviceListenerExceptions,1);
@@ -40,6 +40,8 @@ test('six live seats and registered service listener are diagnostic only',()=>{
  assert.equal(result.runnerTerminationAuthorized,false);
  assert.equal(result.supervisorSpawnAuthorized,false);
  assert.equal(result.leaseMutationAuthorized,false);
+ assert.equal(result.controllerJobAdmissionVerified,false);
+ assert.equal(result.runnerTokenRebindRequired,true);
  assert.equal(result.operationalWrites,0);
  assert.doesNotMatch(JSON.stringify(result),/9000|6079df7b|Runner.Listener.exe/);
 });
@@ -99,6 +101,25 @@ test('duplicate seats, WMI unknown paths and PID ambiguity fail closed',()=>{
   assert.equal(result.promotionAuthorized,false);
   assert.equal(result.leaseMutationAuthorized,false);
  }
+});
+
+test('old Runner environment cannot satisfy a new Supervisor identity without rebind',()=>{
+ const common=fs.readFileSync(new URL('../controller/common.mjs',import.meta.url),'utf8');
+ const entry=fs.readFileSync(new URL('../controller/entry.mjs',import.meta.url),'utf8');
+ const engine=fs.readFileSync(new URL('../controller/engine.mjs',import.meta.url),'utf8');
+ const supervisor=fs.readFileSync(new URL('../controller/supervisor.mjs',import.meta.url),'utf8');
+ assert.match(common,/environment\.ZGMINI_SUPERVISOR_NONCE/);
+ assert.match(common,/owner\?\.nonce===token/);
+ assert.match(common,/process\.kill\(owner\.pid,0\)/);
+ assert.match(entry,/assertSupervisorOwner\(root,host\)/);
+ assert.match(engine,/assertSupervisorOwner\(root,host\)/);
+ assert.match(supervisor,/ZGMINI_SUPERVISOR_NONCE:leaseNonce/);
+ // Merely proving six live Listeners cannot guarantee a new owner
+ // can authorize jobs that inherited a now-dead Supervisor nonce.
+ const result=assessOrphanRunnerPreflight(valid());
+ assert.equal(result.controllerJobAdmissionVerified,false);
+ assert.equal(result.runnerTokenRebindRequired,true);
+ assert.equal(result.supervisorSpawnAuthorized,false);
 });
 
 test('read-only module cannot start, terminate, archive or change leases',()=>{
