@@ -5,7 +5,9 @@ import {performance} from 'node:perf_hooks';
 import {inspectSidecarBResourceFlagsReadonly} from './operating-probe.mjs';
 
 const STOP=code=>{throw Object.assign(new Error(code),{code});};
-const WINDOW_MS=240_000;
+// Seven-minute passive window covers the observed five-minute Core cycle.
+// No Task, lease, provider or operational write changes.
+const WINDOW_MS=420_000;
 const STEP_MS=5_000;
 
 export async function awaitNaturalSidecarIdle({
