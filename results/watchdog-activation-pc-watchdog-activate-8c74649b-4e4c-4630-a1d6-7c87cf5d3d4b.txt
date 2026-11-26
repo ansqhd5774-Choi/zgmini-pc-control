@@ -1,0 +1,7 @@
+schema=ZGMINI_PC_WATCHDOG_ACTIVATION_B_RESULT_V1
+requestId=pc-watchdog-activate-8c74649b-4e4c-4630-a1d6-7c87cf5d3d4b
+status=STATE_UNKNOWN
+code=WATCHDOG_ACTIVATION_NEW_PROCESS_NOT_CONFIRMED
+newProcessAttested=false
+watchdogFileWrites=0
+next=STOP_INSPECT_EXISTING_CLAIM_NO_RETRY
