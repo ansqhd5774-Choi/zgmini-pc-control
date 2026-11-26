@@ -41,7 +41,7 @@ export function sanitizeTaskCreateB(raw,request,{verified=false}={}){
  const base={schema:RESULT_SCHEMA,requestId:request.requestId,
   taskName:TASK,status:'TASK_CREATE_B_STATE_UNKNOWN',
   code:'TASK_CREATE_B_RESULT_UNVERIFIED_STOP',
-  installed:false,taskChanges:null,otherTaskChanges:0,
+  installed:null,taskChanges:null,otherTaskChanges:0,
   installerProviderCalls:0,installerSqliteWrites:0,installerD1Writes:0,
   scheduledRuntimeEffects:'UNVERIFIED_UNTIL_NATURAL_TICKS',
   retry:'READ_ONLY_RECONCILE_NO_REEXECUTE'};
