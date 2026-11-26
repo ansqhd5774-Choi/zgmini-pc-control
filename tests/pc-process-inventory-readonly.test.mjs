@@ -3723,3 +3723,21 @@ test('fixed orphan per-seat A accepts only canonical operating-only probe',()=>{
   probe:'controller-orphan-seat-map-readonly',pid:1234})}};
  assert.throws(()=>authenticateProcess(command,env,'operating'));
 });
+
+test('fixed orphan owner CAS A allows only exact operating scope',()=>{
+ const e=event('operating'),original=JSON.parse(e.issue.body);
+ const req={...e,issue:{...e.issue,body:JSON.stringify({...original,
+  probe:'controller-orphan-owner-cas-readonly'})}};
+ assert.equal(authenticateProcess(req,env,'operating').orphanOwnerCas,true);
+ assert.throws(()=>authenticateProcess(req,env,'handoff'));
+ for(const bogus of ['controller-orphan-owner-cas-readonly;cmd',
+  'controller-orphan-owner-cas-write']){
+  const bad={...e,issue:{...e.issue,body:JSON.stringify({...original,probe:bogus})}};
+  assert.throws(()=>authenticateProcess(bad,env,'operating'));
+ }
+ for(const extra of [{nonce:'private'},{path:'E:/data'},{pid:1234}]){
+  const bad={...e,issue:{...e.issue,body:JSON.stringify({...original,
+   ...extra,probe:'controller-orphan-owner-cas-readonly'})}};
+  assert.throws(()=>authenticateProcess(bad,env,'operating'));
+ }
+});
