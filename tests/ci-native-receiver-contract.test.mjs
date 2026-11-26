@@ -158,3 +158,19 @@ test('admin effect is not accepted in native A Writer receiver',()=>{
  const f=fixture();f.policy.effect='C_ADMIN';
  expect(f,'CI_NATIVE_RECEIVER_INSTALLED_POLICY_INVALID');
 });
+
+
+for(const effect of ['A_READONLY','B_WRITER_SOURCE'])test(effect+' independently verified event-bound Run cannot mint an execution grant',()=>{
+ const f=fixture(effect);
+ f.policy.sourceRunMode='EVENT_COMPLETION_V1';
+ const r=inspectNativeReceiver(f);
+ assert.equal(r.state,'CONTRACT_MATCH_ONLY');
+ assert.equal(r.canPublish,false);
+ assert.equal(r.canExecute,false);
+ assert.equal(r.canInstall,false);
+});
+test('receiver rejects unknown event-binding policy schemas even with a successful run',()=>{
+ const f=fixture();
+ f.policy.sourceRunMode='UNREVIEWED';
+ expect(f,'CI_NATIVE_RECEIVER_INSTALLED_POLICY_INVALID');
+});

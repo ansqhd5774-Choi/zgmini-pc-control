@@ -10,6 +10,7 @@ const hash=b=>createHash('sha256').update(b).digest('hex');
 const blob=b=>createHash('sha1').update(Buffer.from('blob '+b.length+'\0')).update(b).digest('hex');
 const fixture=(effect='A_READONLY')=>{
  const requestBytes=Buffer.from('{"operation":"core-status"}');
+ const approvalBytes=Buffer.from('{"approved":"pinned-A-or-Writer-scope"}');
  const sourceBytes=Buffer.from('name: approved source CI\n');
  const receiverBytes=Buffer.from('name: approved native receiver\n');
  const pathValue=effect==='A_READONLY'?'.github/workflows/ci-approved-a-once.yml':'.github/workflows/ci-approved-writer-b-once.yml';
@@ -17,7 +18,7 @@ const fixture=(effect='A_READONLY')=>{
   sourceRunId:222,sourceAttempt:1,sourceWorkflowId:1234,sourceHeadSha:'a'.repeat(40),
   sourceWorkflowPath:'.github/workflows/controller-maintenance-source-tests.yml',
   sourceWorkflowBlobSha:blob(sourceBytes),receiverWorkflowPath:pathValue,receiverWorkflowBlobSha:blob(receiverBytes),
-  businessApprovalSha256:'b'.repeat(64),approvedRequestSha256:hash(requestBytes),policyRevision:'c'.repeat(40)};
+  businessApprovalSha256:hash(approvalBytes),approvedRequestSha256:hash(requestBytes),policyRevision:'c'.repeat(40)};
  const run={id:222,run_attempt:1,workflow_id:1234,path:policy.sourceWorkflowPath,
   head_sha:policy.sourceHeadSha,status:'completed',conclusion:'success',event:'pull_request',
   repository:{id:1442936296,full_name:REPO,private:true},head_repository:{id:1442936296}};
@@ -25,7 +26,7 @@ const fixture=(effect='A_READONLY')=>{
  const env={GITHUB_EVENT_NAME:'workflow_run',GITHUB_REPOSITORY:REPO,GITHUB_REF:'refs/heads/main'};
  let created=0,claim=null;
  const ports={
-  readNativeScope:async()=>({policy,requestBytes}),
+  readNativeScope:async()=>({policy,requestBytes,approvalBytes}),
   readSourceRun:async()=>run,
   readSourceWorkflow:async()=>({type:'file',path:policy.sourceWorkflowPath,
    sha:policy.sourceWorkflowBlobSha,encoding:'base64',content:sourceBytes.toString('base64')}),
@@ -132,4 +133,65 @@ test('native publisher workflow is event-driven, write-scoped, opt-in only',()=>
  assert.match(source,/github\.event\.workflow_run\.event == 'pull_request'/);
  assert.match(source,/native-publisher-entry\.mjs/);
  assert.doesNotMatch(source,/controller\\entry\.mjs|writer-b\\windows-adapter\.mjs/);
+});
+
+
+for(const effect of ['A_READONLY','B_WRITER_SOURCE'])test(effect+' preinstalled event-bound grant binds the first actual CI run once',async()=>{
+ const x=fixture(effect);
+ delete x.policy.sourceRunId;
+ x.policy.sourceRunMode='EVENT_COMPLETION_V1';
+ const first=await publishNativeCompletion({...x,effect});
+ assert.equal(first.state,'DISPATCH_ACCEPTED_NOT_EXECUTED');
+ assert.equal(x.readCount(),1);
+ assert.equal(x.ports.readNativeScope!==undefined,true);
+ const again=await publishNativeCompletion({...x,effect});
+ assert.equal(again.code,'CI_NATIVE_DISPATCH_PRIOR_EFFECT_NO_REPOST');
+ assert.equal(x.readCount(),1);
+});
+test('event-bound publisher rejects a source-run attempt 2, unknown source SHA or unapproved policy mode',async()=>{
+ for(const change of [
+  x=>{x.event.workflow_run.run_attempt=2},
+  x=>{x.event.workflow_run.head_sha='f'.repeat(40)},
+  x=>{x.policy.sourceRunMode='UNREVIEWED'}
+ ]){
+  const x=fixture();
+  delete x.policy.sourceRunId;
+  x.policy.sourceRunMode='EVENT_COMPLETION_V1';
+  change(x);
+  const r=await publishNativeCompletion({...x,effect:'A_READONLY'});
+  assert.notEqual(r.dispatched,true);
+  assert.equal(x.readCount(),0);
+ }
+});
+test('event-bound publisher does not accept a future run from a different workflow',async()=>{
+ const x=fixture();
+ delete x.policy.sourceRunId;
+ x.policy.sourceRunMode='EVENT_COMPLETION_V1';
+ x.event.workflow_run.workflow_id=999;
+ const r=await publishNativeCompletion({...x,effect:'A_READONLY'});
+ assert.equal(r.code,'CI_NATIVE_PUBLISH_SOURCE_EVENT_NOT_TARGET');
+ assert.equal(x.readCount(),0);
+});
+test('future-run mode is explicit and cannot silently reuse a fixed-ID grant',async()=>{
+ const x=fixture();
+ x.policy.sourceRunMode='EVENT_COMPLETION_V1';
+ const r=await publishNativeCompletion({...x,effect:'A_READONLY'});
+ assert.equal(r.code,'CI_NATIVE_PUBLISH_SOURCE_EVENT_NOT_TARGET');
+ assert.equal(x.readCount(),0);
+});
+
+
+for(const mode of ['FIXED','EVENT_COMPLETION_V1'])test('approval bytes drift refuses native dispatch without consuming the one-shot claim in '+mode,async()=>{
+ const x=fixture();
+ if(mode==='EVENT_COMPLETION_V1'){
+  delete x.policy.sourceRunId;
+  x.policy.sourceRunMode=mode;
+ }
+ const old=x.ports.readNativeScope;
+ x.ports.readNativeScope=async()=>({...await old(),
+  approvalBytes:Buffer.from('{"unapproved":true}')});
+ const r=await publishNativeCompletion({...x,effect:'A_READONLY'});
+ assert.equal(r.code,'CI_NATIVE_PUBLISH_APPROVAL_BYTES_DRIFT');
+ assert.equal(r.state,'EVIDENCE_MISSING');
+ assert.equal(x.readCount(),0);
 });

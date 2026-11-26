@@ -42,7 +42,9 @@ export function inspectNativeReceiver({
 }={}){
  if(policy?.enabled!==true)return result('DISABLED','CI_NATIVE_RECEIVER_NOT_ENABLED');
  const effect=policy.effect,path=WORKFLOWS[effect];
- if(!path||policy.schema!=='ZGMINI_CI_NATIVE_DISPATCH_V1'||
+ if((policy.sourceRunMode!==undefined&&
+     policy.sourceRunMode!=='EVENT_COMPLETION_V1')||
+    !path||policy.schema!=='ZGMINI_CI_NATIVE_DISPATCH_V1'||
     policy.receiverWorkflowPath!==path||!sha(policy.receiverWorkflowBlobSha,40)||
     !sha(policy.sourceHeadSha,40)||!sha(policy.sourceWorkflowBlobSha,40)||
     !id(policy.sourceRunId)||!id(policy.sourceAttempt)||!id(policy.sourceWorkflowId)||

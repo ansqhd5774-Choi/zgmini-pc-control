@@ -7,6 +7,7 @@
 import {createHash} from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import {isDeepStrictEqual} from 'node:util';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control', REPO_ID=1442936296;
 const RECEIVERS=Object.freeze({
@@ -30,7 +31,9 @@ const denied=(state,code,extra={})=>Object.freeze({state,code,dispatched:false,e
 export async function dispatchApprovedCiEffect({policy,requestBytes,ports}={}){
  if(!policy||policy.enabled!==true)return denied('DISABLED','CI_NATIVE_DISPATCH_POLICY_DISABLED');
  const effect=policy.effect,receiver=RECEIVERS[effect];
- if(!receiver||policy.schema!=='ZGMINI_CI_NATIVE_DISPATCH_V1'||
+ const eventBound=policy.sourceRunMode==='EVENT_COMPLETION_V1';
+ if((policy.sourceRunMode!==undefined&&!eventBound)||
+    !receiver||policy.schema!=='ZGMINI_CI_NATIVE_DISPATCH_V1'||
    policy.receiverWorkflowPath!==receiver||!hex(policy.receiverWorkflowBlobSha,40)||
    !id(policy.sourceRunId)||!id(policy.sourceAttempt)||!id(policy.sourceWorkflowId)||
    !hex(policy.sourceHeadSha,40)||!hex(policy.sourceWorkflowBlobSha,40)||
@@ -84,12 +87,16 @@ export async function dispatchApprovedCiEffect({policy,requestBytes,ports}={}){
  // A caller-supplied policy cannot independently prove a business grant.
  // Compare *all* material authority fields with the installed trusted scope.
  // A changed approval hash or source run must never mint a new effect claim.
- const installedFields=['effect','receiverWorkflowPath','receiverWorkflowBlobSha',
-  'sourceRunId','sourceAttempt','sourceWorkflowId','sourceWorkflowPath',
-  'sourceHeadSha','sourceWorkflowBlobSha','businessApprovalSha256',
-  'approvedRequestSha256','policyRevision'];
+ // The complete installed policy is the authority, including execution
+ // enable flags and adapter/Controller SHA pins. Comparing only transport
+ // fields would let a modified local scope silently elevate its effect.
+ // For an event-bound policy, remove ONLY the authenticated runtime Run ID:
+ // it is deliberately absent from the independently installed B proof.
+ const authorizedPolicy={...policy};
+ if(eventBound)delete authorizedPolicy.sourceRunId;
  if(installed?.enabled!==true||
-   installedFields.some(k=>installed[k]!==policy[k]))
+    (eventBound&&policy.sourceAttempt!==1)||
+    !isDeepStrictEqual(installed,authorizedPolicy))
   return denied('EVIDENCE_MISSING','CI_NATIVE_DISPATCH_RECEIVER_NOT_ATTESTED',{effectKey:key});
  let prior;
  try{prior=await ports.loadReceipt(key);}catch{return denied('STATE_UNKNOWN','CI_NATIVE_DISPATCH_RECEIPT_READ_UNKNOWN',{effectKey:key});}

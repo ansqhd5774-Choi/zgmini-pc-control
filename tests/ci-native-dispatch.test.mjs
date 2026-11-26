@@ -159,3 +159,102 @@ test('200 response survives exact durable receipt readback',async()=>{
   assert.equal(r.downstreamRunId,id);assert.equal(store.loadReceipt(r.effectKey).downstreamRunId,id);
  }finally{fs.rmSync(root,{recursive:true,force:true})}
 });
+
+
+for(const effect of ['A_READONLY','B_WRITER_SOURCE'])test(effect+' actual CI run is independently read and claimed under preinstalled event-mode grant',async()=>{
+ const x=make(effect);
+ delete x.policy.sourceRunId;
+ x.policy.sourceRunMode='EVENT_COMPLETION_V1';
+ const installed={...x.policy};
+ x.ports.readInstalledReceiver=async()=>installed;
+ const bound={...x.policy,sourceRunId:123};
+ const result=await dispatchApprovedCiEffect({policy:bound,requestBytes:x.bytes,ports:x.ports});
+ assert.equal(result.code,'CI_NATIVE_DISPATCH_WAKEUP_ONLY');
+ assert.equal(x.dispatches.length,1);
+ assert.equal(x.dispatches[0].payload.inputs.source_run_id,'123');
+ const duplicate=await dispatchApprovedCiEffect({policy:bound,requestBytes:x.bytes,ports:x.ports});
+ assert.equal(duplicate.code,'CI_NATIVE_DISPATCH_PRIOR_EFFECT_NO_REPOST');
+ assert.equal(x.dispatches.length,1);
+});
+test('event-mode policy cannot include a prechosen run ID or unreviewed mode',async()=>{
+ for(const modify of [
+  x=>{x.policy.sourceRunMode='OTHER'},
+  x=>{x.policy.sourceRunMode='EVENT_COMPLETION_V1';x.policy.sourceAttempt=2}
+ ]){
+  const x=make();
+  modify(x);
+  const r=await dispatchApprovedCiEffect({policy:x.policy,requestBytes:x.bytes,ports:x.ports});
+  assert.equal(r.dispatched,false);
+  assert.equal(x.claims.length,0);
+ }
+ const x=make();
+ x.policy.sourceRunMode='EVENT_COMPLETION_V1';
+ const r=await dispatchApprovedCiEffect({policy:x.policy,requestBytes:x.bytes,ports:x.ports});
+ assert.equal(r.code,'CI_NATIVE_DISPATCH_RECEIVER_NOT_ATTESTED');
+ assert.equal(x.claims.length,0);
+});
+test('event-bound installed scope blocks a different CI source revision and bad run provenance',async()=>{
+ const x=make();
+ delete x.policy.sourceRunId;
+ x.policy.sourceRunMode='EVENT_COMPLETION_V1';
+ const bound={...x.policy,sourceRunId:123};
+ const installed={...x.policy};
+ x.ports.readInstalledReceiver=async()=>installed;
+ x.run.head_sha='f'.repeat(40);
+ const r=await dispatchApprovedCiEffect({policy:bound,requestBytes:x.bytes,ports:x.ports});
+ assert.equal(r.code,'CI_NATIVE_DISPATCH_RUN_UNVERIFIED');
+ assert.equal(x.claims.length,0);
+});
+test('event-bound live policy cannot drift from independent installed approved scope',async()=>{
+ const x=make();
+ delete x.policy.sourceRunId;
+ x.policy.sourceRunMode='EVENT_COMPLETION_V1';
+ const installed={...x.policy};
+ x.ports.readInstalledReceiver=async()=>installed;
+ const bound={...x.policy,sourceRunId:123,policyRevision:'d'.repeat(40)};
+ const r=await dispatchApprovedCiEffect({policy:bound,requestBytes:x.bytes,ports:x.ports});
+ assert.equal(r.code,'CI_NATIVE_DISPATCH_RECEIVER_NOT_ATTESTED');
+ assert.equal(x.claims.length,0);
+});
+
+
+for(const mode of ['FIXED','EVENT_COMPLETION_V1'])test('installed full native policy pins execution toggles and adapter/controller SHA in '+mode+' mode',async()=>{
+ for(const changed of [
+  {nativeAExecutionEnabled:true},
+  {nativeWriterBExecutionEnabled:true},
+  {nativeAAdapterSha256:'a'.repeat(64)},
+  {nativeWriterBAdapterSha256:'b'.repeat(64)},
+  {nativeWriterBControlSha:'c'.repeat(40)},
+  {installedControllerSha:'d'.repeat(40)}
+ ]){
+  const x=make();
+  if(mode==='EVENT_COMPLETION_V1'){
+   delete x.policy.sourceRunId;
+   x.policy.sourceRunMode=mode;
+  }
+  const approved={...x.policy};
+  x.ports.readInstalledReceiver=async()=>approved;
+  const caller={...x.policy,...changed,
+   ...(mode==='EVENT_COMPLETION_V1'?{sourceRunId:123}:{})};
+  const r=await dispatchApprovedCiEffect({policy:caller,requestBytes:x.bytes,ports:x.ports});
+  assert.equal(r.code,'CI_NATIVE_DISPATCH_RECEIVER_NOT_ATTESTED');
+  assert.equal(x.dispatches.length,0);
+  assert.equal(x.claims.length,0);
+ }
+});
+
+
+for(const mode of ['FIXED','EVENT_COMPLETION_V1'])test('equivalent independently installed native policy is not rejected by JSON key order in '+mode+' mode',async()=>{
+ const x=make();
+ if(mode==='EVENT_COMPLETION_V1'){
+  delete x.policy.sourceRunId;
+  x.policy.sourceRunMode=mode;
+ }
+ const installation={};
+ for(const [name,value] of Object.entries(x.policy).reverse())installation[name]=value;
+ x.ports.readInstalledReceiver=async()=>installation;
+ const current={...x.policy,...(mode==='EVENT_COMPLETION_V1'?{sourceRunId:123}:{})};
+ const r=await dispatchApprovedCiEffect({policy:current,requestBytes:x.bytes,ports:x.ports});
+ assert.equal(r.code,'CI_NATIVE_DISPATCH_WAKEUP_ONLY');
+ assert.equal(x.dispatches.length,1);
+});
