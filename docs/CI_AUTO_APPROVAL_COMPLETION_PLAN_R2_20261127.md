@@ -688,3 +688,11 @@
 1. 정확 HEAD의 Process Source/C996 결과 회수 → 검증 성공 시 타 담당자 main 변경을 보존하여 PR 병합·Git blob 확인, 실패 시 해당 source 원인만 최소 수정.
 2. 새로운 소스 CI PASS를 기존 #4117 영수증 복구로 오인하지 않는다. 그 고유 원본은 불명/미발행 유지. 새 승인·변수/정책 root 생성/설치 없이 독립 원본 존재를 추가 읽기.
 3. Native A/Writer B의 격리 PC 루트·Publisher/Executor 플래그 미설정(#4113)과 Controller B policy empty/flag false(#4117)를 별도 보존. 승인된 독립 policy root/업무 Owner grant 및 실제 적용 명세가 확인된 범위에서만 정규 활성화·실효과 종단 검증. **무인 A/Writer B/Controller B 0/3** 유지.
+
+### #4126 동시 소스 PR 경합 정리 — #4125 선병합 확인
+
+- 동일한 공유 결과 업로더 3파일을 다른 담당자가 먼저 [PR #4125](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4125)로 검증·병합. 원본 PR 최종 HEAD `e23880d6714bfb474431a50696b7181174f861b7`, 정확 3 CI **SUCCESS**: [Secret 45900499978](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45900499978), [Process Source 45900499948](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45900499948), [C996 45900500055](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45900500055). 병합 `main=2022e2270690d83bbabda9196abcf7bc38ceeaf6`, `writer-config-b/result-pair-atomic.mjs` Git blob `1b89a7232d931ad8d6b185ca67f941fada16e6f7`.
+- 해당 구현도 최초 422 후 매번 최신 SHA가 검증된 후손 `ahead`인 경우에만 재구성하며 두 결과 경로 404·non-force CAS·응답 불명 시 읽기만·기존 경로 보존을 유지한다. 소스의 `MAX_PROVEN_REBASES=3`은 우리 PR #4126의 2회보다 **기존 범위에서 추가 1회** 더 수용하지만, 횟수가 유한하고 매번 독립 조건을 확인한다. PR #4125의 시험과 exact head CI 3/3은 이미 운영 전 source 검증으로 유효.
+- 우리 [PR #4126](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4126)은 최신 main과 `dirty` 충돌임을 확인해 무리한 동기화·소스 덮어쓰기/중복 병합 대신 [superseded 판정 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4126#issuecomment-7204145981)을 게시한 뒤 **closed/unmerged** 확인. 전용 브랜치 기록은 보존. 위 §26의 #4126 `queued` 상태는 최초 관측 기록이며 현재 정본은 #4125 main 구현.
+- 해당 source fix는 #4117 과거 `RESULT_PAIR_REF_CONFLICT_UNTOUCHED` 결과 0/2를 소급 복원하지 않으며, 현재 Native A/Writer B root·플래그 미설정과 Controller B `false/empty` 업무 승인 미구성도 해소하지 않는다. 사용자 C급/보안 변경 추가 승인 없이 정책·변수를 작성·활성화하지 않는다. **실제 무인 종단 A·Writer B·Controller B 0/3** 유지.
+- 다음 필수 실행: 기존 #4117 결과 미확정 보존 및 새로운 정규 승인 업무의 정확 소스/업무 원본과 독립 Owner B installed policy/proof readback. 기설치 승인·보안설정 범위가 실제로 입증된 효과부터 정규 workflow_run → 영구 단회 dispatch → PC 실행 → JSON/TXT 효과 원본을 확인. 미확인 효과를 다른 운영 프로세스의 복구 대기로 확대하지 않음.
