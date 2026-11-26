@@ -412,3 +412,9 @@
 - 기존 effect-key/receipt-claim 및 Runtime origin 검증과 함께, 이제 `JSON.stringify(installedPolicy)`와 현재 정책 전체를 대조한다. `EVENT_COMPLETION_V1`에서는 검증한 현재 Run ID **하나만** 제거하고 비교하며 나머지 모든 권한·어댑터/설치 SHA 항목은 정확히 일치해야 한다. 기존 고정 모드의 sourceRunId 검증도 유지한다.
 - 고정/이벤트 모드별 각 실행 플래그·어댑터/Controller SHA 변조를 차단하는 회귀 12가지 사례 추가. [PR #4088](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4088)의 **최신 HEAD는 `0cd02981418984d7392537b0e45f56040656c1b1`**, 이전 `fb0fe5fe...` CI를 새 HEAD 합격 증거로 재사용하지 않는다.
 - 신규 정확 HEAD CI: [C996 45888305188](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45888305188), [Windows Source 45888305199](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45888305199), [Secret Scan 45888305340](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45888305340), 최초 관측 `queued/pending`. 병합·운영 활성화·PC 설치는 실행하지 않았다.
+
+### #4088 후속 보완 — 전체 설치 정책 구조 동등성 검증
+
+- 정확 비교 조건의 추가 확인: 독립 설치된 `proof.policy`와 `scope.policy`는 동일 권한이더라도 JSON 객체 필드 순서가 다를 수 있다. 원문 `JSON.stringify` 비교는 유효한 승인을 오탐 거절한다. `isDeepStrictEqual`로 구조·자료형·추가 권한 필드까지 정확 비교하도록 수정하고 JSON 필드 순서 차이의 정상 통과 회귀시험 2건 추가. 기존 권한 변조 12종 차단 시험 유지.
+- [PR #4088](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4088)의 **최신 HEAD `cd20a96ac6f71dd079014135e991102df0223768`**. 정확 HEAD 테스트 세 종류: Windows Source Run [45888649625](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45888649625), C996 [45888649626](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45888649626), Secret Scan [45888649590](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45888649590), 관측 시 3종 `queued`. 이전 HEAD 시험 결과 재사용하지 않음.
+- 이 조치는 승인 정책 설치/승인 확대가 아닌 읽기 정확성 수정이다. C996/Windows/Secret 3/3 결과 전에는 병합하지 않고, 실제 PC 운영 무인 완료는 **0/3**을 유지한다.
