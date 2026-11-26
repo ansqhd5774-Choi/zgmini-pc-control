@@ -1,4 +1,6 @@
 import test from 'node:test';
+// Reuse existing standby CI; this preflight has no Windows operating effects.
+import './supervisor-orphan-readonly.test.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
