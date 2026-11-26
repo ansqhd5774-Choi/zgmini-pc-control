@@ -5,6 +5,8 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {R4_GUARDIAN_TARGET,R4_GUARDIAN_REQUEST_ID}
+ from './guardian-r4-contract.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const TITLE='pc-watchdog-guardian-activate';
 const SCRIPT='a2ec241d98a2ca93508443deb5b4688ecbccb905';
@@ -57,8 +59,10 @@ function main(){
   ||event.issue?.user?.login!=='ansqhd5774-Choi'
   ||event.issue?.title!==TITLE)fail('WATCHDOG_ACTIVATION_REPORT_ACTOR_DENIED');
  const body=JSON.parse(event.issue.body);
- if(!ID.test(body.requestId??'')||body.requestId!==APPROVED_REQUEST_ID
-  ||body.targetSha!==SCRIPT)
+ const r4=body.targetSha===R4_GUARDIAN_TARGET;
+ if(!ID.test(body.requestId??'')||
+   !(r4?body.requestId===R4_GUARDIAN_REQUEST_ID:
+     body.requestId===APPROVED_REQUEST_ID&&body.targetSha===SCRIPT))
   fail('WATCHDOG_ACTIVATION_REPORT_REQUEST_INVALID');
  let raw='';
  try{raw=fs.readFileSync(path.join(process.env.RUNNER_TEMP,
@@ -66,7 +70,7 @@ function main(){
  const result=normalizeResult(raw);
  const payload={schema:'ZGMINI_PC_WATCHDOG_ACTIVATION_B_RESULT_V1',
   requestId:body.requestId,issueNumber:event.issue.number,
-  targetSha:SCRIPT,runId:process.env.GITHUB_RUN_ID??null,
+  targetSha:r4?R4_GUARDIAN_TARGET:SCRIPT,runId:process.env.GITHUB_RUN_ID??null,
   attempt:process.env.GITHUB_RUN_ATTEMPT,...result};
  const stem='results/watchdog-activation-'+body.requestId;
  createOnly(stem+'.json',Buffer.from(JSON.stringify(payload,null,2)+'\n'));
@@ -74,7 +78,8 @@ function main(){
   'schema='+payload.schema,'requestId='+payload.requestId,'status='+payload.status,
   'code='+payload.code,'newProcessAttested='+payload.newProcessAttested,
   'watchdogFileWrites=0','next='+(payload.status==='PASS'
-   ?'READ_EXISTING_HANDOFF_ISSUE_1378':'STOP_INSPECT_EXISTING_CLAIM_NO_RETRY'),
+   ?r4?'VERIFY_R4_ACTIVE_AND_STANDBY_RUNTIME':'READ_EXISTING_HANDOFF_ISSUE_1378':
+     'STOP_INSPECT_EXISTING_CLAIM_NO_RETRY'),
   ''].join('\r\n')));
  run(['issue','comment',String(event.issue.number),'--repo',REPO,'--body',
   ['ZGMINI Guardian Watchdog activation: '+payload.status,
