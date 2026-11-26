@@ -176,8 +176,17 @@ function verifyCiIssue(expected,actual){
 // invocation. The root must already exist, be separately registered for the
 // isolated host and survive workflow checkout/cleanup. No automatic directory
 // creation, TTL, deletion, or relocation of unresolved claims.
-export function createCiEffectReceiptStore(root){
- if(typeof root!=='string'||!path.isAbsolute(root))fail('MAINTENANCE_CI_RECEIPT_ROOT_UNVERIFIED');
+export function createCiEffectReceiptStore(root,{volatileRoots=[]}={}){
+ if(typeof root!=='string'||!path.isAbsolute(root)||!Array.isArray(volatileRoots))
+  fail('MAINTENANCE_CI_RECEIPT_ROOT_UNVERIFIED');
+ // A real directory under a runner checkout or TEMP is still disposable.
+ // An effect claim there would vanish between CI runs and allow a second POST.
+ const within=(parent,child)=>{
+  const rel=path.relative(path.resolve(parent),path.resolve(child));
+  return rel===''||(rel!=='..'&&!rel.startsWith('..'+path.sep)&&!path.isAbsolute(rel));
+ };
+ if(volatileRoots.some(p=>typeof p==='string'&&path.isAbsolute(p)&&within(p,root)))
+  fail('MAINTENANCE_CI_RECEIPT_ROOT_VOLATILE');
  // Match the isolated Runner's existing read-only directory safety check.
  // A real final directory beneath a symlink/junction parent is not a safe
  // durable effect ledger even when lstat(root) itself reports a directory.
