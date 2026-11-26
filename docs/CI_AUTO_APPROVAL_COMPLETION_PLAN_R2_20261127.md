@@ -665,3 +665,26 @@
 1. A/Writer: 기설치 B-native Owner scope/proof 원본·영수증의 존재/업무 승인 범위를 확인하고, **신규 권한 생성 없이** 독립 루트 설정을 기존 승인된 운영 경로로 연결할 수 있는지 판정. 현재 원본은 미관측이므로 실효과 없는 경로 플래그만 설정하는 작업 금지.
 2. Controller B: 기존 승인 업무 grant의 정확한 정책 JSON 및 Installed Receiver pin과 현재 GitHub 자동 발행 Policy 변수의 **빈 값**을 구분. 실효과와 업무 원본이 명확한 경우에만 정규 설정 경로로 정확 등록; 비슷한 서류/CI PASS로 grant 허위 생성 금지.
 3. 세 효과 중 승인·실제 설치·정규 CI 권한이 완전히 입증된 것부터 실제 workflow_run → 단회 dispatch → 운영 PC 수신·효과 적용 → 결과 JSON/TXT 및 설치 SHA readback으로 효과별 DONE을 판정. #4117은 업로드 실패의 고유 증거를 보존하고 **확실한 환경 변화 없이 동일 PC A를 재발행하지 않음**.
+
+## 26. 스물두 번째 실행 기록 — 검증된 두 번째 Git ref 경합에서 결과 쌍 보존 (2026-11-27 KST)
+
+### 현재 운영 상태 및 결과 업로드 실패 조건
+
+- [#4117](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4117) [Run 45899164961](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45899164961) 고정 Controller B handoff A는 조회 PC에 제공된 `ZGMINI_CI_CONTROLLER_B_ENABLED=false`, `ZGMINI_CI_CONTROLLER_B_POLICY` 빈 값을 job 로그로 확인. 그러나 `RESULT_PAIR_REF_CONFLICT_UNTOUCHED`로 JSON/TXT 결과가 main에 0/2, Issue readback 미완료. 기존 A 영수증 PASS 또는 실제 Controller B 실효과 승인/실행으로 계산하지 않는다.
+- Git main에서 결과 업로더 오류 2026-11-26 21:38:07 UTC 전, 21:37:52/54 및 21:38:00/02 UTC에 정상 결과 보고 커밋 `952dbfd`, `bbc1e52`, `5c5baac`, `66dd011` 4건 연속 반영 확인. 경쟁적인 head 이동 가설에 실증 근거는 있지만 정확 어떤 PATCH 반환 분기에서 첫/두 번째 422가 발생했는지는 당시 로그에 없으므로 **운영 원인 확정 아님**.
+- `writer-config-b/result-pair-atomic.mjs` 원본은 처음 422 때만 후손 HEAD 증명/목적지 JSON/TXT 미존재를 검사한 뒤 ref rebuild 1회 허용. 재검증된 **두 번째 서로 다른 HEAD 이동**에는 재구성 경로가 없어 422 반환 시 최종 `RESULT_PAIR_REF_CONFLICT_UNTOUCHED`. 이 부분은 소스에서 안전하게 구별·재현 가능.
+
+### 최소 소스 변경 PR #4126
+
+- 별도 브랜치 `codex/ci-proof-pair-double-cas-20261127`; [PR #4126](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4126), 최초 정확 HEAD `7c4dde3ff0e472f96a4b356804dd617de898996d`.
+- **변경 3개:** `writer-config-b/result-pair-atomic.mjs`, 동일 `result-pair-test-fixture.mjs` 및 `result-pair-atomic.test.mjs`. 운영 파일·PC 설치·DB·보안변수·승인 Owner/effect 비변경. Shared 결과 업로더 기존 JSON/TXT 스키마·소스 계약·non-force CAS·단회 requestId·보호 원장 유지.
+- **증거에 따른 추가 1회만:** 첫 번째와 두 번째 각각 이전 기준 SHA보다 새로운 Git `main` HEAD가 확실한 후손 `compare.status=ahead`이고 대상 두 경로가 둘 다 404인 것을 재검증하면 같은 결과 쌍을 신규 base tree/commit으로 재구성. 최대 3번의 non-force PATCH. 같은 HEAD에서 다시 422·비후손·기존 목적지·증명 실패·PATCH 결과 불명/네트워크 오류는 즉시 fail-closed, 응답 불명 시 읽기 전용 reconcile만 수행. A/B 업무 작업 자체는 재실행하지 않는다.
+- 회귀 추가: **2회의 독립 HEAD 이동 → JSON/TXT 2/2 readback**, **두 번째 이동 시 하나라도 기존 파일 → 작성 0**, **세 번째 확정 ref 거절 → 재구성 없이 종료**. 기존 `same HEAD 422`에서 두 번만 PATCH, lost PATCH/중복 파일/비후손/권한 오류 계약 보존.
+- 정확 HEAD CI: [Secret Scan 45900597757](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45900597757) **completed/success**, [C996 45900597687](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45900597687) `queued`, [Process Source 45900597719](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45900597719) `queued` (최초 관측). CI 결과 전 main 병합/운영 적용 없음.
+- [#4117 보완 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4117#issuecomment-7204098323)에 독립적인 경합 증거·source PR·과거 영수증 미복구 경계를 연결. 동일 Issue 재실행 또는 기존 결과 바이트 재구성 금지.
+
+### 남은 정규 필수 실행
+
+1. 정확 HEAD의 Process Source/C996 결과 회수 → 검증 성공 시 타 담당자 main 변경을 보존하여 PR 병합·Git blob 확인, 실패 시 해당 source 원인만 최소 수정.
+2. 새로운 소스 CI PASS를 기존 #4117 영수증 복구로 오인하지 않는다. 그 고유 원본은 불명/미발행 유지. 새 승인·변수/정책 root 생성/설치 없이 독립 원본 존재를 추가 읽기.
+3. Native A/Writer B의 격리 PC 루트·Publisher/Executor 플래그 미설정(#4113)과 Controller B policy empty/flag false(#4117)를 별도 보존. 승인된 독립 policy root/업무 Owner grant 및 실제 적용 명세가 확인된 범위에서만 정규 활성화·실효과 종단 검증. **무인 A/Writer B/Controller B 0/3** 유지.
