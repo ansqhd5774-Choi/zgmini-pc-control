@@ -76,7 +76,7 @@ jobs:
       - name: W06 exact one-Task B committed manifest preflight
         if: github.event.issue.title == 'pc-writer-task-create-once'
         id: w06taskapprove
-        run: '"E:\\ZGmini\\runtime\\node.exe" "%GITHUB_WORKSPACE%\\writer-b-control\\task-create-b\\preflight.mjs"'
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\task-create-b\preflight.mjs"'
       - name: Checkout pinned W06 Task pure candidate only
         if: github.event.issue.title == 'pc-writer-task-create-once' && steps.w06taskapprove.outcome == 'success'
         id: w06taskcandidate
@@ -90,12 +90,12 @@ jobs:
       - name: Create only exact approved W06 CNN minute Task with B CAS
         if: github.event.issue.title == 'pc-writer-task-create-once' && steps.w06taskcandidate.outcome == 'success'
         id: w06taskcreate
-        run: '"E:\\ZGmini\\runtime\\node.exe" "%GITHUB_WORKSPACE%\\writer-b-control\\task-create-b\\entry.mjs"'
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\task-create-b\entry.mjs"'
       - name: Create-only W06 Task B redacted result pair and Issue readback
         if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'pc-writer-task-create-once'
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: '"E:\\ZGmini\\runtime\\node.exe" "%GITHUB_WORKSPACE%\\writer-b-control\\task-create-b\\report.mjs"'
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\task-create-b\report.mjs"'
       - name: R181 exact protected source B (independent immutable manifest)
         if: github.event.issue.title == 'r181-protected-route-install'
         id: r181
