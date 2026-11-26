@@ -207,6 +207,19 @@ test('B: unknown activation is RECOVERY_REQUIRED, no unsafe rollback/replay',asy
  assert.equal(log.includes('undoTask'),false);
  assert.equal(log.includes('release'),false);
 });
+test('B: uncertain one-shot claim keeps lock and reports recovery, never preflight',async()=>{
+ const {proof,bytes,original}=proofSetup(),{io,log}=port(original);
+ io.claimOnce=async()=>{log.push('claim');throw Error('PARTIAL_JOURNAL_EXISTS');};
+ const result=await applyTaskCreateB(proof,bytes,io);
+ assert.equal(result.status,'TASK_CREATE_B_RECOVERY_REQUIRED');
+ assert.equal(result.code,'TASK_CREATE_B_CLAIM_OUTCOME_UNKNOWN');
+ assert.equal(result.created,null);
+ assert.equal(result.taskChanges,null);
+ assert.deepEqual(log,['lease','observe','claim']);
+ assert.equal(log.includes('release'),false);
+ assert.equal(log.includes('wrapper'),false);
+ assert.equal(log.includes('enable'),false);
+});
 test('B: ambiguous exclusive-wrapper creation never removes possibly foreign file',async()=>{
  const {proof,bytes,original}=proofSetup(),{io,log}=port(original);
  io.createLauncherExclusive=async()=>{log.push('wrapper');throw Error('EEXIST_OR_PARTIAL_WRITE');};
