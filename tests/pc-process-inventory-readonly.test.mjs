@@ -1,6 +1,8 @@
 import './w04-3409-source-preflight-readonly.test.mjs';
 import './w04-3516-archive-receipt-readonly.test.mjs';
 import test from 'node:test';
+// Source-only fixed orphan Owner CAS hashes, no operational effect.
+import './supervisor-orphan-owner-preimage-readonly.test.mjs';
 // Existing inventory CI owns this fixed, operating-only orphan seat proof.
 import './supervisor-orphan-seat-readonly.test.mjs';
 import {createHash} from 'node:crypto';
