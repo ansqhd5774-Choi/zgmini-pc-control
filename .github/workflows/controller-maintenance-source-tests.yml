@@ -484,6 +484,9 @@ jobs:
         run: |
           node --check inflation-census-api-b/windows-adapter.mjs
           node --check inflation-census-api-b/report.mjs
+      - name: Verify R3 exact five-file Controller selective B pin and rollback contract
+        if: steps.scope.outputs.core == 'true'
+        run: node --test --test-concurrency=1 tests/controller-standby-selective-r3.test.mjs
       - name: Regression test six operating runners without PC writes
         if: steps.scope.outputs.core == 'true'
         run: node --test --test-concurrency=1 tests/maintenance-recovery.test.mjs
