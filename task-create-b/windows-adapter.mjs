@@ -83,6 +83,10 @@ export function hasOnlyApprovedMinuteTrigger(xml){
  return /^<TimeTrigger(?:\s[^>]*)?>[\s\S]*<\/TimeTrigger>$/i.test(content)&&
   (content.match(/<TimeTrigger\b/gi)??[]).length===1&&
   (content.match(/<\/TimeTrigger\s*>/gi)??[]).length===1&&
+  // The interval MUST belong to this sole TimeTrigger; a PT1M string
+  // elsewhere in the Task cannot attest a different trigger's cadence.
+  (content.match(/<Interval\b/gi)??[]).length===1&&
+  /<Repetition(?:\s[^>]*)?>[\s\S]*?<Interval>PT1M<\/Interval>[\s\S]*?<\/Repetition>/i.test(content)&&
   !/<(?!TimeTrigger\b)[A-Za-z]+Trigger\b/i.test(content);
 }
 
