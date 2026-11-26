@@ -29,8 +29,8 @@ validateControllerConfigTransition,controllerAdmissionForPurpose,
  R6_HOST_CANDIDATE_SHA256,validateR54BIssueEnvelope,
  validateR54BManifestRequest,R54_B_ISSUE_TITLE,R54_B_OPERATION,
  R54_B_SOURCE_FILES,SOURCE_BUNDLE_OPERATION,SOURCE_BUNDLE_ISSUE_TITLE,
- validateSourceBundleIssueEnvelope,validateSourceBundleBApproval}
-  from './maintenance-contract.mjs';
+ validateSourceBundleIssueEnvelope,validateSourceBundleBApproval,
+ validateS6OnceBManifest} from './maintenance-contract.mjs';
 import {acquireMaintenanceLock,maintenanceLockStatus} from './maintenance-lock.mjs';
 import {planSourceBundleRegistration,stageApprovedSourceBundle,
  applyPreparedSourceBundleHostCas} from './source-bundle-register.mjs';
@@ -3169,6 +3169,59 @@ export function readS6OnceCurrentPreimage(requestId){
  };
 }
 
+
+
+/**
+ * Preserve the *exact* S6 old owner, six children and earlier request ledger
+ * hashes before any operational effect. A candidate manifest only becomes
+ * acceptable after the independent live source and owner CAS comparison.
+ * The returned nonce/PIDs must remain inside the authorized Windows process.
+ */
+export function captureS6OncePinnedBaseline(issue,approvedBytes,{actor=null}={}){
+ const observation=readS6OnceCurrentPreimage(issue?.requestId);
+ const pinned=validateS6OnceBManifest(issue,approvedBytes,{
+  actor,controlRepository,live:observation.s6Live});
+ need(pinned.operationalEffectExecuted===false&&pinned.authorization===false,
+  'S6_BASELINE_ADMISSION_NOT_EFFECT_AUTHORITY');
+ const {owner,status}=readOwner();
+ need(status.pid===owner.pid&&status.mode==='LISTENING'&&
+  Array.isArray(status.children)&&status.children.length===6&&
+  status.children.every((r,i)=>r?.seat===i+1&&
+   Number.isSafeInteger(r.pid)&&r.pid>0&&r.alive===true)&&
+  new Set(status.children.map(r=>r.pid)).size===6,
+  'S6_BASELINE_SIX_CHILDREN_UNVERIFIED');
+ const root=path.join(controlRoot,'ledger');
+ need(fs.existsSync(root)&&fs.statSync(root).isDirectory(),
+  'S6_BASELINE_REQUEST_LEDGER_UNAVAILABLE');
+ const names=fs.readdirSync(root);
+ need(names.length<=10000,'S6_BASELINE_LEDGER_SCOPE_EXCEEDED');
+ const ledgerHashes={};
+ for(const name of names){
+  need(/^[a-z0-9-]{8,80}\.json$/.test(name),
+   'S6_BASELINE_UNKNOWN_LEDGER_ENTRY');
+  const file=path.join(root,name);
+  need(fs.lstatSync(file).isFile()&&!fs.lstatSync(file).isSymbolicLink(),
+   'S6_BASELINE_LEDGER_NOT_PLAIN_FILE');
+  ledgerHashes[name]=sha256(fs.readFileSync(file));
+ }
+ need(fs.existsSync(path.join(controlRoot,'leases/supervisor/owner.json')),
+  'S6_BASELINE_OWNER_VANISHED');
+ const rawOwner=fs.readFileSync(path.join(controlRoot,'leases/supervisor/owner.json'));
+ need(sha256(rawOwner)===observation.s6Live.ownerSha256&&
+  JSON.parse(rawOwner.toString('utf8')).nonce===owner.nonce,
+  'S6_BASELINE_OWNER_CAS_CHANGED');
+ return Object.freeze({
+  requestId:issue.requestId,controllerSha:observation.actualControllerSha,
+  approvalManifestSha256:issue.approvalManifestSha256,
+  protectedSha256:observation.s6Live.protectedSha256,
+  ownerSha256:observation.s6Live.ownerSha256,
+  oldSupervisorPid:owner.pid,oldSupervisorNonce:owner.nonce,
+  watchdogPid:observation.s6Live.watchdogPid,
+  standbyPids:Object.freeze([...observation.s6Live.standbyPids]),
+  oldChildren:Object.freeze(status.children.map(({seat,pid})=>Object.freeze({seat,pid}))),
+  ledgerHashes:Object.freeze({...ledgerHashes})
+ });
+}
 
 /**
  * Operating PC local-only, read-only S6 phase evidence collector.
