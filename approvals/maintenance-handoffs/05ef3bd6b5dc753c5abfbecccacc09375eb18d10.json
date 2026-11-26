@@ -1,0 +1,48 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "73f70de98b030d4bac0af48ac50023ec1bd7ce1f",
+  "targetSha": "05ef3bd6b5dc753c5abfbecccacc09375eb18d10",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "Reuse of existing 2026-11-03 standing same-purpose independent-maintainer V2 seven-to-seven source handoff authorization (docs/CONTROLLER_RECOVERY.md / PC_AUTOMATION_STANDARD.md) and user's ongoing S6 source integration work instruction. This approval is strictly one exact receiver-source handoff from verified installed 73f70de98b030d4bac0af48ac50023ec1bd7ce1f to merged S6 source 05ef3bd6b5dc753c5abfbecccacc09375eb18d10; four of seven operating maintainer runtime files changed, five of nine source pins unchanged. The newly added S6 command is INERT without a separately authorized, exact B effect manifest, Owner Issue and live preimage; no permission to terminate Supervisor or six Runners, alter workflow, publish data, change controller/host or bypass Win32 independent-medium-token origin/CAS/lease/backup/recovery checks. This source manifest itself does not authorize S6 one-shot effect.",
+  "files": {
+    "tools/maintenance-contract.mjs": "d24f03ee6db54c7e176e89f31bce8eb6de9aafba082cbb48213748d0f0b9facf",
+    "tools/maintenance-apply.mjs": "745233ed111ff5dedb2d7747e7153a53a6e6a6a89c82c8a00c95f43d76f828db",
+    "tools/maintenance-agent.mjs": "9cd06c1ca7d35b7d81d9e0bfa7318a5fd6acc86543329858f461c6ea8c66dc8c",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "4451064cd0a2c52c0ab5d5051b4f12c486f05893ff45a23bf75c3007853fd69b",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "af31ab1f6a159aa1d8467d2585eb16750e8a1a293f9ecfb90b85c388d8640d70",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "23f3709ed0387cfb0132d9546f0fd6e2f10eabfad4212a67a170d5201a4a5de0"
+  },
+  "runtimeChangedFiles": [
+    "tools/maintenance-contract.mjs",
+    "tools/maintenance-apply.mjs",
+    "tools/maintenance-agent.mjs",
+    "tools/update.mjs"
+  ],
+  "checks": {
+    "sourceCi": "PR #3899 HEAD e48b0671e720fbe855f1cfb5ec8cd3ffd790c124 Windows Controller Maintenance 45837520481/C996 45837520460/Secret Scan 45837520661/Automation Status 45837520491 all SUCCESS",
+    "installedWindowsEvidence": "Fresh A Issue #3905, Run #45839799357, results/pc-process-inventory-45839799357-1-operating.json observed 2026-11-26T14:33:05.800Z: maintenanceSourceSha 73f70de98b030d4bac0af48ac50023ec1bd7ce1f, maintenanceFilesVerified=true, receiver LISTENING, installLockReadbackVerified=true, installLockHeld=false. Observation only; B needs recheck immediately before execution.",
+    "exactBytePlan": "Git target 05ef3bd6b5dc753c5abfbecccacc09375eb18d10 raw nine source blob SHA-256 independently computed; SHA-256 selftest abc and five unchanged source hash cross-check against approved prior 73f70de98b030d4bac0af48ac50023ec1bd7ce1f manifest PASS. Four of seven runtime bytes changed; three of seven runtime and both support tools unchanged.",
+    "sourceAncestry": "Target 05ef3bd6b5dc753c5abfbecccacc09375eb18d10 is 45 commits ahead of installed source 73f70de98b030d4bac0af48ac50023ec1bd7ce1f. Latest main e2961e0ec24aec376b0536cfe92d49345f02e29f is three commits after target; no changes to the nine approved handoff source paths.",
+    "windowsHandoffExecuted": false,
+    "s6OperationalTested": false
+  },
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "effects": [
+    "One exact independent 7-to-7 maintainer source handoff via existing tools/handoff-maintenance.mjs, four runtime files modified and three unchanged",
+    "Preserve installed six-runner Controller and R5 Watchdog state; no S6 Supervisor-tree stop, workflow pause, provider/DB/D1 operation or separate S6 B request under this source-handoff approval",
+    "Newly installed S6 B Issue receiver and pinned s6-once-apply remain fail-closed until separately approved exact S6 effect, fresh installed 7-file CAS and independent live operator identity"
+  ],
+  "preserve": [
+    "Installed Controller SHA 182bb46f2838306ba40d8b4ec32bac40ab75b69a as last observed, host.json and six dedicated Runner registrations",
+    "Existing R5 Watchdog active plus two standby processes and original Supervisor/runner owner, without stop or restart during this source-only candidate",
+    "SQLite/Writer/D1/provider data, intake workflow, Core/Korea Tasks, approved Iran R13 absence, existing request ledger and maintenance leases",
+    "W06 active Task and other independently approved job results, shared source-apply coordination Issue #68"
+  ],
+  "scopeNote": "SOURCE HANDOFF ONLY; exact 9 Git source hash pins, 7-file installed CAS, owner/startup/WMI provenance, medium-token independent Windows operator, absent conflicting lease, before/after SHA and byte-preserved backup/rollback mandatory. Do not run in Actions/Runner or via normal pc-job. Source handoff approved under standing same-effect maintenance permission; S6 Supervisor/Runner tree stop is a DIFFERENT B-grade operational effect with NO approval in this manifest and no automatic trigger. Fresh source and runtime readback required; BLOCKED/UNKNOWN must not retry blindly."
+}
