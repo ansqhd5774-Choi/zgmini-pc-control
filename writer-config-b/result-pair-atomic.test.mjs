@@ -38,6 +38,15 @@ test('confirmed concurrent main advance rebases pair only once with no overwrite
  assert.equal(f.files.get(outputs[0][0]).toString(),outputs[0][1]);
  assert.equal(f.files.get(outputs[1][0]).toString(),outputs[1][1]);
 });
+test('two consecutive descendant main advances keep exact pair atomic',async()=>{
+ const f=createGitPairFixture({advanceMainOnFirstPatch:true,
+  advanceMainOnSecondPatch:true});
+ const r=await uploadResultPairAtomic({outputs,headers,fetchApi:f.fetchApi});
+ assert.deepEqual([r.created,r.verified,f.counts.commits,f.counts.updates],
+  [2,2,3,3]);
+ assert.equal(f.files.get(outputs[0][0]).toString(),outputs[0][1]);
+ assert.equal(f.files.get(outputs[1][0]).toString(),outputs[1][1]);
+});
 test('concurrent creation of even one result rejects pair without rewrite',async()=>{
  const f=createGitPairFixture({advanceMainWithExistingPath:outputs[0][0]});
  const r=await uploadResultPairAtomic({outputs,headers,fetchApi:f.fetchApi});
