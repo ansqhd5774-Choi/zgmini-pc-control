@@ -3573,6 +3573,12 @@ export function makeS6OnceOwnedOperatingPort({request,approvedBytes,
    return baseline;
   },
   observe:observed,
+  // Existing single-host Watchdog pauses while the S6 install lease is held.
+  // No separately attested recovery operator can currently release it after
+  // the maintainer dies with all six Runner listeners stopped. Deny the
+  // entire S6 effect before it can claim or pause until such a mechanism is
+  // implemented, approved, installed and proved on the operating host.
+  verifyIndependentRecovery:async()=>false,
   claimOnce:async()=>{
    need(approved&&baseline,'S6_PORT_PRECLAIM_NOT_AUTHENTICATED');
    try{fs.mkdirSync(owned);}

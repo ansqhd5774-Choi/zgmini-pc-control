@@ -1081,6 +1081,10 @@ function s6Fixture(options={}){
   observe:async phase=>{add('observe:'+phase);
    return s6Observe(phase,options);
   },
+  verifyIndependentRecovery:async()=>{add('verifyIndependentRecovery');
+   if(options.rescueProofThrows)throw Error('S6_TEST_RESCUE_PROOF_UNAVAILABLE');
+   return options.rescueReady!==false;
+  },
   claimOnce:async()=>{add('claimOnce');return options.claim!==false;},
   acquireOwnedInstallLease:async()=>{add('acquireOwnedInstallLease');
    if(options.failAcquire)throw Object.assign(Error('S6_TEST_INSTALL_LEASE_UNKNOWN'),{code:'S6_TEST_INSTALL_LEASE_UNKNOWN'});
@@ -1104,6 +1108,24 @@ function s6Fixture(options={}){
  };
  return {port,calls,journal};
 }
+test('S6 refuses full runner stop before claim or pause without independently proven crash recovery',async()=>{
+ for(const options of [{rescueReady:false},{rescueProofThrows:true}]){
+  const {port,calls,journal}=s6Fixture(options);
+  const result=await runApprovedS6FailoverOnce(s6Request(),port);
+  assert.equal(result.status,'BLOCKED');
+  assert.equal(result.code,'S6_ONCE_CRASH_SAFE_RECOVERY_UNVERIFIED');
+  assert.equal(result.operationalEffectUnverified,true);
+  assert.equal(calls.includes('verifyIndependentRecovery'),true);
+  assert.equal(calls.includes('claimOnce'),false);
+  assert.equal(calls.includes('acquireOwnedInstallLease'),false);
+  assert.equal(calls.includes('pauseIntake'),false);
+  assert.equal(calls.includes('stopOwnTree'),false);
+  assert.equal(journal.length,0);
+ }
+ // An existing live Watchdog does not attest a rescue while install lease is held.
+ const liveSource=fs.readFileSync(new URL('../tools/update.mjs',import.meta.url),'utf8');
+ assert.match(liveSource,/verifyIndependentRecovery:async\(\)=>false/);
+});
 test('S6 coordinator keeps exact one-shot owner transitions and never marks the A job complete',async()=>{
  const {port,calls,journal}=s6Fixture();
  const r=await runApprovedS6FailoverOnce(s6Request(),port);
@@ -1116,6 +1138,7 @@ test('S6 coordinator keeps exact one-shot owner transitions and never marks the 
  assert.equal(calls.filter(x=>x==='releaseOwnedInstallLease').length,1);
  assert.ok(calls.indexOf('acquireOwnedInstallLease')<calls.indexOf('pauseIntake'));
  assert.ok(calls.indexOf('pauseIntake')<calls.indexOf('waitForDrain'));
+ assert.ok(calls.indexOf('verifyIndependentRecovery')<calls.indexOf('claimOnce'));
  assert.ok(calls.indexOf('waitForDrain')<calls.indexOf('verifyStopGuard'));
  assert.ok(calls.indexOf('verifyStopGuard')<calls.indexOf('stopOwnTree'));
  assert.ok(calls.indexOf('stopOwnTree')<calls.indexOf('waitForStoppedHeld'));
