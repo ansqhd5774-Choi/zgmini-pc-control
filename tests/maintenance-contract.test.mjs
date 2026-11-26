@@ -907,3 +907,37 @@ test('S6 B compares every independent live origin CAS; no stale Watchdog, owner 
    /S6_ONCE_MANIFEST_PREIMAGE_INVALID/);
  }
 });
+
+
+test('CI-native B policy attestation requires an Owner-pinned selective Controller B manifest',()=>{
+ const f=fixture();
+ f.manifest.purpose='pc-controller-maintenance';
+ f.manifest.approval.scope='PC_CONTROL_CONTROLLER_UPDATE';
+ f.manifest.controllerOnlyInstall=true;
+ f.manifest.selectiveSource={schema:'ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1',
+  branch:'codex/ci-native-approved-20261127',mainSha:POST,
+  customPaths:['controller/operations.mjs']};
+ f.manifest.ciNativeApproval={schema:'ZGMINI_CI_NATIVE_B_POLICY_APPROVAL_V1',
+  effect:'A_READONLY',nativePolicySha256:HASH_C};
+ repin(f);
+ const pair=admitted(f);
+ assert.equal(pair.manifest.ciNativeApproval.nativePolicySha256,HASH_C);
+ assert.equal(requestFingerprint(pair).length,64);
+ for(const mutate of [
+  m=>{m.ciNativeApproval.effect='C_ADMIN'},
+  m=>{m.ciNativeApproval.nativePolicySha256='wrong'},
+  m=>{m.ciNativeApproval.extra='self granted'},
+  m=>{delete m.controllerOnlyInstall},
+  m=>{delete m.selectiveSource},
+  m=>{m.purpose='pc-controller-heavy-readonly';m.approval.scope='PC_CONTROL_HEAVY_READONLY_UPDATE'}
+ ]){
+  const test=clone(f);
+  mutate(test.manifest);repin(test);
+  assert.throws(()=>admitted(test));
+ }
+ const bot=clone(f);bot.context.actor='github-actions[bot]';
+ bot.context.allowedActors=['github-actions[bot]'];
+ assert.throws(()=>admitted(bot));
+ const noNative=clone(f);delete noNative.manifest.ciNativeApproval;repin(noNative);
+ assert.equal(admitted(noNative).manifest.ciNativeApproval,undefined);
+});
