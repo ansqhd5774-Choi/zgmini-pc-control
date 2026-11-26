@@ -23,6 +23,13 @@ export async function awaitNaturalSidecarIdle({
  const start=clock();
  if(!Number.isFinite(start))STOP('SIDECAR_B_IDLE_WINDOW_CLOCK_STOP');
  const deadline=start+windowMs;
+ const evidence={samples:0,coreActiveSamples:0,sidecarActiveSamples:0,
+  controllerBusySamples:0,writerBusySamples:0};
+ const stopWithEvidence=code=>{
+  const error=Object.assign(new Error(code),{code});
+  error.idleObservation={...evidence,windowMs};
+  throw error;
+ };
  for(;;){
   let flags;
   try{flags=observe();}catch{STOP('SIDECAR_B_IDLE_WINDOW_OBSERVATION_STOP');}
@@ -30,16 +37,21 @@ export async function awaitNaturalSidecarIdle({
    flags.sidecarActive===null||flags.controllerInstallBusy===null||
    flags.sharedWriterLockPresent===null)
    STOP('SIDECAR_B_IDLE_WINDOW_OBSERVATION_STOP');
+  evidence.samples++;
+  if(flags.coreQuiet===false)evidence.coreActiveSamples++;
+  if(flags.sidecarActive===true)evidence.sidecarActiveSamples++;
+  if(flags.controllerInstallBusy===true)evidence.controllerBusySamples++;
+  if(flags.sharedWriterLockPresent===true)evidence.writerBusySamples++;
   // Another shared writer/Controller owner is not a natural Core cycle.
   // Never hold a lease or wait while another installation owns resources.
   if(flags.controllerInstallBusy!==false||
    flags.sharedWriterLockPresent!==false)
-   STOP('SIDECAR_B_PROBE_RESOURCE_STOP');
+   stopWithEvidence('SIDECAR_B_PROBE_RESOURCE_STOP');
   if(flags.currentPreflightReadyIgnoringLease===true&&
    flags.coreQuiet===true&&flags.sidecarActive===false)return;
   const remaining=deadline-clock();
   if(!Number.isFinite(remaining)||remaining<=0)
-   STOP('SIDECAR_B_PROBE_RESOURCE_STOP');
+   stopWithEvidence('SIDECAR_B_PROBE_RESOURCE_STOP');
   await pause(Math.min(stepMs,remaining));
  }
 }
