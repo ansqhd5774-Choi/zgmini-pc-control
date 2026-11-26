@@ -137,3 +137,41 @@ test('both workflow registrations remain gated and read-only',()=>{
   assert.doesNotMatch(y,/controller\\entry\.mjs|writer-b\\windows-adapter\.mjs/);
  }
 });
+
+
+for(const effect of ['A_READONLY','B_WRITER_SOURCE'])test(effect+' receiver revalidates original source Run ID from dispatch against installed future-run policy',async()=>{
+ const x=make(effect);
+ delete x.policy.sourceRunId;
+ x.policy.sourceRunMode='EVENT_COMPLETION_V1';
+ const r=await observeNativeReceiver(x);
+ assert.equal(r.state,'CONTRACT_MATCH_ONLY');
+ assert.equal(r.canExecute,false);
+ assert.equal(r.canInstall,false);
+ assert.equal(x.reads[0],'actions/runs/222/attempts/1');
+ assert.equal(Object.hasOwn(x.policy,'sourceRunId'),false);
+});
+test('event-bound receiver denies a noncanonical or prefilled source Run ID before any REST read',async()=>{
+ for(const alter of [
+  x=>{x.event.inputs.source_run_id='0222'},
+  x=>{x.event.inputs.source_run_id='999999999999999999999999999'},
+  x=>{x.event.inputs.source_run_id='not-a-number'},
+  x=>{x.policy.sourceRunId=222}
+ ]){
+  const x=make('A_READONLY');
+  delete x.policy.sourceRunId;
+  x.policy.sourceRunMode='EVENT_COMPLETION_V1';
+  alter(x);
+  const r=await observeNativeReceiver(x);
+  assert.equal(r.code,'CI_NATIVE_RECEIVER_SOURCE_RUN_INPUT_DENIED');
+  assert.equal(x.reads.length,0);
+ }
+});
+test('event-bound receiver cannot accept a different completed CI Run',async()=>{
+ const x=make('A_READONLY');
+ delete x.policy.sourceRunId;
+ x.policy.sourceRunMode='EVENT_COMPLETION_V1';
+ x.event.inputs.source_run_id='223';
+ const r=await observeNativeReceiver(x);
+ assert.notEqual(r.state,'CONTRACT_MATCH_ONLY');
+ assert.equal(x.reads[0],'actions/runs/223/attempts/1');
+});
