@@ -145,6 +145,29 @@ test('B: unknown activation is RECOVERY_REQUIRED, no unsafe rollback/replay',asy
  assert.equal(log.includes('undoTask'),false);
  assert.equal(log.includes('release'),false);
 });
+test('B: ambiguous exclusive-wrapper creation never removes possibly foreign file',async()=>{
+ const {proof,bytes,original}=proofSetup(),{io,log}=port(original);
+ io.createLauncherExclusive=async()=>{log.push('wrapper');throw Error('EEXIST_OR_PARTIAL_WRITE');};
+ const result=await applyTaskCreateB(proof,bytes,io);
+ assert.equal(result.status,'TASK_CREATE_B_RECOVERY_REQUIRED');
+ assert.equal(result.code,'TASK_CREATE_B_CREATION_OUTCOME_UNKNOWN');
+ assert.equal(result.created,null);
+ assert.equal(log.includes('undoWrapper'),false);
+ assert.equal(log.includes('undoTask'),false);
+ assert.equal(log.includes('release'),false);
+});
+test('B: ambiguous Windows scheduler registration never deletes another Task',async()=>{
+ const {proof,bytes,original}=proofSetup(),{io,log}=port(original);
+ io.registerTaskDisabled=async()=>{log.push('registerDisabled');throw Error('UNKNOWN_SCHTASKS_EXIT');};
+ const result=await applyTaskCreateB(proof,bytes,io);
+ assert.equal(result.status,'TASK_CREATE_B_RECOVERY_REQUIRED');
+ assert.equal(result.code,'TASK_CREATE_B_CREATION_OUTCOME_UNKNOWN');
+ assert.equal(result.created,null);
+ assert.equal(log.includes('undoTask'),false);
+ assert.equal(log.includes('undoWrapper'),false);
+ assert.equal(log.includes('enable'),false);
+ assert.equal(log.includes('release'),false);
+});
 test('B: failed pre-enable rollback retains lease and claim for reconciliation',async()=>{
  const {proof,bytes,original}=proofSetup();
  const {io,log}=port(original,{disabledReadback:false,taskUndoOk:false});
