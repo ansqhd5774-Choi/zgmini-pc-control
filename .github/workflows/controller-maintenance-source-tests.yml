@@ -14,6 +14,8 @@ on:
       - '.github/workflows/ci-approval-controller-b.yml'
       - '.github/workflows/ci-approved-a-once.yml'
       - '.github/workflows/ci-approved-writer-b-once.yml'
+      - '.github/workflows/ci-native-auto-publish.yml'
+      - 'tests/ci-native-publisher-entry.test.mjs'
       - 'tests/ci-native-receiver-observe.test.mjs'
       - 'tests/ci-approval-shadow-decision.test.mjs'
       - 'tests/ci-native-dispatch.test.mjs'
@@ -320,6 +322,11 @@ jobs:
         run: |
           node --check ci-approval/native-receiver-observe.mjs
           node --test --test-concurrency=1 tests/ci-native-receiver-observe.test.mjs
+      - name: Verify native CI source-driven A Writer publication and exact B installed evidence
+        if: hashFiles('ci-approval/native-publisher-entry.mjs') != '' && hashFiles('tests/ci-native-publisher-entry.test.mjs') != ''
+        run: |
+          node --check ci-approval/native-publisher-entry.mjs
+          node --test --test-concurrency=1 tests/ci-native-publisher-entry.test.mjs
       - name: Verify deterministic scoped request previews without submission
         if: hashFiles('ci-approval/request-preview.mjs', 'tests/ci-approval-request-preview.test.mjs') != ''
         run: node --test --test-concurrency=1 tests/ci-approval-request-preview.test.mjs
