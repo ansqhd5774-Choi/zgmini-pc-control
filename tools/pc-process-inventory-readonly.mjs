@@ -62,6 +62,8 @@ const R3_WATCHDOG_PREIMAGE_PROBE='controller-standby-watchdog-preimage-readonly'
 const R3_WMI_PROBE='controller-standby-runner-wmi-readonly';
 const R4_RUNTIME_PROBE='controller-standby-r4-runtime-readonly';
 const R5_RUNTIME_PROBE='controller-standby-r5-runtime-readonly';
+const S6_PREIMAGE_PROBE='controller-s6-once-approval-preimage-readonly';
+const S6_INSTALLED_MAINTAINER='05ef3bd6b5dc753c5abfbecccacc09375eb18d10';
 const R4_GUARDIAN_ORIGIN_PROBE='controller-standby-r4-guardian-origin-readonly';
 const CI_RECEIPT_ROOT_PROBE='ci-controller-b-receipt-root-readonly';
 // Existing A only: observe whether the same fixed WMI process-path query
@@ -602,12 +604,13 @@ export function authenticateProcess(event,env,role){
  const isR3Wmi=withW05&&raw.probe===R3_WMI_PROBE;
  const isR4Runtime=withW05&&raw.probe===R4_RUNTIME_PROBE;
  const isR5Runtime=withW05&&raw.probe===R5_RUNTIME_PROBE;
+ const isS6Preimage=withW05&&raw.probe===S6_PREIMAGE_PROBE;
  const isR4GuardianOrigin=withW05&&raw.probe===R4_GUARDIAN_ORIGIN_PROBE;
  const isCiReceiptRoot=withW05&&raw.probe===CI_RECEIPT_ROOT_PROBE;
  const allowedOperatingProbe=isOperator||is2960||is3409||isEr1Postcheck||is3516||
   isD05Writer||isD05PrivateReceipt||isD05Theme||isD05Registration||is3160||
   isCnnStaticGuard||isCnnGitPredicates||isCnnBPins||isCnnBResources||
-  isCnnBCore||isW06Task||isR3Watchdog||isR3Wmi||isR4Runtime||isR5Runtime||isR4GuardianOrigin;
+  isCnnBCore||isW06Task||isR3Watchdog||isR3Wmi||isR4Runtime||isR5Runtime||isS6Preimage||isR4GuardianOrigin;
  const acceptedProbe=(role==='operating'&&allowedOperatingProbe)||
   (role==='handoff'&&isCiReceiptRoot);
  if(!raw||(!basic&&!withJobs&&!withW05)||
@@ -643,6 +646,7 @@ export function authenticateProcess(event,env,role){
   ...(isR3Wmi?{standbyRunnerWmi:true}:{}),
   ...(isR4Runtime?{watchdogR4Runtime:true}:{}),
   ...(isR5Runtime?{watchdogR5Runtime:true}:{}),
+   ...(isS6Preimage?{s6ApprovalPreimage:true}:{}),
   ...(isR4GuardianOrigin?{watchdogR4GuardianOrigin:true}:{}),
   ...(isCiReceiptRoot?{ciControllerBReceiptRoot:true}:{})};
 }
@@ -2761,6 +2765,106 @@ export function projectCnnSidecarStaticGuard(raw){
   operationalWrites:0,providerCalls:0,d1Writes:0};
 }
 
+
+/**
+ * Single-point operating Runner A observation for preparing the separate
+ * Owner-approved S6 B manifest. This is NOT the independent maintainer's
+ * s6-once-status: the B receiver must re-attest origin, all six Runner
+ * seats idle, active intake, exact CAS and current installed bytes.
+ * No subprocess stop, writes, keys, paths, environment or credentials.
+ */
+export function projectS6ApprovalPreimageReadonly(raw,{now=Date.now()}={}){
+ const base={schema:'ZGMINI_S6_APPROVAL_PREIMAGE_A_V1',
+  status:'STATE_UNKNOWN',code:'S6_APPROVAL_PREIMAGE_UNVERIFIED',
+  independentOperatorAttested:false,bAuthorization:false,
+  failoverTested:false,promotionApproved:false,operationalWrites:0,
+  providerCalls:0,d1Writes:0};
+ const sha40=x=>typeof x==='string'&&/^[a-f0-9]{40}$/.test(x);
+ const sha64=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
+ const pid=x=>Number.isSafeInteger(x)&&x>0;
+ const obj=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
+ const wd=raw?.wd,owner=raw?.owner,sup=raw?.supervisor;
+ const at=Date.parse(wd?.at??'');
+ if(!obj(raw)||!obj(wd)||!obj(owner)||!obj(sup)||
+    raw.maintainerSourceSha!==S6_INSTALLED_MAINTAINER||
+    raw.maintainerFilesVerified!==true||raw.controllerFilesVerified!==true||
+    raw.installLockHeld!==false||!sha40(raw.controllerSha)||
+    !sha64(raw.watchdogSourceSha256)||!sha64(raw.watchdogActualSha256)||
+    raw.watchdogActualSha256!==raw.watchdogSourceSha256||
+    raw.watchdogMode!=='ACTIVE_1_STANDBY_2'||raw.watchdogApproved!==true||
+    wd.state!=='HEALTHY'||wd.standbyRole!=='READY'||
+    wd.secondStandbyRole!=='READY'||wd.standbyReadyCount!==2||
+    !pid(wd.pid)||!pid(wd.standbyPid)||!pid(wd.secondStandbyPid)||
+    !pid(raw.receiverPid)||wd.pid!==raw.receiverPid||
+    new Set([wd.pid,wd.standbyPid,wd.secondStandbyPid]).size!==3||
+    !pid(owner.pid)||owner.pid!==sup.pid||
+    !/^[a-f0-9-]{36}$/.test(owner.nonce??'')||
+    sup.mode!=='LISTENING'||sup.sourceSha!==raw.controllerSha||
+    !Array.isArray(sup.children)||sup.children.length!==6||
+    !Number.isFinite(now)||!Number.isFinite(at)||now-at<0||now-at>=45000||
+    !sha64(raw.ownerSha256)||!sha64(raw.protectedSha256))
+  return base;
+ return {...base,status:'PASS',code:'S6_APPROVAL_PREIMAGE_CANDIDATE_ONLY',
+  observedAtUtc:new Date(now).toISOString(),
+  sixIdleRunnersVerified:false,workflowActiveVerified:false,
+  // Exact values are confined to the authenticated *private* A result JSON.
+  // Never echo them in the public TXT summary or an Issue comment.
+  s6Live:{installedControllerSha:raw.controllerSha,
+   installedMaintainerSha:raw.maintainerSourceSha,
+   watchdogSourceSha256:raw.watchdogSourceSha256,
+   protectedSha256:raw.protectedSha256,
+   ownerSha256:raw.ownerSha256,
+   watchdogPid:wd.pid,standbyPids:[wd.standbyPid,wd.secondStandbyPid]}};
+}
+export function inspectS6ApprovalPreimageReadonly({
+ io=fs,now=Date.now(),protect=protectedSnapshot,
+ maintenance=collectMaintenanceStatusReadonly
+}={}){
+ const unknown=()=>projectS6ApprovalPreimageReadonly(null,{now});
+ try{
+  const rd=p=>{
+   const st=io.lstatSync(p);
+   if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1||
+      st.size<=0||st.size>131072)throw Error('S6_A_FILE_UNVERIFIED');
+   return io.readFileSync(p);
+  };
+  const get=p=>JSON.parse(rd(p).toString('utf8'));
+  const maint=maintenance();
+  const maintRoot='E:/ZGmini/automation/pc-maintenance';
+  const wdRoot='E:/ZGmini/automation/pc-watchdog';
+  const ctl='E:/ZGmini/automation/pc-control';
+  const wdInstall=get(path.join(wdRoot,'INSTALL.json'));
+  const wd=get(path.join(wdRoot,'STATUS.json'));
+  const wdOwner=get(path.join(wdRoot,'receiver/owner.json'));
+  const ownerRaw=rd(path.join(ctl,'leases/supervisor/owner.json'));
+  const owner=JSON.parse(ownerRaw.toString('utf8'));
+  const sup=get(path.join(ctl,'SUPERVISOR_STATUS.json'));
+  const maintInstall=get(path.join(maintRoot,'MAINTENANCE_INSTALL.json'));
+  const localFiles=Object.entries(maintInstall.files??{});
+  if(localFiles.length!==7||localFiles.some(([rel,hash])=>
+    !/^tools\/[a-z0-9.-]+$/.test(rel)||
+    !/^[a-f0-9]{64}$/.test(hash)||
+    createHash('sha256').update(rd(path.join(maintRoot,rel))).digest('hex')!==hash))
+   return unknown();
+  const sha=x=>createHash('sha256').update(x).digest('hex');
+  const wdRaw=rd(path.join(wdRoot,'runner-watchdog.mjs'));
+  const protectedSha256=sha(JSON.stringify(protect()));
+  return projectS6ApprovalPreimageReadonly({
+   maintainerSourceSha:maintInstall.sourceSha,
+   maintainerFilesVerified:maint.maintenanceFilesVerified===true,
+   controllerFilesVerified:maint.runtimeSignals?.controllerFilesVerified===true,
+   controllerSha:maint.actualControllerSha,
+   installLockHeld:maint.installLockReadbackVerified===true?maint.installLockHeld:null,
+   watchdogSourceSha256:wdInstall.sha256,
+   watchdogActualSha256:sha(wdRaw),
+   watchdogMode:wdInstall.standby?.mode,
+   watchdogApproved:wdInstall.standby?.approved,
+   wd,receiverPid:wdOwner.pid,owner,sup:undefined,
+   supervisor:sup,ownerSha256:sha(ownerRaw),protectedSha256
+  },{now});
+ }catch{return unknown();}
+}
+
 export function collect(role,ctx,env=process.env){
  const host=os.hostname().toUpperCase();
  const runnerName=String(env.RUNNER_NAME||'');
@@ -2792,6 +2896,11 @@ export function collect(role,ctx,env=process.env){
  if(ctx.watchdogR4GuardianOrigin===true){
   const proof=inspectR4GuardianOriginReadonly();
   return {...base,status:proof.status,code:proof.code,watchdogR4GuardianOrigin:proof};
+ }
+ if(ctx.s6ApprovalPreimage===true){
+  const evidence=inspectS6ApprovalPreimageReadonly();
+  return {...base,status:evidence.status,code:evidence.code,
+   s6ApprovalPreimage:evidence};
  }
  if(ctx.watchdogR5Runtime===true){
   const proof=inspectR5StandbyRuntimeReadonly();
@@ -3001,6 +3110,10 @@ export function toText(r){
    'guardianProbePassed='+r.watchdogR4GuardianOrigin.guardianProbePassed,
    'guardianOriginMismatchCodes='+r.watchdogR4GuardianOrigin.originMismatches.join(','),
    'guardianActivationExecuted=false']:[]),
+  ...(r.s6ApprovalPreimage?[
+   's6ApprovalPreimage='+r.s6ApprovalPreimage.code,
+   's6ApprovalCandidateOnly='+r.s6ApprovalPreimage.status,
+   's6IndependentAttested=false','s6BEffectAuthorized=false']:[]),
   ...(r.watchdogR5Runtime?[
    'watchdogR5Runtime='+r.watchdogR5Runtime.code,
    'watchdogR5InstalledMatch='+r.watchdogR5Runtime.installedMatch,
