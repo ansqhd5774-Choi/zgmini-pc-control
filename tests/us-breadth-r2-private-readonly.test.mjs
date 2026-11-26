@@ -54,6 +54,7 @@ test('fixed stock and ETF receipt inventory and immutable private hash without s
  const r=inspectUsBreadthR2PrivateReadonly(root);
  assert.equal(r.status,'PASS');
  assert.equal(r.stockDaily.receiptDates,2);
+ assert.equal(r.stockDaily.latest251FirstDate,'2026-11-24');
  assert.equal(r.stockDaily.selectedMetadataValid,2);
  assert.equal(r.stockDaily.selectedRawFilesPresent,2);
  assert.equal(r.etfDaily.receiptDates,1);
@@ -90,4 +91,17 @@ test('empty but present paid storage does not imply missing provider access',t=>
  assert.equal(r.status,'PASS');
  assert.equal(r.stockDaily.state,'DIRECTORY_UNAVAILABLE');
  assert.equal(r.privateOutput.state,'DIRECTORY_UNAVAILABLE');
+});
+
+test('two different immutable outputs for one date are not arbitrarily selected',t=>{
+ const {root,base}=fixture(t);
+ const record={schema:'ZGMINI_US_PAID_BREADTH_R2_PRIVATE_V1',
+  firstDate:'2026-11-25',lastDate:'2026-11-25',comparedSessions:1,
+  fullYearHistory:false,points:[{date:'2026-11-25',risingPct:51}],
+  sourceReceipts:[{},{}]};
+ savePrivate(base,record);
+ savePrivate(base,{...record,points:[{date:'2026-11-25',risingPct:52}]});
+ const r=inspectUsBreadthR2PrivateReadonly(root);
+ assert.equal(r.privateOutput.state,'PRIVATE_SAME_DATE_AMBIGUOUS');
+ assert.equal(r.privateOutput.fileSha256,null);
 });
