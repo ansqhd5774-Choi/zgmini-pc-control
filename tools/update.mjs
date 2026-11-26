@@ -9,7 +9,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {execFileSync,spawn,spawnSync} from 'node:child_process';
 import {TextDecoder} from 'node:util';
 import {fileURLToPath,pathToFileURL} from 'node:url';
-import {applyApprovedUpdate,maintenanceCliFailureReport} from './maintenance-apply.mjs';
+import {applyApprovedUpdate,maintenanceCliFailureReport,runApprovedS6FailoverOnce} from './maintenance-apply.mjs';
 import {validateUpdateRequest,validateMaintenanceRequest,
  authenticateControllerBIssue,CI_CONTROLLER_ACTOR,installedControllerBPolicy,
 validateControllerConfigTransition,controllerAdmissionForPurpose,
@@ -30,7 +30,7 @@ validateControllerConfigTransition,controllerAdmissionForPurpose,
  validateR54BManifestRequest,R54_B_ISSUE_TITLE,R54_B_OPERATION,
  R54_B_SOURCE_FILES,SOURCE_BUNDLE_OPERATION,SOURCE_BUNDLE_ISSUE_TITLE,
  validateSourceBundleIssueEnvelope,validateSourceBundleBApproval,
- validateS6OnceBManifest} from './maintenance-contract.mjs';
+ validateS6OnceBManifest,validateS6OnceIssueEnvelope,assessS6ControllerTransition} from './maintenance-contract.mjs';
 import {acquireMaintenanceLock,maintenanceLockStatus} from './maintenance-lock.mjs';
 import {planSourceBundleRegistration,stageApprovedSourceBundle,
  applyPreparedSourceBundleHostCas} from './source-bundle-register.mjs';
@@ -3409,6 +3409,256 @@ export async function readS6OncePhaseReadback({phase,baseline,
    owner?.pid!==baseline.oldSupervisorPid,
   existingRequestLedgerPreserved
  };
+}
+
+
+
+/**
+ * Proposed S6 B operating-port adapter for the *existing* independent
+ * maintainer. It is intentionally NOT invoked by the CLI or Issue receiver.
+ * Actual process termination / workflow toggles can only be connected after
+ * separately reviewed B effect approval, exact 7-file handoff and Windows
+ * isolation tests. Do not call with an Issue body alone.
+ *
+ * The port preserves one atomic local claim, a local phase ledger, the B
+ * approval byte pin, original Supervisor owner and the 6 Runner seats. It
+ * never spawns a second Supervisor, kills a process other than the approved
+ * old owner tree, deletes an unknown lock, or automatically retries.
+ */
+export function makeS6OnceOwnedOperatingPort({request,approvedBytes,
+ actor=null,issueNumber=null}={}){
+ need(process.platform==='win32'&&!process.env.GITHUB_ACTIONS&&!process.env.RUNNER_NAME,
+  'S6_PORT_INDEPENDENT_WINDOWS_ONLY');
+ need(actor==='ansqhd5774-Choi'&&Number.isSafeInteger(issueNumber)&&issueNumber>0,
+  'S6_PORT_OPERATOR_OR_ISSUE_UNVERIFIED');
+ const issue=validateS6OnceIssueEnvelope(request,{actor,controlRepository});
+ need(Buffer.isBuffer(approvedBytes)&&approvedBytes.length>0&&approvedBytes.length<=32768,
+  'S6_PORT_B_MANIFEST_BYTES_INVALID');
+ const requestId=issue.requestId;
+ const owned=path.join(maintenanceRoot,'ledger','S6_ONCE_'+requestId);
+ const claimFile=path.join(owned,'claim.json');
+ const journalFile=path.join(owned,'journal.json');
+ const backlogFile=path.join(owned,'backlog.json');
+ let claimNonce=null,installLease=null,baseline=null,approved=false;
+ const claimOwned=()=>{
+  need(claimNonce!==null&&fs.existsSync(claimFile)&&
+    json(claimFile).nonce===claimNonce&&
+    json(claimFile).requestId===requestId,
+   'S6_PORT_CLAIM_OWNER_CHANGED');
+ };
+ const lockOwned=()=>{
+  claimOwned();
+  need(installLease!==null,'S6_PORT_OWN_INSTALL_LEASE_REQUIRED');
+  const l=json(path.join(maintenanceRoot,'leases/controller-install/owner.json'));
+  need(l.nonce===installLease.owner.nonce&&l.pid===process.pid,
+   'S6_PORT_INSTALL_LEASE_OWNER_CHANGED');
+ };
+ const authenticate=()=>{
+  const actual=github('issues/'+issueNumber);
+  need(actual?.state==='open'&&actual.title==='pc-controller-s6-once'&&
+   actual.user?.login===actor&&
+   actual.labels?.some(l=>l.name==='pc-maintenance')&&!actual.pull_request,
+   'S6_PORT_ISSUE_CHANGED_OR_CANCELED');
+  const envelope=validateS6OnceIssueEnvelope(JSON.parse(actual.body),{
+   actor:actual.user.login,controlRepository});
+  need(JSON.stringify(envelope)===JSON.stringify(issue),
+   'S6_PORT_ISSUE_PAYLOAD_CHANGED');
+  const remote=github('contents/approvals/controller-s6/'+
+   issue.approvalManifestSha256+'.json?ref=main');
+  need(remote?.type==='file'&&remote.encoding==='base64'&&
+   typeof remote.content==='string'&&remote.content.length<=65536,
+   'S6_PORT_B_APPROVAL_SOURCE_UNVERIFIED');
+  const bytes=Buffer.from(remote.content.replace(/\s/g,''),'base64');
+  need(bytes.equals(approvedBytes)&&sha256(bytes)===issue.approvalManifestSha256,
+   'S6_PORT_B_APPROVAL_DRIFT');
+  const live=readS6OnceCurrentPreimage(requestId).s6Live;
+  validateS6OnceBManifest(issue,bytes,{actor,controlRepository,live});
+  const owner=readOwner().owner;
+  verifyIndependent(owner.pid);
+  return true;
+ };
+ const verifyOld=bound=>{
+  need(bound?.requestId===requestId&&bound===baseline,
+   'S6_PORT_BASELINE_NOT_PINNED');
+  const status=readOwner(),ownerRaw=fs.readFileSync(
+   path.join(controlRoot,'leases/supervisor/owner.json'));
+  need(status.owner.pid===bound.oldSupervisorPid&&
+   status.owner.nonce===bound.oldSupervisorNonce&&
+   sha256(ownerRaw)===bound.ownerSha256&&
+   installedManifest().installedSha===bound.controllerSha&&
+   sha256(JSON.stringify(protectedSnapshot()))===bound.protectedSha256,
+   'S6_PORT_OLD_OWNER_OR_PROTECTION_CHANGED');
+  verifyIndependent(status.owner.pid);
+  need(normalizeS6OldChildren(status.status.children,{requireAlive:true})?.
+   every((x,i)=>x.pid===bound.oldChildren[i].pid)===true,
+   'S6_PORT_SIX_RUNNERS_CHANGED');
+  const wd='E:/ZGmini/automation/pc-watchdog';
+  need(s6WatchdogPinMatches({baseline:bound,
+   install:json(path.join(wd,'INSTALL.json')),
+   receiver:json(path.join(wd,'receiver/owner.json')),
+   status:json(path.join(wd,'STATUS.json')),
+   sourceSha256:sha256(fs.readFileSync(path.join(wd,'runner-watchdog.mjs')))}),
+   'S6_PORT_WATCHDOG_CHANGED');
+  return true;
+ };
+ const pending=()=>['in_progress','queued','waiting'].reduce((total,state)=>{
+  const count=github('actions/workflows/pc-job.yml/runs?status='+state+
+   '&per_page=1').total_count;
+  need(Number.isSafeInteger(count)&&count>=0,
+   'S6_PORT_WORKFLOW_PENDING_COUNT_UNVERIFIED');
+  return total+count;
+ },0);
+ const noLeases=()=>fs.readdirSync(path.join(controlRoot,'leases'))
+  .every(x=>x==='supervisor'||x.startsWith('supervisor.dead-'));
+ const sixIdle=()=>requireCompleteRunnerInventory(github('actions/runners?per_page=100'))
+  .every(x=>x.status==='online'&&x.busy===false);
+ const observed=async(phase,bound)=>{
+  need(approved===true&&bound===baseline,'S6_PORT_READBACK_NOT_AUTHENTICATED');
+  return readS6OncePhaseReadback({phase,baseline:bound,
+   exactApprovalBytesAttested:true,independentOperatorAttested:true});
+ };
+ return Object.freeze({
+  now:()=>Date.now(),
+  read:async()=>fs.existsSync(owned)?{
+   phase:fs.existsSync(journalFile)?json(journalFile).phase:'CLAIM_UNKNOWN'
+  }:null,
+  attestApproval:async()=>{
+   approved=authenticate();
+   return approved;
+  },
+  captureBaseline:async()=>{
+   need(approved,'S6_PORT_PREAPPROVAL_REQUIRED');
+   baseline=captureS6OncePinnedBaseline(issue,approvedBytes,{actor});
+   return baseline;
+  },
+  observe:observed,
+  claimOnce:async()=>{
+   need(approved&&baseline,'S6_PORT_PRECLAIM_NOT_AUTHENTICATED');
+   try{fs.mkdirSync(owned);}
+   catch(error){if(error.code==='EEXIST')return false;throw error;}
+   claimNonce=randomUUID();
+   fs.writeFileSync(claimFile,JSON.stringify({schema:'ZGMINI_S6_CLAIM_V1',
+    requestId,nonce:claimNonce,ownerPid:process.pid,at:new Date().toISOString(),
+    baselineSha256:sha256(JSON.stringify(baseline))})+'\n',{flag:'wx'});
+   return true;
+  },
+  persist:async data=>{
+   claimOwned();
+   need(data?.schema==='ZGMINI_S6_ONCE_JOURNAL_V1'&&data.requestId===requestId,
+    'S6_PORT_JOURNAL_SCHEMA_OR_IDENTITY');
+   writeJson(journalFile,data);
+  },
+  acquireOwnedInstallLease:async()=>{
+   claimOwned();
+   authenticate();
+   verifyOld(baseline);
+   need(installLease===null,'S6_PORT_INSTALL_LEASE_DUPLICATE');
+   installLease=acquireMaintenanceLock(maintenanceRoot,'controller-install');
+   lockOwned();
+  },
+  pauseIntake:async()=>{
+   lockOwned();
+   verifyOld(baseline);
+   need(github('actions/workflows/pc-job.yml').state==='active',
+    'S6_PORT_INTAKE_STATE_CHANGED');
+   need(!fs.existsSync(backlogFile),'S6_PORT_BACKLOG_ALREADY_EXISTS');
+   const at=new Date().toISOString();
+   writeJson(backlogFile,{schema:'ZGMINI_PC_BACKLOG_V1',requestId,
+    pausedAt:at,resumedAt:null,windows:[{pausedAt:at,resumedAt:null}],
+    replays:{}});
+   github('actions/workflows/pc-job.yml/disable','PUT');
+   need(await confirmExactWorkflowState(()=>github('actions/workflows/pc-job.yml').state,
+    'disabled_manually'),'S6_PORT_INTAKE_PAUSE_UNVERIFIED');
+  },
+  waitForDrain:async()=>{
+   lockOwned();
+   for(let i=0;i<60;i++){
+    verifyOld(baseline);
+    need(github('actions/workflows/pc-job.yml').state==='disabled_manually',
+     'S6_PORT_INTAKE_PAUSE_LOST');
+    if(sixIdle()&&noLeases()&&pending()===0){
+     await wait(3000);
+     if(sixIdle()&&noLeases()&&pending()===0)return;
+    }
+    await wait(3000);
+   }
+   need(false,'S6_PORT_DRAIN_WAIT_TIMEOUT');
+  },
+  verifyStopGuard:async()=>{
+   lockOwned();
+   verifyOld(baseline);
+   return github('actions/workflows/pc-job.yml').state==='disabled_manually'&&
+    noLeases()&&pending()===0&&sixIdle();
+  },
+  stopOwnTree:async()=>{
+   lockOwned();
+   verifyOld(baseline);
+   need(github('actions/workflows/pc-job.yml').state==='disabled_manually'&&
+    noLeases()&&pending()===0&&sixIdle(),'S6_PORT_STOP_GUARD_CHANGED');
+   // The original exact six-child Supervisor PID only; never another tree.
+   execFileSync('taskkill.exe',['/PID',String(baseline.oldSupervisorPid),
+    '/T','/F'],{windowsHide:true,stdio:'ignore',timeout:15000});
+  },
+  waitForStoppedHeld:async()=>{
+   lockOwned();
+   for(let n=0;n<40;n++){
+    try{
+     const snap=await observed('STOPPED_HELD',baseline);
+     if(assessS6ControllerTransition({phase:'STOPPED_HELD',baseline,
+      observed:snap}).status==='OBSERVED')return;
+    }catch{/* read-only uncertain; never retry the stop */}
+    await wait(3000);
+   }
+   need(false,'S6_PORT_STOPPED_HELD_TIMEOUT');
+  },
+  resumeIntake:async()=>{
+   lockOwned();
+   const snap=await observed('STOPPED_HELD',baseline);
+   need(assessS6ControllerTransition({phase:'STOPPED_HELD',baseline,
+    observed:snap}).status==='OBSERVED','S6_PORT_STOPPED_GUARD_LOST');
+   github('actions/workflows/pc-job.yml/enable','PUT');
+   need(await confirmExactWorkflowState(()=>github('actions/workflows/pc-job.yml').state,
+    'active'),'S6_PORT_INTAKE_RESUME_UNVERIFIED');
+   const old=json(backlogFile);
+   writeJson(backlogFile,closeLatestPause(old,new Date().toISOString()));
+  },
+  verifyReleaseGuard:async()=>{
+   lockOwned();
+   const snap=await observed('STOPPED_HELD',baseline);
+   return snap.oldSupervisorAlive===false&&
+    snap.oldSixChildrenStopped===true&&
+    snap.runnerExecutableProof==='NO_CONTROLLER_RUNNER_PROCESS'&&
+    snap.watchdogPaused===true&&snap.maintenanceLeaseHeld===true&&
+    snap.workflowState==='active'&&snap.controllerDraining===false&&
+    snap.relatedLeasesAbsent===true&&
+    snap.existingRequestLedgerPreserved===true&&
+    snap.protectedSha256===baseline.protectedSha256;
+  },
+  releaseOwnedInstallLease:async()=>{
+   lockOwned();
+   // Previous guard remains necessary at the irreversible handoff.
+   const snap=await observed('STOPPED_HELD',baseline);
+   need(snap.oldSupervisorAlive===false&&snap.oldSixChildrenStopped===true&&
+    snap.runnerExecutableProof==='NO_CONTROLLER_RUNNER_PROCESS'&&
+    snap.watchdogPaused===true&&snap.workflowState==='active'&&
+    snap.existingRequestLedgerPreserved===true,
+    'S6_PORT_RELEASE_PROTECTION_DRIFT');
+   installLease.release();
+   installLease=null;
+  },
+  waitForPromotion:async()=>{
+   need(installLease===null,'S6_PORT_PROMOTION_STILL_LOCKED');
+   for(let n=0;n<60;n++){
+    try{
+     const snap=await observed('PROMOTED',baseline);
+     if(assessS6ControllerTransition({phase:'PROMOTED',baseline,
+      observed:snap}).status==='OBSERVED')return;
+    }catch{/* read-only retry; never restart or kill */}
+    await wait(3000);
+   }
+   need(false,'S6_PORT_PROMOTION_UNVERIFIED');
+  }
+ });
 }
 
 export async function command(args=process.argv.slice(2)) {
