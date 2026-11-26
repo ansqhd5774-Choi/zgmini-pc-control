@@ -16,8 +16,8 @@ jobs:
       github.actor == 'ansqhd5774-Choi' &&
       github.event.sender.login == 'ansqhd5774-Choi' &&
       github.event.issue.user.login == 'ansqhd5774-Choi' &&
-      (github.event.issue.title == 'pc-writer-source-install' || github.event.issue.title == 'r181-protected-route-install' || github.event.issue.title == 'r181-source-shape-readonly' || github.event.issue.title == 'r181-saved-ledger-readonly' || github.event.issue.title == 'w03-r179-stored-handoff-readonly' || github.event.issue.title == 'w03-r179-guard-shape-readonly' || github.event.issue.title == 'w03-r179-readback-guard-install' || github.event.issue.title == 'w03-gmh-seven-history-manual-once' || github.event.issue.title == 'w03-gmh-seven-private-score-once' || github.event.issue.title == 'w03-gmh-seven-public-compat-readonly' || github.event.issue.title == 'w03-gmh-seven-d1-seed-readonly' || github.event.issue.title == 'w03-gmh-seven-collection-time-readonly' || github.event.issue.title == 'r181-primary-route-install' || github.event.issue.title == 'r181-existing-task-run-once' || github.event.issue.title == 'r47-existing-task-run-once' || github.event.issue.title == 'marketparquet-exact-task-retire-once' || github.event.issue.title == 'w03-r47-private-readback-once' || github.event.issue.title == 'w03-r48-private-readback-once' || github.event.issue.title == 'w03-r51-stored-date-readback-once' || github.event.issue.title == 'w01-census-m3-api-once') &&
-      contains(github.event.issue.labels.*.name, 'pc-writer-b-install') &&
+      (github.event.issue.title == 'pc-writer-source-install' || github.event.issue.title == 'pc-writer-task-create-once' || github.event.issue.title == 'r181-protected-route-install' || github.event.issue.title == 'r181-source-shape-readonly' || github.event.issue.title == 'r181-saved-ledger-readonly' || github.event.issue.title == 'w03-r179-stored-handoff-readonly' || github.event.issue.title == 'w03-r179-guard-shape-readonly' || github.event.issue.title == 'w03-r179-readback-guard-install' || github.event.issue.title == 'w03-gmh-seven-history-manual-once' || github.event.issue.title == 'w03-gmh-seven-private-score-once' || github.event.issue.title == 'w03-gmh-seven-public-compat-readonly' || github.event.issue.title == 'w03-gmh-seven-d1-seed-readonly' || github.event.issue.title == 'w03-gmh-seven-collection-time-readonly' || github.event.issue.title == 'r181-primary-route-install' || github.event.issue.title == 'r181-existing-task-run-once' || github.event.issue.title == 'r47-existing-task-run-once' || github.event.issue.title == 'marketparquet-exact-task-retire-once' || github.event.issue.title == 'w03-r47-private-readback-once' || github.event.issue.title == 'w03-r48-private-readback-once' || github.event.issue.title == 'w03-r51-stored-date-readback-once' || github.event.issue.title == 'w01-census-m3-api-once') &&
+      ((github.event.issue.title == 'pc-writer-task-create-once' && contains(github.event.issue.labels.*.name, 'pc-writer-task-create-b')) || (github.event.issue.title != 'pc-writer-task-create-once' && contains(github.event.issue.labels.*.name, 'pc-writer-b-install'))) &&
       github.run_attempt == 1
     concurrency:
       group: zgmini-writer-source-b-one-at-a-time
@@ -73,6 +73,29 @@ jobs:
         if: github.event.issue.title == 'pc-writer-source-install' && steps.candidate.outcome == 'success'
         id: install
         run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\writer-b\windows-adapter.mjs" > "%RUNNER_TEMP%\writer-b-install-result.json"'
+      - name: W06 exact one-Task B committed manifest preflight
+        if: github.event.issue.title == 'pc-writer-task-create-once'
+        id: w06taskapprove
+        run: '"E:\\ZGmini\\runtime\\node.exe" "%GITHUB_WORKSPACE%\\writer-b-control\\task-create-b\\preflight.mjs"'
+      - name: Checkout pinned W06 Task pure candidate only
+        if: github.event.issue.title == 'pc-writer-task-create-once' && steps.w06taskapprove.outcome == 'success'
+        id: w06taskcandidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: ${{ steps.w06taskapprove.outputs.candidateSourceSha }}
+          path: task-b-candidate
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Create only exact approved W06 CNN minute Task with B CAS
+        if: github.event.issue.title == 'pc-writer-task-create-once' && steps.w06taskcandidate.outcome == 'success'
+        id: w06taskcreate
+        run: '"E:\\ZGmini\\runtime\\node.exe" "%GITHUB_WORKSPACE%\\writer-b-control\\task-create-b\\entry.mjs"'
+      - name: Create-only W06 Task B redacted result pair and Issue readback
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'pc-writer-task-create-once'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\\ZGmini\\runtime\\node.exe" "%GITHUB_WORKSPACE%\\writer-b-control\\task-create-b\\report.mjs"'
       - name: R181 exact protected source B (independent immutable manifest)
         if: github.event.issue.title == 'r181-protected-route-install'
         id: r181
