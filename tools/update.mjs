@@ -9,7 +9,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {execFileSync,spawn,spawnSync} from 'node:child_process';
 import {TextDecoder} from 'node:util';
 import {fileURLToPath,pathToFileURL} from 'node:url';
-import {applyApprovedUpdate,maintenanceCliFailureReport,runApprovedS6FailoverOnce} from './maintenance-apply.mjs';
+import {applyApprovedUpdate,maintenanceCliFailureReport} from './maintenance-apply.mjs';
 import {validateUpdateRequest,validateMaintenanceRequest,
  authenticateControllerBIssue,CI_CONTROLLER_ACTOR,installedControllerBPolicy,
 validateControllerConfigTransition,controllerAdmissionForPurpose,
