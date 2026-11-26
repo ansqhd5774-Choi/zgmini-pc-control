@@ -2591,7 +2591,7 @@ test('R4 Watchdog candidate before natural restart or without exact live identit
 });
 
 test('R4 fixed read-only file evidence rejects aliases and reports only safe status',()=>{
- const wd='/fixture/watchdog',controller='/fixture/controller';
+ const wd=path.resolve('fixture-r4-watchdog'),controller=path.resolve('fixture-r4-controller');
  const exactSource=fs.readFileSync(new URL('../tools/runner-watchdog.mjs',import.meta.url));
  const x=r4RuntimeFixture();
  const data=new Map([
