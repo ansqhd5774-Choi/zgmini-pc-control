@@ -577,3 +577,28 @@
 - **검증 결론:** 이 범위에 한해 S6 이후 Controller B 독립 설치 정책을 다시 B로 설치할 필요 없음. `ciControllerBReceiver.approvedV2PinMatches=false`는 구형 두 설치의 비교 필드일 뿐이고 현재 설치 무결성 위반이 아님. `executionAuthorized=false`는 A 읽기 응답 고정값이므로 Publisher에 실제 business grant가 있는지 판단하지 못함.
 - [Issue #4100 결론 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4100#issuecomment-7203640152) 게시 후 `closed/completed` 확인. 기존 요청을 반복 발행하지 않는다.
 - **남은 실제 자동화 범위:** 격리 CI Controller B의 `ZGMINI_CI_CONTROLLER_B_POLICY`와 `ENABLED` 변수는 기존 #4029에서 미구성/비활성이고 현재 재설정 증거 없음. 새 Owner 업무 위임·실제 A/B 후보 승인·본래 business effect가 독립적으로 검증된 경우에만 정규 자동 발행을 할 수 있다. Native A/Writer B의 Owner-B-installed scope/proof root도 현장 확인되지 않았다. **A·Writer B·Controller B 실제 무인 종단 완료율 0/3 유지**. S6 0/1도 과거 journal 원본 보존.
+
+## 23. 열아홉 번째 실행 기록 — Native 격리 PC 고정 A 조회 개선 (2026-11-27 KST)
+
+### 관측 필요성과 기존 완료점
+
+- Native A/Writer B source PR #4085/#4086/#4088/#4089는 정확 CI 및 main 병합 완료. Runner 6/6 정상 복구·공통 A #4080 PASS와 Controller B 정책 CAS #4100 PASS는 별개 실제 증거로 보존. 자동 무인 A·Writer B·Controller B 종단은 **0/3**.
+- 격리 PC에 설치된 Native 정책·B-installed proof 및 단회 receipt root의 현재 상태를 읽는 기존 Owner A probe가 없었다. CI의 Native 발행 Job skipped는 실행 조건 불충족만 나타내고 실제 PC 설정/파일 존재를 입증하지 않는다. 읽기 결함을 신뢰된 기존 장비 조회기로 최소 보완.
+- 별도 S6 담당자의 [PR #4098](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4098)은 공통 `tools/pc-process-inventory-readonly.mjs`의 S6 원장 3003·3056 부근을 수정 중이나, 아래 Native 수정과 hunk가 겹치지 않는다. 타 담당 파일 변경 보존, 강제 reset/rebase 없음.
+
+### Native A/Writer 독립 로컬 정책 관측 PR #4107
+
+- 신규 브랜치 `codex/ci-native-local-preflight-a-20261127`. [PR #4107](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4107) 최초 HEAD `48fa90d729e5bad1a5de4ce558d85138328bde76`.
+- 기존 Owner 인증 고정 A `pc-process-inventory-readonly`의 격리 PC `role=handoff`에 `probe=ci-native-publisher-local-readonly`를 추가. 임의 path/command/추가 Issue 필드 수용 없음.
+- `tools/ci-native-publisher-local-readonly.mjs`는 이미 구현된 공식 `createNativePublisherLocalPolicyPorts` 및 `readNativeScope/readNativeInstalledProof`를 재사용한다. Native A 및 Writer B 두 효과에 대해 정책·원문 SHA·별도 proof 형식과 일치성, 설정된 policy/receipt 루트의 분리·심볼릭 링크·임시 경로 차단을 읽기 전용으로 관측한다.
+- 결과는 루트 구성/분리 여부, 두 효과의 `CI_NATIVE_LOCAL_*` 고정 상태 코드와 불리언, Native publisher/execution flag의 ENABLED/DISABLED/UNSET_OR_INVALID 값만 포함. 실제 경로·환경변수 원문·승인 JSON/base64 bytes·secret·실행 인증정보는 반환하지 않는다.
+- **이 읽기 진단은 독립 GitHub B 설치 영수증을 확인하지 않음.** `independentGitHubInstallationReceiptVerified=false`, `canPublish/canExecute/canInstall=false` 고정. 실제 발행·설치·승인 효과 없음.
+- 변경 4파일: 기존 `.github/workflows/pc-process-inventory-readonly.yml`, `tools/pc-process-inventory-readonly.mjs`, 신규 `tools/ci-native-publisher-local-readonly.mjs`, `tests/ci-native-publisher-local-readonly.test.mjs`. 배정된 Runner/업무 스키마/DB/D1/운영 설정/Native 수신기는 불변.
+- 테스트: 정상 2효과·루트 누락/불신·scope/proof 누락·승인 바이트 변조·비활성 정책·Owner/role/입력 범위·TXT/JSON 기밀 redaction 및 기존 발행 gate 유지.
+- 정확 HEAD CI [Process Source 45897985942](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45897985942), [C996 45897985931](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45897985931), [Secret 45897985992](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45897985992). 최초 조회 queued 3건으로 병합 전; 이전 HEAD 성공 재사용 금지.
+
+### 다음 필수 실행
+
+1. #4107 정확 HEAD CI 실제 결과 회수, 관련 시험 실패면 최소 수정 후 재검증. 3/3 성공 시 최신 main 및 동시 작업 원문 보존해 병합·변경 blob 확인.
+2. 기존 정규 Owner A로 격리 PC fixed probe 1회 Issue→실행→JSON/TXT 원본 readback, 현재 Native 설정과 설치된 파일의 존재·동등성 대조. 중복 Job 생성 금지.
+3. 별도 검증된 B 승인 원본·독립 설치 영수증·원자 단회 receipt 및 실제 Owner 범위가 정확히 갖춰진 효과만 자동 CI 발행/PC 실행으로 연결. 현행 운영 종단 0/3 유지; 새 보안 권한/승인 원본/설치 파일을 진단 결과로 자동 생성하지 않는다.
