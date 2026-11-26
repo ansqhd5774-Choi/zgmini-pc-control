@@ -1,0 +1,33 @@
+{
+  "schema": "ZGMINI_PC_S6_ONCE_B_APPROVAL_V1",
+  "operation": "controller-s6-failover-once",
+  "requestId": "pc-s6-63afb126-72dc-4ec5-a721-4819771fa9ee",
+  "installedControllerSha": "3c7d4cfefacf072fd35cb19706b352c64c5e4fd2",
+  "installedMaintainerSha": "5a85f803fd9cb280561395f88a3544ee8e7d4660",
+  "watchdogSourceSha256": "9137447231d354d9999cdadbbb5b2a6dee7f0bf869df61881742902ac445128f",
+  "protectedSha256": "1e04296eab72cc0397c43ac2741252af9c3e2d9f31a7b38c189093d9765a0bee",
+  "ownerSha256": "0f3f0655aaa4a94b6156becbad3fbdbd9c67882ad79268a6f1ce7a7de8dc887f",
+  "watchdogPid": 33920,
+  "standbyPids": [
+    20068,
+    26984
+  ],
+  "approval": {
+    "approved": true,
+    "grade": "B",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4063",
+    "scope": "EXACT_ONE_SUPERVISOR_TREE_STOP_WITH_WATCHDOG_AUTO_PROMOTION"
+  },
+  "effect": {
+    "mode": "SINGLE_S6_FAILOVER",
+    "stop": "OLD_OWNED_SUPERVISOR_TREE_ONLY",
+    "promotion": "EXISTING_WATCHDOG_ONE_READY_STANDBY",
+    "independentMaintainer": true,
+    "noArbitraryCommands": true,
+    "noAutomaticRetry": true,
+    "noForcedRollback": true,
+    "preserveWorkersAndLedger": true,
+    "preserveProtectedSourceAndDb": true,
+    "postcheck": "EXISTING_A_JOB_WITH_READBACK"
+  }
+}
