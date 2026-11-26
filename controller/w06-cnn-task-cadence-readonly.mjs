@@ -1,5 +1,5 @@
 // W06 fixed read-only Windows Task cadence/action evidence. No Task mutation,
-// provider, SQLite, D1 or launch of any Task action. Never return raw actions.
+// provider calls, SQLite/D1 writes or Task launches. Never return raw actions.
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
