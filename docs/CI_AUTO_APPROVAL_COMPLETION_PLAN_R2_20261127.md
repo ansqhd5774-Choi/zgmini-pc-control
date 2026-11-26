@@ -128,3 +128,26 @@
 1. A·Writer B 각각의 기존 Owner 인증과 신규 CI 제출 주체를 **동일한 신원으로 가장하지 않고** 분리할 실제 허용 수신·서명/영수증 계약을 특정한다.
 2. 독립 검증·계정 범위·단회 요청/기존 영수증·재생 방지를 만족하는 공식 경로만 최소 변경한다. 인증/관리자 권한 변경이 필요한 범위는 별도 근거로 분리한다.
 3. PR #4044 정확 HEAD CI·병합·main readback은 완료. **운영 동작이나 자동 승인 활성화를 변경하지 않았다.** 실제 A·Writer 종단 실증 0건으로 보존하고, 다음 구현의 검증된 코드 결과와 분리한다.
+
+## 6. 두 번째 실행 기록 — 2026-11-27 KST
+
+### 확인된 실제 원인과 완료 증거
+
+- 일반 `GITHUB_TOKEN`으로 생성한 Issue가 후속 `issues` workflow를 시작하지 않는다는 GitHub 공식 실행 계약을 확인했다. 기존 A `.github/workflows/pc-job.yml`, Writer B `.github/workflows/pc-writer-b-source-once.yml`의 Owner-only 이벤트·요청자 인증은 보호한다.
+- 별도 R2 Controller B 사용자 요청 [#4036](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4036#issuecomment-7200174075)은 `SUCCEEDED/APPROVED_UPDATE_AND_DIAGNOSTIC_VERIFIED`, 실제 Controller `3c7d4cfefacf072fd35cb19706b352c64c5e4fd2` 설치, 백업/보호 상태 유지, JSON/TXT 업로드 확인. 이 요청은 **수동 제출**이므로 자동 승인 종단 1건으로 계상하지 않는다.
+- 사용자 직접 댓글은 필요하지 않으며 #4038 수동 Gate를 재개하지 않는다.
+
+### 소스 변경 및 범위
+
+- 새 소스 브랜치: `codex/ci-a-writer-native-dispatch-20261127`, 최신 당시 main `aed6469b65940d59813daf290106c819cd2737ba` 기준.
+- [PR #4050](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4050): `ci-approval/native-dispatch.mjs`에 **A·Writer B 전용, 정확한 수신 workflow_dispatch 호출 계약**을 분리 구현. 임의 경로·C 효과 제외, 소스 Run/수신 workflow Blob/설치된 독립 수신 정책 대조 후 기존 효과 영구 원장에 배타 claim → 단회 API 호출 → 204 확인. POST 상태 불명은 재발행 금지. **PC 설치나 승인 판정은 하지 않는다.**
+- 현행 Owner-only 운영 Workflow, A 실행기, Writer 설치기, Controller B 정책, GitHub 변수, PC Runtime, DB·D1·예약 **변경 0**.
+- 정책 Revision 변경에도 동일 승인 효과를 재발행하지 않도록 효과 키를 `effect + businessApprovalSha256 + approvedRequestSha256`로 고정. 추가한 단일 회귀까지 로컬 Node 시험 **19/19 PASS**.
+- HEAD `6f017cc091e4a2ad56b8409e504da80c6d8eeca0`; PR 실제 CI는 **별도 Run 확인 전 대기/미확인**, 현재 소스 PR 작성이 운영 적용은 아니다.
+
+### 다음 필수 실행
+
+1. PR #4050의 정확 HEAD 소스 CI 결과를 회수하여 정상 검증된 코드만 병합하고 원장에 SHA를 남긴다.
+2. A·Writer B 각각의 **독립 CI 전용 수신 workflow 및 PC측 인증·효과 원장·사후검사**를 기존 공통 엔진과 연결한다. owner-only 경로를 우회하지 않는다.
+3. 실제 인증된 발행 주체가 기존 승인 원본을 독립 검증한 뒤 정규 단회 호출하도록 연결한다. 새 권한이 필요한 경로는 정규 승인 없이 활성화하지 않는다.
+4. A / Controller B / Writer B 실제 CI 무인 종단 검증은 여전히 **0/3**이다. 이 PR을 운영 DONE으로 계산하지 않는다.
