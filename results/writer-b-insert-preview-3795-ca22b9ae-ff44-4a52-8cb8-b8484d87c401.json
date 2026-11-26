@@ -1,0 +1,29 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_RESULT_V1",
+  "requestId": "ca22b9ae-ff44-4a52-8cb8-b8484d87c401",
+  "chatId": "8c83c47c-8117-4b44-9bc8-d53f340197b3",
+  "issueNumber": 3795,
+  "status": "PASS_READONLY",
+  "code": "WRITER_B_INSERT_PREVIEW_VERIFIED",
+  "pcSourceWrites": 0,
+  "taskWrites": 0,
+  "dbWrites": 0,
+  "d1Writes": 0,
+  "providerCalls": 0,
+  "beforeSha256": "379f56dd94dc8df8ca6ef46331a4fd831495759bddcc9cee22b0159c65559efe",
+  "afterSha256": "68ee9e869c8bac308731c3748a67c644f37700dd038bc841ec06584fd064b2a9",
+  "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+  "baseHead": "d8ac245003e7b8e006c2345382d5c639c6d5f18b",
+  "filePath": "scripts/pc-writer/quota-ledger.mjs",
+  "insertions": 7,
+  "coreDrain": {
+    "status": "SNAPSHOT",
+    "enabled": true,
+    "state": 4,
+    "instances": 0,
+    "relatedProcesses": 1,
+    "unknownProcessLines": 0,
+    "cycleLockPresent": true,
+    "drainReadyIfDisabled": false
+  }
+}
