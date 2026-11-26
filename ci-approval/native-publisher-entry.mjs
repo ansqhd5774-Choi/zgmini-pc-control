@@ -82,11 +82,19 @@ export async function verifyNativeInstalledProof(effect,proof,{getJson}={}){
 }
 function sourceEventMatches(event,env,policy){
  const run=event?.workflow_run;
- return env?.GITHUB_EVENT_NAME==='workflow_run'&&
+ // A future CI run ID is unknowable at policy-install time. An explicitly
+ // installed EVENT_COMPLETION_V1 scope instead pins the reviewed source SHA,
+ // workflow and business effect; the signed event provides the one-shot ID.
+ const eventBound=policy?.sourceRunMode==='EVENT_COMPLETION_V1'&&
+   !Object.hasOwn(policy,'sourceRunId')&&
+   Number.isSafeInteger(run?.id)&&run.id>0&&policy.sourceAttempt===1;
+ const fixed=policy?.sourceRunMode===undefined&&
+   run?.id===policy.sourceRunId;
+ return (eventBound||fixed)&&env?.GITHUB_EVENT_NAME==='workflow_run'&&
   env.GITHUB_REPOSITORY===REPO&&env.GITHUB_REF==='refs/heads/main'&&
   event?.action==='completed'&&event.repository?.id===REPO_ID&&
   event.repository.full_name===REPO&&event.repository.private===true&&
-  run?.id===policy.sourceRunId&&run.run_attempt===policy.sourceAttempt&&
+  run.run_attempt===policy.sourceAttempt&&
   run.workflow_id===policy.sourceWorkflowId&&run.path===policy.sourceWorkflowPath&&
   run.head_sha===policy.sourceHeadSha&&run.status==='completed'&&
   run.conclusion==='success'&&run.event==='pull_request'&&
@@ -103,9 +111,12 @@ export async function publishNativeCompletion({effect,event,env,ports}={}){
  // exact installed source Run may produce a dispatch; ignore all others.
  if(!sourceEventMatches(event,env,scope.policy))
   return out('IGNORED','CI_NATIVE_PUBLISH_SOURCE_EVENT_NOT_TARGET');
- // Keep independent receiver verification in the existing core dispatcher.
+ // Bind only the original authenticated event's actual run number; it is
+ // neither an approval grant nor a replacement for the installed SHA pins.
+ const approvedPolicy=scope.policy.sourceRunMode==='EVENT_COMPLETION_V1'
+  ?{...scope.policy,sourceRunId:event.workflow_run.id}:scope.policy;
  const publishPorts={...ports};
- return dispatchApprovedCiEffect({policy:scope.policy,requestBytes:scope.requestBytes,
+ return dispatchApprovedCiEffect({policy:approvedPolicy,requestBytes:scope.requestBytes,
   ports:publishPorts});
 }
 async function main(){
