@@ -1406,7 +1406,7 @@ test('S6 live operating-port remains blocked in CI and only exact pinned CLI can
  assert.match(body,/S6_PORT_SYSTEMROOT_UNVERIFIED/);
  assert.match(body,/s6OwnedLeaseReleaseReadback\(snap,baseline\)/);
  assert.match(body,/case.*claim|claimOnce:/);
- assert.match(src.slice(e),/if\\(cmd==='s6-once-apply'\\)/);
+ assert.equal(src.slice(e).includes("if(cmd==='s6-once-apply')"),true);
  const cli=src.slice(src.indexOf("if(cmd==='s6-once-apply')"),
   src.indexOf("if(cmd==='source-bundle-status')"));
  assert.match(cli,/S6_PORT_INDEPENDENT_WINDOWS_ONLY/);
