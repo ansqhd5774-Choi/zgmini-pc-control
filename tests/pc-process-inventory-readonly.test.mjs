@@ -3129,12 +3129,28 @@ test('S6 one-shot UNKNOWN journal classification preserves claim/stop uncertaint
  assert.equal(ioFailure.operationalWrites,0);
 });
 
-test('S6 #3947 approval raw LF bytes stay pinned on Windows read-only A checkout',()=>{
+
+import {s6OncePinnedApprovalCheckoutBytes} from '../tools/pc-process-inventory-readonly.mjs';
+
+test('S6 #3947 raw approved manifest checksum survives LF and reusable Windows CRLF checkout',()=>{
  const ref='b8fed5bebec6a473730ed0b09ede5b5dc173db53af5cfc1e619e34a45bb8aefd';
  const attrs=fs.readFileSync(new URL('../.gitattributes',import.meta.url),'utf8');
  assert.ok(attrs.split(/\r?\n/).includes('approvals/controller-s6/*.json text eol=lf'));
- const approved=fs.readFileSync(new URL('../approvals/controller-s6/'+ref+'.json',import.meta.url));
- assert.ok(approved.length>0&&approved.length<32768);
+ const checkout=fs.readFileSync(new URL('../approvals/controller-s6/'+ref+'.json',import.meta.url));
+ const approved=s6OncePinnedApprovalCheckoutBytes(checkout);
+ assert.ok(Buffer.isBuffer(approved));
  assert.equal(approved.includes(Buffer.from('\r\n')),false);
  assert.equal(createHash('sha256').update(approved).digest('hex'),ref);
+ // Previously checked-out Windows working trees may retain CRLF even
+ // after the new checkout attribute appears; this is never B authority.
+ const crlf=Buffer.from(approved.toString('utf8').replace(/\n/g,'\r\n'),'utf8');
+ const pinned=s6OncePinnedApprovalCheckoutBytes(crlf);
+ assert.ok(Buffer.isBuffer(pinned));
+ assert.ok(pinned.equals(approved));
+ assert.equal(s6OncePinnedApprovalCheckoutBytes(Buffer.from(
+  approved.toString('utf8').replace(/\n/,'\r'), 'utf8')),null);
+ const edited=Buffer.from(crlf);edited[10]^=1;
+ assert.equal(s6OncePinnedApprovalCheckoutBytes(edited),null);
+ assert.equal(s6OncePinnedApprovalCheckoutBytes(Buffer.alloc(32769,65)),null);
 });
+
