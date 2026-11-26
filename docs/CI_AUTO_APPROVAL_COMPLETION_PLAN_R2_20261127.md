@@ -985,3 +985,26 @@
 - Supervisor·R6·Standby 정상 복구 증거는 관련 운영 총괄/Watchdog 담당이 확보하는 기존 독립 경로에서만 읽어 비교. 이 역할에서 새로운 PC A를 반복 발행하거나 기존 Watchdog/Runner를 조작하지 않는다.
 - 3조건의 실제 충족이 입증되고 사용자가 정책 범위·CAS 재검토를 지시할 때까지 **Controller B 정책 설치, Draft #4152 병합·활성화, Owner B 승인 원본 작성 작업은 보류**.
 
+## 38. 서른네 번째 실행 기록 — Controller 복구 완료 통보 전 비운영 범위 고정 (2026-11-27 KST)
+
+### 최신 사용자 지시/상태
+
+- **Controller 담당자가 작업 완료를 직접 알려주기 전까지** R6 Supervisor 복구·Watchdog 승격·Standby 재확인에 대한 신규 PC A/B/C 작업 요청을 하지 않는다. 사용자에게 상태 확인을 반복 요구하지 않고, 활성화 Watchdog 재요청·Runner 종료·lease 초기화·운영 파일 변경을 하지 않는다. 이 대화에 새로운 Runtime 완료 통보가 아직 없으므로 Controller B 정책 교체는 **계속 보류**다.
+- 앞선 [#4157 Run 45907705042](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45907705042), [#4158 Run 45907709067](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45907709067), [#4159 Run 45908087228](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45908087228) 결과의 R6 `BLOCKED_OLD_RUNNER_EXECUTABLE_UNVERIFIED`, Supervisor alive/fresh false, Runner Listener 6개라는 서로 다른 관측을 보존한다. **현재 복구 완료 여부에 대한 새로운 PC Runtime 관측·추정은 하지 않았다**.
+- 승인 보류를 원본 소스에 반영하는 [Draft PR #4160](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4160), exact HEAD `540bc25f025bd559cb1ea3c28f6cdb342ae303ae`: diff는 `proposals/maintenance-handoffs/905c0b1806a3988f39400dc82536fd753b9ff764.json`와 `tests/ci-controller-b-policy-only-proposal.test.mjs` **2개 소스 파일만**. 명세는 `approved:false`, `approvalHold.state=USER_DEFERRED`, `approvalHold.authorization=NONE`. Supervisor 정상 alive/fresh, R6 current owner HEALTHY, Standby 2/2 READY 증거가 확보되더라도 **자동 승인/설치 없이 새 Owner 승인과 정확 CAS 검토**가 필요하다는 원래 계약 유지.
+
+### CI 정확 결과 및 대기 대상
+
+- [Controller Maintenance Source Tests Run 45908757271](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45908757271): exact HEAD `completed/success`, 보류 상태와 기존 JSON 원본 구분 회귀 포함.
+- [PC Secret Scan Run 45908757250](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45908757250): exact HEAD `completed/success`.
+- [C996 R5 Readonly Source Checks Run 45908757295](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45908757295): **queued**, Job `c996-source`의 `runner_name` 공란, 요구 label `[self-hosted,Windows,X64,zgmini-handoff-ci-isolated]`. 같은 격리 label의 Source CI 자체는 `zgmini-handoff-ci-spare-01`에서 실제 완료됨. C996 상태는 **실패 또는 성공으로 변환하지 않는다**. 호스트 배정이 늦는 이유를 R6 Supervisor 장애라고 단정할 증거는 없음.
+- 이번 실행은 위 CI/PR/소스만 readback하고, [PR #4160](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4160) 본문에 **C996 queued와 사용자 복구 완료 통보 전 운영 작업 금지**를 반영했다. #4160은 Draft·미병합으로 유지한다. 운영 변경을 포함하는 [PR #4152](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4152) 역시 Draft·미병합이다.
+- Production `.github/workflows/ci-approval-controller-b.yml` Git blob `27e48ecde81bdf6f15cccffcffd9b3e70482a5f3` 및 publisher pin `cfe57f3d720219613c87eff21338de0d35edbf6b` unchanged. 현재 main의 승인 명세 `approvals/maintenance-handoffs/905c0b1806a3988f39400dc82536fd753b9ff764.json`는 **존재하지 않음**. Controller B 신규 승인/B 설치/CI 활성화·Native A/Writer B PC job 및 파일·DB/D1·Runner·Watchdog·lease 조작 0건.
+
+### 다음 작업 경계
+
+- 비운영 Source CI C996의 완료 증거는 다음 요청 시 정확 HEAD로 확인하고, 필요한 경우 이 **기존 Draft의 소스 검증만** 정리한다. C996가 오래 queued여도 격리 CI Runner나 Windows Supervisor를 강제 조작하지 않는다.
+- **Controller 담당자 완료 통보 전** 운영 Runtime 추가 조회/설치·승인 범위 재협상을 시작하지 않는다. 완료 통보를 받은 뒤에도 Supervisor 정상, R6 HEALTHY, Standby 2/2 READY의 독립 증거를 검토하고 최신 원본 CAS·정책 범위를 **다시 판단**할 뿐 자동 승인·실행하지 않는다.
+
+**종단 실제 무인 자동화 A/Writer B/Controller B 0/3 (0%) 변동 없음.**
+
