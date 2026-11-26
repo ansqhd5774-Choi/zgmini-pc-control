@@ -61,7 +61,7 @@ function lateOwnerFixture(){
  const pr={number:num,merged:true,merged_at:'2026-11-26T22:20:00Z',
   merged_by:{login:'ansqhd5774-Choi',id:327938088,type:'User'},
   merge_commit_sha:mergedSha,
-  base:{ref:'main',repo:repository},head:{sha:e.workflow_run.head_sha,repo:repository}};
+  base:{ref:'main',repo:{...repository}},head:{sha:e.workflow_run.head_sha,repo:{...repository}}};
  const file={filename:manifestPath,status:'added',sha:blob};
  const record={type:'file',path:manifestPath,encoding:'base64',sha:blob,
   content:bytes.toString('base64')};
