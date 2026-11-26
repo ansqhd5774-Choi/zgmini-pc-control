@@ -2598,6 +2598,51 @@ test('R4 Watchdog candidate before natural restart or without exact live identit
  assert.equal(unavailable.code,'WATCHDOG_R4_PROCESS_OWNER_UNVERIFIED');
 });
 
+test('R4 Watchdog runtime A accepts only the exact W06 selective Controller B successor',()=>{
+ const w06Files={
+  'controller/common.mjs':'91e4ceb5d26412893cc047670a420338aa8ef293e95498f852ac0a2f5edd6cc6',
+  'controller/engine.mjs':'6112b5a357d6ecba2ffb299857c2649ee51ca97e1e7755162efd69337976769f',
+  'controller/operations.mjs':'d4a76910806cba861b3253f5fd24eccc8968fcbaa66133999483034b2f661cd3',
+  'controller/entry.mjs':'407ea8693ab48a03b04ec77fe63f86d05537a37661b42c9ddcd55f5b36aa01d7',
+  'controller/supervisor.mjs':'5ec0952872adcaa16eb14adec614f024bac7264deb5b59fb68b9080f0edb0344',
+  'controller/standby.mjs':'e18c09b7e9b90fc483d5200e1e0c4741d2e4f93e049328566d710e37c21be7e7',
+  'controller/preimage-manifest-contract.mjs':'c59d5d36f0024b7a4b1781ea6eef9351f6275db33c8799bec05bf99abebbfcc1'
+ };
+ const fixture=()=>{
+  const x=r4RuntimeFixture();
+  x.controllerHost={controllerSourceSha:'182bb46f2838306ba40d8b4ec32bac40ab75b69a',
+   controllerFiles:{...w06Files}};
+  return x;
+ };
+ const good=r4Assess(fixture());
+ assert.equal(good.status,'PASS');
+ assert.equal(good.controllerTargetMatch,true);
+ assert.equal(good.failoverTested,false);
+ assert.equal(good.promotionApproved,false);
+ for(const file of Object.keys(w06Files)){
+  const x=fixture();delete x.controllerHost.controllerFiles[file];
+  const denied=r4Assess(x);
+  assert.equal(denied.status,'STATE_UNKNOWN');
+  assert.equal(denied.code,'WATCHDOG_R4_STAGE_OR_CONTROLLER_SOURCE_UNVERIFIED');
+  assert.equal(denied.controllerTargetMatch,false);
+ }
+ for(const mutation of [
+  x=>x.controllerHost.controllerSourceSha='f'.repeat(40),
+  x=>x.controllerHost.controllerFiles['controller/standby.mjs']='0'.repeat(64),
+  x=>x.controllerHost.controllerFiles['controller/preimage-manifest-contract.mjs']='0'.repeat(64),
+  x=>x.controllerHost.controllerFiles=[],
+  x=>x.controllerHost.controllerFiles=null,
+  x=>x.install.sha256='0'.repeat(64)
+ ]){
+  const x=fixture();mutation(x);
+  assert.equal(r4Assess(x).status,'STATE_UNKNOWN');
+  assert.equal(r4Assess(x).failoverTested,false);
+  assert.equal(r4Assess(x).promotionApproved,false);
+ }
+ const beforeRestart=fixture();beforeRestart.owner.at='2026-11-26T01:09:00Z';
+ assert.equal(r4Assess(beforeRestart).code,'WATCHDOG_R4_NATURAL_RESTART_PENDING');
+});
+
 test('R4 fixed read-only file evidence rejects aliases and reports only safe status',()=>{
  const wd=path.resolve('fixture-r4-watchdog'),controller=path.resolve('fixture-r4-controller');
  const exactSource=fs.readFileSync(new URL('../tools/runner-watchdog.mjs',import.meta.url));
