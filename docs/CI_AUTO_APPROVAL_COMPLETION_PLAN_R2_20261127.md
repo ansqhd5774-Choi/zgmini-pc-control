@@ -331,3 +331,20 @@
 2. 실제 승인된 개별 A/Writer/Controller 업무에서 동일 B 명세의 명시 native 정책 해시, 독립 로컬 Scope/proof 설치, 활성화 변수와 실제 PC 버전을 **현재 Runtime으로 검증**한다. Source-only 개발을 실행 완료로 세지 않는다.
 3. A, Writer B, Controller B의 실제 자연 CI 이벤트 → 원본 인증 → PC 단회 실행 → JSON/TXT 지속 영수증 및 설치 SHA readback. 특히 Controller B 기존 미구성 정책은 무단 활성화하지 않는다.
 4. 운영 무인 완료 증거 없음: **0/3** 유지. 구형 성공·CI PASS·PR 자체를 신규 무인 성공으로 승격하지 않는다.
+
+## 15. 열한 번째 실행 기록 — 2026-11-27 KST
+
+### PR #4086의 종단 보고 누락 조건 재현 및 최소 보완
+
+- 초기 4파일 변경 검토 중 실제 `tools/maintenance-agent.mjs::deliverReports`가 `persistResult` 원장 `entry.result`를 다시 `normalizedResult`에 넣어 GitHub JSON/TXT를 생성하며, 처음 첨부한 `ciNativeEffect` 및 `ciNativePolicySha256` 두 필드를 제거하는 **후단 직접 결함**을 발견했다. 원장에만 증명을 남겨서는 native publisher의 외부 결과 조회에 도달하지 않는다.
+- 같은 [PR #4086](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4086)에서 **원장에 먼저 저장된** Owner 요청, 동일 operation, 안정적인 body/fingerprint SHA, 정확 requestId, `SUCCEEDED`, 설치 SHA 일치 및 `protectedStateUnchanged=true`를 확인한 경우에만 최종 JSON/TXT를 생성하는 시점에도 해당 두 필드를 제한적으로 보존한다.
+- `tests/maintenance-agent.test.mjs`가 실제 create-only 원격 두 파일의 JSON native effect/policy hash, TXT 대응 값, reportUploadStatus VERIFIED, 중복 apply 0을 검사. 일반 B/업데이터 임의 stdout는 원래 필터에서 제외하는 시험 유지.
+- 최종 소스 브랜치 HEAD **`0a586c1416cf27180a9071ddd71be579ceb5cf60`**. [C996 45886928744](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45886928744), [Windows Source 45886928698](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45886928698), [Secret Scan 45886928655](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45886928655)은 최종 HEAD 기준 관측 시 **queued/pending**, CI 완료·병합·운영 적용 아님.
+- PR #4085 HEAD `79cf7661e4e3c3fa3b6969ef4a71eea8d0e1fe54`: Windows Source Run 45886304836 **SUCCESS**, Secret Scan 45886304824 **SUCCESS**, C996 45886304905 **queued**; CI 2/3 통과로 병합 보류.
+- Runner 관련 직접 관측: C996 Job 140137746766은 `queued`/runner_name 미배정이고 요구 label은 `self-hosted, Windows, X64, zgmini-handoff-ci-isolated`. GitHub API로 Runner 등록 실시간 조회는 권한/지원 미확보. 소스 실패·운영 PC 실패로 단정하지 않는다.
+
+### 정확한 이후 작업
+
+1. #4085와 #4086 각각 현재 정확 HEAD CI 3/3 결과 회수 및 성공 시 정규 병합 후 main readback. CI 대기는 중복 재실행·Gate 삭제 없이 원래 Run을 재조회.
+2. 실제 승인된 native policy·B 명세와 독립 설치 Scope/proof의 설치 여부를 현재 PC 정규 읽기 경로에서 확인한다. #4086의 source producer 구현은 실제 승인 manifest/정규 B 설치/현재 GitHub 변수 활성화가 아니다.
+3. 권한이 확인된 A/Writer B/Controller B의 자연 CI 무인 작업과 결과 JSON/TXT, SHA 및 중복 효과 0 검증. **실제 운영 완료율 0/3 유지**.
