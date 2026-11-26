@@ -1,0 +1,12 @@
+{
+  "schema": "ZGMINI_PC_WATCHDOG_ACTIVATION_B_RESULT_V1",
+  "requestId": "pc-watchdog-activate-8c74649b-4e4c-4630-a1d6-7c87cf5d3d4b",
+  "issueNumber": 4156,
+  "targetSha": "8bdeca9b55457fc9c9d35585aacd7eea14af63f0",
+  "runId": "45907384333",
+  "attempt": "1",
+  "status": "STATE_UNKNOWN",
+  "code": "WATCHDOG_ACTIVATION_NEW_PROCESS_NOT_CONFIRMED",
+  "watchdogFileWrites": 0,
+  "newProcessAttested": false
+}
