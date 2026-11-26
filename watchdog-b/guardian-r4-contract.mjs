@@ -6,6 +6,7 @@ import {FINAL_SCOPE,PROTECTION_POLICY,error,exact,REPO} from './contract.mjs';
 
 export const R4_GUARDIAN_TARGET=R4_TARGET;
 export const R4_GUARDIAN_SOURCE_SHA256=R4_SOURCE_SHA256;
+export const R4_GUARDIAN_INSTALL_RAW_SHA256='a47343964fbf3668d27f77deba69dbfc9b53788775c26ea420eeb3b2509e3805';
 export const R4_GUARDIAN_REQUEST_ID='pc-watchdog-activate-69e65f42-d21a-4428-8450-b80b8e8ec395';
 export const R4_GUARDIAN_STAGE_REQUEST_ID='pc-watchdog-b-8a5ce329-6df0-4f42-b6d1-e45c2a765f3b';
 export const R4_GUARDIAN_STAGE_ISSUE=3784;
@@ -17,6 +18,7 @@ export const R4_GUARDIAN_EFFECT='ONE_EXACT_WATCHDOG_PROCESS_EXIT_GUARDIAN_RESTAR
 export const R4_GUARDIAN_BASIS='EXISTING_SAME_PURPOSE_WATCHDOG_B_APPROVAL_AND_R4_STAGED_SOURCE';
 const V=/^[a-f0-9]{64}$/;
 const expectedKeys=['schema','approved','scope','targetSha','installedSha256',
+ 'installedManifestSha256',
  'installedScope','guardianHelperSha256','activationScriptSha256',
  'stageRequestId','oldStageIssueNumber','expectedControllerSha',
  'effect','approvalBasis','protectionPolicy'];
@@ -44,6 +46,7 @@ export function validateR4GuardianRequest(event,body,approval,{
     approval.scope!==R4_GUARDIAN_SCOPE||
     approval.targetSha!==R4_GUARDIAN_TARGET||
     approval.installedSha256!==R4_GUARDIAN_SOURCE_SHA256||
+    approval.installedManifestSha256!==R4_GUARDIAN_INSTALL_RAW_SHA256||
     approval.installedScope!==FINAL_SCOPE||
     approval.guardianHelperSha256!==R4_GUARDIAN_HELPER_SHA256||
     helperDigest!==R4_GUARDIAN_HELPER_SHA256||
@@ -58,10 +61,11 @@ export function validateR4GuardianRequest(event,body,approval,{
  return {requestId:body.requestId,issueNumber:event.issue.number};
 }
 
-export function verifyR4GuardianPrecheck({install,sourceDigest,stage,owner,status,
+export function verifyR4GuardianPrecheck({install,sourceDigest,installedManifestDigest,stage,owner,status,
  now=Date.now(),pidAlive=()=>null}={}){
  if(install?.sha256!==R4_GUARDIAN_SOURCE_SHA256||
     sourceDigest!==R4_GUARDIAN_SOURCE_SHA256||
+    installedManifestDigest!==R4_GUARDIAN_INSTALL_RAW_SHA256||
     install.scope!==FINAL_SCOPE||
     install.approvedTargetSourceSha!==R4_GUARDIAN_TARGET||
     !exact(install.standby,['mode','approved'])||
@@ -90,13 +94,14 @@ export function verifyR4GuardianPrecheck({install,sourceDigest,stage,owner,statu
  return true;
 }
 
-export function verifyR4GuardianPostcheck({install,sourceDigest,oldOwner,newOwner,
+export function verifyR4GuardianPostcheck({install,sourceDigest,installedManifestDigest,oldOwner,newOwner,
  status,signalledAt,now=Date.now(),pidAlive=()=>null}={}){
  const valid=pid=>Number.isSafeInteger(pid)&&pid>0;
  const newAt=Date.parse(newOwner?.at),signalAt=Date.parse(signalledAt),
   statusAt=Date.parse(status?.at),stageAt=Date.parse(install?.upgradedAt);
  if(install?.sha256!==R4_GUARDIAN_SOURCE_SHA256||
     sourceDigest!==R4_GUARDIAN_SOURCE_SHA256||
+    installedManifestDigest!==R4_GUARDIAN_INSTALL_RAW_SHA256||
     install.scope!==FINAL_SCOPE||
     install.approvedTargetSourceSha!==R4_GUARDIAN_TARGET||
     !exact(install.standby,['mode','approved'])||
