@@ -25,6 +25,7 @@ function fixture(){
  const adapterBytes=Buffer.from('exact pinned independent native Writer adapter');
  const p={schema:'ZGMINI_CI_NATIVE_DISPATCH_V1',enabled:true,
   effect:'B_WRITER_SOURCE',nativeWriterBExecutionEnabled:true,
+  nativeWriterBControlSha:'a'.repeat(40),
   nativeWriterBAdapterSha256:hash(adapterBytes),
   businessApprovalSha256:hash(approvalBytes),
   approvedRequestSha256:hash(requestBytes)};
@@ -76,6 +77,10 @@ test('native Writer B cannot execute on isolated CI controller Runner',()=>{
 });
 test('only first run attempt is eligible for one-shot Writer installation',()=>{
  const x=fixture();x.env.GITHUB_RUN_ATTEMPT='2';
+ assert.throws(()=>authorizeWriterBNative(x),{code:'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP'});
+});
+test('transitive Writer installer revision must match exact installed control SHA',()=>{
+ const x=fixture();x.scope.policy.nativeWriterBControlSha='b'.repeat(40);
  assert.throws(()=>authorizeWriterBNative(x),{code:'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP'});
 });
 test('unreviewed native adapter SHA is blocked before installer',()=>{
