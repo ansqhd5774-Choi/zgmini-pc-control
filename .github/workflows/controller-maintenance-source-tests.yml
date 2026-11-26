@@ -13,6 +13,7 @@ on:
       - '.github/workflows/ci-approval-event-intake.yml'
       - '.github/workflows/ci-approval-controller-b.yml'
       - 'tests/ci-approval-shadow-decision.test.mjs'
+      - 'tests/ci-native-dispatch.test.mjs'
       - 'tests/ci-approval-contract-adapter.test.mjs'
       - 'tests/ci-approval-github-ci-evidence.test.mjs'
       - 'tests/ci-approval-approval-source-integrity.test.mjs'
@@ -300,6 +301,11 @@ jobs:
       - name: Verify exact pinned manifest effect scope without issuance
         if: hashFiles('ci-approval/pinned-manifest-scope.mjs', 'tests/ci-approval-pinned-manifest-scope.test.mjs') != ''
         run: node --test --test-concurrency=1 tests/ci-approval-pinned-manifest-scope.test.mjs
+      - name: Verify exact A Writer B workflow dispatch transport without operational calls
+        if: hashFiles('ci-approval/native-dispatch.mjs') != '' && hashFiles('tests/ci-native-dispatch.test.mjs') != ''
+        run: |
+          node --check ci-approval/native-dispatch.mjs
+          node --test --test-concurrency=1 tests/ci-native-dispatch.test.mjs
       - name: Verify deterministic scoped request previews without submission
         if: hashFiles('ci-approval/request-preview.mjs', 'tests/ci-approval-request-preview.test.mjs') != ''
         run: node --test --test-concurrency=1 tests/ci-approval-request-preview.test.mjs
