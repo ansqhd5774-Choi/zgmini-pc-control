@@ -38,6 +38,35 @@ test('confirmed concurrent main advance rebases pair only once with no overwrite
  assert.equal(f.files.get(outputs[0][0]).toString(),outputs[0][1]);
  assert.equal(f.files.get(outputs[1][0]).toString(),outputs[1][1]);
 });
+test('two separately proven descendant main advances retain atomic pair publication',async()=>{
+ const f=createGitPairFixture({advanceMainOnFirstPatch:true,
+  advanceMainOnSecondPatch:true});
+ const r=await uploadResultPairAtomic({outputs,headers,fetchApi:f.fetchApi});
+ assert.equal(r.delivery,'RESULT_PAIR_READBACK_VERIFIED');
+ assert.deepEqual([r.created,r.verified,f.counts.commits,f.counts.updates],
+  [2,2,3,3]);
+ assert.equal(f.files.get(outputs[0][0]).toString(),outputs[0][1]);
+ assert.equal(f.files.get(outputs[1][0]).toString(),outputs[1][1]);
+});
+test('second verified advance containing one output rejects before third ref write',async()=>{
+ const f=createGitPairFixture({advanceMainOnFirstPatch:true,
+  secondAdvanceWithExistingPath:outputs[0][0]});
+ const r=await uploadResultPairAtomic({outputs,headers,fetchApi:f.fetchApi});
+ assert.deepEqual([r.created,r.verified,f.counts.commits,f.counts.updates],
+  [0,0,2,2]);
+ assert.equal(r.delivery,'RESULT_PAIR_ALREADY_EXISTS_OR_PREFLIGHT_UNVERIFIED');
+ assert.equal(f.files.get(outputs[0][0]).toString(),'old result');
+ assert.equal(f.files.has(outputs[1][0]),false);
+});
+test('third proven CAS conflict is final and never replays PC job or evidence',async()=>{
+ const f=createGitPairFixture({advanceMainOnFirstPatch:true,
+  advanceMainOnSecondPatch:true,rejectRefUpdate:true});
+ const r=await uploadResultPairAtomic({outputs,headers,fetchApi:f.fetchApi});
+ assert.deepEqual([r.created,r.verified,f.counts.commits,f.counts.updates],
+  [0,0,3,3]);
+ assert.equal(r.delivery,'RESULT_PAIR_REF_CONFLICT_UNTOUCHED');
+ assert.equal(f.files.size,0);
+});
 test('concurrent creation of even one result rejects pair without rewrite',async()=>{
  const f=createGitPairFixture({advanceMainWithExistingPath:outputs[0][0]});
  const r=await uploadResultPairAtomic({outputs,headers,fetchApi:f.fetchApi});
