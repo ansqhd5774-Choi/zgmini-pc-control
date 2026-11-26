@@ -158,10 +158,10 @@ test('late Owner-merged run invokes existing strict B submitter, not direct CI I
 test('late-run source is inert until existing Controller B receiver pin is separately installed',()=>{
  const y=readFileSync(new URL('../.github/workflows/ci-approval-controller-b.yml',import.meta.url),'utf8');
  const publisher=readFileSync(new URL('../ci-approval/completed-run-intake.mjs',import.meta.url),'utf8');
- assert.match(y,/vars\\.ZGMINI_CI_CONTROLLER_B_ENABLED == 'true'/);
- assert.match(y,/vars\\.ZGMINI_CI_CONTROLLER_B_POLICY != ''/);
+ assert.match(y,/vars\.ZGMINI_CI_CONTROLLER_B_ENABLED == 'true'/);
+ assert.match(y,/vars\.ZGMINI_CI_CONTROLLER_B_POLICY != ''/);
  assert.match(y,/ref: cfe57f3d720219613c87eff21338de0d35edbf6b/);
- assert.match(publisher,/return publishLateOwnerMergedControllerApproval\\(event,opts\\)/);
+ assert.match(publisher,/return publishLateOwnerMergedControllerApproval\(event,opts\)/);
  assert.doesNotMatch(y,/workflow_dispatch:|schedule:/);
 });
 function publicationFixture(){
