@@ -12,6 +12,8 @@ import {
   deployableControllerTreePaths,isControllerSourceTestPath,
   prepareControllerUpdateRequest,selectPreservedRecoveryProtection,
   recoveryProtectedSnapshotStillPinned,assessS6ControllerTransition,
+  validateS6OnceIssueEnvelope,validateS6OnceBManifest,S6_ONCE_OPERATION,
+  S6_ONCE_ISSUE_TITLE,S6_ONCE_MANIFEST_SCHEMA,
 } from "../tools/maintenance-contract.mjs";
 
 const OLD="c491d95fdb594a729f08deff68d86e04c18a9544";
@@ -779,4 +781,127 @@ test('S6 promoted readback needs unique new owner, fencing, preserved ledger and
  const busy={...good,relatedLeasesAbsent:false,pendingWorkCount:1,
   runnerSeats:good.runnerSeats.map((x,i)=>i===2?{...x,busy:true}:x)};
  assert.equal(s6('PROMOTED',busy).status,'OBSERVED');
+});
+
+
+const s6Approved=()=>{
+ const manifest={
+  schema:S6_ONCE_MANIFEST_SCHEMA,operation:S6_ONCE_OPERATION,
+  requestId:'pc-s6-01234567-89ab-4cde-8f01-123456789abc',
+  installedControllerSha:'1'.repeat(40),
+  installedMaintainerSha:'2'.repeat(40),
+  watchdogSourceSha256:'3'.repeat(64),
+  protectedSha256:'4'.repeat(64),
+  ownerSha256:'5'.repeat(64),
+  watchdogPid:23001,standbyPids:[23002,23003],
+  approval:{
+   approved:true,grade:'B',
+   ref:'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/3871',
+   scope:'EXACT_ONE_SUPERVISOR_TREE_STOP_WITH_WATCHDOG_AUTO_PROMOTION'
+  },
+  effect:{
+   mode:'SINGLE_S6_FAILOVER',
+   stop:'OLD_OWNED_SUPERVISOR_TREE_ONLY',
+   promotion:'EXISTING_WATCHDOG_ONE_READY_STANDBY',
+   independentMaintainer:true,noArbitraryCommands:true,
+   noAutomaticRetry:true,noForcedRollback:true,
+   preserveWorkersAndLedger:true,preserveProtectedSourceAndDb:true,
+   postcheck:'EXISTING_A_JOB_WITH_READBACK'
+  }
+ };
+ const bytes=Buffer.from(JSON.stringify(manifest)+'\n');
+ const request={
+  schema:MAINTENANCE_ISSUE_SCHEMA,requestId:manifest.requestId,
+  chatId:'chat-controller-s6-once-20261126',
+  operation:S6_ONCE_OPERATION,controlRepository:CONTROL_REPOSITORY,
+  targetControllerSha:manifest.installedControllerSha,
+  approvalManifestSha256:digest(bytes)
+ };
+ const live={
+  installedControllerSha:manifest.installedControllerSha,
+  installedMaintainerSha:manifest.installedMaintainerSha,
+  watchdogSourceSha256:manifest.watchdogSourceSha256,
+  protectedSha256:manifest.protectedSha256,
+  ownerSha256:manifest.ownerSha256,
+  watchdogPid:manifest.watchdogPid,standbyPids:[...manifest.standbyPids]
+ };
+ const ctx={actor:CONTROL_ACTOR,controlRepository:CONTROL_REPOSITORY,live};
+ return {manifest,bytes,request,ctx};
+};
+const repinS6=f=>({...f,bytes:Buffer.from(JSON.stringify(f.manifest)+'\n'),
+ request:{...f.request,approvalManifestSha256:digest(Buffer.from(JSON.stringify(f.manifest)+'\n'))}});
+test('S6 B uses a separate exact owner Issue and never inherits Controller-update or bot authorization',()=>{
+ const f=s6Approved();
+ assert.equal(S6_ONCE_ISSUE_TITLE,'pc-controller-s6-once');
+ assert.equal(validateS6OnceIssueEnvelope(f.request,{actor:CONTROL_ACTOR}).requestId,
+  f.request.requestId);
+ assert.equal(validateS6OnceBManifest(f.request,f.bytes,f.ctx).authorization,false);
+ assert.equal(validateS6OnceBManifest(f.request,f.bytes,f.ctx).operationalEffectExecuted,false);
+ for(const change of [
+  {operation:'controller-update'},
+  {operation:'runner-smoke'},
+  {requestId:'pc-s6-not-uuid'},
+  {extra:'arbitrary'},
+  {targetControllerSha:'c'.repeat(40)}
+ ]){
+  assert.throws(()=>validateS6OnceIssueEnvelope({...f.request,...change},
+   {actor:CONTROL_ACTOR}),/S6_ONCE_/);
+ }
+ assert.throws(()=>validateS6OnceIssueEnvelope(f.request,{actor:'github-actions[bot]'}),
+  /S6_ONCE_ACTOR_OR_REPOSITORY_DENIED/);
+ assert.throws(()=>validateS6OnceBManifest(f.request,f.bytes,{...f.ctx,actor:'github-actions[bot]'}),
+  /S6_ONCE_ACTOR_OR_REPOSITORY_DENIED/);
+});
+test('S6 B requires exact manifest raw SHA and new B effect; never treats source PR as actual approval',()=>{
+ const f=s6Approved();
+ const denied=[
+  x=>{x.approval.approved=false;},
+  x=>{x.approval.grade='A';},
+  x=>{x.approval.scope='WATCHDOG_GUARDIAN_ONE_PID_ACTIVATE';},
+  x=>{x.approval.ref='https://example.com/pr/1';},
+  x=>{x.effect.stop='ANY_PROCESS';},
+  x=>{x.effect.noAutomaticRetry=false;},
+  x=>{x.effect.postcheck='SKIP';},
+  x=>{x.effect.extra=true;},
+  x=>{x.operation='controller-update';},
+  x=>{x.sourcePath='C:/temp/execute.cmd';}
+ ];
+ for(const edit of denied){
+  const g=s6Approved();edit(g.manifest);
+  const pinned=repinS6(g);
+  assert.throws(()=>validateS6OnceBManifest(pinned.request,pinned.bytes,pinned.ctx),
+   /S6_ONCE_/);
+ }
+ assert.throws(()=>validateS6OnceBManifest(f.request,Buffer.concat([f.bytes,Buffer.from(' ')]),f.ctx),
+  /S6_ONCE_MANIFEST_BYTES_DRIFT/);
+ assert.throws(()=>validateS6OnceBManifest(f.request,Buffer.from('not-json'),f.ctx),
+  /S6_ONCE_MANIFEST_BYTES_DRIFT/);
+});
+test('S6 B compares every independent live origin CAS; no stale Watchdog, owner or standby',()=>{
+ const f=s6Approved();
+ for(const change of [
+  {installedControllerSha:'f'.repeat(40)},
+  {installedMaintainerSha:'f'.repeat(40)},
+  {watchdogSourceSha256:'f'.repeat(64)},
+  {protectedSha256:'f'.repeat(64)},
+  {ownerSha256:'f'.repeat(64)},
+  {watchdogPid:43201},
+  {standbyPids:[23003,23002]},
+  {standbyPids:[23002]},
+  {standbyPids:null}
+ ]){
+  assert.throws(()=>validateS6OnceBManifest(f.request,f.bytes,
+   {...f.ctx,live:{...f.ctx.live,...change}}),/S6_ONCE_LIVE_CAS_UNVERIFIED/);
+ }
+ for(const edit of [
+  x=>{x.standbyPids=[23002,23002];},
+  x=>{x.watchdogPid=23002;},
+  x=>{x.watchdogSourceSha256='unverified';},
+  x=>{x.ownerSha256='';}
+ ]){
+  const g=s6Approved();edit(g.manifest);
+  const pinned=repinS6(g);
+  assert.throws(()=>validateS6OnceBManifest(pinned.request,pinned.bytes,pinned.ctx),
+   /S6_ONCE_MANIFEST_PREIMAGE_INVALID/);
+ }
 });
