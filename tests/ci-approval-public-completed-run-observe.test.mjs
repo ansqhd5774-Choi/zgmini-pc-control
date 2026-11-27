@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {observePublicSourceCompletion} from '../ci-approval/public-completed-run-observe.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
@@ -15,16 +16,34 @@ const env=()=>({GITHUB_EVENT_NAME:'workflow_run',GITHUB_REPOSITORY:REPO,
  GITHUB_REF:'refs/heads/main',GITHUB_SHA:'b'.repeat(40),
  RUNNER_ENVIRONMENT:'github-hosted'});
 
+const SOURCE_PATH='.github/workflows/controller-maintenance-source-tests.yml';
+const PIN='a8f49337200d2e7ce902ab3ecf23d42c811fabe2';
+const sourceBytes=readFileSync(new URL('../'+SOURCE_PATH,import.meta.url));
+const reviewedWorkflow=()=>({type:'file',path:SOURCE_PATH,encoding:'base64',sha:PIN,
+ content:sourceBytes.toString('base64')});
+const jobs=e=>({total_count:2,jobs:[
+ {id:991,run_id:e.workflow_run.id,name:'public-source-only',status:'completed',
+  conclusion:'success',steps:[
+   {name:'Verify exact public source-only event origin',status:'completed',conclusion:'success'},
+   {name:'Verify public source/runner isolation and deferred B approval',
+    status:'completed',conclusion:'success'}]},
+ {id:992,run_id:e.workflow_run.id,name:'source-only',status:'completed',conclusion:'skipped'}
+]});
+const proof=e=>({getJobs:async()=>jobs(e),getWorkflow:async()=>reviewedWorkflow()});
+
+
 test('public source CI is observed by an independent exact run read, never approved',async()=>{
  const e=event(),seen=[];
  const r=await observePublicSourceCompletion({event:e,env:env(),getRun:async id=>{
   seen.push(id);return structuredClone(e.workflow_run);
- }});
+ },...proof(e)});
  assert.deepEqual(seen,[e.workflow_run.id]);
  assert.equal(r.state,'OBSERVED_ONLY');
  assert.equal(r.code,'PUBLIC_CI_COMPLETION_SOURCE_OBSERVED');
  assert.equal(r.runId,e.workflow_run.id);
  assert.equal(r.headSha,e.workflow_run.head_sha);
+ assert.equal(r.sourceJobId,991);
+ assert.equal(r.reviewedWorkflowBlobSha,PIN);
  for(const key of ['canPublish','canExecute','approvalVerified','selfHostedAuthorized',
   'controllerBAuthorized'])assert.equal(r[key],false,key);
  for(const key of ['operationalWrites','providerCalls','d1Writes'])
@@ -69,7 +88,8 @@ for(const [name,change] of [
 ]){
  test(name+' fails closed after authenticated read',async()=>{
   const e=event(),run=structuredClone(e.workflow_run);change(run);
-  const r=await observePublicSourceCompletion({event:e,env:env(),getRun:async()=>run});
+  const r=await observePublicSourceCompletion({event:e,env:env(),getRun:async()=>run,
+   ...proof(e)});
   assert.equal(r.state,'EVIDENCE_MISSING');
   assert.equal(r.code,'PUBLIC_CI_COMPLETION_API_MISMATCH');
   assert.equal(r.canPublish,false);assert.equal(r.canExecute,false);
@@ -82,10 +102,67 @@ test('missing/failed authenticated read is neither approval nor execution',async
  assert.equal(missing.code,'PUBLIC_CI_COMPLETION_READ_PORT_MISSING');
  const broken=await observePublicSourceCompletion({event:e,env:env(),getRun:async()=>{
   throw Error('token or network unavailable');
- }});
+ },...proof(e)});
  assert.equal(broken.code,'PUBLIC_CI_COMPLETION_API_READ_FAILED');
  assert.equal(broken.operationalWrites,0);
  assert.doesNotMatch(JSON.stringify(broken),/token or network unavailable/);
+});
+
+
+test('success without the authenticated job or workflow read cannot count',async()=>{
+ const e=event();
+ for(const x of [
+  {getRun:async()=>e.workflow_run,getWorkflow:async()=>reviewedWorkflow()},
+  {getRun:async()=>e.workflow_run,getJobs:async()=>jobs(e)}
+ ]){
+  const r=await observePublicSourceCompletion({event:e,env:env(),...x});
+  assert.equal(r.code,'PUBLIC_CI_COMPLETION_READ_PORT_MISSING');
+ }
+});
+
+for(const [name,mutate] of [
+ ['missing job',x=>{x.jobs=[];x.total_count=0;}],
+ ['truncated first page',x=>{x.total_count=3;}],
+ ['duplicate successful job',x=>{x.jobs[1]={...x.jobs[0],id:999};}],
+ ['public job skipped',x=>{x.jobs[0].conclusion='skipped';}],
+ ['private job activated',x=>{x.jobs[1].conclusion='success';}],
+ ['wrong run binding',x=>{x.jobs[0].run_id++;}],
+ ['missing security step',x=>{x.jobs[0].steps.pop();}],
+ ['failed security step',x=>{x.jobs[0].steps[0].conclusion='failure';}],
+ ['duplicate required step',x=>{x.jobs[0].steps.push({...x.jobs[0].steps[0]});}]
+]){
+ test(name+' cannot become Public CI source proof',async()=>{
+  const e=event(),j=jobs(e);mutate(j);
+  const r=await observePublicSourceCompletion({event:e,env:env(),
+   getRun:async()=>e.workflow_run,getJobs:async()=>j,
+   getWorkflow:async()=>reviewedWorkflow()});
+  assert.equal(r.code,'PUBLIC_CI_COMPLETION_JOB_EVIDENCE_UNVERIFIED');
+  assert.equal(r.canPublish,false);assert.equal(r.canExecute,false);
+ });
+}
+
+for(const [name,change] of [
+ ['wrong trusted blob',x=>{x.sha='f'.repeat(40);}],
+ ['modified workflow bytes',x=>{x.content=Buffer.from('fake').toString('base64');}],
+ ['missing bytes',x=>{delete x.content;}],
+ ['wrong path',x=>{x.path='other.yml';}],
+ ['wrong encoding',x=>{x.encoding='utf-8';}]
+]){
+ test(name+' cannot promote PR-edited workflow',async()=>{
+  const e=event(),f=reviewedWorkflow();change(f);
+  const r=await observePublicSourceCompletion({event:e,env:env(),
+   getRun:async()=>e.workflow_run,getJobs:async()=>jobs(e),
+   getWorkflow:async()=>f});
+  assert.equal(r.code,'PUBLIC_CI_COMPLETION_WORKFLOW_BLOB_UNVERIFIED');
+  assert.equal(r.canPublish,false);assert.equal(r.canExecute,false);
+ });
+}
+
+test('actual immutable main workflow bytes equal the reviewed pinned Git blob',async()=>{
+ const {createHash}=await import('node:crypto');
+ const h=createHash('sha1').update(Buffer.from('blob '+sourceBytes.length+' '))
+  .update(Buffer.from([0])).update(sourceBytes).digest('hex');
+ assert.equal(h,PIN);
 });
 
 test('Public CI observer is hosted and read-only; original Private B gate remains',async()=>{
