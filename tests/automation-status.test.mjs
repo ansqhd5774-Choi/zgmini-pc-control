@@ -2,6 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import path from 'node:path';
 import './controller-operating-audit-selective.test.mjs';
+import './controller-audit-sha-repair-source.test.mjs';
 import './controller-operating-audit-b-manifest.test.mjs';
 import './controller-audit-public-b-operator-once.test.mjs';
 import './controller-audit-lineage-approval.test.mjs';
