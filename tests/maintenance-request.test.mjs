@@ -297,6 +297,10 @@ function publicBPublisherFixture(){
    repositoryVisibility:'public',installedSha:OLD,targetSha:NEXT,
    manifestSha256:f.input.approvalSha256
   }};
+ f.ports.readPublisherWorkflowIdentity=async()=>({
+  workflowId:installed.ciControllerBPolicy.workflowId,
+  workflowBlobSha:installed.ciControllerBPolicy.workflowBlobSha
+ });
  return {f,installed};
 }
 
@@ -307,6 +311,31 @@ test('Public CI publishing is fail-closed without an independently installed V2 
  await assert.rejects(()=>submitExistingControllerApprovalFromCi(f.input,f.ports),
   /MAINTENANCE_CI_PUBLIC_POLICY_NOT_INSTALLED/);
  assert.equal(reads,0);assert.equal(f.posts,0);assert.equal(f.saved,null);
+});
+
+test('Public CI publisher denies missing or altered current Workflow readback before manifest or POST',async()=>{
+ const mutations=[
+  {name:'missing execution identity',value:undefined,code:'PUBLISHER_IDENTITY_UNVERIFIED'},
+  {name:'incorrect running workflow id',value:{workflowId:1,workflowBlobSha:'f'.repeat(40)},
+   code:'PUBLISHER_IDENTITY_MISMATCH'},
+  {name:'incorrect running workflow sha',value:{workflowId:430972394,workflowBlobSha:'a'.repeat(40)},
+   code:'PUBLISHER_IDENTITY_MISMATCH'},
+  {name:'workflow API unavailable',value:async()=>{throw Error('private token');},
+   code:'PUBLISHER_IDENTITY_UNVERIFIED'}
+ ];
+ for(const change of mutations){
+  const {f,installed}=publicBPublisherFixture();let manifestReads=0;
+  const original=f.ports.readManifest;
+  f.ports.readManifest=async()=>{manifestReads++;return original();};
+  f.ports.readIndependentInstalledCiPolicy=async()=>installed;
+  if(change.value===undefined)delete f.ports.readPublisherWorkflowIdentity;
+  else f.ports.readPublisherWorkflowIdentity=typeof change.value==='function'?
+   change.value:async()=>change.value;
+  await assert.rejects(()=>submitExistingControllerApprovalFromCi(f.input,f.ports),
+   new RegExp(change.code),change.name);
+  assert.equal(f.posts,0,change.name);
+  assert.equal(manifestReads,0,change.name);
+ }
 });
 
 test('Public publisher mock can submit exactly one preapproved B effect with installed V2',async()=>{
