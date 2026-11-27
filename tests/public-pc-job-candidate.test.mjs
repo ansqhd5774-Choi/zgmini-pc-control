@@ -61,6 +61,31 @@ test('official issues opened webhook may omit redundant top-level number without
  deny(invalid,'PUBLIC_PC_JOB_ISSUE_IDENTITY_DENIED');
 });
 
+test('exact original Public Controller postcheck is a no-effect hosted candidate, never B approval',()=>{
+ const id='pc-update-11111111-1111-4111-8111-111111111111';
+ const x=good();delete x.event.number;
+ const post={...request(),requestId:id+'-postcheck',operation:'core-status'};
+ x.event.issue.title='PC Update '+id+' postcheck';
+ x.event.issue.body=JSON.stringify(post);
+ const yes=assessPublicPcJobCandidate(x);
+ assert.equal(yes.status,'CANDIDATE_ONLY');
+ assert.equal(yes.executionAuthorized,false);
+ assert.equal(yes.selfHostedAuthorized,false);
+ assert.equal(yes.controllerBAuthorized,false);
+ assert.equal(yes.operationalWrites,0);
+ for(const bad of [
+  s=>{s.event.issue.title='PC Update pc-update-22222222-1111-4111-8111-111111111111 postcheck';},
+  s=>{const p=JSON.parse(s.event.issue.body);p.requestId='pc-update-22222222-1111-4111-8111-111111111111-postcheck';s.event.issue.body=JSON.stringify(p);},
+  s=>{const p=JSON.parse(s.event.issue.body);p.operation='controller-update';s.event.issue.body=JSON.stringify(p);},
+  s=>{const p=JSON.parse(s.event.issue.body);p.operation='runner-smoke';s.event.issue.body=JSON.stringify(p);},
+  s=>{s.event.issue.title='pc-job';},
+  s=>{s.event.issue.title='PC Update '+id+' postcheck';const p=JSON.parse(s.event.issue.body);p.requestId='normal-owner-a';s.event.issue.body=JSON.stringify(p);},
+ ]){
+  const candidate=structuredClone(x);bad(candidate);
+  deny(candidate,'PUBLIC_PC_JOB_CONTRACT_DENIED');
+ }
+});
+
 test('repository visibility, owner id, name or issuer cannot bypass gate',()=>{
   for(const p of [
     s=>{s.event.repository.private=true;},

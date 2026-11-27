@@ -71,7 +71,10 @@ export function attestOwnerPcJobEvent(event,env,policy){
   event.issue?.user?.login===owner&&event.issue.user.id===ownerId,
   'CONTROL_OWNER_IDENTITY_UNVERIFIED');
  need(Number.isSafeInteger(event.issue?.number)&&event.issue.number>0&&
-  !event.issue.pull_request&&event.issue.title==='pc-job'&&
+  !event.issue.pull_request&&
+  (event.issue.title==='pc-job'||
+   (event.repository.private===false&&
+    exactPublicUpdatePostcheckTitle(event.issue.title,event.issue.body)))&&
   event.issue.labels?.some(x=>x.name==='pc-job'),
   'CONTROL_ISSUE_SCOPE_UNTRUSTED');
  need(event.action==='opened'||
@@ -79,6 +82,24 @@ export function attestOwnerPcJobEvent(event,env,policy){
   'CONTROL_EVENT_ACTION_UNTRUSTED');
  return Object.freeze({repository:repo,visibility:event.repository.private?'PRIVATE':'PUBLIC',
   ownerVerified:true,prCodeAllowed:false});
+}
+
+// Existing maintenance update emits one original, exact-titled A postcheck.
+// Public owner transport admits only this derived title for a pinned A
+// operation. Invalid JSON/shape is denied before any Controller worker runs.
+export function exactPublicUpdatePostcheckTitle(title,body){
+ if(typeof title!=='string'||typeof body!=='string'||
+   Buffer.byteLength(body,'utf8')>16384)return false;
+ let request;
+ try{request=JSON.parse(body);}catch{return false;}
+ if(!request||typeof request!=='object'||Array.isArray(request))return false;
+ const id=request.requestId;
+ if(typeof id!=='string'||!/^pc-(?:update-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-postcheck$/.test(id))return false;
+ const base=id.slice(0,-'-postcheck'.length);
+ return title==='PC Update '+base+' postcheck'&&
+  ['core-status','source-audit','fear-greed-archive-status'].includes(request.operation)&&
+  request.schema==='ZGMINI_PC_JOB_V1'&&
+  request.sourceRepository==='ansqhd5774-Choi/zgmini';
 }
 
 // The public Issues transport may publish a status receipt, never the local

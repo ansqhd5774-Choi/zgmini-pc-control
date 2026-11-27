@@ -62,6 +62,35 @@ test('workflow accepts exactly owner opened or pc-job labeled and retains pinned
  assert.doesNotMatch(wf,/workflow_dispatch:|repository_dispatch:|schedule:/);
 });
 
+test('Public maintenance postcheck requires exact original owner requestId/title and A allowlist',()=>{
+ const id='pc-update-11111111-1111-4111-8111-111111111111';
+ const title='PC Update '+id+' postcheck';
+ const p={...request,requestId:id+'-postcheck',operation:'core-status'};
+ const origin=event('opened');origin.issue.title=title;origin.issue.body=JSON.stringify(p);
+ assert.equal(attestOwnerPcJobEvent(origin,env,policy).visibility,'PUBLIC');
+ const shortId='pc-11111111-1111-4111-8111-111111111111';
+ const short=structuredClone(origin);
+ short.issue.title='PC Update '+shortId+' postcheck';
+ short.issue.body=JSON.stringify({...p,requestId:shortId+'-postcheck'});
+ assert.equal(attestOwnerPcJobEvent(short,env,policy).visibility,'PUBLIC');
+ const common=fs.readFileSync(new URL('../controller/common.mjs',import.meta.url),'utf8');
+ assert.match(common,/exactPublicUpdatePostcheckTitle\(event\.issue\.title,event\.issue\.body\)/);
+ assert.match(publicA,/startsWith\(github\.event\.issue\.title, 'PC Update pc-'\)/);
+ assert.match(publicA,/endsWith\(github\.event\.issue\.title, ' postcheck'\)/);
+ assert.match(publicA,/github\.event\.issue\.title == 'pc-job'/);
+ for(const mutate of [
+  e=>{e.issue.title='PC Update pc-update-22222222-1111-4111-8111-111111111111 postcheck';},
+  e=>{const body=JSON.parse(e.issue.body);body.requestId='pc-update-22222222-1111-4111-8111-111111111111-postcheck';e.issue.body=JSON.stringify(body);},
+  e=>{const body=JSON.parse(e.issue.body);body.operation='controller-update';e.issue.body=JSON.stringify(body);},
+  e=>{e.issue.title='PC Update '+id+' postcheck extra';},
+  e=>{e.issue.body='not json';},
+  e=>{e.repository.private=true;},
+ ]){
+  const copy=structuredClone(origin);mutate(copy);
+  assert.throws(()=>attestOwnerPcJobEvent(copy,env,policy),/CONTROL_ISSUE_SCOPE_UNTRUSTED/);
+ }
+});
+
 test('labeled workflow admission is independently gated from opened single-run entry',()=>{
  const jobExpression=publicA.split('    if: >-\n')[1]?.split('\n    # Public visibility')[0];
  assert.ok(jobExpression,'expected fixed self-hosted job admission');
