@@ -71,7 +71,7 @@ export function verifyOperatorSourceClosure(readLocal,readTrusted){
  }
  const expected=new Set(SOURCE);
  for(const [rel,code] of Object.entries(sources)){
-  const specifiers=code.matchAll(/\\b(?:from\\s+|import\\s+)(['"])([^'"]+)\\1/g);
+  const specifiers=code.matchAll(/\b(?:from\s+|import\s+)(['"])([^'"]+)\1/g);
   for(const item of specifiers){
    const spec=item[2];
    if(spec.startsWith('node:'))continue;
