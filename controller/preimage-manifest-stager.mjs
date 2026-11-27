@@ -4,17 +4,21 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
-import {validateRequest} from './common.mjs';
+import {validateRequest,attestOwnerPcJobEvent} from './common.mjs';
 import {blockedPayload,preimageStageFile,stagedPayload} from './preimage-manifest-contract.mjs';
 
 const CONTROL='ansqhd5774-Choi/zgmini-pc-control';
 const stop=code=>{throw Object.assign(new Error(code),{code});};
+// The log status never contains manifest bytes, credentials or local paths.
+export const preimageStageLogStatus=output=>output?.status==='READY'?
+ 'PREIMAGE_SCOPE_STAGE_READY':output?.status==='BLOCKED'?
+ 'PREIMAGE_SCOPE_STAGE_BLOCKED':'PREIMAGE_SCOPE_STAGE_NOT_STAGED';
 
 export async function stagePreimageManifest({env,event,policy,fetchImpl=fetch}={}){
- if(env.GITHUB_REPOSITORY!==CONTROL||event?.repository?.private!==true||
-  env.GITHUB_ACTOR!=='ansqhd5774-Choi'||event?.issue?.user?.login!=='ansqhd5774-Choi'||
-  env.GITHUB_EVENT_NAME!=='issues'||event?.action!=='opened'||
-  !event.issue?.labels?.some(x=>x.name==='pc-job'))stop('PREIMAGE_STAGE_EVENT_STOP');
+ // Use the same immutable repository, owner and workflow identity as entry.
+ // A credential is present here; never fetch based on an untrusted PR/event.
+ try{attestOwnerPcJobEvent(event,env,policy);}
+ catch{stop('PREIMAGE_STAGE_EVENT_STOP');}
  let request;
  try{request=validateRequest(JSON.parse(event.issue.body),policy);}
  catch{stop('PREIMAGE_STAGE_EVENT_STOP');}
@@ -75,7 +79,7 @@ async function main(env=process.env){
   const file=preimageStageFile(env);
   fs.writeFileSync(file,JSON.stringify(output)+'\n',{flag:'wx',mode:0o600});
  }
- process.stdout.write('PREIMAGE_SCOPE_STAGE_COMPLETE\n');
+ process.stdout.write(preimageStageLogStatus(output)+'\n');
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))

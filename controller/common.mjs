@@ -49,6 +49,85 @@ export function assertSupervisorOwner(root,host,environment=process.env,io=fs){
  return 'SUPERVISOR_OWNERSHIP_VERIFIED';
 }
 
+// Public repository trust boundary for the *existing* fixed pc-job Issues path.
+// Repository visibility is not actor authentication. The immutable GitHub
+// repository/owner IDs, trusted owner event and default-branch workflow must
+// agree before any allowlisted A worker is launched. Never use for PR events.
+export function attestOwnerPcJobEvent(event,env,policy){
+ const repo='ansqhd5774-Choi/zgmini-pc-control',owner='ansqhd5774-Choi';
+ const repoId=1442936296,ownerId=327938088;
+ need(policy?.controlRepository===repo&&env?.GITHUB_REPOSITORY===repo,
+  'CONTROL_REPOSITORY_MISMATCH');
+ need(event?.repository?.id===repoId&&event.repository.full_name===repo&&
+  event.repository.owner?.login===owner&&event.repository.owner?.id===ownerId&&
+  typeof event.repository.private==='boolean',
+  'CONTROL_REPOSITORY_IDENTITY_UNVERIFIED');
+ need(env.GITHUB_EVENT_NAME==='issues'&&env.GITHUB_REF==='refs/heads/main'&&
+  env.GITHUB_WORKFLOW_REF===repo+'/.github/workflows/pc-job.yml@refs/heads/main'&&
+  String(env.GITHUB_RUN_ATTEMPT)==='1',
+  'CONTROL_WORKFLOW_OR_EVENT_UNTRUSTED');
+ need(env.GITHUB_ACTOR===owner&&
+  event.sender?.login===owner&&event.sender?.id===ownerId&&
+  event.issue?.user?.login===owner&&event.issue.user.id===ownerId,
+  'CONTROL_OWNER_IDENTITY_UNVERIFIED');
+ need(Number.isSafeInteger(event.issue?.number)&&event.issue.number>0&&
+  !event.issue.pull_request&&
+  (event.issue.title==='pc-job'||
+   (event.repository.private===false&&
+    exactPublicUpdatePostcheckTitle(event.issue.title,event.issue.body)))&&
+  event.issue.labels?.some(x=>x.name==='pc-job'),
+  'CONTROL_ISSUE_SCOPE_UNTRUSTED');
+ need(event.action==='opened'||
+  (event.action==='labeled'&&event.label?.name==='pc-job'),
+  'CONTROL_EVENT_ACTION_UNTRUSTED');
+ return Object.freeze({repository:repo,visibility:event.repository.private?'PRIVATE':'PUBLIC',
+  ownerVerified:true,prCodeAllowed:false});
+}
+
+// Existing maintenance update emits one original, exact-titled A postcheck.
+// Public owner transport admits only this derived title for a pinned A
+// operation. Invalid JSON/shape is denied before any Controller worker runs.
+export function exactPublicUpdatePostcheckTitle(title,body){
+ if(typeof title!=='string'||typeof body!=='string'||
+   Buffer.byteLength(body,'utf8')>16384)return false;
+ let request;
+ try{request=JSON.parse(body);}catch{return false;}
+ if(!request||typeof request!=='object'||Array.isArray(request))return false;
+ const id=request.requestId;
+ if(typeof id!=='string'||!/^pc-(?:update-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-postcheck$/.test(id))return false;
+ const base=id.slice(0,-'-postcheck'.length);
+ return title==='PC Update '+base+' postcheck'&&
+  ['core-status','source-audit','fear-greed-archive-status'].includes(request.operation)&&
+  request.schema==='ZGMINI_PC_JOB_V1'&&
+  request.sourceRepository==='ansqhd5774-Choi/zgmini';
+}
+
+// The public Issues transport may publish a status receipt, never the local
+// Worker result, provenance inventory, installation paths or private DB details.
+// Keep complete results on the operating PC; this is not a data publication API.
+export function publicPcReportProjection(report){
+ need(report?.schema==='ZGMINI_PC_RESULT_V1'&&
+  typeof report.jobId==='string'&&
+  /^run-[0-9]{1,20}-[0-9]{1,3}-seat-[1-6]$/.test(report.jobId),
+  'PUBLIC_REPORT_SCOPE_UNVERIFIED');
+ const safe=(value,pattern)=>typeof value==='string'&&pattern.test(value)?value:null;
+ const status=['PASS','FAIL','BLOCKED','STATE_UNKNOWN'].includes(report.status)?
+  report.status:'BLOCKED';
+ // A syntactically safe uppercase code can still encode a secret.
+ // Public callers receive only status; full diagnostic code stays on PC.
+ const code='PUBLIC_RESULT_CODE_REDACTED';
+ return Object.freeze({
+  schema:'ZGMINI_PC_RESULT_V1',jobId:report.jobId,
+  requestId:safe(report.requestId,/^[a-z0-9][a-z0-9-]{7,79}$/),
+  operation:safe(report.operation,/^[a-z0-9][a-z0-9-]{1,79}$/),
+  seat:Number.isSafeInteger(report.seat)&&report.seat>=1&&report.seat<=6?
+   report.seat:null,
+  status,code,
+  actualExecutionSha:safe(report.actualExecutionSha,/^[a-f0-9]{40}$/),
+  reportTransfer:{status:'SUMMARY_ONLY',code:'PUBLIC_REPOSITORY_REDACTED'}
+ });
+}
+
 export function validateRequest(request,policy){
  need(request&&typeof request==='object'&&!Array.isArray(request),'REQUEST_OBJECT');
  const keys=['schema','requestId','chatId','operation','sourceRepository','sourceBranch','sourceSha'];
@@ -123,4 +202,16 @@ export async function readAllPages(readPage,{maxPages=100}={}){
   if(rows.length<100)return out;
  }
  need(false,'PAGINATION_INCOMPLETE');
+}
+/**
+ * Preserve private operational diagnostics on the legacy private path.
+ * Public (or unverifiable) visibility must never stream the raw worker report
+ * into publicly readable GitHub Actions logs. This is a log projection only;
+ * the original receipt remains available to the protected local ledger.
+ */
+export function publicJobLogEnvelope(report,repositoryPrivate){
+ if(repositoryPrivate===true)return report;
+ const status=['PASS','FAIL','BLOCKED','STATE_UNKNOWN'].includes(report?.status)
+   ?report.status:'BLOCKED';
+ return Object.freeze({status,code:'PUBLIC_LOCAL_RESULT_REDACTED'});
 }
