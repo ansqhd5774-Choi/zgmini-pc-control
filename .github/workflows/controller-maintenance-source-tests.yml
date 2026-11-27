@@ -331,6 +331,7 @@ jobs:
           node --check ci-approval/public-completed-run-observe.mjs
           node --test --test-concurrency=1 tests/ci-approval-public-completed-run-observe.test.mjs
           node --test --test-concurrency=1 tests/supervisor-orphan-six-b-receiver-source.test.mjs
+          node --test --test-concurrency=1 tests/supervisor-status-write.test.mjs
   source-only:
     if: >-
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
