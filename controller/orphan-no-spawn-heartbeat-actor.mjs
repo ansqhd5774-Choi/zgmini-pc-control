@@ -70,7 +70,9 @@ export function createNoSpawnHeartbeatActor({
   // body or accept caller-supplied synthetic approval/nonce assertions.
   const sample=await attest();
   const instant=now();
-  const assessed=assessNoSpawnMonitorSnapshot({...sample,now:instant});
+  const assessed=assessNoSpawnMonitorSnapshot({...sample,now:instant,
+   monitorPhase:baseline===null?'INITIAL_OWNER_ADOPTION':
+    'ESTABLISHED_MONITOR_RENEWAL'});
   if(assessed.status!=='CANDIDATE_ONLY'||
      assessed.exactSeatIdentityCount!==6||
      !validPid(sample?.newOwner?.pid)||sample.newOwner.pid!==process.pid)
