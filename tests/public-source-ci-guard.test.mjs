@@ -12,6 +12,8 @@ import '../sidecar-b/w06-r3-sevenmin-approval.test.mjs';
 import '../sidecar-b/w06-v2-to-v3-pin-only.test.mjs';
 // Reuse the existing immutable GitHub-hosted source CI for the V2 live preimage read.
 import '../sidecar-b/operating-probe.test.mjs';
+// Public W06 independent Windows preimage path is READONLY, never an install.
+import '../sidecar-b/public-v3-independent-preimage-readonly.test.mjs';
 
 const repo='ansqhd5774-Choi/zgmini-pc-control', id=1442936296;
 const owner='ansqhd5774-Choi', ownerId=327938088;
