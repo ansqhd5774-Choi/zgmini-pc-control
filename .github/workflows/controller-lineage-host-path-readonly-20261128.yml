@@ -101,32 +101,14 @@ jobs:
               $branchOk = $LASTEXITCODE -eq 0 -and $branch -ceq 'main'
               $origin = & $git.Source -C $checkout remote get-url origin 2>$null | Select-Object -First 1
               $originOk = $LASTEXITCODE -eq 0 -and [string]$origin -cmatch
-                '^(?:https://github\.com/|git@github\.com:|ssh://git@github\.com/)ansqhd5774-Choi/zgmini-pc-control(?:\.git)?/?
-            Write-Output 'DIAG_RESULT=OPERATOR_FILE_MISSING'
-            exit 2
-          }
-          if (-not $nodePresent) {
-            Write-Output 'DIAG_RESULT=NODE_RUNTIME_MISSING'
-            exit 3
-          }
-          Write-Output 'DIAG_RESULT=OPERATOR_FILE_PRESENT_ONLY'
-
+                '^(?:https://github\.com/|git@github\.com:|ssh://git@github\.com/)ansqhd5774-Choi/zgmini-pc-control(?:\.git)?/?$'
               $dirty = @(& $git.Source -C $checkout -c core.fsmonitor=false -c core.untrackedCache=false status --porcelain=v1 --untracked-files=all 2>$null | Where-Object { $_ -ne '' })
               $statusOk = $LASTEXITCODE -eq 0
               $clean = $statusOk -and $dirty.Count -eq 0
               $remoteSha = $null
               if ($originOk) {
                 $remoteLine = & $git.Source -C $checkout ls-remote --heads origin main 2>$null | Select-Object -First 1
-                if ($LASTEXITCODE -eq 0 -and $remoteLine -match '^([a-f0-9]{40})\s+refs/heads/main
-            Write-Output 'DIAG_RESULT=OPERATOR_FILE_MISSING'
-            exit 2
-          }
-          if (-not $nodePresent) {
-            Write-Output 'DIAG_RESULT=NODE_RUNTIME_MISSING'
-            exit 3
-          }
-          Write-Output 'DIAG_RESULT=OPERATOR_FILE_PRESENT_ONLY'
-) {
+                if ($LASTEXITCODE -eq 0 -and $remoteLine -match '^([a-f0-9]{40})\s+refs/heads/main$') {
                   $remoteSha = $Matches[1]
                 }
               }
