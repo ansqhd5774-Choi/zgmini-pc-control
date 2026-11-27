@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {
  assessOrphanRunnerSelfNonce as assess,
@@ -167,9 +168,9 @@ test('inspector reads only three fixed PC files twice and emits sanitized result
  const r=request(),readPaths=[],stats=[];
  const root='E:/ZGmini/automation/pc-control';
  const files=new Map([
-  [root+'/host.json',r.hostBytes],
-  [root+'/leases/supervisor/owner.json',r.ownerBytes],
-  [root+'/SUPERVISOR_STATUS.json',r.statusBytes]
+  [path.join(root,'host.json'),r.hostBytes],
+  [path.join(root,'leases/supervisor/owner.json'),r.ownerBytes],
+  [path.join(root,'SUPERVISOR_STATUS.json'),r.statusBytes]
  ]);
  const filesystem={
   lstatSync:p=>{
@@ -215,9 +216,9 @@ test('same-host private reader refuses noncanonical OS/host without reading anyt
 test('time-of-check change across two reads never produces a positive observation',()=>{
  const r=request();
  const root='E:/ZGmini/automation/pc-control',paths={
-  [root+'/host.json']:r.hostBytes,
-  [root+'/leases/supervisor/owner.json']:r.ownerBytes,
-  [root+'/SUPERVISOR_STATUS.json']:r.statusBytes
+  [path.join(root,'host.json')]:r.hostBytes,
+  [path.join(root,'leases/supervisor/owner.json')]:r.ownerBytes,
+  [path.join(root,'SUPERVISOR_STATUS.json')]:r.statusBytes
  };
  let statusReads=0;
  const filesystem={
@@ -241,11 +242,11 @@ test('symlink, hardlink, unstable read, and missing owner reject all evidence',(
  const r=request(),root='E:/ZGmini/automation/pc-control';
  for(const mode of ['symlink','hardlink','missing','changed']){
   const bytes={
-   [root+'/host.json']:r.hostBytes,
-   [root+'/leases/supervisor/owner.json']:r.ownerBytes,
-   [root+'/SUPERVISOR_STATUS.json']:r.statusBytes
+   [path.join(root,'host.json')]:r.hostBytes,
+   [path.join(root,'leases/supervisor/owner.json')]:r.ownerBytes,
+   [path.join(root,'SUPERVISOR_STATUS.json')]:r.statusBytes
   };
-  const file=root+'/leases/supervisor/owner.json';
+  const file=path.join(root,'leases/supervisor/owner.json');
   const filesystem={
    lstatSync:p=>{
     if(mode==='missing'&&p===file)throw Error('NOT_FOUND');
