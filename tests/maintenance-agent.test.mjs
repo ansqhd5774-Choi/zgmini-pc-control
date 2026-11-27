@@ -2042,3 +2042,6 @@ import './s6-4078-backlog-only-transaction.test.mjs';
 // Reuse the immutable public source workflow for fixed Windows S6 read-only
 // byte-source tests. This import cannot access the actual operating PC.
 import './s6-4078-windows-local-readonly.test.mjs';
+// Public GitHub-hosted source-only CI runs the fixed Writer B COM probe
+// in Node vm with injected fixtures; no Windows API/PC action is invoked.
+import '../r17-writer-b/r17-b-windows-probe.test.mjs';
