@@ -7,8 +7,13 @@ export const PREIMAGE='ce07af0b5e8d17625644e204f2815c1f754aff2468bc5434ac13c0dad
 export const SCHEMA='ZGMINI_CNN_SIDECAR_ONEFILE_B_V1';
 // Explicit successor of the already-installed R3 bytes only. V1 is unchanged.
 export const SUCCESSOR_SCHEMA='ZGMINI_CNN_SIDECAR_ONEFILE_B_V2';
+// Pin-only successor to the *currently installed*, reviewed V2 bytes.
+// V1 and V2 retain their exact original preimage and authorization guards.
+export const NEXT_SUCCESSOR_SCHEMA='ZGMINI_CNN_SIDECAR_ONEFILE_B_V3';
 export const R3_AFTER='583297b451f168a32a2a5de4b0b04c9b14449aab9a041c954a420203cf04f188';
 const R3_SOURCE='e4b768530335182f422ebd51d163a6f5b754361c';
+export const V2_AFTER='eb3c43bf8fba6ea4e51f3e84b77f9ec13000db9d9e38077ffd914950d7080b6b';
+const V2_SOURCE='393cee0da46515ff056543173fcd1253a858b3d7';
 const sha64=/^[0-9a-f]{64}$/;
 const sha40=/^[0-9a-f]{40}$/;
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -26,12 +31,14 @@ export function validateManifest(m){
   'installedConfigSource','taskDefinitionSha256','wrapperSha256',
   'allowProviderCalls','allowDbChanges','allowD1Writes','allowTaskChanges',
   'runCount']),'SIDECAR_B_FIELDS_STOP');
- const legacy=m.schema===SCHEMA,successor=m.schema===SUCCESSOR_SCHEMA;
- check((legacy||successor)&&m.status==='APPROVED_B'&&
+ const legacy=m.schema===SCHEMA,successor=m.schema===SUCCESSOR_SCHEMA,
+  next=m.schema===NEXT_SUCCESSOR_SCHEMA;
+ check((legacy||successor||next)&&m.status==='APPROVED_B'&&
   uuid.test(m.requestId)&&m.target===TARGET&&
-  m.beforeSha256===(legacy?PREIMAGE:R3_AFTER)&&sha64.test(m.afterSha256)&&
+  m.beforeSha256===(legacy?PREIMAGE:successor?R3_AFTER:V2_AFTER)&&sha64.test(m.afterSha256)&&
   m.afterSha256!==m.beforeSha256&&m.approvedContentSha256===m.afterSha256&&
   (!successor||(m.afterSha256!==PREIMAGE&&m.installedHead===m.installedConfigSource&&m.installedHead!==R3_SOURCE))&&
+  (!next||(m.installedHead===m.installedConfigSource&&m.installedHead!==V2_SOURCE))&&
   sha40.test(m.approvedSourceSha)&&sha40.test(m.installedHead)&&
   sha40.test(m.installedConfigSource)&&sha64.test(m.taskDefinitionSha256)&&
   sha64.test(m.wrapperSha256)&&m.runCount===1&&
@@ -57,18 +64,20 @@ export function verifyObservation(m,o){
  return o;
 }
 
-// Successor may change exactly the one R3 APPROVED source literal to the
-// manifest's actual installed Writer HEAD. Reverse substitution must recover
-// the complete verified R3 bytes, including all existing guards and line endings.
+// A successor may change exactly the previous reviewed Sidecar source pin.
+// Reverse substitution must reproduce its entire old approved byte image.
+// This never permits changing executable logic, source paths or safety guards.
 export function verifyCandidateBytes(m,bytes){
  validateManifest(m);
  check(Buffer.isBuffer(bytes)&&bytes.length>0&&bytes.length<=131072&&
   sha256(bytes)===m.afterSha256,'SIDECAR_B_CANDIDATE_HASH_STOP');
- if(m.schema===SUCCESSOR_SCHEMA){
+ if(m.schema===SUCCESSOR_SCHEMA||m.schema===NEXT_SUCCESSOR_SCHEMA){
   const text=bytes.toString('utf8');
+  const priorSource=m.schema===SUCCESSOR_SCHEMA?R3_SOURCE:V2_SOURCE;
+  const priorBytes=m.schema===SUCCESSOR_SCHEMA?R3_AFTER:V2_AFTER;
   const pin=`const APPROVED='${m.installedHead}';`;
   check(Buffer.from(text,'utf8').equals(bytes)&&text.split(pin).length===2&&
-   sha256(Buffer.from(text.replace(pin,`const APPROVED='${R3_SOURCE}';`),'utf8'))===R3_AFTER,
+   sha256(Buffer.from(text.replace(pin,`const APPROVED='${priorSource}';`),'utf8'))===priorBytes,
    'SIDECAR_B_SUCCESSOR_SOURCE_PIN_STOP');
  }
  return bytes;
