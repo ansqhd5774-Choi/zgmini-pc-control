@@ -7,6 +7,17 @@ import {pathToFileURL} from 'node:url';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control', REPO_ID=1442936296;
 const OWNER='ansqhd5774-Choi', OWNER_ID=327938088;
+// Public host-side precheck remains source-only. A maintenance postcheck is
+// a candidate only when its Issue title, requestId and A operation are the
+// exact immutable relationship already produced by tools/update.mjs.
+function isPublicAReviewScope(issue,request){
+ if(issue?.title==='pc-job')return request?.operation==='runner-smoke';
+ if(typeof request?.requestId!=='string'||!/^pc-update-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-postcheck$/.test(request.requestId))return false;
+ const base=request.requestId.slice(0,-'-postcheck'.length);
+ return issue?.title==='PC Update '+base+' postcheck'&&
+   ['core-status','source-audit','fear-greed-archive-status'].includes(request.operation);
+}
+
 const SOURCE_REPO='ansqhd5774-Choi/zgmini', FIELDS=[
   'schema','requestId','chatId','operation','sourceRepository','sourceBranch','sourceSha'
 ];
@@ -29,7 +40,7 @@ export function assessPublicPcJobCandidate({event,env}={}) {
   const issue=event?.issue;
   if(event?.sender?.id!==OWNER_ID||event.sender.login!==OWNER||
      issue?.user?.id!==OWNER_ID||issue.user.login!==OWNER||
-     issue.title!=='pc-job'||issue.state!=='open'||
+     issue.state!=='open'||
      !Number.isSafeInteger(issue.number)||issue.number<=0||
      // GitHub 'issues' webhook identifies the Issue in issue.number;
      // some valid payloads do not carry a redundant top-level number.
@@ -54,7 +65,7 @@ export function assessPublicPcJobCandidate({event,env}={}) {
   if(request.schema!=='ZGMINI_PC_JOB_V1'||
      !REQUEST_ID.test(request.requestId??'')||
      !CHAT_ID.test(request.chatId??'')||
-     request.operation!=='runner-smoke'||
+     !isPublicAReviewScope(issue,request)||
      request.sourceRepository!==SOURCE_REPO||
      request.sourceBranch!=='main'||!SHA40.test(request.sourceSha??''))
     return blocked('PUBLIC_PC_JOB_CONTRACT_DENIED');
