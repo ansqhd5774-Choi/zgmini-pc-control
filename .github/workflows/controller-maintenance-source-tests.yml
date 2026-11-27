@@ -329,6 +329,7 @@ jobs:
           node --test --test-concurrency=1 tests/automation-status.test.mjs
           node --test --test-concurrency=1 tests/ci-controller-b-policy-only-proposal.test.mjs
           node --test --test-concurrency=1 tests/supervisor-orphan-six-b-receiver-source.test.mjs
+          node --test --test-concurrency=1 tests/supervisor-status-write.test.mjs
   source-only:
     if: >-
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
