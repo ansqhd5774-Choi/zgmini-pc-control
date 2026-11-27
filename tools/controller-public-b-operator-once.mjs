@@ -37,12 +37,13 @@ const api=(route,{method='GET',data}={})=>{
   timeout:60000,maxBuffer:3000000,...(data?{input:JSON.stringify(data)}:{})});
  return JSON.parse(raw);
 };
-const readMain=p=>{
- const f=api('repos/'+REPO+'/contents/'+p+'?ref=main');
+const readRevision=(p,revision)=>{
+ const f=api('repos/'+REPO+'/contents/'+p+'?ref='+revision);
  need(f?.type==='file'&&f?.encoding==='base64'&&typeof f.content==='string',
   'PUBLIC_B_MAIN_SOURCE_MISSING');
  return Buffer.from(f.content,'base64');
 };
+const readMain=p=>readRevision(p,'main');
 const isRegular=p=>{
  const st=fs.lstatSync(p);
  return st.isFile()&&!st.isSymbolicLink()&&st.nlink===1&&st.size>0&&st.size<=3000000;
@@ -121,12 +122,31 @@ async function sourceAndOwner(){
  const chain=api('repos/'+REPO+'/compare/'+APPROVAL_MERGE+'...main');
  need(chain?.behind_by===0&&chain?.merge_base_commit?.sha===APPROVAL_MERGE,
   'PUBLIC_B_APPROVAL_NOT_ON_MAIN');
+ // Never trust a moving main as executable source authority. Bind every
+ // runtime dependency to the *merged* reviewed source PR and check main still
+ // serves those immutable bytes, even if unrelated main commits advance.
+ const sourcePr=api('repos/'+REPO+'/pulls/4262');
+ need(sourcePr?.number===4262&&sourcePr?.merged===true&&
+  sourcePr?.user?.id===327938088&&
+  sourcePr?.base?.ref==='main'&&sourcePr?.base?.repo?.full_name===REPO&&
+  sourcePr?.head?.repo?.full_name===REPO&&
+  /^[a-f0-9]{40}$/.test(sourcePr?.merge_commit_sha??''),
+  'PUBLIC_B_OPERATOR_SOURCE_PR_NOT_MERGED');
+ const sourceMerge=sourcePr.merge_commit_sha;
+ const sourceLineage=api('repos/'+REPO+'/compare/'+sourceMerge+'...main');
+ need(sourceLineage?.behind_by===0&&
+  sourceLineage?.merge_base_commit?.sha===sourceMerge,
+  'PUBLIC_B_OPERATOR_SOURCE_PR_NOT_ON_MAIN');
  verifyOperatorSourceClosure(rel=>{
   const local=path.join(CHECKOUT,rel);
   need(isRegular(local)&&fs.realpathSync(local).toLowerCase()===
     path.resolve(local).toLowerCase(),'PUBLIC_B_OPERATOR_SOURCE_CAS_FAILED');
   return fs.readFileSync(local);
- },readMain);
+ },rel=>{
+  const approved=readRevision(rel,sourceMerge);
+  need(approved.equals(readMain(rel)),'PUBLIC_B_OPERATOR_MAIN_SOURCE_DRIFT');
+  return approved;
+ });
  // All local static imports are now verified against authenticated main bytes.
  const [contract,updater,apply,lock]=await Promise.all([
   import('./maintenance-contract.mjs'),import('./update.mjs'),
