@@ -1,3 +1,5 @@
+// Orphan no-spawn Actor: double private read before any isolated heartbeat.
+import './supervisor-orphan-no-spawn-heartbeat-actor.test.mjs';
 import test from 'node:test';
 // No operational process or lease effect; pure orphan no-spawn monitor regressions.
 import './supervisor-orphan-no-spawn-monitor.test.mjs';
