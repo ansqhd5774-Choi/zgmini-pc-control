@@ -20,7 +20,7 @@ const OLD='3c7d4cfefacf072fd35cb19706b352c64c5e4fd2';
 const TARGET='555f95708984580cd7d5a0fd05a80b718e867710';
 const MANIFEST_SHA='e36ab64432b5c4e8891140fdec5d226de77f1821fe73f0d11a836a0fc14a8939';
 const APPROVAL_MERGE='ac0e806a929bcab05b72115edd5d673b172839f3';
-const RECOVERY_PR=0; // replaced with exact PR number before review
+const RECOVERY_PR=4264; // exact reviewed/merged origin, not an operator argument
 const LOCAL='tools/controller-public-b-recover-4263.mjs';
 const ledgerPath=path.join(ROOT,'ledger',REQUEST+'.json');
 const backlogPath=path.join(ROOT,'backlog',REQUEST+'.json');
@@ -60,7 +60,7 @@ function sourceAndOwner(){
   'B4263_INDEPENDENT_WINDOWS_REQUIRED');
  need(path.resolve(fileURLToPath(import.meta.url)).toLowerCase()===
   path.resolve(SOURCE,LOCAL).toLowerCase(),'B4263_OPERATOR_PATH_DRIFT');
- const user=github('user'),r=upstream('');
+ const user=github('user'),r=github('repos/'+REPO);
  need(user?.id===327938088&&user?.login==='ansqhd5774-Choi'&&
   r?.id===1442936296&&r?.private===false&&r?.owner?.id===327938088,
   'B4263_GITHUB_OWNER_UNVERIFIED');
