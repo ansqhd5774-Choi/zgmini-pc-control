@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {classifyW06PublicBEffect} from './public-v3-independent-owner-b-once.mjs';
+import {classifyW06PublicBEffect,matchesExactW06OwnerEffectComment} from './public-v3-independent-owner-b-once.mjs';
 
 const fixture=()=>({
  approvedMergePinned:true,ownerApprovalVerified:true,
@@ -76,4 +76,21 @@ test('sidecar operation reuses existing exact CAS backup rollback adapter but no
  assert.match(s,/createWindowsSidecarIO/);
  assert.match(s,/awaitNaturalSidecarIdle/);
  assert.doesNotMatch(s,/receiveApprovedSidecarB|authorizeSidecarIssue|GITHUB_WORKSPACE|workflow_dispatch/);
+});
+
+test('owner PR merge never substitutes for a separate exact B effect consent',()=>{
+ const body='ZGMINI_W06_V3_B_EFFECT_APPROVED_V1 manifestSha256='+'a'.repeat(64);
+ const mergedAt='2026-11-28T04:00:00Z';
+ const event={user:{id:327938088},body,created_at:'2026-11-28T04:01:00Z'};
+ assert.equal(matchesExactW06OwnerEffectComment(event,body,mergedAt),true);
+ for(const mutate of [
+  v=>{v.user.id=1;},v=>{v.body+=' changed';},
+  v=>{v.created_at='2026-11-28T03:59:00Z';},
+  v=>{v.created_at='invalid';},v=>{delete v.user;}
+ ]){
+  const bad=structuredClone(event);mutate(bad);
+  assert.equal(matchesExactW06OwnerEffectComment(bad,body,mergedAt),false);
+ }
+ const source=fs.readFileSync(new URL('./public-v3-independent-owner-b-once.mjs',import.meta.url),'utf8');
+ assert.match(source,/W06_PUBLIC_B_EXPLICIT_OWNER_EFFECT_CONSENT_STOP/);
 });

@@ -104,6 +104,14 @@ function verifyNewDependencyClosure() {
   need(sha(readLocal(relative))===sha(readRemote(relative,'main')),
    'W06_PUBLIC_B_SOURCE_DRIFT_STOP');
 }
+// Separates an owner-merged source PR from explicit approval of these
+// exact effect bytes. A PR merge alone is never B execution consent.
+export function matchesExactW06OwnerEffectComment(comment,expected,mergedAt) {
+ const posted=Date.parse(comment?.created_at??''),merged=Date.parse(mergedAt??'');
+ return comment?.user?.id===327938088&&
+  typeof comment?.body==='string'&&comment.body.trim()===expected&&
+  Number.isFinite(posted)&&Number.isFinite(merged)&&posted>=merged;
+}
 function verifyFixedOwnerApproval() {
  need(Number.isSafeInteger(APPROVAL_PR)&&APPROVAL_PR>0&&
   hex40(APPROVAL_MERGE),
@@ -121,6 +129,15 @@ function verifyFixedOwnerApproval() {
  const merged=readRemote(APPROVAL,APPROVAL_MERGE),
   current=readRemote(APPROVAL,'main');
  need(merged.equals(current),'W06_PUBLIC_B_APPROVAL_BYTES_CHANGED_STOP');
+ const consent='ZGMINI_W06_V3_B_EFFECT_APPROVED_V1 '+
+  'manifestSha256='+sha(merged)+' '+
+  'beforeSha256='+FIXED.beforeSha256+' '+
+  'afterSha256='+FIXED.afterSha256+' '+
+  'oneFile=true provider=false db=false d1=false task=false';
+ const comments=api('repos/'+REPO+'/issues/'+APPROVAL_PR+'/comments?per_page=100');
+ need(Array.isArray(comments)&&comments.some(c=>
+  matchesExactW06OwnerEffectComment(c,consent,pr.merged_at)),
+  'W06_PUBLIC_B_EXPLICIT_OWNER_EFFECT_CONSENT_STOP');
  const manifest=JSON.parse(current.toString('utf8'));
  const scope=classifyW06PublicBEffect({
   approvedMergePinned:true,ownerApprovalVerified:true,
