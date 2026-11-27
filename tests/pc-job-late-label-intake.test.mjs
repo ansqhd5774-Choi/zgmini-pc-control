@@ -228,7 +228,7 @@ test('public JSON/TXT export never contains local private result payload or toke
  ].sort());
  assert.equal(publicReceipt.reportTransfer.status,'SUMMARY_ONLY');
  assert.equal(publicReceipt.reportTransfer.code,'PUBLIC_REPOSITORY_REDACTED');
- assert.equal(publicReceipt.code,'RUNNER_COMMAND_EXECUTED');
+ assert.equal(publicReceipt.code,'PUBLIC_RESULT_CODE_REDACTED');
  assert.equal(publicReceipt.status,'PASS');
  assert.doesNotMatch(JSON.stringify(publicReceipt),
   /DO_NOT_PUBLISH_TEST_SECRET|ghp_fake_not_real|private|ZGmini|internal raw source/);
