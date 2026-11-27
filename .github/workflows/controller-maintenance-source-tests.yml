@@ -65,6 +65,8 @@ on:
       - 'tests/supervisor-orphan-six-b-receiver-source.test.mjs'
       - 'tools/supervisor-orphan-six-graceful-b-coordinator.mjs'
       - 'tests/supervisor-orphan-six-graceful-b-coordinator.test.mjs'
+      - 'tools/supervisor-orphan-six-windows-ctrlbreak-port.mjs'
+      - 'tests/supervisor-orphan-six-windows-ctrlbreak-port.test.mjs'
       - 'tests/controller-standby.test.mjs'
       - 'tools/supervisor-orphan-lease-temp-fixture.mjs'
       - 'tests/supervisor-orphan-lease-temp-fixture.test.mjs'

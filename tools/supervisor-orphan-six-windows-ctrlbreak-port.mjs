@@ -10,6 +10,9 @@ const stamp=x=>typeof x==='string'&&
 const goodPid=x=>Number.isSafeInteger(x)&&x>0&&x<=0x7fffffff;
 const sha=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
 const privateSources=new WeakMap();
+// Per-process, fail-closed one-use guard. Consume BEFORE the OS call, including
+// ambiguous timeout/error outcomes; never retransmit the same private token.
+const consumedSources=new WeakSet();
 const denied=code=>Object.freeze({schema:'ZGMINI_ORPHAN_SIX_BREAK_V1',
  status:'BLOCKED',code,signalSubmitted:false,exitVerified:false,
  operationalRecoveryVerified:false});
@@ -80,6 +83,11 @@ export async function submitOrphanSixCtrlBreakOnce({
   return denied('ORPHAN_SIX_BREAK_INSTALLED_B_AUTHORITY_UNAVAILABLE');
  if(pin.mode==='TEMP'&&String(os.hostname()).toUpperCase()!=='DESKTOP-N62L0NG')
   return denied('ORPHAN_SIX_BREAK_TEMP_ISOLATED_HOST_REQUIRED');
+ // No awaits between the check and consume: concurrent callers cannot reuse
+ // an already-attempted private source, even when PowerShell outcome is unknown.
+ if(consumedSources.has(source))
+  return denied('ORPHAN_SIX_BREAK_PRIVATE_SOURCE_ALREADY_CONSUMED');
+ consumedSources.add(source);
  let result;
  try{
   result=await run(path.win32.join(root,'System32',
