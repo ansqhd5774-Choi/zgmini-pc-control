@@ -86,7 +86,18 @@ jobs:
     steps:
       # Pin all transitive publisher source at the reviewed commit, not at the
       # event's main revision, candidate PR or mutable branch.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      # Do not replace the existing independently approved Private B source.
+      # Each checkout is a literal immutable source pin, selected only by
+      # GitHub's repository visibility, never by event/PR/Issue input.
+      - name: Checkout existing Private B source pin
+        if: github.event.repository.private == true
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: cfe57f3d720219613c87eff21338de0d35edbf6b
+          persist-credentials: false
+      - name: Checkout separately approved Public B candidate source pin
+        if: github.event.repository.private == false
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: 62249e557c63f9b641b22cdd2213a71a88470d6e
           persist-credentials: false
