@@ -302,7 +302,8 @@ export async function submitExistingControllerApprovalFromCi({targetSha,approval
  const q=JSON.parse(expected.body);
  if(q.targetControllerSha!==targetSha||manifest.purpose!=='pc-controller-maintenance'||
     manifest.controllerOnlyInstall!==true||!manifest.selectiveSource||
-    !manifest.allowFiles.every(f=>/^controller\/[a-z][a-z0-9-]*\.mjs$/.test(f.path)))
+    !manifest.allowFiles.every(f=>f.path==='config/operations.json'||
+     /^controller\/[a-z][a-z0-9-]*\.mjs$/.test(f.path)))
   fail('MAINTENANCE_CI_PILOT_SCOPE_DENIED');
  const prNumber=Number(manifest.approval.ref.split('/').at(-1));
  const pr=await ports.readApprovalPr(prNumber);
