@@ -1832,6 +1832,33 @@ test('Public receiver poll performs exact installed V2 CI proof, one isolated ap
  assert.equal(f.stats.applies,1,'one approved B effect is never reinstalled');
 });
 
+test('Public receiver accepts exact approved operations config plus Controller module via V2 receipt',async t=>{
+ const p=publicBAuthFixture();
+ const files=[
+  {path:'config/operations.json',sha256:'a'.repeat(64)},
+  {path:'controller/operations.mjs',sha256:'c'.repeat(64)}
+ ];
+ const f=fixture(t,{privateRepo:false,actor:'app/github-actions',
+  requestPatch:{chatId:'chat-ci-765-1'},
+  manifestPatch:{allowFiles:files,checks:{targetSha:TARGET,status:'PASS',
+   manifestSha256:manifestFingerprint(files).sha256},
+   controllerOnlyInstall:true,selectiveSource:{
+    schema:'ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1',
+    branch:'codex/ci-public-effect-review',mainSha:'e'.repeat(40),
+    customPaths:files.map(x=>x.path)}},
+  installedCiPolicy:(_issue,raw)=>({...p.installed,ciControllerBPolicy:{
+   ...p.installed.ciControllerBPolicy,manifestSha256:digest(raw)}}),
+  publicCiProof:{actual:p.actual,getJson:p.proof.getJson,
+   readJobLogs:(id,issue)=>id===p.job.id?
+    '2026-11-28T00:00:00Z '+controllerBReceiptMarker(issue.number,Buffer.from(issue.body))+'\\n':''}
+ });
+ const observed=await f.agent.pollOnce();
+ assert.equal(observed.find(x=>x.status==='SUCCEEDED')?.code,'UPDATE_COMMITTED',JSON.stringify(observed));
+ assert.equal(f.stats.applies,1);assert.equal(f.stats.manifestReads,1);
+ assert.equal(f.remote.size,2,'the original JSON/TXT receipt pair remains required');
+ assert.equal(f.agent.loadLedger(f.request.requestId)?.status,'SUCCEEDED');
+});
+
 test('Public receiver rejects spoofed CI issue despite pinned V2 grant without an apply',async t=>{
  const p=publicBAuthFixture();
  const f=fixture(t,{privateRepo:false,actor:CI_CONTROLLER_ACTOR,
