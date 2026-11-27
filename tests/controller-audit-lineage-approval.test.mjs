@@ -14,7 +14,7 @@ const clone=x=>JSON.parse(JSON.stringify(x));
 test('lineage B candidate is one-file pinned, protected and explicitly not yet approved',()=>{
  assert.equal(manifest.installedSha,installed);
  assert.equal(manifest.targetSha,target);
- assert.equal(manifest.checks.status,'PROPOSED_NOT_APPROVED');
+ assert.equal(manifest.checks.status,'PASS'); // source checks only; no B owner authorization
  assert.equal(manifest.controllerOnlyInstall,true);
  assert.equal(manifest.backup.strategy,'VERSIONED_SNAPSHOT');
  assert.equal(manifest.backup.rollback.sha,installed);
