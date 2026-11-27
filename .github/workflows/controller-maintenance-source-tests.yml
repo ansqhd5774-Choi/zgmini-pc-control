@@ -139,6 +139,8 @@ on:
       - 'controller/engine.mjs'
       - 'controller/memory-admission.mjs'
       - 'tools/maintenance-contract.mjs'
+      - 'tools/automation-status.mjs'
+      - 'tests/automation-status.test.mjs'
       - 'tools/maintenance-recovery.mjs'
       - 'tests/maintenance-recovery.test.mjs'
       - 'shared-resource/issue-admission.mjs'
@@ -319,6 +321,7 @@ jobs:
           node --test --test-concurrency=1 tests/public-a-controller-selective-source.test.mjs
           node --test --test-concurrency=1 tests/maintenance-agent.test.mjs
           node --test --test-concurrency=1 tests/maintenance-postcheck-link.test.mjs
+          node --test --test-concurrency=1 tests/automation-status.test.mjs
           node --test --test-concurrency=1 tests/ci-controller-b-policy-only-proposal.test.mjs
           node --test --test-concurrency=1 tests/supervisor-orphan-six-b-receiver-source.test.mjs
   source-only:

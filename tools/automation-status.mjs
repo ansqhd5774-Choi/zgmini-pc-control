@@ -172,12 +172,21 @@ export function summarizeAutomation(s){
  const healthy=localHealthy&&s.runnerSetOnline===true;
  const permissionOnly=localHealthy&&s.runnerSetOnline===null&&
   s.runnerQueryError==='HTTP_403_FORBIDDEN';
+ const receiverVerified=s.maintenanceFilesVerified===true&&
+  s.receiverIdentityVerified===true&&s.receiverFresh===true;
+ // Public repository receiver is deliberately metadata-only. Do not report
+ // its authenticated SOURCE_ONLY poll as a broken install or as B LISTENING.
+ const fullReceiver=receiverVerified&&s.receiverListening===true&&
+  s.receiverSourceOnly!==true;
+ const sourceOnlyReceiver=receiverVerified&&s.receiverSourceOnly===true&&
+  s.receiverListening!==true;
  return {...base,localControllerState:localHealthy?'HEALTHY':'UNVERIFIED',
   runnerRegistryState:s.runnerSetOnline===true?'ALL_SIX_ONLINE':s.runnerSetOnline===false?'NOT_ALL_ONLINE':'UNVERIFIED',
   runtimeState:healthy?'HEALTHY':'UNVERIFIED',
   controllerState:healthy?'HEALTHY':'UNVERIFIED',
-  maintenanceState:s.maintenanceFilesVerified===true&&s.receiverIdentityVerified===true&&s.receiverFresh===true&&s.receiverListening===true?'HEALTHY':'UNVERIFIED',
-  automationState:healthy&&s.maintenanceFilesVerified===true&&s.receiverIdentityVerified===true&&s.receiverFresh===true&&s.receiverListening===true?'HEALTHY':'PARTIAL_OR_UNVERIFIED',
+  maintenanceState:fullReceiver?'HEALTHY':sourceOnlyReceiver?'SOURCE_ONLY_VERIFIED':'UNVERIFIED',
+  // SOURCE_ONLY never supplies B effects or whole-automation readiness.
+  automationState:healthy&&fullReceiver?'HEALTHY':'PARTIAL_OR_UNVERIFIED',
   installedOperations:s.installedOperations??[],
   // A roster-only permission failure never becomes a required next action.
   // Keep the existing normal path; do not diagnose local Controller again.
@@ -336,7 +345,8 @@ export function collectAutomationStatus(args=process.argv.slice(2)){
  Object.assign(state,{maintenanceFilesVerified:maintenanceVerified===true,
   receiverIdentityVerified:Boolean(receiverOwner?.nonce&&receiver?.pid===receiverOwner.pid&&live(receiverOwner.pid)===true),
   receiverFresh:Date.now()-Date.parse(receiver?.at??'')>=0&&Date.now()-Date.parse(receiver?.at??'')<180000,
-  receiverListening:receiver?.status==='LISTENING'});
+  receiverListening:receiver?.status==='LISTENING',
+  receiverSourceOnly:receiver?.status==='PUBLIC_SOURCE_ONLY'});
  return {schema:'ZGMINI_PC_AUTOMATION_STATUS_V1',observedAt:new Date().toISOString(),
   freshnessSeconds:45,collectorSource:'tools/automation-status.mjs',...summarizeAutomation(state),
   actualControllerSha:state.actualControllerSha,maintenanceSourceSha:installed?.sourceSha??null,

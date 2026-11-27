@@ -20,6 +20,31 @@ test('healthy Controller with dead maintainer is not healthy whole automation',(
  assert.equal(full.automationState,'HEALTHY');
  assert.equal(summarizeAutomation({...healthy(),maintenanceFilesVerified:true,receiverIdentityVerified:true,receiverFresh:false,receiverListening:true}).maintenanceState,'UNVERIFIED');
 });
+test('authenticated Public SOURCE_ONLY poll reports verified source without asserting B or A readiness',()=>{
+ const state={...healthy(),maintenanceFilesVerified:true,receiverIdentityVerified:true,
+  receiverFresh:true,receiverSourceOnly:true,receiverListening:false};
+ const r=summarizeAutomation(state);
+ assert.equal(r.controllerState,'HEALTHY');
+ assert.equal(r.runtimeState,'HEALTHY');
+ assert.equal(r.maintenanceState,'SOURCE_ONLY_VERIFIED');
+ assert.equal(r.automationState,'PARTIAL_OR_UNVERIFIED');
+ assert.equal(r.updateSuccessProven,false);
+ assert.equal(r.blockScope,'NONE_FROM_INSTALL_LEASE');
+ // Identical observed status without installed bytes or fresh owner fails closed.
+ for(const field of ['maintenanceFilesVerified','receiverIdentityVerified','receiverFresh']){
+  const bad=summarizeAutomation({...state,[field]:false});
+  assert.equal(bad.maintenanceState,'UNVERIFIED',field);
+  assert.notEqual(bad.automationState,'HEALTHY',field);
+ }
+ // Contradictory full-B plus source-only markers cannot become B HEALTHY.
+ const conflicting=summarizeAutomation({...state,receiverListening:true});
+ assert.equal(conflicting.maintenanceState,'UNVERIFIED');
+ assert.equal(conflicting.automationState,'PARTIAL_OR_UNVERIFIED');
+ // Private full-B LISTENING remains recognized with the original protections.
+ const privateFull=summarizeAutomation({...state,receiverSourceOnly:false,receiverListening:true});
+ assert.equal(privateFull.maintenanceState,'HEALTHY');
+ assert.equal(privateFull.automationState,'HEALTHY');
+});
 test('historical recovery journal without live lock does not block all work',()=>{
  const r=summarizeAutomation({...healthy(),ledger:{status:'RECOVERY_REQUIRED'}});
  assert.equal(r.state,'NO_ACTIVE_INSTALL_LEASE');assert.equal(r.blockScope,'NONE_FROM_INSTALL_LEASE');
