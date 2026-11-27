@@ -327,6 +327,7 @@ jobs:
           node --test --test-concurrency=1 tests/controller-public-b-operator-once.test.mjs
           node --test --test-concurrency=1 tests/maintenance-postcheck-link.test.mjs
           node --test --test-concurrency=1 tests/automation-status.test.mjs
+          node --test --test-concurrency=1 tests/controller-operating-audit-selective.test.mjs
           node --test --test-concurrency=1 tests/ci-controller-b-policy-only-proposal.test.mjs
           node --check ci-approval/public-completed-run-observe.mjs
           node --test --test-concurrency=1 tests/ci-approval-public-completed-run-observe.test.mjs
