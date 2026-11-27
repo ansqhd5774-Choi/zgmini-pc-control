@@ -62,8 +62,7 @@ export function projectOrphanConsoleCohort(raw,{observedAtUtc=null}={}){
  // summary cannot be used to reconstruct or spoof this WeakMap entry.
  if(typeof observedAtUtc==='string'&&Number.isFinite(Date.parse(observedAtUtc))&&
     raw.rows.every(row=>typeof row.birth==='string'&&
-     Number.isFinite(Date.parse(row.birth))&&
-     new Date(row.birth).toISOString()===new Date(Date.parse(row.birth)).toISOString())){
+     Number.isFinite(Date.parse(row.birth)))){
   internal.set(output,Object.freeze({
    observedAtUtc,
    rows:Object.freeze(raw.rows.map(row=>Object.freeze({
@@ -72,7 +71,7 @@ export function projectOrphanConsoleCohort(raw,{observedAtUtc=null}={}){
    })))
   }));
  }
- return output;
+ return Object.freeze(output);
 }
 
 // A separate PowerShell observer briefly attaches to the target console.
