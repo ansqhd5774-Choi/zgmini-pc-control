@@ -36,6 +36,7 @@ import {inspectOrphanConsoleCohortReadonly} from './supervisor-orphan-console-re
 import {inspectOrphanOwnerPreimageReadonly} from './supervisor-orphan-owner-preimage-readonly.mjs';
 import {inspectOrphanRunnerSelfNonceReadonly} from './supervisor-orphan-runner-self-nonce-readonly.mjs';
 import {inspectOrphanSixBirthBoundReadonly} from './supervisor-orphan-six-birth-bound-readonly.mjs';
+import {inspectOrphanSixRunnerBinaryReadonly,ORPHAN_SIX_BINARY_PROBE} from './supervisor-orphan-six-runner-binary-readonly.mjs';
 import {inspect3409ArchivedReceiptReadonly} from './w04-3409-archive-receipt-readonly.mjs';
 import {inspect3516ArchivedReceiptReadonly} from './w04-3516-archive-receipt-readonly.mjs';
 import {inspect3409OperatorFileSafetyReadonly} from './w04-3409-operator-file-safety-readonly.mjs';
@@ -77,6 +78,7 @@ const ORPHAN_OWNER_CAS_PROBE='controller-orphan-owner-cas-readonly';
 // raw bytes only. Read-only CAS pins, NEVER a new Owner B approval.
 const ORPHAN_SELF_NONCE_PROBE='controller-orphan-runner-self-nonce-readonly';
 const ORPHAN_SIX_WMI_BIRTH_PROBE='controller-orphan-six-wmi-birth-readonly';
+const ORPHAN_SIX_RUNNER_BINARY_PROBE=ORPHAN_SIX_BINARY_PROBE;
 const ORPHAN_SELF_NONCE_PREIMAGE=Object.freeze({
  ownerSha256:'4fd973b5db9a291a8fa7359e3dc65f32488fb5aa2039fd3d3f425004b5ff4dc3',
  hostSha256:'da40637d29d699891fb9199b5e35cc91fc9a2046bbb3257f48a59c231ad25588',
@@ -803,6 +805,7 @@ export function authenticateProcess(event,env,role){
  const isOrphanOwnerCas=withW05&&raw.probe===ORPHAN_OWNER_CAS_PROBE;
  const isOrphanSelfNonce=withW05&&raw.probe===ORPHAN_SELF_NONCE_PROBE;
  const isOrphanSixBirth=withW05&&raw.probe===ORPHAN_SIX_WMI_BIRTH_PROBE;
+ const isOrphanSixBinary=withW05&&raw.probe===ORPHAN_SIX_RUNNER_BINARY_PROBE;
  const isR4Runtime=withW05&&raw.probe===R4_RUNTIME_PROBE;
  const isR5Runtime=withW05&&raw.probe===R5_RUNTIME_PROBE;
  const isR6Runtime=withW05&&raw.probe===R6_RUNTIME_PROBE;
@@ -820,7 +823,7 @@ export function authenticateProcess(event,env,role){
  const allowedOperatingProbe=isOperator||is2960||is3409||isEr1Postcheck||is3516||
   isD05Writer||isD05PrivateReceipt||isD05Theme||isD05Registration||is3160||
   isCnnStaticGuard||isCnnGitPredicates||isCnnBPins||isCnnBResources||
-  isCnnBCore||isW06Task||isR3Watchdog||isR3Wmi||isOrphanSeatMap||isOrphanConsoleCohort||isOrphanOwnerCas||isOrphanSelfNonce||isOrphanSixBirth||isR4Runtime||isR5Runtime||isR6Runtime||isS6Preimage||isS6NextPreimage||isS6Predrain||isS6Journal||isS6CurrentJournal||isS6ReceiverLedger||isR4GuardianOrigin||isCiPolicyCas;
+  isCnnBCore||isW06Task||isR3Watchdog||isR3Wmi||isOrphanSeatMap||isOrphanConsoleCohort||isOrphanOwnerCas||isOrphanSelfNonce||isOrphanSixBirth||isOrphanSixBinary||isR4Runtime||isR5Runtime||isR6Runtime||isS6Preimage||isS6NextPreimage||isS6Predrain||isS6Journal||isS6CurrentJournal||isS6ReceiverLedger||isR4GuardianOrigin||isCiPolicyCas;
  const acceptedProbe=(role==='operating'&&allowedOperatingProbe)||
   (role==='handoff'&&(isCiReceiptRoot||isCiActivation||isCiNativeLocal));
  if(!raw||(!basic&&!withJobs&&!withW05)||
@@ -859,6 +862,7 @@ export function authenticateProcess(event,env,role){
    ...(isOrphanOwnerCas?{orphanOwnerCas:true}:{}),
    ...(isOrphanSelfNonce?{orphanSelfNonce:true}:{}),
    ...(isOrphanSixBirth?{orphanSixBirth:true}:{}),
+   ...(isOrphanSixBinary?{orphanSixRunnerBinary:true}:{}),
   ...(isR4Runtime?{watchdogR4Runtime:true}:{}),
   ...(isR5Runtime?{watchdogR5Runtime:true}:{}),
   ...(isR6Runtime?{watchdogR6Runtime:true}:{}),
@@ -3588,6 +3592,11 @@ export function collect(role,ctx,env=process.env){
   const proof=inspectR4StandbyRuntimeReadonly();
   return {...base,status:proof.status,code:proof.code,watchdogR4Runtime:proof};
  }
+ if(ctx.orphanSixRunnerBinary===true){
+  const proof=inspectOrphanSixRunnerBinaryReadonly();
+  return {...base,status:proof.status,code:proof.code,
+   orphanSixRunnerBinary:proof};
+ }
  if(ctx.orphanSixBirth===true){
   // Double same-host WMI birth observations only. No original launcher
   // handles, private nonce evidence, Controller B authority or writes.
@@ -3807,6 +3816,13 @@ export function toText(r){
   ...(r.c3160LocalPreflight?[
    'c3160LocalApproval='+r.c3160LocalPreflight.localApproval,
    'c3160RecoveryClaim='+r.c3160LocalPreflight.recoveryClaim]:[]),
+  ...(r.orphanSixRunnerBinary?[
+   'orphanSixRunnerBinary='+r.orphanSixRunnerBinary.code,
+   'orphanSixRunnerVersion='+(r.orphanSixRunnerBinary.version??'UNVERIFIED'),
+   'orphanSixRunnerSameVersion='+r.orphanSixRunnerBinary.versionUniform,
+   'orphanSixRunnerSameBinary='+r.orphanSixRunnerBinary.binaryUniform,
+   'orphanSixRunnerGracefulStopProven=false',
+   'orphanSixRunnerEffectAuthorized=false']:[]),
   ...(r.orphanSixBirth?[
    'orphanSixBirth='+r.orphanSixBirth.code,
    'orphanSixBirthSixOlder='+r.orphanSixBirth.allSixOlderThanOriginalHeartbeat,
