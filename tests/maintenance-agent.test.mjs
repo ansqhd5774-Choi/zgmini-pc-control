@@ -1419,6 +1419,9 @@ test('new Public B submission branch is separately opt-in and bound to installed
  assert.match(section,/github\.event\.workflow_run\.workflow_id == 416355595/);
  assert.match(section,/github\.event\.workflow_run\.conclusion == 'success'/);
  assert.match(section,/github\.event\.workflow_run\.head_repository\.id == 1442936296/);
+ assert.match(section,/name: Checkout existing Private B source pin\s+if: github\.event\.repository\.private == true/);
+ assert.match(section,/ref: cfe57f3d720219613c87eff21338de0d35edbf6b/);
+ assert.match(section,/name: Checkout separately approved Public B candidate source pin\s+if: github\.event\.repository\.private == false/);
  assert.match(section,/ref: 62249e557c63f9b641b22cdd2213a71a88470d6e/);
  assert.match(section,/runs-on: \[self-hosted, Windows, X64, zgmini-handoff-ci-isolated\]/);
  assert.match(section,/persist-credentials: false/);
