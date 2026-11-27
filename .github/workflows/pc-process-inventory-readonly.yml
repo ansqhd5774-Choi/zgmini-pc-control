@@ -6,6 +6,8 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - 'tools/pc-process-inventory-readonly.mjs'
+      - 'tools/supervisor-orphan-six-birth-bound-readonly.mjs'
+      - 'tests/supervisor-orphan-six-birth-bound-readonly.test.mjs'
       - 'controller/w06-cnn-task-cadence-readonly.mjs'
       - 'tests/w06-cnn-task-cadence-readonly.test.mjs'
       - 'tools/ci-controller-b-receipt-root-readonly.mjs'

@@ -5,6 +5,8 @@ import test from 'node:test';
 import './supervisor-orphan-owner-preimage-readonly.test.mjs';
 // The existing A job may compare only its OWN process env to pinned old Owner bytes.
 import './supervisor-orphan-runner-self-nonce-readonly.test.mjs';
+// Two private Win32 WMI birth samples, pinned old Owner CAS and sanitized A summary.
+import './supervisor-orphan-six-birth-bound-readonly.test.mjs';
 // Existing inventory CI owns this fixed, operating-only orphan seat proof.
 import './supervisor-orphan-seat-readonly.test.mjs';
 import {createHash} from 'node:crypto';
@@ -3792,4 +3794,46 @@ test('orphan self-nonce A TXT projection never serializes nonce/Owner PID/path/s
  assert.match(out,/orphanSelfNonceInheritanceVerified=false/);
  assert.match(out,/orphanSelfNonceEffectAuthorized=false/);
  assert.doesNotMatch(out,/CRITICAL_PRIVATE_NONCE_SHOULD_NOT_PRINT|999999|E:\/ZGmini|a{64}/);
+});
+
+
+test('six-birth A observation remains one fixed owner-only operating probe',()=>{
+ const e=event('operating'),request=JSON.parse(e.issue.body);
+ const body={...request,probe:'controller-orphan-six-wmi-birth-readonly'};
+ const make=(role,changes={})=>{const x=event(role);return {
+  ...x,issue:{...x.issue,body:JSON.stringify({...body,role,...changes})}
+ };};
+ const good=make('operating');
+ const v=authenticateProcess(good,env,'operating');
+ assert.equal(v.orphanSixBirth,true);
+ assert.equal(v.orphanSelfNonce,undefined);
+ assert.equal(v.orphanOwnerCas,undefined);
+ for(const x of [
+  make('handoff'),make('operating',{ownerPid:111}),
+  make('operating',{nonce:'SECRET'}),make('operating',{path:'E:/Other'}),
+  make('operating',{originalSeatPins:[1,2,3,4,5,6]}),
+  make('operating',{probe:'controller-orphan-six-wmi-birth-readonly;pwsh'}),
+  make('operating',{probe:'controller-orphan-six-wmi-birth-test'})
+ ])assert.throws(()=>authenticateProcess(x,env,JSON.parse(x.issue.body).role));
+});
+
+test('six-birth TXT result returns only age/stability counts, never original WMI identity',()=>{
+ const x=toText({
+  schema:'ZGMINI_PC_PROCESS_INVENTORY_RESULT_V1',role:'operating',
+  requestId:'3ec94da3-1429-44a4-abcc-c72b4769f9dc',
+  runId:'45900000000',attempt:1,host:'PC',runnerName:'zgmini-pc-05',
+  status:'PASS',code:'ORPHAN_SIX_WMI_BIRTH_PREHEARTBEAT_TWO_OBSERVATIONS',
+  orphanSixBirth:{
+   status:'PASS',code:'ORPHAN_SIX_WMI_BIRTH_PREHEARTBEAT_TWO_OBSERVATIONS',
+   allSixOlderThanOriginalHeartbeat:true,twoSnapshotSeatIdentityStable:true,
+   privateOriginalLaunchProven:false,nonceInheritanceVerified:false,
+   effectAuthorized:false,secretPid:88338,
+   secretPath:'E:/SUPER_SECRET',secretNonce:'ORIGINAL_PRIVATE_NONCE'
+  }
+ });
+ assert.match(x,/orphanSixBirthSixOlder=true/);
+ assert.match(x,/orphanSixBirthDoubleWmiStable=true/);
+ assert.match(x,/orphanSixBirthOriginalLaunchProven=false/);
+ assert.match(x,/orphanSixBirthEffectAuthorized=false/);
+ assert.doesNotMatch(x,/88338|SUPER_SECRET|ORIGINAL_PRIVATE_NONCE/);
 });
