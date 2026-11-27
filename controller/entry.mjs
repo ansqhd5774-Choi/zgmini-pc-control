@@ -73,4 +73,5 @@ try{
 }catch(error){
  const missingModule=error?.code==='ERR_MODULE_NOT_FOUND'||error?.code==='MODULE_NOT_FOUND';
  const code=missingModule?'CONTROLLER_IMPORT_MISSING':errorCode(error);
- writeJson(pointer,{issueNumber:event?.issue?.number,report:{schema:'ZGMINI_PC_RESULT_V1',jobId:`run-${runId}-${attempt}-seat-${seat}`,status:'BLOCKED',code,lastPass:'EVENT_RECEIVED',firstFail:missingModule?importFailureStage:code==='CONTROLLER_HOST_MANIFEST_UNAVAILABLE'?'HOST_MANIFEST_READ':'EVENT_OR_REQUEST_VALIDATION',operationalWrites:0,providerCalls:0,d1Writes:0}});console.log(JSON.stringify({status:'BLOCKED',code}));process.exitCode=1;}
+ writeJson(pointer,{issueNumber:event?.issue?.number,report:{schema:'ZGMINI_PC_RESULT_V1',jobId:`run-${runId}-${attempt}-seat-${seat}`,status:'BLOCKED',code,lastPass:'EVENT_RECEIVED',firstFail:missingModule?importFailureStage:code==='CONTROLLER_HOST_MANIFEST_UNAVAILABLE'?'HOST_MANIFEST_READ':'EVENT_OR_REQUEST_VALIDATION',operationalWrites:0,providerCalls:0,d1Writes:0}});// Before event trust is proven, the failure code is PC-local evidence only.
+ console.log(JSON.stringify(publicJobLogEnvelope({status:'BLOCKED',code},false)));process.exitCode=1;}
