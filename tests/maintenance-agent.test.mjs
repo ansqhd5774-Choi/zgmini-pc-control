@@ -60,7 +60,7 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
   verifyInstalledSource=()=>{},statusFaults={},preexistingLedger=null,
   extraIssueSummaries=[],extraIssueDetails=[],progressError=null,
   s6RawManifest=null,s6Status=null,s6ApplyResult=null,s6ApplyError=null,
-  s6ApplyRaw=null}={}){
+  s6ApplyRaw=null,publicMetadataPatch={}}={}){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),"zgmini-maintainer-agent-test-"));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const leaseRoot=path.join(root,"leases");fs.mkdirSync(leaseRoot);
@@ -93,6 +93,9 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
         return {stdout:JSON.stringify(extraIssueDetails.find(row=>row.number===number)??issue)};
       }
       if(args[0]==="api"){
+        if(args[1]==="repos/"+REPO)
+          return {stdout:JSON.stringify({id:1442936296,full_name:REPO,
+            owner:{id:327938088,login:ACTOR},private:false,...publicMetadataPatch})};
         if(args[1].includes("/contents/approvals/controller-s6/")){
           stats.manifestReads++;
           if(s6RawManifest===null)throw Error('HTTP_404');
@@ -378,12 +381,37 @@ test("crash after claim but before updater ledger becomes visible UNKNOWN, never
  assert.equal(f.agent.loadLedger(REQUEST_ID).result.code,'UPDATE_OUTCOME_UNKNOWN');
 });
 
-test("public repository blocks all issue or updater access",async t=>{
+test("public owner intake reads source only and cannot apply B",async t=>{
   const f=fixture(t,{privateRepo:false});
-  await assert.rejects(f.agent.pollOnce(),/GITHUB_PRIVATE_REPOSITORY_REQUIRED/);
+  const output=await f.agent.pollOnce();
+  assert.equal(output[0].status,'PUBLIC_SOURCE_ONLY');
+  assert.equal(output[0].code,'PUBLIC_B_EFFECT_HELD');
+  assert.equal(output[1].status,'BLOCKED');
+  assert.equal(output[1].code,'PUBLIC_B_EFFECT_SEPARATE_AUTH_REQUIRED');
+  assert.equal(output[1].effectAuthorized,false);
+  const direct=await f.agent.processIssue(f.issue);
+  assert.equal(direct.code,'PUBLIC_B_EFFECT_SEPARATE_AUTH_REQUIRED');
+  assert.equal(direct.operationalWrites,0);
   assert.equal(f.stats.applies,0);
   assert.equal(f.stats.manifestReads,0);
-  assert.ok(f.calls.every(call=>call.file.endsWith("gh.exe")&&call.args[0]==="repo"));
+  assert.equal(f.stats.uploadWrites,0);
+  assert.equal(f.stats.comments,0);
+  assert.equal(f.agent.loadLedger(REQUEST_ID),null);
+  assert.ok(f.calls.every(call=>call.file.endsWith('gh.exe')));
+});
+
+test("public maintainer rejects spoofed canonical repo metadata before intake",async t=>{
+ for(const publicMetadataPatch of [
+  {id:1},{full_name:'attacker/repo'},{private:true},
+  {owner:{id:987654,login:ACTOR}},
+  {owner:{id:327938088,login:'attacker'}}
+ ]){
+  const f=fixture(t,{privateRepo:false,publicMetadataPatch});
+  await assert.rejects(f.agent.pollOnce(),/GITHUB_PUBLIC_REPOSITORY_IDENTITY_UNVERIFIED/);
+  assert.equal(f.stats.issueViews,0);
+  assert.equal(f.stats.applies,0);
+  assert.equal(f.stats.manifestReads,0);
+ }
 });
 
 test("non-owner actor, missing label, title mismatch and closed issue are ignored",async t=>{
