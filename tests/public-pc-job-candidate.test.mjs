@@ -201,3 +201,16 @@ test('public-capable PC job has no raw stdout or unprojected Issue headline',()=
    assert.doesNotMatch(a,/uses: actions\/checkout|workflow_dispatch|repository_dispatch/);
  }
 });
+
+
+test('Controller pre-admission failure never logs raw diagnostic code',async()=>{
+ const {publicJobLogEnvelope}=await import('../controller/common.mjs');
+ const entry=fs.readFileSync(new URL('../controller/entry.mjs',import.meta.url),'utf8');
+ assert.match(entry,/publicJobLogEnvelope\(\{status:'BLOCKED',code\},false\)/);
+ assert.doesNotMatch(entry,/console\.log\(JSON\.stringify\(\{status:'BLOCKED',code\}\)\)/);
+ // Even regex-valid diagnostic codes are not public proof of safe contents.
+ const secret='DO_NOT_PUBLISH_TEST_SECRET';
+ const projected=publicJobLogEnvelope({status:'BLOCKED',code:secret},false);
+ assert.deepEqual(projected,{status:'BLOCKED',code:'PUBLIC_LOCAL_RESULT_REDACTED'});
+ assert.doesNotMatch(JSON.stringify(projected),/DO_NOT_PUBLISH_TEST_SECRET/);
+});

@@ -66,7 +66,9 @@ test('missing engine dependency or host manifest yields uploadable BLOCKED point
   assert.equal(pointer.report.operationalWrites,0);
   assert.equal(pointer.report.providerCalls,0);
   assert.equal(pointer.report.d1Writes,0);
-  assert.match(out.stdout,/CONTROLLER_IMPORT_MISSING/);
+  // Exact failure remains on PC pointer, but public Actions stdout is bounded.
+  assert.match(out.stdout,/PUBLIC_LOCAL_RESULT_REDACTED/);
+  assert.doesNotMatch(out.stdout,/CONTROLLER_IMPORT_MISSING/);
   // Missing, invalid JSON and valid JSON with invalid host shape all need an uploadable
   // BLOCKED receipt, never an uncaught TypeError from Object.entries.
   // A missing or malformed installed host manifest also needs an uploadable
