@@ -1107,7 +1107,7 @@ test('ordinary B result never gains CI-native permission from updater stdout',as
 
 
 function orphanSixInletFixture(t,{actor=ACTOR,approved=true,priorClaim=false,
-  installedVerified=true}={}){
+  installedVerified=true,sourceDrift=false}={}){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-orphan-b-inlet-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   fs.mkdirSync(path.join(root,'leases'));
@@ -1185,6 +1185,7 @@ function orphanSixInletFixture(t,{actor=ACTOR,approved=true,priorClaim=false,
   };
   const agent=createMaintenanceAgent({stateDir:root,ghBinary:'gh',
     leaseRoot:path.join(root,'leases'),execFileImpl:fakeExec,
+    verifyInstalledSource:()=>{if(sourceDrift)throw Error('maintainer source drift');},
     orphanSixInstalledReadback:async()=>{
       if(!installedVerified)throw Error('installed CAS unavailable');
       return {origin:'PRIVATE_INDEPENDENT_B_MAINTAINER',
@@ -1239,5 +1240,14 @@ test('orphan-six B durable prior STOP_INTENT refuses replay before any GitHub ap
   const result=(await f.agent.pollOnce())[0];
   assert.equal(result.status,'BLOCKED');
   assert.equal(result.code,'ORPHAN_SIX_B_ORIGINAL_CLAIM_RECONCILE_FIRST');
+  assert.equal(f.calls.filter(c=>c.args[0]==='api').length,0);
+});
+
+test('orphan-six B installed source drift blocks before GitHub approval read',async t=>{
+  const f=orphanSixInletFixture(t,{sourceDrift:true});
+  const result=(await f.agent.pollOnce())[0];
+  assert.equal(result.status,'BLOCKED');
+  assert.equal(result.code,'ORPHAN_SIX_B_RECEIVER_INSTALLED_SOURCE_UNVERIFIED');
+  assert.equal(result.operationalWrites,0);
   assert.equal(f.calls.filter(c=>c.args[0]==='api').length,0);
 });
