@@ -70,7 +70,13 @@ export const CI_CONTROLLER_POLICY=null;
 export function installedControllerBPolicy(installed){
  if(installed?.ciControllerBPolicy===undefined)return null;
  const policy=installed.ciControllerBPolicy;
- const keys=['schema','enabled','workflowId','workflowBlobSha','workflowPath'];
+ // V1 remains Private-only. V2 is an independent, *installed* one-effect
+ // Public admission scope. No Issue, CI variable or PR may create this pin.
+ const isPublic=policy?.schema==='ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V2';
+ const keys=isPublic?
+  ['schema','enabled','workflowId','workflowBlobSha','workflowPath',
+   'repositoryVisibility','installedSha','targetSha','manifestSha256']:
+  ['schema','enabled','workflowId','workflowBlobSha','workflowPath'];
  if(installed?.schema!=='ZGMINI_PC_MAINTENANCE_INSTALL_V1'||
     !/^[a-f0-9]{40}$/.test(installed.sourceSha??'')||
     !/^[a-f0-9]{64}$/.test(installed.startupSha256??'')||
@@ -78,12 +84,23 @@ export function installedControllerBPolicy(installed){
     Object.keys(installed.files).length!==7||
     !policy||typeof policy!=='object'||Array.isArray(policy)||
     Object.keys(policy).length!==keys.length||!keys.every(k=>Object.hasOwn(policy,k))||
-    policy.schema!=='ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V1'||policy.enabled!==true||
+    !['ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V1',
+      'ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V2'].includes(policy.schema)||
+    policy.enabled!==true||
     !Number.isSafeInteger(policy.workflowId)||policy.workflowId<=0||
     !/^[a-f0-9]{40}$/.test(policy.workflowBlobSha??'')||
-    policy.workflowPath!=='.github/workflows/ci-approval-controller-b.yml')
+    policy.workflowPath!=='.github/workflows/ci-approval-controller-b.yml'||
+    (isPublic&&(policy.repositoryVisibility!=='public'||
+      !/^[a-f0-9]{40}$/.test(policy.installedSha??'')||
+      !/^[a-f0-9]{40}$/.test(policy.targetSha??'')||
+      policy.installedSha===policy.targetSha||
+      !/^[a-f0-9]{64}$/.test(policy.manifestSha256??''))))
   throw Error('CI_INSTALLED_POLICY_INVALID');
- return Object.freeze({workflowId:policy.workflowId,workflowBlobSha:policy.workflowBlobSha});
+ return Object.freeze(isPublic?{
+  workflowId:policy.workflowId,workflowBlobSha:policy.workflowBlobSha,
+  repositoryVisibility:'public',installedSha:policy.installedSha,
+  targetSha:policy.targetSha,manifestSha256:policy.manifestSha256
+ }:{workflowId:policy.workflowId,workflowBlobSha:policy.workflowBlobSha});
 }
 export const CI_CONTROLLER_ACTOR='github-actions[bot]';
 const ciWorkload=(()=>{
@@ -109,12 +126,19 @@ async function verifyControllerBIdentity({issueNumber,requestBytes,runId,attempt
  if(!id(runId)||!id(attempt)||!id(issueNumber)||!bytesOk(requestBytes)||
     typeof getJson!=='function'||typeof readJobLogs!=='function')
   return out('REJECTED','CI_RECEIPT_INPUT_INVALID');
+ const publicMode=policy.repositoryVisibility==='public';
+ if(publicMode&&(!sha(policy.installedSha)||!sha(policy.targetSha)||
+  policy.installedSha===policy.targetSha||
+  !/^[a-f0-9]{64}$/.test(policy.manifestSha256??'')))
+  return out('REJECTED','CI_PUBLIC_POLICY_SCOPE_INVALID');
  const expected=controllerBReceiptMarker(issueNumber,requestBytes),route='actions/runs/'+runId+'/attempts/'+attempt;
  try{
   const run=await getJson(route);
   if(run?.id!==runId||run.run_attempt!==attempt||run.workflow_id!==policy.workflowId||
      run.path!==WORKFLOW||run.repository?.id!==REPO_ID||run.repository?.full_name!==REPO||
-     run.repository?.private!==true||run.head_repository?.id!==REPO_ID||
+     run.repository?.private!==(publicMode?false:true)||run.head_repository?.id!==REPO_ID||
+     (publicMode&&(run.head_repository.full_name!==REPO||
+       run.head_repository.private!==false))||
      run.head_branch!=='main'||!sha(run.head_sha)||!['push','workflow_run'].includes(run.event))
    return out('REJECTED','CI_RUN_IDENTITY_MISMATCH');
   if(run.status!=='completed')return out('QUEUED','CI_RUN_NOT_COMPLETED');
@@ -174,6 +198,12 @@ export async function authenticateControllerBIssue(actual,{policy=CI_CONTROLLER_
  let request;try{request=JSON.parse(actual.body);}catch{return denied('CI_ISSUE_BODY_INVALID');}
  if(!request||request.operation!=='controller-update'||request.controlRepository!==CONTROL_REPOSITORY||
     JSON.stringify(request)!==actual.body)return denied('CI_ISSUE_BODY_INVALID');
+ // The GitHub-issued request cannot select or enlarge the installed B scope.
+ // This does not by itself authorize a public receiver or publisher.
+ if(policy.repositoryVisibility==='public'&&
+   (request.targetControllerSha!==policy.targetSha||
+    request.approvalManifestSha256!==policy.manifestSha256))
+  return denied('CI_PUBLIC_EFFECT_SCOPE_MISMATCH');
  const trace=typeof request.chatId==='string'&&request.chatId.match(/^chat-ci-([1-9]\d*)-([1-9]\d*)$/);
  if(!trace)return denied('CI_ISSUE_TRACE_INVALID');
  const result=await verifyControllerBIdentity({issueNumber:actual.number,requestBytes:Buffer.from(actual.body),
