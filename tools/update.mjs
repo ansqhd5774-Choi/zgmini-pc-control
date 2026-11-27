@@ -1221,7 +1221,74 @@ export function protectedSnapshot() {
  return out;
 }
 
-export function makePorts(packageData,issueNumber,{recoveryOperator=false,
+// Public polling still rejects all B requests. This is a separate, one-shot
+// interactive Windows operator origin for the exact owner-approved 4-file effect.
+const PUBLIC_OWNER_B=Object.freeze({
+ installed:'3c7d4cfefacf072fd35cb19706b352c64c5e4fd2',
+ target:'555f95708984580cd7d5a0fd05a80b718e867710',
+ approvalMerge:'ac0e806a929bcab05b72115edd5d673b172839f3',
+ paths:['controller/common.mjs','controller/entry.mjs',
+  'controller/preimage-manifest-stager.mjs','controller/upload.mjs']
+});
+export function validatePublicOwnerBExactScope(data){
+ const {issue,manifest}=data??{};
+ need(data?.actor==='ansqhd5774-Choi'&&
+  issue?.operation==='controller-update'&&issue?.controlRepository===controlRepository&&
+  issue?.targetControllerSha===PUBLIC_OWNER_B.target&&
+  manifest?.installedSha===PUBLIC_OWNER_B.installed&&
+  manifest?.targetSha===PUBLIC_OWNER_B.target&&
+  manifest?.controllerOnlyInstall===true&&manifest?.purpose==='pc-controller-maintenance'&&
+  manifest?.approval?.grade==='B'&&manifest?.approval?.scope==='PC_CONTROL_CONTROLLER_UPDATE'&&
+  manifest?.approval?.ref==='https://github.com/'+controlRepository+'/pull/4260'&&
+  manifest?.postOperation==='core-status'&&
+  manifest?.selectiveSource?.branch==='codex/public-a-controller-postcheck-selective-20261128'&&
+  Array.isArray(manifest?.allowFiles)&&
+  JSON.stringify(manifest.allowFiles.map(x=>x.path).sort())===JSON.stringify([...PUBLIC_OWNER_B.paths].sort()),
+  'PUBLIC_B_EFFECT_SCOPE_DENIED');
+ return true;
+}
+export function verifyPublicOwnerBWindows(data,issueNumber,supervisorPid){
+ validatePublicOwnerBExactScope(data);
+ need(process.platform==='win32'&&os.hostname().toUpperCase()==='PC'&&
+  !process.env.GITHUB_ACTIONS&&!process.env.RUNNER_NAME&&!process.env.GITHUB_RUN_ID,
+  'PUBLIC_B_INDEPENDENT_WINDOWS_REQUIRED');
+ verifyRecoveryOperator(supervisorPid);
+ const readApi=x=>JSON.parse(execFileSync(gh,['api',x],{windowsHide:true,
+  encoding:'utf8',timeout:60000,maxBuffer:2000000}));
+ const owner=readApi('user'),repoInfo=readApi('repos/'+controlRepository);
+ need(owner?.login==='ansqhd5774-Choi'&&owner?.id===327938088&&
+  repoInfo?.id===1442936296&&repoInfo?.owner?.id===327938088&&
+  repoInfo?.full_name===controlRepository&&repoInfo?.private===false,
+  'PUBLIC_B_OWNER_AUTH_UNVERIFIED');
+ const approval=github('pulls/4260');
+ need(approval?.merged===true&&approval?.merge_commit_sha===PUBLIC_OWNER_B.approvalMerge,
+  'PUBLIC_B_APPROVAL_NOT_MERGED');
+ const issueRow=github('issues/'+issueNumber);
+ need(issueRow?.number===issueNumber&&issueRow?.state==='open'&&
+  issueRow?.title==='pc-controller-update'&&!issueRow?.pull_request&&
+  issueRow?.user?.login==='ansqhd5774-Choi'&&issueRow?.user?.id===327938088&&
+  issueRow?.body===JSON.stringify(data.issue)&&
+  issueRow?.labels?.some(x=>x.name==='pc-maintenance'),
+  'PUBLIC_B_OWNER_ISSUE_NOT_AUTHENTICATED');
+ const mainBytes=kind=>{
+  const f=github('contents/approvals/'+kind+'/'+PUBLIC_OWNER_B.target+'.json?ref=main');
+  need(f?.type==='file'&&f?.encoding==='base64'&&typeof f.content==='string',
+   'PUBLIC_B_APPROVAL_FILE_MISSING');
+  return Buffer.from(f.content,'base64');
+ };
+ const bytes=mainBytes('controller-updates');
+ need(sha256(bytes)===data.issue.approvalManifestSha256&&
+  bytes.equals(Buffer.from(data.manifestRawBase64??'','base64')),
+  'PUBLIC_B_MAIN_MANIFEST_BYTES_MISMATCH');
+ const checked=validateUpdateRequest(data.issue,bytes,{
+  actor:'ansqhd5774-Choi',installedSha:PUBLIC_OWNER_B.installed});
+ need(JSON.stringify(checked.manifest)===JSON.stringify(data.manifest),
+  'PUBLIC_B_MANIFEST_NOT_VALIDATED');
+ validateControllerSelectivePin(checked.manifest,
+  JSON.parse(mainBytes('controller-selective-targets').toString('utf8')));
+ return true;
+}
+export function makePorts(packageData,issueNumber,{recoveryOperator=false,publicOwnerBOperator=false,
  approvedRecoveryWriterConfigSha256=null}={}) {
  const {issue,manifest}=packageData,request={requestId:issue.requestId,chatId:issue.chatId,
   installedSha:manifest.installedSha,targetSha:manifest.targetSha,postOperation:manifest.postOperation};
@@ -1309,7 +1376,10 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
      'MAINTENANCE_ISSUE_IDENTITY');
    }
    const {host}=installedManifest();
-   const owner=readOwner();verifyIndependent(owner.owner.pid);oldOwner=owner;
+   const owner=readOwner();
+   if(publicOwnerBOperator)verifyPublicOwnerBWindows(packageData,issueNumber,owner.owner.pid);
+   else verifyIndependent(owner.owner.pid);
+   oldOwner=owner;
    need(github('actions/workflows/pc-job.yml').state==='active','WORKFLOW_NOT_ACTIVE_PREEXISTING');
    need(issue.targetControllerSha===manifest.targetSha&&validSha(manifest.targetSha),'TARGET_SHA_MISMATCH');
    need(manifest.installedSha===host.controllerSourceSha,'INSTALLED_SHA_MISMATCH');
@@ -1479,7 +1549,8 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
    const verifyStopSafety=()=>{
     const current=readOwner();
     need(current.owner.pid===oldOwner.owner.pid&&current.owner.nonce===oldOwner.owner.nonce,'SUPERVISOR_OWNER_CHANGED');
-    verifyIndependent(current.owner.pid);
+    if(publicOwnerBOperator)verifyPublicOwnerBWindows(packageData,issueNumber,current.owner.pid);
+    else verifyIndependent(current.owner.pid);
     need(JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore),'PROTECTED_STATE_DRIFT');
    };
    // Online and Idle remain required. Busy alone may settle during the bounded
@@ -1791,7 +1862,9 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
    if(fs.existsSync(ownerFile)){
     const owner=json(ownerFile);let alive=true;try{process.kill(owner.pid,0);}catch{alive=false;}
     if(alive){
-      const current=readOwner();if(recoveryOperator)verifyRecoveryOperator(current.owner.pid);else verifyIndependent(current.owner.pid);
+      const current=readOwner();if(recoveryOperator)verifyRecoveryOperator(current.owner.pid);
+      else if(publicOwnerBOperator)verifyPublicOwnerBWindows(packageData,issueNumber,current.owner.pid);
+      else verifyIndependent(current.owner.pid);
       need(current.status.sourceSha===manifest.targetSha,'ROLLBACK_SUPERVISOR_SOURCE_UNKNOWN');
       execFileSync('taskkill.exe',['/PID',String(current.owner.pid),'/T','/F'],{windowsHide:true,stdio:'ignore',timeout:15000});
       let stopped=false;
