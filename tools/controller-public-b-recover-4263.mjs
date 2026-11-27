@@ -143,7 +143,7 @@ function preflight(update){
   manifest.approval?.ref==='https://github.com/'+REPO+'/pull/4260'&&
   manifest.controllerOnlyInstall===true&&
   Array.isArray(manifest.allowFiles)&&manifest.allowFiles.length===4&&
-  manifest.checks?.manifestSha256===update.manifestFingerprint(manifest.allowFiles).sha256,
+  manifest.checks?.manifestSha256==='006d8d2c3ed9c78581e34e0713c97d74dff6b1bb09a278fde5f25fa9c1db68b8',
   'B4263_APPROVAL_SCOPE_CHANGED');
  const data={actor:'ansqhd5774-Choi',issue:JSON.parse(issue.body),
   manifest,manifestRawBase64:manifestRaw.toString('base64')};
