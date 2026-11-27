@@ -246,62 +246,6 @@ test('parallel TEMP submissions consume token synchronously before OS dispatch',
  assert.equal(calls,1);
  assert.deepEqual(results.map(r=>r.status).sort(),['BLOCKED','SIGNAL_SUBMITTED']);
 });
-test('private TEMP token submits once; rejected preflight does not consume it',
- windows,async()=>{
- const born='2026-11-27T03:00:00.1234567Z',pid=52000;
- const source=prepareOrphanSixFixedConsoleBreak({seat:1,pid,
-  startedAtUtc:born,platform:process.platform,
-  hostname:os.hostname(),testExe:process.execPath});
- assert.equal(source.status,'PRIVATE_SOURCE_READY');
- let calls=0;
- const run=()=>{calls++;return {status:0,stdout:
-  '{"status":"SENT","code":"EXCLUSIVE_CONSOLE_CTRL_BREAK_SUBMITTED"}'};};
- const input={source,exactIntent:intent(1),preSignal:proof(pid,born,1),
-  platform:'win32',root:process.env.SystemRoot,run};
- const denied=await submitOrphanSixCtrlBreakOnce({...input,
-  exactIntent:{...intent(1),phase:'PREPARED'}});
- assert.equal(denied.status,'BLOCKED');assert.equal(calls,0);
- const first=await submitOrphanSixCtrlBreakOnce(input);
- assert.equal(first.status,'SIGNAL_SUBMITTED');
- const second=await submitOrphanSixCtrlBreakOnce(input);
- assert.equal(second.status,'BLOCKED');
- assert.equal(second.code,'ORPHAN_SIX_BREAK_PRIVATE_SOURCE_ALREADY_CONSUMED');
- assert.equal(calls,1);
-});
-test('ambiguous TEMP signal outcome consumes source and forbids replay',
- windows,async()=>{
- const born='2026-11-27T03:00:00.1234567Z',pid=52001;
- const source=prepareOrphanSixFixedConsoleBreak({seat:1,pid,
-  startedAtUtc:born,platform:process.platform,
-  hostname:os.hostname(),testExe:process.execPath});
- let calls=0;
- const input={source,exactIntent:intent(1),preSignal:proof(pid,born,1),
-  platform:'win32',root:process.env.SystemRoot,
-  run:()=>{calls++;throw Error('outcome unknown');}};
- const first=await submitOrphanSixCtrlBreakOnce(input);
- const again=await submitOrphanSixCtrlBreakOnce(input);
- assert.equal(first.status,'RECOVERY_REQUIRED');
- assert.equal(again.code,'ORPHAN_SIX_BREAK_PRIVATE_SOURCE_ALREADY_CONSUMED');
- assert.equal(calls,1);
-});
-test('parallel TEMP submissions consume token synchronously before OS dispatch',
- windows,async()=>{
- const born='2026-11-27T03:00:00.1234567Z',pid=52002;
- const source=prepareOrphanSixFixedConsoleBreak({seat:1,pid,
-  startedAtUtc:born,platform:process.platform,
-  hostname:os.hostname(),testExe:process.execPath});
- let calls=0;
- const input={source,exactIntent:intent(1),preSignal:proof(pid,born,1),
-  platform:'win32',root:process.env.SystemRoot,
-  run:async()=>{calls++;await Promise.resolve();return {status:0,stdout:
-   '{"status":"SENT","code":"EXCLUSIVE_CONSOLE_CTRL_BREAK_SUBMITTED"}'};}};
- const results=await Promise.all([
-  submitOrphanSixCtrlBreakOnce(input),submitOrphanSixCtrlBreakOnce(input)
- ]);
- assert.equal(calls,1);
- assert.deepEqual(results.map(r=>r.status).sort(),['BLOCKED','SIGNAL_SUBMITTED']);
-});
-
 
 test('synthetic native Windows Ctrl+Break sends once to exact private console only',
  windows,async()=>{
