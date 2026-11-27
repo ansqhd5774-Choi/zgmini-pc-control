@@ -34,6 +34,8 @@ for(const [name,edit,code] of [
  ['S6 request changed',e=>e.s6Issue.body='{}','S6_ORIGINAL_BODY_CAS_FAILED'],
  ['S6 approval bytes changed',e=>e.s6Issue.body=e.s6Issue.body.replace('1fceeba0','0fceeba0'),'S6_ORIGINAL_BODY_CAS_FAILED'],
  ['journal changed',e=>e.journal.phase='PASS','S6_JOURNAL_PHASE_DRIFT'],
+ ['legacy journal field rejected',e=>{e.journal.failedCode=e.journal.code;delete e.journal.code;},'S6_JOURNAL_PHASE_DRIFT'],
+ ['wrong journal schema',e=>e.journal.schema='INVALID','S6_JOURNAL_PHASE_DRIFT'],
  ['replay already present',e=>e.backlog.replays['4078']={status:'POSTING'},'S6_BACKLOG_OR_REPLAY_DRIFT'],
  ['pause window excludes issue',e=>e.backlog.windows[0].pausedAt='2026-11-26T19:15:00Z','BACKLOG_4078_PAUSE_WINDOW_UNVERIFIED'],
  ['runtime degraded',e=>e.runtimeState='STATE_UNKNOWN','S6_CURRENT_PROTECTION_UNVERIFIED'],
