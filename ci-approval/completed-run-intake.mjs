@@ -565,6 +565,11 @@ export function createControllerPrPublicationIo({getJson,github,targetSha}={}){
 }
 
 export async function publishConfiguredControllerApproval(event,{getJson,ports,policy,runId,attempt,emitReceipt,stageApprovalPr,allowPublic=false}={}){
+ // This function may create or merge an approval PR. A verified Public
+ // one-effect receiver grant is NOT an owner delegation to merge that PR.
+ // Public is allowed to submit only already Owner-merged exact approvals
+ // through the separate existing-publication path.
+ if(allowPublic)return {state:'DISABLED',code:'CI_PUBLIC_CONFIGURED_MERGE_NOT_AUTHORIZED',results:[]};
  if(!policy||!sha(policy.targetSha)||!id(policy.sourcePrNumber)||
     !(id(policy.approvalPrNumber)||typeof stageApprovalPr==='function')||
     !id(runId)||!id(attempt)||typeof emitReceipt!=='function')
@@ -690,12 +695,12 @@ export async function main({eventPath=process.env.GITHUB_EVENT_PATH,token=proces
   const ports=createControllerPublicationPorts({getJson,postIssue:body=>github('issues',body),store,
    readIndependentInstalledCiPolicy:()=>readIndependentlyInstalledControllerBPublisherPolicy(),
    readPublisherWorkflowIdentity:()=>readAuthenticatedControllerBPublisherWorkflow({getJson}),
-   autoApprovalPolicy:initialControllerPublicationPolicy(policy),readJobLogs,
+   autoApprovalPolicy:allowPublic?null:initialControllerPublicationPolicy(policy),readJobLogs,
    putMerge:(n,body)=>github('pulls/'+n+'/merge',body,'PUT')});
   const opts={getJson,ports,runId:Number(process.env.GITHUB_RUN_ID),
    attempt:Number(process.env.GITHUB_RUN_ATTEMPT),allowPublic,
    emitReceipt:marker=>console.log(marker)};
-  if(policy){
+  if(policy&&!allowPublic){
    const stageApprovalPr=policy.installPlan?async()=>{
     const prepared=createConfiguredSelectivePreparer({policy,getJson,readJobLogs});
     const io=createControllerPrPublicationIo({getJson,github,targetSha:policy.targetSha});
