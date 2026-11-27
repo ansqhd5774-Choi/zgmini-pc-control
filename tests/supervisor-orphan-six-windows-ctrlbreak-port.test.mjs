@@ -163,7 +163,7 @@ test('fixed native Windows effect source checks Controller Workers before CTRL+B
  const src=fs.readFileSync(new URL(
   '../tools/supervisor-orphan-six-windows-ctrlbreak-port.mjs',import.meta.url),'utf8');
  const start=src.indexOf("if($kind -eq 'RUNNER')");
- const worker=src.indexOf("Get-CimInstance Win32_Process -Filter");
+ const worker=src.indexOf("$workers=@(Get-CimInstance Win32_Process -Filter",start);
  const stop=src.indexOf("CONTROLLER_WORKER_STILL_ACTIVE");
  const signal=src.indexOf("GenerateConsoleCtrlEvent([uint32]1");
  assert.ok(start>=0&&worker>start&&stop>worker&&signal>stop,
