@@ -6,6 +6,8 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 
 const schema='ZGMINI_ORPHAN_CONSOLE_COHORT_A_V1';
+const internal=new WeakMap();
+export function readPrivateOrphanConsoleEvidence(summary){return internal.get(summary)??null;}
 const base={schema,operationalWrites:0,providerCalls:0,d1Writes:0,
  signalEmitted:false,runnerTerminationAuthorized:false,
  supervisorSpawnAuthorized:false,ownerAdoptionAuthorized:false};
@@ -15,7 +17,7 @@ const unknown=code=>({...base,status:'STATE_UNKNOWN',code,
  extraConsoleMemberCount:null});
 const positive=n=>Number.isSafeInteger(n)&&n>0;
 
-export function projectOrphanConsoleCohort(raw){
+export function projectOrphanConsoleCohort(raw,{observedAtUtc=null}={}){
  if(raw?.schema!==schema||raw.stable!==true||
     !positive(raw.inspectorPid)||!Array.isArray(raw.rows)||
     raw.rows.length!==6)return unknown('ORPHAN_CONSOLE_SNAPSHOT_UNVERIFIED');
@@ -49,13 +51,27 @@ export function projectOrphanConsoleCohort(raw){
   others+=g.members.filter(p=>!pids.has(p)).length;
   largest=Math.max(largest,g.members.length);
  }
- return {...base,status:'PASS',code:'ORPHAN_CONSOLE_COHORT_READONLY_OBSERVED',
+ const output={...base,status:'PASS',code:'ORPHAN_CONSOLE_COHORT_READONLY_OBSERVED',
   inspectedSeatCount:6,consoleAttachedSeatCount:6,
   distinctConsoleGroupCount:groups.size,sharedListenerConsoleGroupCount:shared,
   extraConsoleMemberCount:others,maxConsoleMemberCount:largest,
   // This is ONE observation. Neither Windows console group ownership nor
   // safe CTRL_C_EVENT routing, job drain, or termination authority is proven.
   gracefulShutdownSupported:null};
+ // The only host-private link to WMI PID/birth observations. A public JSON
+ // summary cannot be used to reconstruct or spoof this WeakMap entry.
+ if(typeof observedAtUtc==='string'&&Number.isFinite(Date.parse(observedAtUtc))&&
+    raw.rows.every(row=>typeof row.birth==='string'&&
+     Number.isFinite(Date.parse(row.birth)))){
+  internal.set(output,Object.freeze({
+   observedAtUtc,
+   rows:Object.freeze(raw.rows.map(row=>Object.freeze({
+    seat:row.seat,pid:row.pid,startedAtUtc:new Date(row.birth).toISOString(),
+    members:Object.freeze(row.members.filter(p=>p!==raw.inspectorPid))
+   })))
+  }));
+ }
+ return Object.freeze(output);
 }
 
 // A separate PowerShell observer briefly attaches to the target console.
@@ -100,7 +116,7 @@ foreach($item in $items){
    }
   }
  } finally {[void][ZgminiReadonlyConsole]::FreeConsole()}
- $groups+=[pscustomobject]@{seat=$item.seat;pid=$item.pid;mode=$mode;members=@($members)}
+ $groups+=[pscustomobject]@{seat=$item.seat;pid=$item.pid;birth=$item.birth;mode=$mode;members=@($members)}
 }
 $latest=@(Get-CimInstance -ClassName Win32_Process -Filter "Name='Runner.Listener.exe'" -ErrorAction Stop)
 $stable=$true
@@ -112,7 +128,8 @@ foreach($item in $items){
 `;
 
 export function inspectOrphanConsoleCohortReadonly({
- platform=process.platform,env=process.env,filesystem=fs,run=spawnSync
+ platform=process.platform,env=process.env,filesystem=fs,run=spawnSync,
+ now=()=>new Date().toISOString()
 }={}){
  if(platform!=='win32'||typeof env.SystemRoot!=='string'||
     !/^[a-z]:[\\/]windows$/i.test(env.SystemRoot))
@@ -128,6 +145,7 @@ export function inspectOrphanConsoleCohortReadonly({
   if(out?.error||out?.status!==0||typeof out.stdout!=='string'||
      Buffer.byteLength(out.stdout)>32768)
    return unknown('ORPHAN_CONSOLE_QUERY_UNVERIFIED');
-  return projectOrphanConsoleCohort(JSON.parse(out.stdout.replace(/^\uFEFF/,'').trim()));
+  return projectOrphanConsoleCohort(JSON.parse(out.stdout.replace(/^\uFEFF/,'').trim()),
+   {observedAtUtc:now()});
  }catch{return unknown('ORPHAN_CONSOLE_QUERY_UNVERIFIED');}
 }
