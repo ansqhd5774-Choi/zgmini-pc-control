@@ -66,3 +66,19 @@ test('draft one-file B manifest and selective pin preserve installed CAS and exa
  assert.throws(()=>validateControllerSelectivePin({...m,allowFiles:[...m.allowFiles,
   {path:'controller/common.mjs',sha256:'a'.repeat(64)}]},pin),/SELECTIVE_PIN_MISMATCH/);
 });
+
+test('new historical-ledger B effect remains denied by currently installed exact public owner admission',async()=>{
+ const {validatePublicOwnerBExactScope}=await import('../tools/update.mjs');
+ const {readFileSync}=await import('node:fs');
+ const manifest=JSON.parse(readFileSync('approvals/controller-updates/'+TARGET+'.json','utf8'));
+ const actor='ansqhd5774-Choi';
+ const issue={operation:'controller-update',
+  controlRepository:'ansqhd5774-Choi/zgmini-pc-control',targetControllerSha:TARGET};
+ assert.throws(()=>validatePublicOwnerBExactScope({actor,issue,manifest}),
+  /PUBLIC_B_EFFECT_SCOPE_DENIED/);
+ // Changing target/installed solely in an old approved effect is also denied.
+ const oldTarget='cde1dd372210e4658ae348cb9e2577967cb11634';
+ const oldApproved=JSON.parse(readFileSync('approvals/controller-updates/'+oldTarget+'.json','utf8'));
+ assert.throws(()=>validatePublicOwnerBExactScope({actor,issue,
+  manifest:{...oldApproved,targetSha:TARGET}}),/PUBLIC_B_EFFECT_SCOPE_DENIED/);
+});
