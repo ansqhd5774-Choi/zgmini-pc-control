@@ -2038,3 +2038,7 @@ test('S6 #4078 transaction denies any unbound operating effect on public CI',asy
 // Run the dedicated source-only replay transaction suite on the existing
 // immutable public maintenance workflow without modifying workflow bytes.
 import './s6-4078-backlog-only-transaction.test.mjs';
+
+// Reuse the immutable public source workflow for fixed Windows S6 read-only
+// byte-source tests. This import cannot access the actual operating PC.
+import './s6-4078-windows-local-readonly.test.mjs';
