@@ -63,6 +63,8 @@ on:
       - 'tests/supervisor-orphan-six-wmi-console-crosscheck.test.mjs'
       - 'tools/supervisor-orphan-six-b-receiver-source.mjs'
       - 'tests/supervisor-orphan-six-b-receiver-source.test.mjs'
+      - 'tools/supervisor-orphan-six-b-maintainer-inlet-source.mjs'
+      - 'tests/supervisor-orphan-six-b-maintainer-inlet-source.test.mjs'
       - 'tools/supervisor-orphan-six-graceful-b-coordinator.mjs'
       - 'tests/supervisor-orphan-six-graceful-b-coordinator.test.mjs'
       - 'tools/supervisor-orphan-six-windows-ctrlbreak-port.mjs'
