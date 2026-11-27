@@ -16,6 +16,10 @@ const unknown=code=>({...base,status:'STATE_UNKNOWN',code,
  distinctConsoleGroupCount:null,sharedListenerConsoleGroupCount:null,
  extraConsoleMemberCount:null});
 const positive=n=>Number.isSafeInteger(n)&&n>0;
+const canonicalBirth=x=>typeof x==='string'&&
+ /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.(?:\d{3}|\d{7})Z$/.test(x)&&
+ Number.isFinite(Date.parse(x))&&new Date(x).toISOString()===x.slice(0,23)+'Z';
+
 
 export function projectOrphanConsoleCohort(raw,{observedAtUtc=null}={}){
  if(raw?.schema!==schema||raw.stable!==true||
@@ -61,12 +65,11 @@ export function projectOrphanConsoleCohort(raw,{observedAtUtc=null}={}){
  // The only host-private link to WMI PID/birth observations. A public JSON
  // summary cannot be used to reconstruct or spoof this WeakMap entry.
  if(typeof observedAtUtc==='string'&&Number.isFinite(Date.parse(observedAtUtc))&&
-    raw.rows.every(row=>typeof row.birth==='string'&&
-     Number.isFinite(Date.parse(row.birth)))){
+    raw.rows.every(row=>canonicalBirth(row.birth))){
   internal.set(output,Object.freeze({
    observedAtUtc,
    rows:Object.freeze(raw.rows.map(row=>Object.freeze({
-    seat:row.seat,pid:row.pid,startedAtUtc:new Date(row.birth).toISOString(),
+    seat:row.seat,pid:row.pid,startedAtUtc:row.birth,
     members:Object.freeze(row.members.filter(p=>p!==raw.inspectorPid))
    })))
   }));
