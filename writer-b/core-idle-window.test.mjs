@@ -82,8 +82,10 @@ test('safe timeout evidence counts intermittent READY and ACTIVE without exposin
  await assert.rejects(awaitNaturalCoreIdle(opts,{windowMs:6000}),error=>{
   assert.equal(error.code,'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED');
   assert.deepEqual(error.idleObservation,{windowMs:6000,samples:4,
-   readySamples:2,activeSamples:2,otherSamples:0,maxReadyStreak:1});
-  assert.equal(JSON.stringify(error).includes('relatedProcesses'),false);
+   readySamples:2,activeSamples:2,otherSamples:0,maxReadyStreak:1,
+   lastBlocker:{enabled:true,state:4,instances:0,relatedProcesses:2,
+    unknownProcessLines:0,cycleLockPresent:true}});
+  assert.doesNotMatch(JSON.stringify(error.idleObservation),/privateCommandLine|pid|commandLine/i);
   return true;
  });
 });
