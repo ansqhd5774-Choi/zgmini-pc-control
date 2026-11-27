@@ -57,8 +57,9 @@ test('new V3 successor is tied to exactly installed V2 bytes, not historic R3',(
 });
 test('only an identical V2 file with one source SHA replacement can pass',()=>{
  const m=manifest();
+ const unchanged={...m,afterSha256:V2_AFTER,approvedContentSha256:V2_AFTER};
+ stop(()=>verifyCandidateBytes(unchanged,installedV2),'SIDECAR_B_SCOPE_STOP');
  for(const bytes of [
-  installedV2,
   Buffer.concat([replacement,Buffer.from('// extra code\\n')]),
   Buffer.from(replacement.toString('utf8').replace('SOURCE_DIRTY','SOURCE_RELAXED'),'utf8'),
   Buffer.from(replacement.toString('utf8').replace(sourceLiteral(next),sourceLiteral('f'.repeat(40))),'utf8')
