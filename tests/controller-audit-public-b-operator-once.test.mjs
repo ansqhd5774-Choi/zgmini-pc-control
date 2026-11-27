@@ -68,7 +68,7 @@ test('new operator source import closure is complete and verifies raw bytes befo
  assert.throws(()=>verifyOperatorSourceClosure(r=>tamper[r],r=>src[r]),
   /PUBLIC_B_OPERATOR_SOURCE_CAS_FAILED/);
  const unreviewed={...src,'tools/update.mjs':Buffer.concat([
-  src['tools/update.mjs'],Buffer.from("\\nimport './unauthorized.mjs';")])};
+  src['tools/update.mjs'],Buffer.from("\nimport './unauthorized.mjs';")])};
  assert.throws(()=>verifyOperatorSourceClosure(r=>unreviewed[r],r=>unreviewed[r]),
   /PUBLIC_B_OPERATOR_IMPORT_NOT_PINNED/);
  const code=src[rels[0]].toString('utf8');
