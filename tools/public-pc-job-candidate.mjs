@@ -31,7 +31,9 @@ function fixedGradeACandidate(operation){
  }catch{return false;}
 }
 function isPublicAReviewScope(issue,request){
- if(issue?.title==='pc-job')return fixedGradeACandidate(request?.operation);
+ if(issue?.title==='pc-job')return typeof request?.requestId==='string'&&
+  !request.requestId.endsWith('-postcheck')&&
+  fixedGradeACandidate(request.operation);
  if(typeof request?.requestId!=='string'||!/^pc-(?:update-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-postcheck$/.test(request.requestId))return false;
  const base=request.requestId.slice(0,-'-postcheck'.length);
  return issue?.title==='PC Update '+base+' postcheck'&&
