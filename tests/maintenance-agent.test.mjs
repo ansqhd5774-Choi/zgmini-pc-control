@@ -9,7 +9,7 @@ import {requireHandoffApproval,handoffFilePlan,nextRuntimeFiles} from "../tools/
 
 import {createMaintenanceAgent,failedUpdaterResult,normalizedResult,attachApprovedNativeBReceipt,parseS6NonzeroRecoveryReport} from "../tools/maintenance-agent.mjs";
 import {prepareMaintenanceIssue,submitExistingControllerApprovalFromCi} from '../tools/maintenance-request.mjs';
-import {readIndependentlyInstalledControllerBPublisherPolicy} from '../ci-approval/completed-run-intake.mjs';
+import {readIndependentlyInstalledControllerBPublisherPolicy,readAuthenticatedControllerBPublisherWorkflow} from '../ci-approval/completed-run-intake.mjs';
 
 test('pre-install child rejection retains exact safe code and current installed SHA',()=>{
  const r=failedUpdaterResult({requestId:'fixture',targetControllerSha:'b'.repeat(40)},
@@ -1337,6 +1337,13 @@ test('Public B publisher on hosted source CI is default-denied until exact insta
   /MAINTENANCE_CI_PUBLIC_EFFECT_SCOPE_MISMATCH/);
  assert.equal(reads,0);assert.equal(posts,0);
  ports.readIndependentInstalledCiPolicy=async()=>installed();
+ await assert.rejects(()=>submitExistingControllerApprovalFromCi(input,ports),
+  /MAINTENANCE_CI_PUBLIC_PUBLISHER_IDENTITY_UNVERIFIED/);
+ assert.equal(reads,0);assert.equal(posts,0);
+ ports.readPublisherWorkflowIdentity=async()=>({
+  workflowId:installed().ciControllerBPolicy.workflowId,
+  workflowBlobSha:installed().ciControllerBPolicy.workflowBlobSha
+ });
  const own={id:327938088,login:ACTOR,type:'User'};
  const pr={number:28,merged:true,merged_by:own,merge_commit_sha:'a'.repeat(40),
   base:{ref:'main',repo:{full_name:REPO}},
@@ -1376,6 +1383,62 @@ test('Public B publisher on hosted source CI is default-denied until exact insta
  assert.equal(reused.status,'EXISTING_REQUEST_REUSED');
  assert.equal(reused.receiptMarker,undefined);
  assert.equal(posts,1);
+});
+
+test('Public running publisher workflow attestation binds authenticated immutable GitHub API bytes',async()=>{
+ const workflow='.github/workflows/ci-approval-controller-b.yml';
+ const bytes=Buffer.from('name: Exact reviewed CI Publisher\non: workflow_run\n');
+ const blob=crypto.createHash('sha1').update(Buffer.from('blob '+bytes.length))
+  .update(Buffer.from([0])).update(bytes).digest('hex');
+ const env={GITHUB_REPOSITORY:REPO,GITHUB_REF:'refs/heads/main',
+  GITHUB_WORKFLOW_REF:REPO+'/'+workflow+'@refs/heads/main',
+  GITHUB_WORKFLOW_SHA:'a'.repeat(40),GITHUB_JOB:'submit-controller-b',
+  GITHUB_RUN_ID:'22',GITHUB_RUN_ATTEMPT:'1'};
+ const api=async route=>{
+  if(route==='actions/workflows/ci-approval-controller-b.yml')
+   return {id:123456,state:'active',path:workflow};
+  if(route==='contents/'+workflow+'?ref='+env.GITHUB_WORKFLOW_SHA')
+   return {type:'file',path:workflow,encoding:'base64',sha:blob,
+    content:bytes.toString('base64')};
+  throw Error('denied');
+ };
+ const proof=await readAuthenticatedControllerBPublisherWorkflow({env,getJson:api});
+ assert.deepEqual(proof,{workflowId:123456,workflowBlobSha:blob});
+ assert.equal(Object.isFrozen(proof),true);
+ for(const patch of [
+  x=>x.GITHUB_WORKFLOW_REF=REPO+'/'+workflow+'@refs/heads/topic',
+  x=>x.GITHUB_JOB='observe-public-source',
+  x=>x.GITHUB_WORKFLOW_SHA='main',
+  x=>x.GITHUB_REPOSITORY='attacker/repo',
+  x=>x.GITHUB_REF='refs/heads/topic',
+  x=>x.GITHUB_RUN_ATTEMPT='0'
+ ]){
+  const v={...env};patch(v);
+  await assert.rejects(()=>readAuthenticatedControllerBPublisherWorkflow({
+   env:v,getJson:()=>assert.fail('untrusted event may not request API')}),
+   /CI_PUBLIC_PUBLISHER_WORKFLOW_UNVERIFIED/);
+ }
+ for(const bad of [
+  {id:222,state:'disabled_manually',path:workflow},
+  {id:222,state:'active',path:'unrelated.yml'}
+ ]){
+  await assert.rejects(()=>readAuthenticatedControllerBPublisherWorkflow({
+   env,getJson:route=>route.startsWith('actions/')?bad:api(route)}),
+   /CI_PUBLIC_PUBLISHER_WORKFLOW_UNVERIFIED/);
+ }
+ for(const file of [
+  {type:'file',path:workflow,encoding:'base64',sha:blob,
+   content:Buffer.from('tampered').toString('base64')},
+  {type:'file',path:workflow,encoding:'base64',sha:'f'.repeat(40),
+   content:bytes.toString('base64')},
+  {type:'file',path:'attacker.yml',encoding:'base64',sha:blob,
+   content:bytes.toString('base64')}
+ ]){
+  await assert.rejects(()=>readAuthenticatedControllerBPublisherWorkflow({
+   env,getJson:route=>route.startsWith('actions/')?{
+    id:123456,state:'active',path:workflow
+   }:file}),/CI_PUBLIC_PUBLISHER_WORKFLOW_UNVERIFIED/);
+ }
 });
 
 test('Public B stays blocked without an independently installed V2 grant, including bot spoof',async t=>{
