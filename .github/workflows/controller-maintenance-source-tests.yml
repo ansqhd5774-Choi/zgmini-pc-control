@@ -50,6 +50,7 @@ on:
       - 'controller/standby.mjs'
       - 'controller/orphan-no-spawn-heartbeat-actor.mjs'
       - 'tests/supervisor-orphan-no-spawn-heartbeat-actor.test.mjs'
+      - 'tests/supervisor-orphan-owner-watchdog-crosscheck.test.mjs'
       - 'tools/supervisor-orphan-runner-self-nonce-readonly.mjs'
       - 'tests/supervisor-orphan-runner-self-nonce-readonly.test.mjs'
       - 'tools/supervisor-orphan-status-temp-writer.mjs'
