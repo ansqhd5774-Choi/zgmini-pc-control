@@ -265,3 +265,12 @@ test('actual installed ancestry must match the existing maintenance source recei
   assert.equal(verifyW06InstalledAncestryAttestation(mutated),false);
  }
 });
+
+test('known adapter stops retain categorical cause while unknown text is redacted',()=>{
+ for(const code of ['SIDECAR_B_PROBE_RESOURCE_STOP','R17_B_REQUEST_ALREADY_CLAIMED_STOP']) {
+  const r=classifyW06BTerminalFailure({errorCode:code});
+  assert.equal(r.status,'BLOCKED');assert.equal(r.code,code);assert.equal(r.operationalWrites,0);
+ }
+ for(const code of ['arbitrary secret message','ENOENT',null])
+  assert.equal(classifyW06BTerminalFailure({errorCode:code}).code,'W06_PUBLIC_B_UNVERIFIED_STOP');
+});

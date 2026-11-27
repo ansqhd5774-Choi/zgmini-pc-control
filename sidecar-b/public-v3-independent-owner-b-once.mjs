@@ -227,7 +227,7 @@ export function classifyW06BTerminalFailure({
   return out('RECOVERY_REQUIRED','W06_PUBLIC_B_EFFECT_OUTCOME_UNVERIFIED',{
    operationalWrites:null,changedFileCount:null,requiresOwnerReconcile:true
   });
- const code=/^W06_PUBLIC_B_[A-Z0-9_]{2,80}$/.test(errorCode??'')?
+ const code=/^(?:W06_PUBLIC_B|SIDECAR_B|R17_B)_[A-Z0-9_]{2,80}$/.test(errorCode??'')?
   errorCode:'W06_PUBLIC_B_UNVERIFIED_STOP';
  return out('BLOCKED',code);
 }
