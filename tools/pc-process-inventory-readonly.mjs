@@ -32,6 +32,7 @@ import {validateRunnerJobRefs,inspectRunnerJobHistory} from './runner-job-histor
 import {inspectW06TaskCadenceReadonly,PROBE as W06_TASK_CADENCE_PROBE} from '../controller/w06-cnn-task-cadence-readonly.mjs';
 import {inspectW043409SourcePreflightReadonly} from './w04-3409-source-preflight-readonly.mjs';
 import {inspectOrphanSeatMapReadonly} from './supervisor-orphan-seat-readonly.mjs';
+import {inspectOrphanConsoleCohortReadonly} from './supervisor-orphan-console-readonly.mjs';
 import {inspectOrphanOwnerPreimageReadonly} from './supervisor-orphan-owner-preimage-readonly.mjs';
 import {inspectOrphanRunnerSelfNonceReadonly} from './supervisor-orphan-runner-self-nonce-readonly.mjs';
 import {inspectOrphanSixBirthBoundReadonly} from './supervisor-orphan-six-birth-bound-readonly.mjs';
@@ -70,6 +71,7 @@ const MAX_BYTES=32768;
 const R3_WATCHDOG_PREIMAGE_PROBE='controller-standby-watchdog-preimage-readonly';
 const R3_WMI_PROBE='controller-standby-runner-wmi-readonly';
 const ORPHAN_SEAT_MAP_PROBE='controller-orphan-seat-map-readonly';
+const ORPHAN_CONSOLE_COHORT_PROBE='controller-orphan-console-cohort-readonly';
 const ORPHAN_OWNER_CAS_PROBE='controller-orphan-owner-cas-readonly';
 // Existing 2026-11-26T23:34:48Z operating #4171: historical old-owner
 // raw bytes only. Read-only CAS pins, NEVER a new Owner B approval.
@@ -797,6 +799,7 @@ export function authenticateProcess(event,env,role){
   const isR3Watchdog=withW05&&raw.probe===R3_WATCHDOG_PREIMAGE_PROBE;
  const isR3Wmi=withW05&&raw.probe===R3_WMI_PROBE;
  const isOrphanSeatMap=withW05&&raw.probe===ORPHAN_SEAT_MAP_PROBE;
+ const isOrphanConsoleCohort=withW05&&raw.probe===ORPHAN_CONSOLE_COHORT_PROBE;
  const isOrphanOwnerCas=withW05&&raw.probe===ORPHAN_OWNER_CAS_PROBE;
  const isOrphanSelfNonce=withW05&&raw.probe===ORPHAN_SELF_NONCE_PROBE;
  const isOrphanSixBirth=withW05&&raw.probe===ORPHAN_SIX_WMI_BIRTH_PROBE;
@@ -817,7 +820,7 @@ export function authenticateProcess(event,env,role){
  const allowedOperatingProbe=isOperator||is2960||is3409||isEr1Postcheck||is3516||
   isD05Writer||isD05PrivateReceipt||isD05Theme||isD05Registration||is3160||
   isCnnStaticGuard||isCnnGitPredicates||isCnnBPins||isCnnBResources||
-  isCnnBCore||isW06Task||isR3Watchdog||isR3Wmi||isOrphanSeatMap||isOrphanOwnerCas||isOrphanSelfNonce||isOrphanSixBirth||isR4Runtime||isR5Runtime||isR6Runtime||isS6Preimage||isS6NextPreimage||isS6Predrain||isS6Journal||isS6CurrentJournal||isS6ReceiverLedger||isR4GuardianOrigin||isCiPolicyCas;
+  isCnnBCore||isW06Task||isR3Watchdog||isR3Wmi||isOrphanSeatMap||isOrphanConsoleCohort||isOrphanOwnerCas||isOrphanSelfNonce||isOrphanSixBirth||isR4Runtime||isR5Runtime||isR6Runtime||isS6Preimage||isS6NextPreimage||isS6Predrain||isS6Journal||isS6CurrentJournal||isS6ReceiverLedger||isR4GuardianOrigin||isCiPolicyCas;
  const acceptedProbe=(role==='operating'&&allowedOperatingProbe)||
   (role==='handoff'&&(isCiReceiptRoot||isCiActivation||isCiNativeLocal));
  if(!raw||(!basic&&!withJobs&&!withW05)||
@@ -852,6 +855,7 @@ export function authenticateProcess(event,env,role){
    ...(isR3Watchdog?{watchdogR3Preimage:true}:{}),
   ...(isR3Wmi?{standbyRunnerWmi:true}:{}),
    ...(isOrphanSeatMap?{orphanSeatMap:true}:{}),
+   ...(isOrphanConsoleCohort?{orphanConsoleCohort:true}:{}),
    ...(isOrphanOwnerCas?{orphanOwnerCas:true}:{}),
    ...(isOrphanSelfNonce?{orphanSelfNonce:true}:{}),
    ...(isOrphanSixBirth?{orphanSixBirth:true}:{}),
@@ -3612,6 +3616,10 @@ export function collect(role,ctx,env=process.env){
   const proof=inspectOrphanSeatMapReadonly();
   return {...base,status:proof.status,code:proof.code,orphanSeatMap:proof};
  }
+ if(ctx.orphanConsoleCohort===true){
+  const proof=inspectOrphanConsoleCohortReadonly();
+  return {...base,status:proof.status,code:proof.code,orphanConsoleCohort:proof};
+ }
  if(ctx.standbyRunnerWmi===true){
   const proof=inspectR3RunnerWmiReadonly();
   return {...base,status:proof.status,code:proof.code,standbyRunnerWmi:proof};
@@ -3816,6 +3824,12 @@ export function toText(r){
    'orphanOldOwnerDead='+(r.orphanOwnerCas.oldOwnerDeadVerified??'UNKNOWN'),
    'orphanOwnerPreimageStable='+r.orphanOwnerCas.preimageStable,
    'orphanOwnerEffectAuthorized=false']:[]),
+  ...(r.orphanConsoleCohort?[
+   'orphanConsoleCohort='+r.orphanConsoleCohort.code,
+   'orphanConsoleAttached='+(r.orphanConsoleCohort.consoleAttachedSeatCount??'UNKNOWN'),
+   'orphanConsoleGroups='+(r.orphanConsoleCohort.distinctConsoleGroupCount??'UNKNOWN'),
+   'orphanConsoleSignalEmitted=false',
+   'orphanConsoleStopAuthorized=false']:[]),
   ...(r.orphanSeatMap?[
    'orphanSeatMap='+r.orphanSeatMap.code,
    'orphanControllerListenerCount='+(r.orphanSeatMap.controllerListenerCount??'UNKNOWN'),
