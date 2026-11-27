@@ -1,0 +1,72 @@
+# One-shot, source-only W06 V3 attestation on GitHub-hosted infrastructure.
+# No operating-PC runner, Windows execution, private result access or B effect.
+name: W06 V3 source evidence on GitHub Actions
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - '.github/workflows/w06-v3-public-source-evidence.yml'
+permissions:
+  contents: read
+concurrency:
+  group: w06-v3-evidence-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  public-source-only:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == false &&
+      github.event.repository.id == 1442936296 &&
+      github.event.repository.owner.id == 327938088 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login == 'ansqhd5774-Choi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout the exact reviewed V3 source commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: 218f2c428e4c5bdecfb60c5b0c253ff672589d9e
+          persist-credentials: false
+      - name: Set up Node 22 for isolated source assertions
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify exact candidate and existing V3 source contract tests
+        run: |
+          node --check sidecar-b/approved/archive-run-w06-v3.mjs
+          node --test sidecar-b/w06-v2-to-v3-pin-only.test.mjs
+      - name: Audit draft scope and public B denial without PC access
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+          import assert from 'node:assert/strict';
+          import {validateManifest,verifyCandidateBytes} from './sidecar-b/contract.mjs';
+          const raw=fs.readFileSync('drafts/w06-cnn-sidecar-v3-pin-20261128.json','utf8');
+          const d=JSON.parse(raw);
+          const prev=fs.readFileSync('sidecar-b/approved/archive-run-w06-v2.mjs');
+          const next=fs.readFileSync('sidecar-b/approved/archive-run-w06-v3.mjs');
+          const sha=x=>crypto.createHash('sha256').update(x).digest('hex');
+          const oldPin="const APPROVED='393cee0da46515ff056543173fcd1253a858b3d7';";
+          const newPin="const APPROVED='c8ed53a3991212dd1778742cda8a86ac133e0796';";
+          assert.equal(d.schema,'ZGMINI_CNN_SIDECAR_ONEFILE_B_V3');
+          assert.equal(d.status,'DRAFT_UNAPPROVED');
+          assert.equal(d.installedHead,'c8ed53a3991212dd1778742cda8a86ac133e0796');
+          assert.equal(d.installedConfigSource,d.installedHead);
+          assert.equal(sha(prev),d.beforeSha256);
+          assert.equal(sha(next),d.afterSha256);
+          assert.equal(d.approvedContentSha256,d.afterSha256);
+          assert.equal(next.length,prev.length);
+          assert.equal(next.toString('utf8'),prev.toString('utf8').replace(oldPin,newPin));
+          assert.equal(next.toString('utf8').split(newPin).length,2);
+          for(const flag of ['allowProviderCalls','allowDbChanges','allowD1Writes','allowTaskChanges'])assert.equal(d[flag],false);
+          assert.equal(d.runCount,1);
+          assert.throws(()=>validateManifest(d),e=>e.code==='SIDECAR_B_SCOPE_STOP');
+          const workflow=fs.readFileSync('.github/workflows/cnn-sidecar-b-once.yml','utf8');
+          const admission=fs.readFileSync('sidecar-b/admission.mjs','utf8');
+          assert.match(workflow,/github\.event\.repository\.private == true/);
+          assert.match(admission,/event\.repository\.private===true/);
+          console.log(JSON.stringify({status:'PASS',scope:'PUBLIC_SOURCE_ONLY',sourceCommit:'218f2c428e4c5bdecfb60c5b0c253ff672589d9e',preimageSha256:sha(prev),candidateSha256:sha(next),writerHead:d.installedHead,approval:'DRAFT_UNAPPROVED',publicBExecution:'DENIED_BY_EXISTING_WORKFLOW',operationalWrites:0,providerCalls:0,d1Writes:0,windowsHostAccess:false}));
+          NODE
