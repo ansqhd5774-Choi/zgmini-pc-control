@@ -3,6 +3,8 @@ import './w04-3516-archive-receipt-readonly.test.mjs';
 import test from 'node:test';
 // Source-only fixed orphan Owner CAS hashes, no operational effect.
 import './supervisor-orphan-owner-preimage-readonly.test.mjs';
+// The existing A job may compare only its OWN process env to pinned old Owner bytes.
+import './supervisor-orphan-runner-self-nonce-readonly.test.mjs';
 // Existing inventory CI owns this fixed, operating-only orphan seat proof.
 import './supervisor-orphan-seat-readonly.test.mjs';
 import {createHash} from 'node:crypto';
@@ -3740,4 +3742,54 @@ test('fixed orphan owner CAS A allows only exact operating scope',()=>{
    ...extra,probe:'controller-orphan-owner-cas-readonly'})}};
   assert.throws(()=>authenticateProcess(bad,env,'operating'));
  }
+});
+
+
+test('orphan self-nonce A probe uses existing exact operating-only envelope',()=>{
+ const old=event('operating');
+ const raw=JSON.parse(old.issue.body);
+ const make=(value,role='operating')=>({...event(role),issue:{
+  ...event(role).issue,body:JSON.stringify({...raw,role,probe:value})}
+ }});
+ const valid=make('controller-orphan-runner-self-nonce-readonly');
+ const scope=authenticateProcess(valid,env,'operating');
+ assert.equal(scope.orphanSelfNonce,true);
+ assert.equal(scope.orphanOwnerCas,undefined);
+ assert.equal(scope.orphanSeatMap,undefined);
+ for(const altered of [
+  make('controller-orphan-runner-self-nonce-readonly;cmd.exe'),
+  make('controller-orphan-runner-self-nonce-readonly-test'),
+  make('controller-orphan-runner-self-nonce-readonly','handoff'),
+  {...valid,issue:{...valid.issue,body:JSON.stringify({
+   ...JSON.parse(valid.issue.body),filename:'E:/other/owner.json'})}},
+  {...valid,issue:{...valid.issue,body:JSON.stringify({
+   ...JSON.parse(valid.issue.body),envOverride:'secret'})}}
+ ]){
+  assert.throws(()=>authenticateProcess(altered,env,
+   JSON.parse(altered.issue.body).role));
+ }
+});
+
+test('orphan self-nonce A TXT projection never serializes nonce/Owner PID/path/sha',()=>{
+ const out=toText({
+  schema:'ZGMINI_PC_PROCESS_INVENTORY_RESULT_V1',
+  role:'operating',runnerName:'zgmini-pc-02',
+  runId:'45999999999',attempt:1,host:'PC',
+  status:'PASS',code:'RUNNER_SELF_NONCE_EQUALS_ORIGINAL_OWNER_ONLY',
+  observedAtUtc:'2026-11-27T01:08:00Z',
+  orphanSelfNonce:{
+   status:'OBSERVED',code:'RUNNER_SELF_NONCE_EQUALS_ORIGINAL_OWNER_ONLY',
+   nonceInheritanceVerified:false,sixRunnerLineageVerified:false,
+   adoptionAuthorized:false,effectAuthorized:false,
+   nonce:'CRITICAL_PRIVATE_NONCE_SHOULD_NOT_PRINT',
+   ownerPid:999999,
+   privateRoot:'E:/ZGmini/automation/pc-control',
+   hash:'a'.repeat(64)
+  }
+ });
+ assert.match(out,/orphanSelfNonce=RUNNER_SELF_NONCE_EQUALS_ORIGINAL_OWNER_ONLY/);
+ assert.match(out,/orphanSelfNonceObserved=true/);
+ assert.match(out,/orphanSelfNonceInheritanceVerified=false/);
+ assert.match(out,/orphanSelfNonceEffectAuthorized=false/);
+ assert.doesNotMatch(out,/CRITICAL_PRIVATE_NONCE_SHOULD_NOT_PRINT|999999|E:\/ZGmini|a{64}/);
 });
