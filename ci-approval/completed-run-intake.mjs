@@ -2,11 +2,13 @@
 // code here. The follow-up must independently establish authority, tested tree,
 // exact effect and live preconditions before any operational submission.
 import {createHash} from 'node:crypto';
-import {readFileSync} from 'node:fs';
+import fs,{readFileSync} from 'node:fs';
+import path from 'node:path';
 import os from 'node:os';
 import {pathToFileURL} from 'node:url';
 import {resolveControllerApprovalCI,createCiEffectReceiptStore,submitExistingControllerApprovalFromCi,mergeAndSubmitPreparedControllerApproval} from '../tools/maintenance-request.mjs';
-import {manifestFingerprint} from '../tools/maintenance-contract.mjs';
+import {manifestFingerprint,installedControllerBPolicy} from '../tools/maintenance-contract.mjs';
+import {nextRuntimeFiles,requireDirectInstalledFiles} from '../tools/handoff-maintenance.mjs';
 import {prepareSelectiveApprovalPublication} from './controller-candidate-review.mjs';
 import {publishExactControllerApprovalPair} from './approval-pr-publisher.mjs';
 
@@ -162,7 +164,39 @@ export function createAutoApprovalContextReader({policy,getJson,readJobLogs}={})
 export function initialControllerPublicationPolicy(policy){
  return policy?.installPlan ? null : policy;
 }
-export function createControllerPublicationPorts({getJson,postIssue,store,autoApprovalPolicy,readJobLogs,putMerge}){
+// The Public publisher grant is never read from GitHub Variables, an event,
+// a PR checkout, or the receipt directory. The only permitted production
+// input is the independently installed Windows maintenance manifest and its
+// exact 7-file SHA256 closure. It must be installed by the separate approved
+// B handoff, not by a CI job. This is a lazy, read-only port; failures deny POST.
+const INSTALLED_PUBLIC_B_ROOT='E:/ZGmini/automation/pc-maintenance';
+export function readIndependentlyInstalledControllerBPublisherPolicy({
+ installRoot=INSTALLED_PUBLIC_B_ROOT,io=fs
+}={}){
+ const fail=()=>{throw Error('CI_PUBLIC_PUBLISHER_INSTALLED_POLICY_UNVERIFIED')};
+ try{
+  if(typeof installRoot!=='string'||!path.isAbsolute(installRoot)||
+     !io||typeof io.lstatSync!=='function'||
+     typeof io.readFileSync!=='function')fail();
+  const required=[...nextRuntimeFiles,'MAINTENANCE_INSTALL.json'];
+  requireDirectInstalledFiles(installRoot,required,io);
+  const raw=io.readFileSync(path.join(installRoot,'MAINTENANCE_INSTALL.json'));
+  if(!Buffer.isBuffer(raw)||raw.length<2||raw.length>131072)fail();
+  const installed=JSON.parse(raw.toString('utf8'));
+  if(installedControllerBPolicy(installed)?.repositoryVisibility!=='public')fail();
+  const names=Object.keys(installed.files||{});
+  if(names.length!==nextRuntimeFiles.length||
+     nextRuntimeFiles.some(rel=>!Object.hasOwn(installed.files,rel)))fail();
+  for(const rel of nextRuntimeFiles){
+   const bytes=io.readFileSync(path.join(installRoot,...rel.split('/')));
+   if(!Buffer.isBuffer(bytes)||bytes.length<1||bytes.length>1048576||
+      createHash('sha256').update(bytes).digest('hex')!==installed.files[rel])fail();
+  }
+  return Object.freeze(installed);
+ }catch{fail()}
+}
+
+export function createControllerPublicationPorts({getJson,postIssue,store,autoApprovalPolicy,readJobLogs,putMerge,readIndependentInstalledCiPolicy}){
  const readBytes=async(target,revision)=>{
   if(!sha(target)||!(revision==='main'||sha(revision)))throw Error('CI_PUBLICATION_SOURCE_INVALID');
   const path='approvals/controller-updates/'+target+'.json';
@@ -204,6 +238,7 @@ export function createControllerPublicationPorts({getJson,postIssue,store,autoAp
   },
   createIssue:expected=>postIssue({title:expected.title,body:expected.body,labels:expected.labels}),
   loadReceipt:store.loadReceipt,saveReceipt:store.saveReceipt,
+  ...(typeof readIndependentInstalledCiPolicy==='function'?{readIndependentInstalledCiPolicy}:{}),
   ...(autoApprovalPolicy&&typeof putMerge==='function'?{mergeApprovalPr:(n,head)=>{
    if(!id(n)||n!==autoApprovalPolicy.approvalPrNumber||!sha(head))
     throw Error('CI_PUBLICATION_PR_INVALID');
@@ -585,6 +620,7 @@ export async function main({eventPath=process.env.GITHUB_EVENT_PATH,token=proces
    return bytes;
   };
   const ports=createControllerPublicationPorts({getJson,postIssue:body=>github('issues',body),store,
+   readIndependentInstalledCiPolicy:()=>readIndependentlyInstalledControllerBPublisherPolicy(),
    autoApprovalPolicy:initialControllerPublicationPolicy(policy),readJobLogs,
    putMerge:(n,body)=>github('pulls/'+n+'/merge',body,'PUT')});
   const opts={getJson,ports,runId:Number(process.env.GITHUB_RUN_ID),
@@ -600,7 +636,8 @@ export async function main({eventPath=process.env.GITHUB_EVENT_PATH,token=proces
     const readyPolicy={...policy,approvalPrNumber:staged.prNumber};
     return {state:staged.state,approvalPrNumber:staged.prNumber,
      ports:createControllerPublicationPorts({getJson,postIssue:body=>github('issues',body),
-      store,autoApprovalPolicy:readyPolicy,readJobLogs,
+      store,readIndependentInstalledCiPolicy:()=>readIndependentlyInstalledControllerBPublisherPolicy(),
+      autoApprovalPolicy:readyPolicy,readJobLogs,
       putMerge:(n,body)=>github('pulls/'+n+'/merge',body,'PUT')})};
    }:undefined;
    const result=await publishConfiguredControllerApproval(event,{...opts,policy,stageApprovalPr});
