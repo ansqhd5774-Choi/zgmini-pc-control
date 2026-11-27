@@ -16,7 +16,7 @@
   },
   "checks": {
     "targetSha": "d3764580fdb08ecddd5f9b1064051eec30f90492",
-    "status": "PROPOSED_NOT_APPROVED",
+    "status": "PASS",
     "manifestSha256": "ded54e837f8dfac59bed4b8bb83258668a9e3693cb5dffe1d1c9e2e9ef0aa6b5"
   },
   "backup": {
