@@ -130,6 +130,19 @@ const STAGES=new Set(['PREPARED','STOP_INTENT_RECORDED',
   'SEAT_EXIT_VERIFIED','WAITING_WATCHDOG','RECOVERY_REQUIRED','SOURCE_FINAL_CANDIDATE']);
 const events=new Set(['DURABLE_STOP_INTENT','PRIVATE_SEAT_EXIT_READBACK',
   'FINAL_WATCHDOG_READBACK']);
+function failJournal(prior,code){
+ // Once an intent has been recorded, any uncertainty is a PARTIAL EFFECT,
+ // not a harmless prevalidation BLOCKED. Preserve the original journal on
+ // the independent B host; never send the same signal a second time.
+ const maybePartial=prior?.status==='CANDIDATE_ONLY'&&
+  Number.isInteger(prior.intentCount)&&prior.intentCount>0;
+ if(!maybePartial)return deny(code);
+ return Object.freeze({...zero,status:'RECOVERY_REQUIRED',code,
+  phase:'RECOVERY_REQUIRED',proposalId:null,
+  stoppedCount:Number.isInteger(prior.stoppedCount)?prior.stoppedCount:null,
+  intentCount:prior.intentCount,
+  nextAction:'RECONCILE_DURABLE_ORIGINAL_JOURNAL_NO_SIGNAL_RETRY'});
+}
 
 // Pure journal reducer: never emits OS signals, even when its test inputs
 // claim approval. An unknown/partial transition fails closed; it can never
@@ -141,7 +154,7 @@ export function advanceOrphanGracefulSixSourceJournal({
  // claim that all six still live after some have already exited. Each event
  // instead needs a separate fresh private same-host readback below.
  const p=strongPrivatePreflight(snapshot,now,{pinnedHistorical:true});
- if(p.code)return deny(p.code);
+ if(p.code)return failJournal(prior,p.code);
  if(!time(proof?.observedAtUtc)||Date.parse(proof.observedAtUtc)>now||
     now-Date.parse(proof.observedAtUtc)>5000)
   return Object.freeze({...zero,status:'RECOVERY_REQUIRED',
@@ -160,8 +173,8 @@ export function advanceOrphanGracefulSixSourceJournal({
     prior.stoppedCount>prior.intentCount||
     prior.intentCount-prior.stoppedCount>1||
     prior.nextSeat!==prior.stoppedCount+1)
-  return deny('ORPHAN_GRACEFUL_JOURNAL_CAS_UNVERIFIED');
- if(!events.has(event))return deny('ORPHAN_GRACEFUL_EVENT_UNKNOWN');
+  return failJournal(prior,'ORPHAN_GRACEFUL_JOURNAL_CAS_UNVERIFIED');
+ if(!events.has(event))return failJournal(prior,'ORPHAN_GRACEFUL_EVENT_UNKNOWN');
  const fixed={phase:prior.phase,proposalId:prior.proposalId,
   verifiedSeatCount:6,stoppedCount:prior.stoppedCount,
   intentCount:prior.intentCount,nextSeat:prior.nextSeat};
@@ -169,14 +182,14 @@ export function advanceOrphanGracefulSixSourceJournal({
  // intent BEFORE it may send its one and only OS control signal.
  if(event==='DURABLE_STOP_INTENT'){
   if(prior.phase!=='PREPARED'&&prior.phase!=='SEAT_EXIT_VERIFIED')
-   return deny('ORPHAN_GRACEFUL_UNEXPECTED_INTENT_PHASE');
+   return failJournal(prior,'ORPHAN_GRACEFUL_UNEXPECTED_INTENT_PHASE');
   if(prior.stoppedCount===6||prior.intentCount!==prior.stoppedCount||
      proof?.source!=='PRIVATE_B_JOURNAL_EXACT_CAS_READBACK'||
      proof?.nextSeat!==prior.nextSeat||proof?.durableIntentReadback!==true||
      proof?.sameOneUseClaimVerified!==true||
      proof?.nextSeatIdentityStillLiveVerified!==true||
      proof?.watchdogFenceUninterruptedVerified!==true)
-   return deny('ORPHAN_GRACEFUL_INTENT_CAS_UNVERIFIED');
+   return failJournal(prior,'ORPHAN_GRACEFUL_INTENT_CAS_UNVERIFIED');
   return ok('ORPHAN_GRACEFUL_SIGNAL_INTENT_RECORDED_SOURCE_ONLY',{
    ...fixed,phase:'STOP_INTENT_RECORDED',intentCount:prior.intentCount+1,
    nextAction:'INDEPENDENT_APPROVED_B_MAY_REATTEST_BEFORE_SIGNAL'
@@ -195,7 +208,7 @@ export function advanceOrphanGracefulSixSourceJournal({
      proof?.watchdogFenceUninterruptedVerified!==true||
      proof?.operatorClaimUninterruptedVerified!==true||
      proof?.otherFiveOrRemainingSeatsUnchangedVerified!==true)
-   return deny('ORPHAN_GRACEFUL_SEAT_EXIT_READBACK_UNVERIFIED');
+   return failJournal(prior,'ORPHAN_GRACEFUL_SEAT_EXIT_READBACK_UNVERIFIED');
   const stoppedCount=prior.stoppedCount+1;
   return ok('ORPHAN_GRACEFUL_SEAT_EXIT_SOURCE_ONLY',{
    ...fixed,stoppedCount,nextSeat:stoppedCount+1,
@@ -215,7 +228,7 @@ export function advanceOrphanGracefulSixSourceJournal({
     proof?.watchdogR6HealthyVerified!==true||
     proof?.standbyTwoReadyVerified!==true||
     proof?.smokeJobPassVerified!==true)
-  return deny('ORPHAN_GRACEFUL_POSTRECOVERY_READBACK_UNVERIFIED');
+  return failJournal(prior,'ORPHAN_GRACEFUL_POSTRECOVERY_READBACK_UNVERIFIED');
  return ok('ORPHAN_GRACEFUL_SOURCE_SEQUENCE_VERIFIED_ONLY',{
   ...fixed,phase:'SOURCE_FINAL_CANDIDATE',stoppedCount:6,nextSeat:7,
   nextAction:'INDEPENDENT_RUNTIME_RECEIPT_REQUIRED'
