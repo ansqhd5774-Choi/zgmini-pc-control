@@ -1322,7 +1322,8 @@ test('Public receiver poll performs exact installed V2 CI proof, one isolated ap
  assert.equal(f.agent.loadLedger(f.request.requestId)?.status,'SUCCEEDED');
  assert.equal(f.remote.size,2,'sanitized JSON and TXT pair');
  const again=await f.agent.pollOnce();
- assert.equal(again.filter(x=>x.status==='SUCCEEDED').length,0);
+ assert.equal(again.find(x=>x.code==='DUPLICATE_REQUEST_SUPPRESSED')?.status,
+   'SUCCEEDED','existing completed ledger status is preserved on duplicate');
  assert.equal(f.stats.applies,1,'one approved B effect is never reinstalled');
 });
 
