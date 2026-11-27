@@ -175,3 +175,46 @@ test('no-spawn Actor has no OS process, lease or filesystem mutation primitives'
  assert.match(src,/writeStatus\(heartbeat\)/);
  assert.match(src,/clearInterval\(timer\)/);
 });
+
+
+test('established actor continues verified heartbeat during a legitimate Controller job lease',async()=>{
+ let active=false,writes=[];
+ const a=actor(async()=>{
+  const x=sample();
+  if(active){
+   x.relatedLeases=2;x.activeControllerWorkers=1;
+   x.ongoingJobs={
+    source:'PRIVATE_SAME_HOST_CONTROLLER_JOB_LEASES',
+    observedRelatedLeaseCount:2,
+    allRelatedLeasesAccountedFor:true,
+    allBoundToOriginalSixSeatsVerified:true,
+    workerProcessLineageVerified:true,
+    noInstallRecoveryOrExternalLeaseVerified:true,
+    jobOwnerNonceContinuityVerified:true,
+    activeWorkerCount:1
+   };
+  }
+  return x;
+ },async hb=>{writes.push(hb);return true;});
+ assert.equal((await a.tick()).status,'MONITORING');
+ active=true;
+ assert.equal((await a.tick()).status,'MONITORING');
+ assert.equal(writes.length,2);
+ assert.deepEqual(writes[1].children,writes[0].children);
+ assert.equal(writes[1].adoptionMode,'ADOPT_EXISTING_SIX_NO_SPAWN');
+ a.stop();
+});
+
+test('unattributed job leases after initial adoption stop further heartbeat',async()=>{
+ let active=false,writes=0;
+ const a=actor(async()=>{
+  const x=sample();
+  if(active){x.relatedLeases=2;x.activeControllerWorkers=1;}
+  return x;
+ },async()=>{writes++;return true;});
+ assert.equal((await a.tick()).status,'MONITORING');
+ active=true;
+ assert.equal((await a.tick()).status,'FAIL_CLOSED');
+ assert.equal(writes,1);
+ assert.equal((await a.tick()).status,'FAIL_CLOSED');
+});
