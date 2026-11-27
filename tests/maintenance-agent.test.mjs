@@ -1974,3 +1974,52 @@ test('Public B requires exact pinned request, origin and run receipt',async()=>{
  const swapped=await verifyControllerBIdentity({...f.proof,issueNumber:43});
  assert.equal(swapped.code,'CI_RECEIPT_ISSUE_OR_BYTES_MISMATCH');
 });
+
+// #4078 S6 backlog-only source evidence integration: public hosted CI executes
+// these pure checks without issuing a PC job or importing the Windows maintainer.
+import {FIXED as S64078_FIXED,inspectS64078BacklogOnly as inspectS64078}
+  from '../tools/s6-4078-backlog-only-plan.mjs';
+
+test('S6 #4078 backlog recovery is source-only and never self-authorizes replay',()=>{
+ const originalBody=JSON.stringify({
+  schema:'ZGMINI_PC_JOB_V1',requestId:S64078_FIXED.originalRequestId,
+  chatId:'chat-usbreadthr2-resource-window-20261127',
+  operation:'shared-resource-release-readonly',
+  sourceRepository:'ansqhd5774-Choi/zgmini',sourceBranch:'main',
+  sourceSha:'7579dea082d0f7a671113e52e39cefc9be8c9a87'
+ });
+ const s6Body=JSON.stringify({
+  schema:'ZGMINI_PC_MAINTENANCE_REQUEST_V1',
+  requestId:S64078_FIXED.s6RequestId,chatId:'chat-zgmini-s6-b3-20261127',
+  operation:'controller-s6-failover-once',
+  controlRepository:'ansqhd5774-Choi/zgmini-pc-control',
+  targetControllerSha:'3c7d4cfefacf072fd35cb19706b352c64c5e4fd2',
+  approvalManifestSha256:'1fceeba061f7f8731811220b27cac245bd91d44e87d68935cd8475117f094141'
+ });
+ const e={
+  s6Issue:{number:4069,state:'open',user:{login:'ansqhd5774-Choi'},body:s6Body},
+  originalIssue:{number:4078,state:'open',user:{login:'ansqhd5774-Choi'},
+   created_at:S64078_FIXED.originalCreatedAt,labels:[{name:'pc-job'}],body:originalBody},
+  journal:{requestId:S64078_FIXED.s6RequestId,phase:'RECOVERY_REQUIRED',
+   failedAt:'WATCHDOG_RELEASE_OUTCOME_UNVERIFIED',
+   failedCode:'S6_PORT_PROMOTION_UNVERIFIED'},
+  backlog:{schema:'ZGMINI_PC_BACKLOG_V1',requestId:S64078_FIXED.s6RequestId,
+   windows:[{pausedAt:'2026-11-26T19:12:00Z',
+    resumedAt:'2026-11-26T19:16:00Z'}],replays:{}},
+  workflowState:'active',runtimeState:'HEALTHY',sixRunnersOnline:true,
+  watchdogReady:true,protectedStateUnchanged:true,existingPcJobRuns:0,
+  existingResultPairs:0,existingReplayIssues:0,resultSearchComplete:true,
+  ownerAndLeaseCasVerified:true,backlogBytesCasVerified:true,
+  s6JournalBytesCasVerified:true
+ };
+ const admitted=inspectS64078(e);
+ assert.equal(admitted.status,'SOURCE_PREFLIGHT_ELIGIBLE');
+ assert.equal(admitted.mutationAuthorized,false);
+ assert.equal(admitted.operationalWrites,0);
+ const replay=structuredClone(e);
+ replay.backlog.replays['4078']={status:'POSTING'};
+ const refused=inspectS64078(replay);
+ assert.equal(refused.status,'BLOCKED');
+ assert.equal(refused.code,'S6_BACKLOG_OR_REPLAY_DRIFT');
+ assert.equal(refused.mutationAuthorized,false);
+});
