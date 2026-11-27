@@ -55,7 +55,7 @@ export function projectOrphanSixRunnerBinaryReadonly(raw){
 
 // Host-private fixed read. Reject alias/replacement during hashing, and
 // recheck each WMI PID+creation time after reading the file. Read-only only.
-const POWERSHELL=String.raw\`
+const POWERSHELL=String.raw`
 $ErrorActionPreference='Stop'
 $items=@(Get-CimInstance -ClassName Win32_Process -Filter "Name='Runner.Listener.exe'" -ErrorAction Stop)
 $rows=@()
@@ -84,7 +84,7 @@ foreach($p in $items){
 }
 [pscustomobject]@{schema='ZGMINI_ORPHAN_SIX_RUNNER_BINARY_A_V1';
  stable=$true;rows=@($rows)} | ConvertTo-Json -Compress -Depth 5
-\`;
+`;
 export function inspectOrphanSixRunnerBinaryReadonly({
  platform=process.platform,hostname=os.hostname(),systemRoot=process.env.SystemRoot,
  run=spawnSync
