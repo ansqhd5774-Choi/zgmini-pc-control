@@ -7,6 +7,7 @@ import {classifyMaintenancePostcheckLink as classify,
  selectMaintenancePostcheckRun as select,
  summarizeMaintenancePostcheckLocalPointer as localPointer,
  summarizeMaintenancePublicPostcheckLedger as publicLedger,
+ validateConfirmedPostcheckFailure as confirmedFailure,
  classifyMaintenancePostcheckWorkflowRegistration as registration} from '../tools/maintenance-contract.mjs';
 
 const id='pc-update-11111111-1111-4111-8111-111111111111';
@@ -330,4 +331,34 @@ test('installed Public postcheck code cannot promote redacted bot receipt withou
  assert.match(source,/\['approved-pc-job','public-approved-a'\]\.includes\(j\.name\)/);
  assert.match(source,/if\(proof\.status==='LOCAL_RESULT_MATCHED'\)/);
  assert.doesNotMatch(source,/console\.log\(JSON\.stringify\(localLedger\)\)/);
+});
+
+test('exact failed Public A postcheck is an evidenced failure, never a replay or fake PASS',()=>{
+ const original={requestId:id,status:'RECOVERY_REQUIRED',firstFail:'POSTCHECK_PENDING',
+  targetSha:'b'.repeat(40),postIssueNumber:42};
+ const manifest={postOperation:'core-status',postSourceBranch:'main',postSourceSha:source};
+ const approval={confirmedPostcheckFailure:{issueNumber:42,runId:777,jobId:889,
+  runnerName:'zgmini-pc-03'}};
+ const failingRun=run({status:'completed',conclusion:'failure'});
+ const failingJob=job({id:889,name:'public-approved-a',runner_name:'zgmini-pc-03',
+  status:'completed',conclusion:'failure',
+  steps:[{name:'Execute fixed host allowlist entry',status:'completed',conclusion:'failure'}]});
+ const parts={original,manifest,approval,issue:issue(),run:failingRun,job:failingJob};
+ assert.equal(confirmedFailure(parts),true);
+ for(const change of [
+  x=>x.run.event='workflow_dispatch',
+  x=>x.job.name='untrusted-external-pr-job',
+  x=>x.job.runner_name='unknown-seat',
+  x=>x.job.id=890,
+  x=>x.job.steps[0].conclusion='success',
+  x=>x.original.postIssueNumber=43,
+  x=>x.issue.user.login='untrusted',
+  x=>x.manifest.postSourceSha='f'.repeat(40),
+  x=>x.run.conclusion='success',
+ ]){
+  const altered=structuredClone(parts);change(altered);
+  assert.equal(confirmedFailure(altered),false);
+ }
+ assert.equal(confirmedFailure({...parts,job:{...failingJob,name:'approved-pc-job'}}),true,
+  'Existing Private-only postcheck failure remains recognized');
 });
