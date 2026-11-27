@@ -1759,6 +1759,10 @@ export function createMaintenanceAgent({
       return blocked('ORPHAN_SIX_B_UNTRUSTED_ISSUE');
     if(typeof issue.body!=='string'||Buffer.byteLength(issue.body)>16384)
       return blocked('ORPHAN_SIX_B_RAW_REQUEST_INVALID');
+    // processIssue is also exported for isolated tests. Never let a direct
+    // invocation bypass the private-repository check performed by pollOnce.
+    try{await repositoryAllowed();}
+    catch{return blocked('ORPHAN_SIX_B_PRIVATE_REPOSITORY_REQUIRED');}
     // No port means no private install/origin evidence. Never manufacture it.
     if(!configuredOrphanSixPorts||typeof configuredOrphanSixPorts!=='object'||
       Array.isArray(configuredOrphanSixPorts))
