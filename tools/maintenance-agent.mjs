@@ -1559,6 +1559,31 @@ function resultComment(result,uploadStatus=null){
  * All side effects are injectable. Tests never access GitHub or a real PC.
  * The agent has no power to run user-supplied commands or arbitrary file paths.
  */
+// Source-only fixed-path GitHub blob read. The protected B maintainer
+// authenticates its own GH identity and validates the source SHA and nine
+// manifest digests separately. This helper never grants effect authority.
+export async function readOrphanSixPinnedHistoricalSource({
+  sourceSha,relative,getJson
+}={}){
+  const files=['tools/bootstrap-maintenance.mjs','tools/handoff-maintenance.mjs'];
+  if(typeof sourceSha!=='string'||!/^[a-f0-9]{40}$/.test(sourceSha)||
+     !files.includes(relative)||typeof getJson!=='function')
+    throw coded('ORPHAN_SIX_B_GIT_SCOPE_DENIED');
+  const item=await getJson('contents/'+relative+'?ref='+sourceSha);
+  if(item?.type!=='file'||item.path!==relative||
+     item.encoding!=='base64'||typeof item.content!=='string'||
+     item.content.length<4||item.content.length>2670000)
+    throw coded('ORPHAN_SIX_B_HISTORICAL_SOURCE_UNVERIFIED');
+  const encoded=item.content.replace(/\s/g,'');
+  if(!/^[A-Za-z0-9+/]*={0,2}$/.test(encoded))
+    throw coded('ORPHAN_SIX_B_HISTORICAL_SOURCE_UNVERIFIED');
+  const bytes=Buffer.from(encoded,'base64');
+  if(bytes.length<1||bytes.length>2000000||
+     bytes.toString('base64')!==encoded)
+    throw coded('ORPHAN_SIX_B_HISTORICAL_SOURCE_UNVERIFIED');
+  return bytes;
+}
+
 export function createMaintenanceAgent({
   stateDir,repo=CONTROL_REPOSITORY,title=ISSUE_TITLE,label=ISSUE_LABEL,
   allowedActors=ALLOWED_ACTORS,execFileImpl=defaultExecFile,
@@ -1602,7 +1627,6 @@ export function createMaintenanceAgent({
   // Canonical read-only source validation belongs exclusively to the
   // independently launched maintainer. This supplies no B effect ports.
   function canonicalOrphanSixReadPorts(){
-    const checkout='E:/ZGmini/projects/zgmini-pc-control';
     const controlRoot='E:/ZGmini/automation/pc-control';
     const runtime=['tools/maintenance-contract.mjs','tools/maintenance-apply.mjs',
       'tools/maintenance-agent.mjs','tools/maintenance-lock.mjs',
@@ -1623,12 +1647,14 @@ export function createMaintenanceAgent({
         throw coded('ORPHAN_SIX_B_PINNED_READ_UNSTABLE');
       return bytes;
     };
-    const gitRaw=(revision,relative)=>{
-      if(!sha40(revision)||
-        ![...runtime,...extra].includes(relative))
-        throw coded('ORPHAN_SIX_B_GIT_SCOPE_DENIED');
-      return execFileSync('git',['show',revision+':'+relative],
-        {cwd:checkout,windowsHide:true,timeout:10000,maxBuffer:2000000});
+    // The approved source SHA is immutable, but an operational checkout may
+    // be shallow, absent, or relocated. Read these two historical bytes from
+    // canonical GitHub at the exact source commit, never from moving main.
+    const historicalSource=async(revision,relative)=>{
+      return readOrphanSixPinnedHistoricalSource({
+        sourceSha:revision,relative,
+        getJson:route=>ghApi(route)
+      });
     };
     async function provenance(){
       verifyInstalledSource();
@@ -1660,7 +1686,7 @@ export function createMaintenanceAgent({
           throw coded('ORPHAN_SIX_B_INSTALLED_SOURCE_DRIFT');
       for(const relative of extra)
         if(!sha64(a.files[relative])||
-          sha256(gitRaw(m.sourceSha,relative))!==a.files[relative])
+          sha256(await historicalSource(m.sourceSha,relative))!==a.files[relative])
           throw coded('ORPHAN_SIX_B_HISTORICAL_PIN_DRIFT');
       const owner=JSON.parse(pinned(path.join(root,'leases/receiver/owner.json')).toString('utf8'));
       if(owner?.pid!==process.pid||typeof owner.nonce!=='string'||
