@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {executeJob} from '../controller/engine.mjs';
-import {attestOwnerPcJobEvent} from '../controller/common.mjs';
+import {attestOwnerPcJobEvent,publicPcReportProjection} from '../controller/common.mjs';
 import {stagePreimageManifest} from '../controller/preimage-manifest-stager.mjs';
 
 const wf=fs.readFileSync(new URL('../.github/workflows/pc-job.yml',import.meta.url),'utf8');
@@ -205,4 +205,45 @@ test('public pc-job preserves fixed A-grade source+report boundary',()=>{
  assert.doesNotMatch(wf,/pull_request:\s*\n|pull_request_target:/);
  assert.match(wf,/controller\\entry\.mjs/);
  assert.match(wf,/controller\\upload\.mjs/);
+});
+
+test('public JSON/TXT export never contains local private result payload or token',()=>{
+ const original={schema:'ZGMINI_PC_RESULT_V1',
+  jobId:'run-46021321376-1-seat-3',
+  requestId:'pc-supervisor-smoke-12345678',
+  operation:'runner-smoke',seat:3,status:'PASS',
+  code:'RUNNER_COMMAND_EXECUTED',actualExecutionSha:'a'.repeat(40),
+  result:{secret:'DO_NOT_PUBLISH_TEST_SECRET',privateConfig:'e:/ZGmini/data/private',
+    source:'internal raw source',token:'ghp_fake_not_real'},
+  protectedBefore:{rawSensitive:'DO_NOT_PUBLISH_TEST_SECRET'},
+  prior:{unredacted:'DO_NOT_PUBLISH_TEST_SECRET'},
+  collector:{environment:'DO_NOT_PUBLISH_TEST_SECRET'}};
+ const sourceBefore=JSON.stringify(original);
+ const publicReceipt=publicPcReportProjection(original);
+ assert.deepEqual(Object.keys(publicReceipt).sort(),[
+  'actualExecutionSha','code','jobId','operation','reportTransfer','requestId',
+  'schema','seat','status'
+ ].sort());
+ assert.equal(publicReceipt.reportTransfer.status,'SUMMARY_ONLY');
+ assert.equal(publicReceipt.reportTransfer.code,'PUBLIC_REPOSITORY_REDACTED');
+ assert.equal(publicReceipt.code,'RUNNER_COMMAND_EXECUTED');
+ assert.equal(publicReceipt.status,'PASS');
+ assert.doesNotMatch(JSON.stringify(publicReceipt),
+  /DO_NOT_PUBLISH_TEST_SECRET|ghp_fake_not_real|private|ZGmini|internal raw source/);
+ assert.equal(JSON.stringify(original),sourceBefore,'input result remains untouched');
+ assert.throws(()=>publicPcReportProjection({...original,jobId:'../escape'}),
+  /PUBLIC_REPORT_SCOPE_UNVERIFIED/);
+});
+
+test('public report uploader verifies repo API identity before selecting sanitized receipt',()=>{
+ const upload=fs.readFileSync(new URL('../controller/upload.mjs',import.meta.url),'utf8');
+ assert.match(upload,/repository=await api\(''\)/);
+ assert.match(upload,/repository\.data\?\.id===1442936296/);
+ assert.match(upload,/repository\.data\.owner\?\.id===327938088/);
+ assert.match(upload,/typeof repository\.data\.private==='boolean'/);
+ assert.match(upload,/repository\.data\.private\?report:\s*publicPcReportProjection\(report\)/);
+ assert.match(upload,/REPORT_REPOSITORY_UNVERIFIED/);
+ const before=upload.indexOf('const {json,txt}=renderBoundedReport');
+ const after=upload.indexOf('uploadVerifiedReportPair(');
+ assert.ok(before>upload.indexOf('repository=await api')&&after>before);
 });
