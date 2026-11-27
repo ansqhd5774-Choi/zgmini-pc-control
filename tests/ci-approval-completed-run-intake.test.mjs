@@ -308,12 +308,12 @@ test('separate Public B activation flag never authorizes uninstalled effect or b
  assert.match(pub,/github\.event\.repository\.private == false/);
  assert.match(pub,/vars\.ZGMINI_CI_CONTROLLER_B_PUBLIC_EFFECT_APPROVED == 'true'/);
  assert.match(y,/name: Checkout existing Private B source pin\s+if: github\.event\.repository\.private == true\s+uses: actions\/checkout@[a-f0-9]{40}\s+with:\s+ref: cfe57f3d720219613c87eff21338de0d35edbf6b/);
- assert.match(y,/name: Checkout separately approved Public B candidate source pin\s+if: github\.event\.repository\.private == false\s+uses: actions\/checkout@[a-f0-9]{40}\s+with:\s+ref: 62249e557c63f9b641b22cdd2213a71a88470d6e/);
+ assert.match(y,/name: Checkout separately approved Public B candidate source pin\s+if: github\.event\.repository\.private == false\s+uses: actions\/checkout@[a-f0-9]{40}\s+with:\s+ref: 25c300b8a13da5b269b05c76039d077710c66287/);
  assert.match(pub,/github\.event\.workflow_run\.workflow_id == 416355595/);
  assert.match(pub,/github\.event\.workflow_run\.event == 'pull_request'/);
  assert.match(pub,/github\.event\.workflow_run\.head_repository\.id == 1442936296/);
  assert.match(y,/runs-on: \[self-hosted, Windows, X64, zgmini-handoff-ci-isolated\]/);
- assert.match(y,/ref: 62249e557c63f9b641b22cdd2213a71a88470d6e\s+persist-credentials: false/);
+ assert.match(y,/ref: 25c300b8a13da5b269b05c76039d077710c66287\s+persist-credentials: false/);
  const publisher=readFileSync(new URL('../ci-approval/completed-run-intake.mjs',import.meta.url),'utf8');
  const submitter=readFileSync(new URL('../tools/maintenance-request.mjs',import.meta.url),'utf8');
  assert.match(publisher,/readIndependentlyInstalledControllerBPublisherPolicy\(\)/);
