@@ -290,8 +290,13 @@ jobs:
       github.event.repository.private == false &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.user.login == 'ansqhd5774-Choi'
-    runs-on: ubuntu-latest
-    timeout-minutes: 4
+    # Both jobs use ephemeral GitHub-hosted runners; no self-hosted PC seat.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
     permissions:
       contents: read
     steps:
