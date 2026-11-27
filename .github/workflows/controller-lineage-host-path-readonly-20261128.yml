@@ -160,6 +160,31 @@ jobs:
               $originHasUserInfo = $false
               if ($originKind -eq 'HTTPS') { try { $originHasUserInfo = -not [string]::IsNullOrEmpty(([Uri]([string]$origin)).UserInfo) } catch {} }
               Write-Output "ORIGIN_HAS_USERINFO=$originHasUserInfo"
+              # Final read-only decision based on direct Git capture, not native/PowerShell pipeline exit status.
+              $rootEqualDirect = $false
+              if ($rootDirectReadable) {
+                $rootEqualDirect = [IO.Path]::GetFullPath([string]$rootCheckLines[0]).TrimEnd('\') -ieq [IO.Path]::GetFullPath($checkout).TrimEnd('\')
+              }
+              $prefixCheck = @(& $git.Source -C $checkout rev-parse --show-prefix 2>$null)
+              $gitAtRoot = $LASTEXITCODE -eq 0 -and $prefixCheck.Count -eq 0
+              $originCanonical = $originKind -eq 'HTTPS' -and $originHostGithub -and $originRepoExact -and -not $originHasUserInfo
+              $remoteMainLines = @()
+              $remoteMainVerified = $false
+              if ($originCanonical) {
+                $remoteMainLines = @(& $git.Source -C $checkout ls-remote --heads origin main 2>$null)
+                $remoteMainExit = $LASTEXITCODE
+                $remoteMatch = @($remoteMainLines | Where-Object { $_ -match '^[a-f0-9]{40}\s+refs/heads/main$' } | Select-Object -First 1)
+                $remoteMainVerified = $remoteMainExit -eq 0 -and $remoteMatch.Count -eq 1
+              }
+              Write-Output "GIT_DIRECT_ROOT_EXACT=$rootEqualDirect"
+              Write-Output "GIT_AT_CHECKOUT_ROOT=$gitAtRoot"
+              Write-Output "ORIGIN_CANONICAL=$originCanonical"
+              Write-Output "REMOTE_MAIN_DIRECT_VERIFIED=$remoteMainVerified"
+              if ($remoteMainVerified) { Write-Output "REMOTE_MAIN_DIRECT_SHA=$($remoteMatch[0].Split()[0])" }
+              $verifiedStatic = $headDirectVerified -and $refKindDirect -eq 'MAIN' -and $clean -and $gitAtRoot -and $originCanonical -and $remoteMainVerified
+              Write-Output "FF_VERIFIED_STATIC_PREFLIGHT=$verifiedStatic"
+              Write-Output 'FF_ACTUAL_SAFE_TO_WRITE=UNVERIFIED_SHARED_COORDINATION'
+
 
               Write-Output "CHECKOUT_ROOT_EXACT=$rootOk"
               Write-Output "CHECKOUT_BRANCH_MAIN=$branchOk"
