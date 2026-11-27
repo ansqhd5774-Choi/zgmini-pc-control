@@ -1106,9 +1106,15 @@ export function createMaintenanceAgent({
       reportUploadStatus:stored.reportUploadStatus};
   }
   async function processIssue(issue){
-    if(await repositoryAllowed()==='PUBLIC'){
-      // Read-only intake in the owner's Public source repository. No historical
-      // or new B claim/ledger/approval/OS effect may be interpreted as authority.
+    const repositoryVisibility=await repositoryAllowed();
+    const publicCandidate=issue?.title===ISSUE_TITLE&&issue.state==='OPEN'&&
+      Number.isSafeInteger(issue.number)&&issue.number>0&&
+      issue.author?.login===CI_CONTROLLER_ACTOR&&
+      issue.labels?.some(x=>x.name===label);
+    if(repositoryVisibility==='PUBLIC'&&!publicCandidate){
+      // Keep every existing Public owner/B/legacy entry blocked. A bot alone
+      // is never enough: a separate installed V2 policy and exact CI receipt
+      // must still pass before any mutation.
       return {status:'BLOCKED',code:'PUBLIC_B_EFFECT_SEPARATE_AUTH_REQUIRED',
         issueNumber:issue?.number,operationalWrites:0,effectAuthorized:false};
     }
@@ -1129,9 +1135,15 @@ export function createMaintenanceAgent({
           throw coded('CI_INSTALLED_POLICY_UNVERIFIED');
         ciPolicy=installedControllerBPolicy(JSON.parse(fs.readFileSync(file,'utf8')));
       }catch{
+        if(repositoryVisibility==='PUBLIC')
+          return {status:'BLOCKED',code:'PUBLIC_B_EFFECT_SEPARATE_AUTH_REQUIRED',
+            issueNumber:issue.number,operationalWrites:0,effectAuthorized:false};
         return {status:'BLOCKED',code:'CI_INSTALLED_POLICY_UNVERIFIED',issueNumber:issue.number};
       }
     }
+    if(repositoryVisibility==='PUBLIC'&&ciPolicy?.repositoryVisibility!=='public')
+      return {status:'BLOCKED',code:'PUBLIC_B_EFFECT_SEPARATE_AUTH_REQUIRED',
+        issueNumber:issue.number,operationalWrites:0,effectAuthorized:false};
     const ciCandidate=ciOrigin&&ciPolicy!==null;
     if(![ISSUE_TITLE,R6_HOST_ISSUE_TITLE,R54_B_ISSUE_TITLE,SOURCE_BUNDLE_ISSUE_TITLE].includes(issue?.title)
       ||(!ciCandidate&&!issueIsTrusted(issue,{allowedActors,title:issue.title,label})))
@@ -1198,6 +1210,19 @@ export function createMaintenanceAgent({
     let approvedBytes,approved;
     try{
       approvedBytes=await manifestBytes(request);
+      if(repositoryVisibility==='PUBLIC'){
+        // Prevent an otherwise matching request/receipt from using a different
+        // installed baseline. The independently protected manifest bytes still
+        // undergo the unchanged original B validation below.
+        let exactManifest;
+        try{exactManifest=JSON.parse(approvedBytes.toString('utf8'));}catch{
+          throw coded('CI_PUBLIC_APPROVAL_MANIFEST_INVALID');
+        }
+        if(exactManifest.installedSha!==ciPolicy.installedSha||
+          request.targetControllerSha!==ciPolicy.targetSha||
+          request.approvalManifestSha256!==ciPolicy.manifestSha256)
+          throw coded('CI_PUBLIC_EFFECT_SCOPE_MISMATCH');
+      }
       const preflight=await updaterStatus(request.requestId,request.operation);
       if(preflight?.installedReadbackCode||preflight?.ledgerReadbackCode||
         preflight?.lockReadbackCode)throw coded('UPDATE_STATUS_RECOVERY_REQUIRED');
