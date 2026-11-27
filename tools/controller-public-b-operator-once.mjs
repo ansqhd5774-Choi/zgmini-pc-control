@@ -125,9 +125,11 @@ async function sourceAndOwner(){
  // Never trust a moving main as executable source authority. Bind every
  // runtime dependency to the *merged* reviewed source PR and check main still
  // serves those immutable bytes, even if unrelated main commits advance.
- const sourcePr=api('repos/'+REPO+'/pulls/4261');
- need(sourcePr?.merged===true&&
-  sourcePr?.base?.ref==='main'&&
+ const sourcePr=api('repos/'+REPO+'/pulls/4262');
+ need(sourcePr?.number===4262&&sourcePr?.merged===true&&
+  sourcePr?.user?.id===327938088&&
+  sourcePr?.base?.ref==='main'&&sourcePr?.base?.repo?.full_name===REPO&&
+  sourcePr?.head?.repo?.full_name===REPO&&
   /^[a-f0-9]{40}$/.test(sourcePr?.merge_commit_sha??''),
   'PUBLIC_B_OPERATOR_SOURCE_PR_NOT_MERGED');
  const sourceMerge=sourcePr.merge_commit_sha;
