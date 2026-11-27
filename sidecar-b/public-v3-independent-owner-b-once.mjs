@@ -148,7 +148,7 @@ export function verifyW06ReviewedImportClosure(sourceByFile) {
   const code=sourceByFile[rel];
   need(typeof code==='string'&&code.length>0,
    'W06_PUBLIC_B_IMPORT_CLOSURE_STOP');
-  for(const match of code.matchAll(/\\b(?:from\\s+|import\\s*(?:\\(\\s*)?)(['"])([^'"]+)\\1/g)){
+  for(const match of code.matchAll(/\b(?:from\s+|import\s*(?:\(\s*)?)(['"])([^'"]+)\1/g)){
    const spec=match[2];
    if(spec.startsWith('node:'))continue;
    need(spec.startsWith('./')||spec.startsWith('../'),
