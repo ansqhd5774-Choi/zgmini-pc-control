@@ -43,9 +43,12 @@ const boundedRead=(io,rel,max)=>{
  return bytes;
 };
 const sameSecret=(a,b)=>{
- // Fixed-format UUIDs only, and never materialize a comparison transcript.
+ // Match the installed assertSupervisorOwner() comparison BYTE FOR BYTE.
+ // That guard uses owner.nonce === env.ZGMINI_SUPERVISOR_NONCE, with no
+ // case folding. Normalizing UUID case here would report a false match.
+ // Neither input nor a comparison transcript is ever emitted.
  if(!uuid4(a)||!uuid4(b))return false;
- const left=Buffer.from(a.toLowerCase()),right=Buffer.from(b.toLowerCase());
+ const left=Buffer.from(a,'utf8'),right=Buffer.from(b,'utf8');
  return left.length===right.length&&timingSafeEqual(left,right);
 };
 function livePid(p){
