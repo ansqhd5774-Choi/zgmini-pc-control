@@ -10,6 +10,7 @@ import {stagePreimageManifest} from '../controller/preimage-manifest-stager.mjs'
 
 const wf=fs.readFileSync(new URL('../.github/workflows/pc-job.yml',import.meta.url),'utf8');
 const entry=fs.readFileSync(new URL('../controller/entry.mjs',import.meta.url),'utf8');
+const publicA=wf.split('  public-approved-a:\n')[1]?.split('\n  # Public issue observation')[0];
 const stager=fs.readFileSync(new URL('../controller/preimage-manifest-stager.mjs',import.meta.url),'utf8');
 const engine=fs.readFileSync(new URL('../controller/engine.mjs',import.meta.url),'utf8');
 
@@ -46,8 +47,10 @@ test('workflow accepts exactly owner opened or pc-job labeled and retains pinned
  assert.match(wf,/github\.event\.issue\.title == 'pc-job'/);
  assert.match(wf,/github\.event\.issue\.pull_request == null/);
  assert.match(wf,/github\.workflow_ref == 'ansqhd5774-Choi\/zgmini-pc-control\/\.github\/workflows\/pc-job\.yml@refs\/heads\/main'/);
- assert.doesNotMatch(wf,/github\.event\.repository\.private == true/);
- assert.doesNotMatch(wf,/pull_request:|pull_request_target:|actions\/checkout/);
+ assert.match(wf,/github\.event\.repository\.private == true/);
+ assert.match(publicA,/github\.event\.repository\.private == false/);
+ assert.doesNotMatch(wf.split('\njobs:')[0],/pull_request:|pull_request_target:|schedule:/);
+ assert.doesNotMatch(publicA,/pull_request:|pull_request_target:|actions\/checkout/);
  assert.match(wf,/cancel-in-progress: false/);
  assert.match(wf,/E:\\ZGmini\\runtime\\node\.exe/);
  assert.match(wf,/controller\\entry\.mjs/);
@@ -56,8 +59,7 @@ test('workflow accepts exactly owner opened or pc-job labeled and retains pinned
 });
 
 test('labeled workflow admission is independently gated from opened single-run entry',()=>{
- const jobExpression=wf.replace(/\r\n/g,'\n')
-  .split('  approved-pc-job:\n    if: >-\n')[1]?.split('\n    # Late-label entry')[0];
+ const jobExpression=publicA.split('    if: >-\n')[1]?.split('\n    # Public visibility')[0];
  assert.ok(jobExpression,'expected fixed self-hosted job admission');
  assert.match(jobExpression,/github\.event\.action == 'opened' \|\|/);
  assert.match(jobExpression,/github\.event\.action == 'labeled'/);
