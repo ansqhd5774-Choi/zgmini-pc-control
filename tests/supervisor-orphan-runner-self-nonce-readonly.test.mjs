@@ -99,9 +99,26 @@ test('wrong, malformed or absent inherited nonce fail without publishing bytes',
  }
 });
 
-test('nonce comparison is case-insensitive for a well-formed UUID only',()=>{
- const r=request();r.env.ZGMINI_SUPERVISOR_NONCE=nonce.toUpperCase();
- assert.equal(assess(r).status,'OBSERVED');
+test('nonce comparison is byte-exact like installed assertSupervisorOwner',()=>{
+ const same=request();
+ assert.equal(assess(same).status,'OBSERVED');
+
+ // The real installed guard uses === on nonce strings, not normalized UUID
+ // bytes. Accepting these would falsely certify an A job that stays BLOCKED.
+ const upperEnv=request();
+ upperEnv.env.ZGMINI_SUPERVISOR_NONCE=nonce.toUpperCase();
+ assert.equal(assess(upperEnv).code,'RUNNER_SELF_PROCESS_NONCE_MISMATCH');
+
+ const upperOwner=request();
+ upperOwner.ownerBytes=json({...owner,nonce:nonce.toUpperCase()});
+ upperOwner.expected.ownerSha256=sha(upperOwner.ownerBytes);
+ assert.equal(assess(upperOwner).code,'RUNNER_SELF_PROCESS_NONCE_MISMATCH');
+
+ const bothUpper=request();
+ bothUpper.env.ZGMINI_SUPERVISOR_NONCE=nonce.toUpperCase();
+ bothUpper.ownerBytes=json({...owner,nonce:nonce.toUpperCase()});
+ bothUpper.expected.ownerSha256=sha(bothUpper.ownerBytes);
+ assert.equal(assess(bothUpper).status,'OBSERVED');
 });
 
 test('wrong host/source/owner/heartbeat raw preimage is rejected before nonce',()=>{
