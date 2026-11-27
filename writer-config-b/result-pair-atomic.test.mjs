@@ -47,6 +47,21 @@ test('two consecutive descendant main advances keep exact pair atomic',async()=>
  assert.equal(f.files.get(outputs[0][0]).toString(),outputs[0][1]);
  assert.equal(f.files.get(outputs[1][0]).toString(),outputs[1][1]);
 });
+// Two unrelated main advances are permitted, but neither may claim a result
+// path. Check both halves independently before any third ref update.
+for(const claimed of outputs.map(([path])=>path)){
+ test('second verified main advance claims '+claimed+' and blocks both outputs',async()=>{
+  const f=createGitPairFixture({advanceMainOnFirstPatch:true,
+   advanceMainOnSecondPatch:true,secondAdvanceWithExistingPath:claimed});
+  const r=await uploadResultPairAtomic({outputs,headers,fetchApi:f.fetchApi});
+  assert.deepEqual([r.created,r.verified,f.counts.commits,f.counts.updates],
+   [0,0,2,2]);
+  assert.equal(r.delivery,'RESULT_PAIR_ALREADY_EXISTS_OR_PREFLIGHT_UNVERIFIED');
+  assert.equal(f.files.get(claimed).toString(),'old result');
+  const other=outputs.find(([path])=>path!==claimed)[0];
+  assert.equal(f.files.has(other),false);
+ });
+}
 test('concurrent creation of even one result rejects pair without rewrite',async()=>{
  const f=createGitPairFixture({advanceMainWithExistingPath:outputs[0][0]});
  const r=await uploadResultPairAtomic({outputs,headers,fetchApi:f.fetchApi});
