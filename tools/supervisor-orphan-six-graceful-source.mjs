@@ -28,11 +28,12 @@ const ok=(code,patch={})=>Object.freeze({...zero,status:'CANDIDATE_ONLY',code,
 function privateIdentity(p){
  return [p.seat,p.pid,p.startedAtUtc,p.canonicalPathSha256];
 }
-function strongPrivatePreflight(snapshot,now){
+function strongPrivatePreflight(snapshot,now,{pinnedHistorical=false}={}){
  const s=snapshot;
  if(!s||s.schema!=='ZGMINI_ORPHAN_SIX_PRIVATE_B_SNAPSHOT_V1'||
     !Number.isFinite(now)||!time(s.observedAtUtc)||
-    Date.parse(s.observedAtUtc)>now||now-Date.parse(s.observedAtUtc)>5000)
+    Date.parse(s.observedAtUtc)>now||
+    (!pinnedHistorical&&now-Date.parse(s.observedAtUtc)>5000))
   return {code:'ORPHAN_GRACEFUL_OBSERVATION_STALE'};
  if(!sha40(s.installed?.controllerSourceSha)||
     s.installed?.controllerFilesVerified!==true||
@@ -136,8 +137,18 @@ const events=new Set(['DURABLE_STOP_INTENT','PRIVATE_SEAT_EXIT_READBACK',
 export function advanceOrphanGracefulSixSourceJournal({
  prior,event,proof,snapshot,now=Date.now()
 }={}){
- const p=strongPrivatePreflight(snapshot,now);
+ // Snapshot is the immutable B-pinned ORIGINAL six-seat preimage, not a
+ // claim that all six still live after some have already exited. Each event
+ // instead needs a separate fresh private same-host readback below.
+ const p=strongPrivatePreflight(snapshot,now,{pinnedHistorical:true});
  if(p.code)return deny(p.code);
+ if(!time(proof?.observedAtUtc)||Date.parse(proof.observedAtUtc)>now||
+    now-Date.parse(proof.observedAtUtc)>5000)
+  return Object.freeze({...zero,status:'RECOVERY_REQUIRED',
+   code:'ORPHAN_GRACEFUL_FRESH_PRIVATE_READBACK_MISSING',
+   phase:'RECOVERY_REQUIRED',stoppedCount:prior?.stoppedCount??0,
+   intentCount:prior?.intentCount??0,
+   nextAction:'RECONCILE_DURABLE_ORIGINAL_JOURNAL_NO_SIGNAL_RETRY'});
  if(!prior||prior.schema!==ORPHAN_GRACEFUL_SIX_SCHEMA||
     !STAGES.has(prior.phase)||prior.status!=='CANDIDATE_ONLY'||
     prior.proposalId!==p.opaque||
@@ -162,7 +173,9 @@ export function advanceOrphanGracefulSixSourceJournal({
   if(prior.stoppedCount===6||prior.intentCount!==prior.stoppedCount||
      proof?.source!=='PRIVATE_B_JOURNAL_EXACT_CAS_READBACK'||
      proof?.nextSeat!==prior.nextSeat||proof?.durableIntentReadback!==true||
-     proof?.sameOneUseClaimVerified!==true)
+     proof?.sameOneUseClaimVerified!==true||
+     proof?.nextSeatIdentityStillLiveVerified!==true||
+     proof?.watchdogFenceUninterruptedVerified!==true)
    return deny('ORPHAN_GRACEFUL_INTENT_CAS_UNVERIFIED');
   return ok('ORPHAN_GRACEFUL_SIGNAL_INTENT_RECORDED_SOURCE_ONLY',{
    ...fixed,phase:'STOP_INTENT_RECORDED',intentCount:prior.intentCount+1,
@@ -180,7 +193,8 @@ export function advanceOrphanGracefulSixSourceJournal({
      proof?.oldInstanceExitedVerified!==true||
      proof?.unknownOrDuplicateListenerAbsentVerified!==true||
      proof?.watchdogFenceUninterruptedVerified!==true||
-     proof?.operatorClaimUninterruptedVerified!==true)
+     proof?.operatorClaimUninterruptedVerified!==true||
+     proof?.otherFiveOrRemainingSeatsUnchangedVerified!==true)
    return deny('ORPHAN_GRACEFUL_SEAT_EXIT_READBACK_UNVERIFIED');
   const stoppedCount=prior.stoppedCount+1;
   return ok('ORPHAN_GRACEFUL_SEAT_EXIT_SOURCE_ONLY',{
