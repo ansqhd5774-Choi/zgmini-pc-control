@@ -1050,3 +1050,17 @@
 - 전용 관리 브랜치는 최신 `main`과 diverged이므로 통째로 main에 병합하지 않음. 코드 수정은 당시 최신 main 기반 최소 작업 브랜치로 처리. 과거 R6/정책 보류는 최신 정확 효과·승인·복구 증거를 비교해 판단하며, 임의로 해제 또는 무관한 기능 전역 중단으로 확대하지 않음.
 
 **현 시점 운영 종단: 신규 무인 A/Controller B/Writer B 0/3 확인.** R3 계획 기록은 실제 운영 설치·실행 증명이 아니다.
+
+## 41. 서른일곱 번째 실행 기록 — #4283/#4287 승인 명세 및 Windows 적용 경계 확인 (2026-11-28 KST)
+
+### 이번 실행 원본 결과
+- [#4283](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4283): merged=true, merge SHA `f96187723c25d2059a53e587d9b31717deaab277`. [정확 2파일 B 승인 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4283#issuecomment-7227602053) 확인.
+- [#4287](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4287): merged=true, merge SHA `6f2afc8651702d966d52815e2976657488ee46d3`. [Public A old/new SHA 보호 변경 승인](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4287#issuecomment-7227602587) 확인. 기존 #68 승인 및 병합 증거 재사용.
+- `main` 승인 명세 `approvals/controller-updates/cde1dd372210e4658ae348cb9e2577967cb11634.json` 및 선택 핀 `approvals/controller-selective-targets/cde1dd372210e4658ae348cb9e2577967cb11634.json` 원문 조회. 기존 installed SHA `555f95708984580cd7d5a0fd05a80b718e867710`→target `cde1dd372210e4658ae348cb9e2577967cb11634`, 정확 변경 파일 `config/operations.json` SHA256 `177cb15b40ca34fc415a091bf93f8f6ac6d607ce4d6f7f429a77d73c8abdcccf`, `controller/operations.mjs` SHA256 `0507663515206b97bb2cad72a2b3fb19032d5ab0f3c2bdd1305eaa6d225d5375`. Manifest 원본 SHA256은 [#68 기존 검토](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-7227627783)에서 `211e833de94751b7577356c3304f30b5ddc81171d5ecb44136ee3e3ff41b8ce9`로 기록. 이번 조회에서는 실제 Windows 파일 바이트를 재계산하지 않음.
+- 최신 [#68 기존 차단 분석](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-7227675658) 대조: 기존 C급 단회 운영자는 #4260의 **과거 4파일 효과 전용**이고 #4283 2파일 효과용으로 SHA만 바꿔 사용할 수 없음. Public 일반 Issue/구 Private-only 제출기는 정확한 실행 경로가 아님. #4276의 main ancestry는 이번 대화에서 이미 해결됐지만 **독립 Windows V2 정책 실설치 및 현행 CAS/lease/backup/readback**은 여전히 입증되지 않음.
+- 기존 실제 설치 마지막 관측은 `555f957...`이며, 최신 현장 readback을 새로 수행하지 못했다. #4156 추가 Standby/로컬 원장 2건 실측도 미확인. 과거 #4263 복구 성공 및 A 실행 8/8을 신규 B 운영 성공으로 바꾸지 않는다.
+
+### 판정과 다음 필수 단계
+- **P1 상태: SOURCE_AND_APPROVAL_VERIFIED / WINDOWS_RUNTIME_STATE_UNKNOWN**. #4283/#4287 소스·효과 승인 중복 요청 금지. Windows 설치 실행 및 B Issue POST 0건, 사용자 수동 작업 전가·비공식 shell 우회 없음.
+- 다음: 기존 정규 독립 Windows 유지보수 경로의 정확한 #4283 2파일 운영 적용 지원·V2 설치 정책 readback·실제 host preimage와 lease 확인. 기존 C급 #4260 4파일 설치기 상수 교체는 금지. 보호 조건을 통과하고 실제 공식 적용 수단이 확인되기 전에는 B 발행·설치하지 않는다. 독립 A/Writer 작업을 이 제한으로 전역 보류하지 않는다.
+- **무인 운영 종단 0/3 확인, P0 기록 완료, P1 운영 증거 미완료.** 
