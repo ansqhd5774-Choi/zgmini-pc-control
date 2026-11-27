@@ -1,0 +1,14 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-46052065337-1-seat-6",
+  "requestId": "pc-stage5-4263-recovery-smoke-20261128-01",
+  "operation": "runner-smoke",
+  "seat": 6,
+  "status": "PASS",
+  "code": "PUBLIC_RESULT_CODE_REDACTED",
+  "actualExecutionSha": "555f95708984580cd7d5a0fd05a80b718e867710",
+  "reportTransfer": {
+    "status": "SUMMARY_ONLY",
+    "code": "PUBLIC_REPOSITORY_REDACTED"
+  }
+}
