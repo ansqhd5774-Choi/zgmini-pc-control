@@ -1221,34 +1221,53 @@ export function protectedSnapshot() {
  return out;
 }
 
-// Public polling still rejects all B requests. This is a separate, one-shot
-// interactive Windows operator origin for the exact owner-approved 4-file effect.
+// Public polling remains B-denied. Independent Windows Owner is allowed only
+// two separately approved immutable one-shot effects. Never infer an approval
+// from the presence of a manifest or a GitHub account session.
 const PUBLIC_OWNER_B=Object.freeze({
  installed:'3c7d4cfefacf072fd35cb19706b352c64c5e4fd2',
  target:'555f95708984580cd7d5a0fd05a80b718e867710',
+ approvalPr:4260,
  approvalMerge:'ac0e806a929bcab05b72115edd5d673b172839f3',
+ selectiveBranch:'codex/public-a-controller-postcheck-selective-20261128',
  paths:['controller/common.mjs','controller/entry.mjs',
   'controller/preimage-manifest-stager.mjs','controller/upload.mjs']
 });
-export function validatePublicOwnerBExactScope(data){
+const PUBLIC_AUDIT_OWNER_B=Object.freeze({
+ installed:'555f95708984580cd7d5a0fd05a80b718e867710',
+ target:'cde1dd372210e4658ae348cb9e2577967cb11634',
+ approvalPr:4283,
+ approvalMerge:'f96187723c25d2059a53e587d9b31717deaab277',
+ selectiveBranch:'codex/controller-operating-audit-selective-one-20261128',
+ paths:['config/operations.json','controller/operations.mjs']
+});
+function approvedPublicOwnerEffect(data){
  const {issue,manifest}=data??{};
- need(data?.actor==='ansqhd5774-Choi'&&
+ const effect=issue?.targetControllerSha===PUBLIC_OWNER_B.target?
+  PUBLIC_OWNER_B:issue?.targetControllerSha===PUBLIC_AUDIT_OWNER_B.target?
+  PUBLIC_AUDIT_OWNER_B:null;
+ need(effect!==null&&data?.actor==='ansqhd5774-Choi'&&
   issue?.operation==='controller-update'&&issue?.controlRepository===controlRepository&&
-  issue?.targetControllerSha===PUBLIC_OWNER_B.target&&
-  manifest?.installedSha===PUBLIC_OWNER_B.installed&&
-  manifest?.targetSha===PUBLIC_OWNER_B.target&&
+  manifest?.installedSha===effect.installed&&
+  manifest?.targetSha===effect.target&&
   manifest?.controllerOnlyInstall===true&&manifest?.purpose==='pc-controller-maintenance'&&
-  manifest?.approval?.grade==='B'&&manifest?.approval?.scope==='PC_CONTROL_CONTROLLER_UPDATE'&&
-  manifest?.approval?.ref==='https://github.com/'+controlRepository+'/pull/4260'&&
+  manifest?.approval?.grade==='B'&&
+  manifest?.approval?.scope==='PC_CONTROL_CONTROLLER_UPDATE'&&
+  manifest?.approval?.ref==='https://github.com/'+controlRepository+'/pull/'+effect.approvalPr&&
   manifest?.postOperation==='core-status'&&
-  manifest?.selectiveSource?.branch==='codex/public-a-controller-postcheck-selective-20261128'&&
+  manifest?.selectiveSource?.branch===effect.selectiveBranch&&
   Array.isArray(manifest?.allowFiles)&&
-  JSON.stringify(manifest.allowFiles.map(x=>x.path).sort())===JSON.stringify([...PUBLIC_OWNER_B.paths].sort()),
+  JSON.stringify(manifest.allowFiles.map(x=>x.path).sort())===
+   JSON.stringify([...effect.paths].sort()),
   'PUBLIC_B_EFFECT_SCOPE_DENIED');
+ return effect;
+}
+export function validatePublicOwnerBExactScope(data){
+ approvedPublicOwnerEffect(data);
  return true;
 }
 export function verifyPublicOwnerBWindows(data,issueNumber,supervisorPid){
- validatePublicOwnerBExactScope(data);
+ const effect=approvedPublicOwnerEffect(data);
  need(process.platform==='win32'&&os.hostname().toUpperCase()==='PC'&&
   !process.env.GITHUB_ACTIONS&&!process.env.RUNNER_NAME&&!process.env.GITHUB_RUN_ID,
   'PUBLIC_B_INDEPENDENT_WINDOWS_REQUIRED');
@@ -1260,8 +1279,8 @@ export function verifyPublicOwnerBWindows(data,issueNumber,supervisorPid){
   repoInfo?.id===1442936296&&repoInfo?.owner?.id===327938088&&
   repoInfo?.full_name===controlRepository&&repoInfo?.private===false,
   'PUBLIC_B_OWNER_AUTH_UNVERIFIED');
- const approval=github('pulls/4260');
- need(approval?.merged===true&&approval?.merge_commit_sha===PUBLIC_OWNER_B.approvalMerge,
+ const approval=github('pulls/'+effect.approvalPr);
+ need(approval?.merged===true&&approval?.merge_commit_sha===effect.approvalMerge,
   'PUBLIC_B_APPROVAL_NOT_MERGED');
  const issueRow=github('issues/'+issueNumber);
  need(issueRow?.number===issueNumber&&issueRow?.state==='open'&&
@@ -1271,7 +1290,7 @@ export function verifyPublicOwnerBWindows(data,issueNumber,supervisorPid){
   issueRow?.labels?.some(x=>x.name==='pc-maintenance'),
   'PUBLIC_B_OWNER_ISSUE_NOT_AUTHENTICATED');
  const mainBytes=kind=>{
-  const f=github('contents/approvals/'+kind+'/'+PUBLIC_OWNER_B.target+'.json?ref=main');
+  const f=github('contents/approvals/'+kind+'/'+effect.target+'.json?ref=main');
   need(f?.type==='file'&&f?.encoding==='base64'&&typeof f.content==='string',
    'PUBLIC_B_APPROVAL_FILE_MISSING');
   return Buffer.from(f.content,'base64');
@@ -1281,7 +1300,7 @@ export function verifyPublicOwnerBWindows(data,issueNumber,supervisorPid){
   bytes.equals(Buffer.from(data.manifestRawBase64??'','base64')),
   'PUBLIC_B_MAIN_MANIFEST_BYTES_MISMATCH');
  const checked=validateUpdateRequest(data.issue,bytes,{
-  actor:'ansqhd5774-Choi',installedSha:PUBLIC_OWNER_B.installed});
+  actor:'ansqhd5774-Choi',installedSha:effect.installed});
  need(JSON.stringify(checked.manifest)===JSON.stringify(data.manifest),
   'PUBLIC_B_MANIFEST_NOT_VALIDATED');
  validateControllerSelectivePin(checked.manifest,
