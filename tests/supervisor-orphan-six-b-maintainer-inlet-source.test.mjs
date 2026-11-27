@@ -249,3 +249,36 @@ test('seven-file read-only module has no OS signal, process kill or persistent w
  assert.doesNotMatch(source,/\b(?:execFile|spawn|taskkill|writeFileSync|renameSync|unlinkSync)\s*\(/);
  assert.doesNotMatch(source,/PRIVATE_INDEPENDENT_B_MAINTAINER'.*origin/);
 });
+
+test('static inlet matches original sources and loads from exactly seven installed files',async t=>{
+ const {pathToFileURL}=await import('node:url');
+ const {render}=await import('../tools/build-orphan-six-static-inlet.mjs');
+ const agent=fs.readFileSync(new URL('../tools/maintenance-agent.mjs',import.meta.url),'utf8');
+ const start=agent.indexOf('// BEGIN GENERATED ORPHAN SIX SOURCE INLET');
+ const end=agent.indexOf('// END GENERATED ORPHAN SIX SOURCE INLET');
+ assert.ok(start>=0&&end>start);
+ assert.equal(agent.slice(start,agent.indexOf('\n',end)+1),render());
+ assert.throws(()=>render(name=>fs.readFileSync(new URL('../tools/'+name,import.meta.url),'utf8')+
+  '\nimport {x} from "./unapproved.mjs";\n'),/ORPHAN_BUNDLE_IMPORT/);
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-orphan-inlet-seven-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ fs.mkdirSync(path.join(root,'tools'));
+ for(const rel of nextRuntimeFiles)fs.copyFileSync(new URL('../'+rel,import.meta.url),path.join(root,rel));
+ assert.equal(fs.readdirSync(path.join(root,'tools')).length,7);
+ const packed=await import(pathToFileURL(path.join(root,'tools/maintenance-agent.mjs')).href);
+ const a=sample(),b=sample();
+ assert.deepEqual(packed.parseOrphanSixPackagedRequest(a.issue.body),a.body);
+ assert.deepEqual(await packed.inspectOrphanSixPackagedInletSource({issue:a.issue,...a.p}),
+  await inspectOrphanSixBMaintainerInletSource({issue:b.issue,...b.p}));
+ for(const mutate of [
+  x=>{x.issue.author.login='github-actions[bot]';},
+  x=>{x.p.readOriginalOneUseClaim=async()=>({phase:'STOP_INTENT_RECORDED'});},
+  x=>{x.p.getOwnerEffectComments=async()=>({source:'GITHUB_CANONICAL_ISSUE_COMMENTS_API',complete:true,issueNumber:6201,items:[x.comment('REVOKE')]});},
+  x=>{x.issue.body=x.issue.body.slice(0,-1)+',"requestId":"duplicate"}';}
+ ]){
+  const x=sample(),y=sample();mutate(x);mutate(y);
+  const out=await packed.inspectOrphanSixPackagedInletSource({issue:x.issue,...x.p});
+  assert.deepEqual(out,await inspectOrphanSixBMaintainerInletSource({issue:y.issue,...y.p}));
+  assert.equal(out.effectAuthorized,false);assert.equal(out.operationalWrites,0);
+ }
+});
