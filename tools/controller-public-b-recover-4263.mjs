@@ -101,14 +101,14 @@ async function attestedModules(merge){
  }
  const allowed=new Set(list);
  for(const [rel,code] of sources){
-  for(const item of code.matchAll(/\\b(?:from\\s+|import\\s+)(['"])([^'"]+)\\1/g)){
+  for(const item of code.matchAll(/\b(?:from\s+|import\s+)(['"])([^'"]+)\1/g)){
    const spec=item[2];if(spec.startsWith('node:'))continue;
    need(spec.startsWith('./')||spec.startsWith('../'),
     'B4263_UNPINNED_IMPORT');
    const resolved=path.posix.normalize(path.posix.join(path.posix.dirname(rel),spec));
    need(allowed.has(resolved),'B4263_UNPINNED_IMPORT');
   }
-  for(const item of code.matchAll(/\\bimport\\s*\\(\\s*(['"])([^'"]+)\\1\\s*\\)/g)){
+  for(const item of code.matchAll(/\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/g)){
    const spec=item[2];
    need(spec.startsWith('node:')||allowed.has(
     path.posix.normalize(path.posix.join(path.posix.dirname(rel),spec))),
