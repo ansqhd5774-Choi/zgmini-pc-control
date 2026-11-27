@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {validatePublicOwnerBExactScope} from '../tools/update.mjs';
-import {main} from '../tools/controller-audit-sha-repair-public-b-operator-once.mjs';
+import {main,verifyOperatorSourceClosure,withPublicBInstallLease} from '../tools/controller-audit-sha-repair-public-b-operator-once.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const INSTALLED='cde1dd372210e4658ae348cb9e2577967cb11634';
@@ -55,4 +55,47 @@ test('operator refuses inspection and installation away from independent Windows
  assert.ok(entry.includes("maintenanceLockStatus(MAINT,'controller-install')"));
  assert.ok(entry.includes('lock.holdForRecovery()'));
  assert.ok(entry.includes('deps.prevalidationInventory(host)!==null'));
+});
+
+test('new independent operator pins entire six-source import closure before evaluation',()=>{
+ const rels=[
+  'tools/controller-audit-sha-repair-public-b-operator-once.mjs',
+  'tools/update.mjs','tools/maintenance-contract.mjs',
+  'tools/maintenance-apply.mjs','tools/maintenance-lock.mjs',
+  'tools/source-bundle-register.mjs'
+ ];
+ const trusted=Object.fromEntries(rels.map(rel=>[rel,fs.readFileSync(rel)]));
+ assert.equal(verifyOperatorSourceClosure(rel=>trusted[rel],rel=>trusted[rel]),true);
+ const modified={...trusted,'tools/update.mjs':Buffer.from('export const injected=true;')};
+ assert.throws(()=>verifyOperatorSourceClosure(rel=>modified[rel],rel=>trusted[rel]),
+  /PUBLIC_B_OPERATOR_SOURCE_CAS_FAILED/);
+ const extra={...trusted,
+  'tools/update.mjs':Buffer.concat([trusted['tools/update.mjs'],
+   Buffer.from("\\nimport './unapproved-sidecar.mjs';")])};
+ assert.throws(()=>verifyOperatorSourceClosure(rel=>extra[rel],rel=>extra[rel]),
+  /PUBLIC_B_OPERATOR_IMPORT_NOT_PINNED/);
+});
+
+test('new independent operator holds lease for unknown results, releases only verified outcomes',async()=>{
+ const lock=()=>({released:0,held:0,release(){this.released++;},
+  holdForRecovery(){this.held++;}});
+ const valid=lock();
+ await withPublicBInstallLease(valid,async()=>({status:'PASS',actualInstalledSha:TARGET,
+  postcheck:{protectedStateUnchanged:true,runnerSetVerified:true,postSourceVerified:true}}));
+ assert.deepEqual([valid.released,valid.held],[1,0]);
+ const cases=[
+  {status:'STATE_UNKNOWN',actualInstalledSha:null},
+  {status:'PASS',actualInstalledSha:TARGET,
+   postcheck:{protectedStateUnchanged:true,runnerSetVerified:true,postSourceVerified:false}},
+  {status:'PASS',actualInstalledSha:INSTALLED,
+   postcheck:{protectedStateUnchanged:true,runnerSetVerified:true,postSourceVerified:true}},
+  {status:'BLOCKED',actualInstalledSha:INSTALLED,workflowEnabled:null}
+ ];
+ for(const result of cases){
+  const l=lock();await withPublicBInstallLease(l,async()=>result);
+  assert.deepEqual([l.released,l.held],[0,1]);
+ }
+ const thrown=lock();
+ await assert.rejects(withPublicBInstallLease(thrown,async()=>{throw Error('uncertain');}),/uncertain/);
+ assert.deepEqual([thrown.released,thrown.held],[0,1]);
 });
