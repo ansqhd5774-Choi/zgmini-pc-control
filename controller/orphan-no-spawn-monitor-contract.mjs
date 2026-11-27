@@ -18,6 +18,17 @@ const base={
 };
 const deny=code=>Object.freeze({...base,status:'BLOCKED',code,
  monitoringCandidate:false,exactSeatIdentityCount:0});
+// Pure source-level shape check only. It does not authenticate a private
+// attestor or grant an operating B effect. The independent Windows maintainer
+// must establish these claims from local evidence, not an Issue body.
+export function hasFencedInitialBLeaseCandidate(installation){
+ return installation?.installLeaseHeld===true&&
+  installation?.installLeaseProofSource==='PRIVATE_INDEPENDENT_MAINTAINER_SAME_HOST'&&
+  installation?.installLeaseOwnerMatchesMaintainerVerified===true&&
+  installation?.installLeaseRequestMatchesApprovalVerified===true&&
+  installation?.installLeaseNonceContinuousVerified===true&&
+  installation?.watchdogRecoveryCriticalSectionExcludedVerified===true;
+}
 export function assessNoSpawnMonitorSnapshot({
  now=Date.now(),observedAt,preimage,approvedPreimage,installed,oldOwner,newOwner,
  watcher,privateLineage,controllerSeatPins,liveWmi,
@@ -103,12 +114,7 @@ export function assessNoSpawnMonitorSnapshot({
  // The future private B must establish a real same-host critical-section
  // barrier rather than rely on the Watchdog's lease-exists check alone.
  const fencedInitialBLease=monitorPhase==='INITIAL_OWNER_ADOPTION'&&
-  installation?.installLeaseHeld===true&&
-  installation?.installLeaseProofSource==='PRIVATE_INDEPENDENT_MAINTAINER_SAME_HOST'&&
-  installation?.installLeaseOwnerMatchesMaintainerVerified===true&&
-  installation?.installLeaseRequestMatchesApprovalVerified===true&&
-  installation?.installLeaseNonceContinuousVerified===true&&
-  installation?.watchdogRecoveryCriticalSectionExcludedVerified===true;
+  hasFencedInitialBLeaseCandidate(installation);
  if((relatedLeases!==0&&!verifiedJobLeaseRenewal)||
     (installation?.installLeaseHeld!==false&&!fencedInitialBLease)||
     installation?.workflowState!=='active'||
