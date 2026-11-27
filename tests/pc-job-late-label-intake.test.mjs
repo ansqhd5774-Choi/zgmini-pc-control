@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {executeJob} from '../controller/engine.mjs';
-import {attestOwnerPcJobEvent,publicPcReportProjection} from '../controller/common.mjs';
+import {attestOwnerPcJobEvent,publicPcReportProjection,publicJobLogEnvelope} from '../controller/common.mjs';
 import {stagePreimageManifest} from '../controller/preimage-manifest-stager.mjs';
 
 const wf=fs.readFileSync(new URL('../.github/workflows/pc-job.yml',import.meta.url),'utf8');
@@ -248,4 +248,18 @@ test('public report uploader verifies repo API identity before selecting sanitiz
  const before=upload.indexOf('const {json,txt}=renderBoundedReport');
  const after=upload.indexOf('uploadVerifiedReportPair(');
  assert.ok(before>upload.indexOf('repository=await api')&&after>before);
+});
+
+test('public A logs redact raw Worker payload while private path stays unchanged',()=>{
+ const report={schema:'ZGMINI_PC_RESULT_V1',status:'PASS',
+  code:'RUNNER_COMMAND_EXECUTED',result:{token:'DO_NOT_PUBLISH_TEST_SECRET'},
+  privateHistory:'DO_NOT_PUBLISH_TEST_SECRET'};
+ const publicLog=publicJobLogEnvelope(report,false);
+ assert.deepEqual(publicLog,{status:'PASS',code:'PUBLIC_LOCAL_RESULT_REDACTED'});
+ assert.doesNotMatch(JSON.stringify(publicLog),/DO_NOT_PUBLISH_TEST_SECRET/);
+ assert.equal(publicJobLogEnvelope(report,true),report);
+ assert.deepEqual(publicJobLogEnvelope(null,false),{
+  status:'BLOCKED',code:'PUBLIC_LOCAL_RESULT_REDACTED'
+ });
+ assert.match(entry,/publicJobLogEnvelope\(result\.report,admitted\.visibility==='PRIVATE'\)/);
 });
