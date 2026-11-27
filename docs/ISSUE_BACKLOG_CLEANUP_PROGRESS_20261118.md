@@ -449,3 +449,12 @@
 3. 실패/차단(#8/#9/#10/#12)은 원담당의 실제 처리·후속 이슈 확인 후 별도 정리. Core/실행기 오류를 이슈 담당자가 임의 수리하지 않는다.
 4. 같은 작업의 원격 결과를 반복 검사하지 않도록 이 원장과 Close 상태를 재사용하고, 정리 결과가 충분히 축적된 뒤 신규 요청 자동 Close를 개발한다.
 5. 완료 시 실제 `open/closed` 건수와 이번 `closedReadbackVerified` 건수, 진짜 미해결·보류 수를 별도 보고한다.
+
+
+## 12. 2026-11-28 이슈 수명주기 최신 재조회 — main 기반 통합 후보
+
+- 기존 이슈 담당 작업 브랜치 `codex/issues-lifecycle-manager-20261118`는 최신 main 대비 `ahead 27 / behind 3701`; 8개 경로에 과거 코드 변경이 있어 전체 브랜치를 바로 병합하지 않음. 이 절은 `main@da52580380885ea6c4ba3d68757b79cbe848ac0b`에서 분기한 문서만의 통합 후보이며 이전 원장 1–11절 유지.
+- **#4276 소스 병합 사실 정정:** 이전 Draft/미병합 판정은 과거 상태. 원본 PR은 merge commit `da52580380885ea6c4ba3d68757b79cbe848ac0b`로 main에 병합됐고 Public checkout `4d3fe664a90f2e8c3dea885559b1ec263df66a24`는 main 조상 검증 `ahead 46, behind 0` 충족. [원본 병합 영수증](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4276#issuecomment-7227708327). 그러나 별도 Windows V2 정책 설치·CAS·7파일 및 효과별 원장·Public B 실제 발행/수신 JSON/TXT는 미확인; 소스 병합은 운영 적용 아님.
+- GitHub 최신 Open 검색 결과: **이슈 24건, PR 2건**. 잔존 PR [#4229](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4229)와 [#4152](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4152)는 이전 HOLD/운영 안전 조건 미해소로 보존. [#4286](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4286) 단회 테스트 PR은 이미 종료되어 중복 처리하지 않음.
+- 미해결 예시: #4159 WMI 분류 `STATE_UNKNOWN`, #4140 R6 자연 재시작 대기, #4110 D1 query failed, #4135 Writer B 167/167 active window, #4131 Watchdog `STAGED` 미활성, #4122 Controller SHA drift 차단, #4055 Writer import closure 두 파일 누락, #4078 S6 중지창 request replay 없음, #4069 S6 `RECOVERY_REQUIRED`. 각각 원본 장애/효과별 증거를 남기고 성공으로 소급 종료하지 않음.
+- 이번 배치 신규 Close 0건·신규 실제 운영 PR 병합 0건·PC/DB/배포/수집 변경 0건. 기존 누적 직접 종료 207건은 역사적 담당 실적으로 유지. 후속은 실제 새로운 receipt·동일 requestId 완료 조건이 확보된 건만 close/readback한다.
