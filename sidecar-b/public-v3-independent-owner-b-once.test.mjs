@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {classifyW06PublicBEffect,matchesExactW06OwnerEffectComment,classifyW06BTerminalFailure,matchesReviewedW06SourceMerge} from './public-v3-independent-owner-b-once.mjs';
+import {classifyW06PublicBEffect,matchesExactW06OwnerEffectComment,classifyW06BTerminalFailure,matchesReviewedW06SourceMerge,REVIEWED_SOURCE_FILES,verifyW06ReviewedImportClosure,verifyW06InstalledAncestryAttestation} from './public-v3-independent-owner-b-once.mjs';
 
 const fixture=()=>({
  approvedMergePinned:true,ownerApprovalVerified:true,
@@ -98,11 +98,13 @@ test('owner PR merge never substitutes for a separate exact B effect consent',()
 test('preflight module cannot be evaluated before its authenticated source CAS',()=>{
  const source=fs.readFileSync(new URL('./public-v3-independent-owner-b-once.mjs',import.meta.url),'utf8');
  assert.doesNotMatch(source,/^import\s+.*from\s+['"]\.\/public-v3-independent-preimage-readonly\.mjs['"]/m);
- const check=source.indexOf('for(const relative of [ENTRY,preflightSource])');
  const sourceMergeCheck=source.indexOf('const reviewedSourceMerge=reviewedW06SourceMerge()');
+ const closureCheck=source.indexOf('verifyReviewedSourceClosure(reviewedSourceMerge)',sourceMergeCheck);
+ const ancestryCheck=source.indexOf('verifyInstalledAncestrySource()',closureCheck);
  const dynamicImport=source.indexOf("await import('./public-v3-independent-preimage-readonly.mjs')");
  const invoke=source.indexOf('await inspectIndependent()');
- assert.ok(sourceMergeCheck>0&&check>sourceMergeCheck&&dynamicImport>check&&invoke>dynamicImport);
+ assert.ok(sourceMergeCheck>0&&closureCheck>sourceMergeCheck&&
+  ancestryCheck>closureCheck&&dynamicImport>ancestryCheck&&invoke>dynamicImport);
  assert.match(source,/W06_PUBLIC_B_REVIEWED_SOURCE_DRIFT_STOP/);
  assert.match(source,/W06_PUBLIC_B_INDEPENDENT_WINDOWS_REQUIRED/);
 });
@@ -209,11 +211,57 @@ test('reviewed W06 operator merge must be owner-authored, main ancestor and not 
 test('reviewed immutable merge bytes are compared before any local preflight evaluation',()=>{
  const s=fs.readFileSync(new URL('./public-v3-independent-owner-b-once.mjs',import.meta.url),'utf8');
  const review=s.indexOf('const reviewedSourceMerge=reviewedW06SourceMerge()');
- const file=s.indexOf('verifyReviewedSourceFile(relative,reviewedSourceMerge)');
+ const closure=s.indexOf('verifyReviewedSourceClosure(reviewedSourceMerge)',review);
+ const ancestry=s.indexOf('verifyInstalledAncestrySource()',closure);
  const dynamic=s.indexOf("await import('./public-v3-independent-preimage-readonly.mjs')");
- assert.ok(review>0&&file>review&&dynamic>file);
+ assert.ok(review>0&&closure>review&&ancestry>closure&&dynamic>ancestry);
  assert.match(s,/reviewed\.equals\(current\)/);
  assert.match(s,/sha\(readLocal\(relative\)\)===sha\(reviewed\)/);
- assert.match(s,/verifyNewDependencyClosure\(reviewedSourceMerge\)/);
+ assert.match(s,/verifyReviewedSourceClosure\(reviewedSourceMerge\)/);
  assert.match(s,/W06_PUBLIC_B_OPERATOR_REVIEWED_MERGE_REQUIRED/);
+});
+
+test('all transitive static, bare and dynamic W06 runtime imports are source-pinned',()=>{
+ const sources=Object.fromEntries(REVIEWED_SOURCE_FILES.map(rel=>[
+  rel,fs.readFileSync(new URL('../'+rel,import.meta.url),'utf8')
+ ]));
+ assert.equal(REVIEWED_SOURCE_FILES.length,11);
+ assert.equal(verifyW06ReviewedImportClosure(sources),true);
+ for(const injected of [
+  "import './malicious-plugin.mjs';",
+  "const m=await import('../unreviewed.mjs');",
+  "export * from 'unapproved-package';",
+  "import 'unexpected-library';"
+ ]){
+  const bad={...sources,[REVIEWED_SOURCE_FILES[0]]:
+   sources[REVIEWED_SOURCE_FILES[0]]+'\n'+injected};
+  assert.throws(()=>verifyW06ReviewedImportClosure(bad),
+   {code:'W06_PUBLIC_B_IMPORT_NOT_PINNED'});
+ }
+ const missing={...sources};
+ delete missing['controller/pc-source-readonly.mjs'];
+ assert.throws(()=>verifyW06ReviewedImportClosure(missing),
+  {code:'W06_PUBLIC_B_IMPORT_CLOSURE_STOP'});
+});
+test('actual installed ancestry must match the existing maintenance source receipt',()=>{
+ const hash='a'.repeat(64);
+ const proof={
+  manifest:{schema:'ZGMINI_PC_MAINTENANCE_INSTALL_V1',
+   sourceSha:'b'.repeat(40),files:{'tools/maintenance-ancestry.vbs':hash}},
+  installedSha256:hash,pinnedSha256:hash
+ };
+ assert.equal(verifyW06InstalledAncestryAttestation(proof),true);
+ for(const field of ['installedSha256','pinnedSha256']){
+  const mutated=structuredClone(proof);mutated[field]='c'.repeat(64);
+  assert.equal(verifyW06InstalledAncestryAttestation(mutated),false);
+ }
+ for(const edit of [
+  p=>{p.manifest.sourceSha='invalid';},
+  p=>{p.manifest.schema='OTHER';},
+  p=>{p.manifest.files['tools/maintenance-ancestry.vbs']='invalid';},
+  p=>{delete p.manifest.files;},
+ ]){
+  const mutated=structuredClone(proof);edit(mutated);
+  assert.equal(verifyW06InstalledAncestryAttestation(mutated),false);
+ }
 });

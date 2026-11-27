@@ -35,8 +35,18 @@ const FIXED={
  wrapperSha256:'9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c'
 };
 const CANDIDATE='sidecar-b/approved/archive-run-w06-v3.mjs';
-const SOURCES=[ENTRY,'sidecar-b/windows-file-adapter.mjs',
- 'sidecar-b/natural-idle-window.mjs','r17-writer-b/r17-b-claim.mjs'];
+// Complete transitive ES module closure required by the independent owner B
+// entry and the read-only preflight; freeze and verify BEFORE any local import.
+export const REVIEWED_SOURCE_FILES=Object.freeze([
+ ENTRY,'sidecar-b/public-v3-independent-preimage-readonly.mjs',
+ 'sidecar-b/operating-probe.mjs','sidecar-b/contract.mjs',
+ 'writer-b/windows-guards.mjs','controller/pc-source-readonly.mjs',
+ 'tools/maintenance-lock.mjs','r17-writer-b/r17-b-windows-probe.js',
+ 'sidecar-b/windows-file-adapter.mjs','sidecar-b/natural-idle-window.mjs',
+ 'r17-writer-b/r17-b-claim.mjs'
+]);
+const INSTALLED_MAINT='E:/ZGmini/automation/pc-maintenance';
+const ANCESTRY_REL='tools/maintenance-ancestry.vbs';
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
 const stop=code=>{throw Object.assign(new Error(code),{code});};
 const need=(x,code)=>{if(!x)stop(code);};
@@ -120,14 +130,79 @@ function reviewedW06SourceMerge() {
 }
 function verifyReviewedSourceFile(relative,sourceMerge) {
  const reviewed=readRemote(relative,sourceMerge),
-  current=readRemote(relative,'main');
- need(reviewed.equals(current)&&sha(readLocal(relative))===sha(reviewed),
+  current=readRemote(relative,'main'),local=readLocal(relative);
+ need(reviewed.equals(current)&&sha(local)===sha(reviewed),
   'W06_PUBLIC_B_REVIEWED_SOURCE_DRIFT_STOP');
+ return local.toString('utf8');
 }
-function verifyNewDependencyClosure(sourceMerge) {
- // The imported read-only checker validates its own 7-file transitive closure
- // and trusted owner/Explorer ancestry before this is called.
- for(const relative of SOURCES)verifyReviewedSourceFile(relative,sourceMerge);
+// Reject any new import edge not included in the complete trusted closure.
+// Static, bare and literal dynamic imports are all checked; runtime source
+// also must match reviewed immutable PR merge bytes, not moving main alone.
+export function verifyW06ReviewedImportClosure(sourceByFile) {
+ need(sourceByFile&&typeof sourceByFile==='object'&&!Array.isArray(sourceByFile),
+  'W06_PUBLIC_B_IMPORT_CLOSURE_STOP');
+ const allowed=new Set(REVIEWED_SOURCE_FILES);
+ need(allowed.size===REVIEWED_SOURCE_FILES.length,
+  'W06_PUBLIC_B_IMPORT_CLOSURE_STOP');
+ for(const rel of REVIEWED_SOURCE_FILES){
+  const code=sourceByFile[rel];
+  need(typeof code==='string'&&code.length>0,
+   'W06_PUBLIC_B_IMPORT_CLOSURE_STOP');
+  for(const match of code.matchAll(/\\b(?:from\\s+|import\\s*(?:\\(\\s*)?)(['"])([^'"]+)\\1/g)){
+   const spec=match[2];
+   if(spec.startsWith('node:'))continue;
+   need(spec.startsWith('./')||spec.startsWith('../'),
+    'W06_PUBLIC_B_IMPORT_NOT_PINNED');
+   const resolved=path.posix.normalize(
+    path.posix.join(path.posix.dirname(rel),spec));
+   need(allowed.has(resolved),'W06_PUBLIC_B_IMPORT_NOT_PINNED');
+  }
+ }
+ return true;
+}
+function verifyReviewedSourceClosure(sourceMerge) {
+ const sources={};
+ for(const relative of REVIEWED_SOURCE_FILES)
+  sources[relative]=verifyReviewedSourceFile(relative,sourceMerge);
+ return verifyW06ReviewedImportClosure(sources);
+}
+// The Windows Explorer-owner verifier is an installed external VBS script,
+// not an imported module. Authenticate the installed bytes against the
+// existing maintenance install receipt and its immutable GitHub source SHA.
+function installedMaintenanceFile(relative,maxBytes) {
+ const filename=path.win32.join(INSTALLED_MAINT,...relative.split('/'));
+ const stat=fs.lstatSync(filename);
+ need(stat.isFile()&&!stat.isSymbolicLink()&&stat.nlink===1&&
+  stat.size>0&&stat.size<=maxBytes,
+  'W06_PUBLIC_B_INSTALLED_ANCESTRY_FILE_STOP');
+ const root=fs.realpathSync.native(INSTALLED_MAINT),
+  actual=fs.realpathSync.native(filename);
+ const remainder=path.win32.relative(root,actual);
+ need(remainder!==''&&remainder!=='..'&&
+  !remainder.startsWith('..'+path.win32.sep)&&
+  !path.win32.isAbsolute(remainder),
+  'W06_PUBLIC_B_INSTALLED_ANCESTRY_REDIRECT_STOP');
+ return fs.readFileSync(filename);
+}
+export function verifyW06InstalledAncestryAttestation({
+ manifest,installedSha256,pinnedSha256
+}={}) {
+ const expected=manifest?.files?.[ANCESTRY_REL];
+ return manifest?.schema==='ZGMINI_PC_MAINTENANCE_INSTALL_V1'&&
+  hex40(manifest?.sourceSha)&&
+  typeof expected==='string'&&/^[a-f0-9]{64}$/.test(expected)&&
+  installedSha256===expected&&pinnedSha256===expected;
+}
+function verifyInstalledAncestrySource() {
+ const manifest=JSON.parse(installedMaintenanceFile(
+  'MAINTENANCE_INSTALL.json',65536).toString('utf8'));
+ need(hex40(manifest?.sourceSha),
+  'W06_PUBLIC_B_INSTALLED_ANCESTRY_MANIFEST_STOP');
+ const installed=installedMaintenanceFile(ANCESTRY_REL,65536);
+ const pinned=readRemote(ANCESTRY_REL,manifest.sourceSha);
+ need(verifyW06InstalledAncestryAttestation({
+  manifest,installedSha256:sha(installed),pinnedSha256:sha(pinned)
+ }), 'W06_PUBLIC_B_INSTALLED_ANCESTRY_CAS_STOP');
 }
 
 // Preserve the distinction between a pre-replacement rejection, a verified
@@ -220,10 +295,11 @@ export async function main(args=process.argv.slice(2)) {
  need(process.platform==='win32'&&!process.env.GITHUB_ACTIONS&&
   !process.env.RUNNER_NAME&&!process.env.GITHUB_RUN_ID,
   'W06_PUBLIC_B_INDEPENDENT_WINDOWS_REQUIRED');
- const preflightSource='sidecar-b/public-v3-independent-preimage-readonly.mjs';
  const reviewedSourceMerge=reviewedW06SourceMerge();
- for(const relative of [ENTRY,preflightSource])
-  verifyReviewedSourceFile(relative,reviewedSourceMerge);
+ // All transitive modules and the installed WMI ancestry script are attested
+ // before evaluating the preflight or its dynamic import of operating-probe.
+ verifyReviewedSourceClosure(reviewedSourceMerge);
+ verifyInstalledAncestrySource();
  const {main:inspectIndependent}=
   await import('./public-v3-independent-preimage-readonly.mjs');
  // The verified preflight independently proves owner Explorer ancestry,
@@ -233,7 +309,6 @@ export async function main(args=process.argv.slice(2)) {
   current?.status==='DEFERRED'&&
   current.code==='W06_V3_NATURAL_CORE_ACTIVE'),
   'W06_PUBLIC_B_CURRENT_PREIMAGE_STOP');
- verifyNewDependencyClosure(reviewedSourceMerge);
  const manifest=verifyFixedOwnerApproval(); // intentionally never passes yet
  const verifiedCandidate=candidate();
  const {validateManifest,verifyCandidateBytes,applyOneFile,TARGET,sha256}=
