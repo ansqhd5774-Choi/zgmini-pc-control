@@ -5,6 +5,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
+import {validateControllerImportClosure,controllerImportScanRoots,validateControllerOnlyInstallDelta} from '../tools/maintenance-contract.mjs';
 
 const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const candidate=JSON.parse(fs.readFileSync(
@@ -91,4 +92,24 @@ test('selective Public A candidate enforces owner Issue identity and redacted re
   assert.match(upload,/publicPcReportProjection/);
   assert.match(upload,/publishedReport=JSON\.parse\(json\)/);
   assert.deepEqual(candidate.allowFiles.map(x=>x.path),paths);
+});
+
+test('exact overlay has full pre-install transitive import closure, without adding unapproved modules',()=>{
+ const changed=candidate.allowFiles.map(x=>x.path);
+ assert.equal(validateControllerOnlyInstallDelta(changed,candidate.allowFiles),true);
+ const allFiles=git(['ls-tree','-r','--name-only',candidate.targetSha,'--','controller','config'])
+   .trim().split(/\r?\n/).filter(Boolean);
+ const roots=controllerImportScanRoots(changed);
+ assert.ok(roots.includes('controller/entry.mjs'));
+ assert.ok(roots.includes('controller/operations.mjs'));
+ const scan=validateControllerImportClosure(allFiles,roots,
+   rel=>bytes(candidate.targetSha,rel).toString('utf8'));
+ assert.equal(scan.status,'VERIFIED');
+ assert.ok(scan.checkedModules>=4);
+ for(const rel of ['controller/engine.mjs','controller/operations.mjs',
+  'controller/report-upload-verified.mjs']){
+  assert.ok(allFiles.includes(rel),'installed import graph module must exist: '+rel);
+  assert.ok(bytes(candidate.installedSha,rel).equals(bytes(candidate.targetSha,rel)),
+   'unchanged runtime dependency: '+rel);
+ }
 });
