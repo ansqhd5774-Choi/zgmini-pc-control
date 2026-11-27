@@ -13,9 +13,12 @@ const ROOT='E:/ZGmini/automation/pc-control';
 const internal=new WeakMap();
 const sha256=s=>createHash('sha256').update(s).digest('hex');
 const pid=x=>Number.isSafeInteger(x)&&x>0;
+// The WMI reader emits 7 fractional digits (100ns), matching console ToString('o').
+// Three-digit synthetic fixtures remain accepted; comparison uses exact text.
 const stamp=x=>typeof x==='string'&&
- /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(x)&&
- Number.isFinite(Date.parse(x))&&new Date(x).toISOString()===x;
+ /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.(?:\d{3}|\d{7})Z$/.test(x)&&
+ Number.isFinite(Date.parse(x))&&
+ new Date(x).toISOString()===x.slice(0,23)+'Z';
 const base={schema:'ZGMINI_ORPHAN_PRIVATE_WMI_READ_V1',
  effectAuthorized:false,adoptionAuthorized:false,nonceVerified:false,
  leaseMutationAuthorized:false,heartbeatWriteAuthorized:false,
@@ -142,7 +145,7 @@ export function inspectPrivateOrphanWmiReadonly({
   "$svcByPid=@{};foreach($sv in $svc){if([string]$sv.Name -match '(?i)^actions\\.runner\\.'){ $svcByPid[[int]$sv.ProcessId]=$true }}",
   "$rows=@(foreach($p in $all | Where-Object {$_.Name -in @('Runner.Listener.exe','Runner.Worker.exe')}){",
   "if($null -eq $p.CreationDate){throw 'PROCESS_BIRTH_UNKNOWN'}",
-  "$started=([DateTime]$p.CreationDate).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ')",
+  "$started=([DateTime]$p.CreationDate).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffffffZ')",
   "$seen=@{};$parent=[int]$p.ParentProcessId;$serviceAncestor=$svcByPid.ContainsKey([int]$p.ProcessId)",
   "for($depth=0;$depth -lt 8 -and !$serviceAncestor;$depth++){if($parent -le 0 -or $seen.ContainsKey($parent)){break};$seen[$parent]=$true;if($svcByPid.ContainsKey($parent)){$serviceAncestor=$true;break};if(!$byPid.ContainsKey($parent)){break};$next=[int]$byPid[$parent].ParentProcessId;if($next -eq $parent){break};$parent=$next}",
   "$session=if($null -eq $p.SessionId){-1}else{[int]$p.SessionId}",

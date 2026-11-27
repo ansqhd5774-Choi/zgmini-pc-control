@@ -88,6 +88,24 @@ test('different PID, birth or nonexclusive console rejects cross-source proof',(
   assert.equal(result.runnerStopAuthorized,false);
  }
 });
+test('same millisecond but distinct 100ns process birth must fail closed',()=>{
+ const raw=consoleRaw();
+ raw.rows[0].birth=birth.replace(/\.([0-9]{3})Z$/,'.$10001Z');
+ // Current WMI fixture is millisecond precision; seven-digit console birth
+ // cannot be accepted as byte-identical origin merely due to Date.parse truncation.
+ const proof=compareOrphanSixWmiAndConsoles(projectWmi(),projectConsole(raw));
+ assert.equal(proof.status,'STATE_UNKNOWN');
+ assert.equal(proof.code,'ORPHAN_SIX_CROSSCHECK_PID_BIRTH_OR_CONSOLE_CHANGED');
+ assert.equal(proof.actuationAllowed,false);
+});
+test('matching canonical 100ns birth strings remain candidate-only',()=>{
+ const b=birth.replace(/\.([0-9]{3})Z$/,'.$10000Z');
+ const rows=wmiRows().map(row=>({...row,startedAtUtc:b}));
+ const raw=consoleRaw();raw.rows.forEach(row=>{row.birth=b;});
+ const proof=compareOrphanSixWmiAndConsoles(projectWmi(rows),projectConsole(raw));
+ assert.equal(proof.status,'CANDIDATE_ONLY');
+ assert.equal(proof.runnerStopAuthorized,false);
+});
 test('no private console birth tuple cannot be used as a B original seat pin',()=>{
  const raw=consoleRaw();raw.rows.forEach(r=>delete r.birth);
  const c=projectConsole(raw);

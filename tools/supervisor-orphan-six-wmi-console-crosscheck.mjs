@@ -16,6 +16,7 @@ const base=Object.freeze({
 });
 const unknown=code=>Object.freeze({...base,status:'STATE_UNKNOWN',
  code,linkedSeatCount:0});
+// Date.parse truncates below milliseconds; use raw canonical UTC text for PID birth identity.
 const validTime=x=>typeof x==='string'&&Number.isFinite(Date.parse(x));
 export function readPrivateOrphanSixCrosscheck(summary){
  return privateProof.get(summary)??null;
@@ -58,7 +59,7 @@ export function compareOrphanSixWmiAndConsoles(wmi,consoleRead,{
      !Number.isSafeInteger(w.pid)||w.pid<=0||
      !Number.isSafeInteger(c.pid)||c.pid!==w.pid||
      !validTime(w.startedAtUtc)||!validTime(c.startedAtUtc)||
-     Date.parse(w.startedAtUtc)!==Date.parse(c.startedAtUtc)||
+     w.startedAtUtc!==c.startedAtUtc||
      !/^[a-f0-9]{64}$/.test(w.canonicalPathSha256??'')||
      !Array.isArray(c.members)||c.members.length!==1||
      c.members[0]!==w.pid)
