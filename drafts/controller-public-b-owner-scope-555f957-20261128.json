@@ -1,0 +1,26 @@
+{
+  "schema": "ZGMINI_CONTROLLER_PUBLIC_B_OWNER_SCOPE_PREPARATION_V1",
+  "status": "OWNER_EFFECT_APPROVED_IN_CHAT_EXECUTION_BLOCKED",
+  "scope": "PC_CONTROL_CONTROLLER_UPDATE",
+  "installedSha": "3c7d4cfefacf072fd35cb19706b352c64c5e4fd2",
+  "targetSha": "555f95708984580cd7d5a0fd05a80b718e867710",
+  "allowFiles": [
+    "controller/common.mjs",
+    "controller/entry.mjs",
+    "controller/preimage-manifest-stager.mjs",
+    "controller/upload.mjs"
+  ],
+  "effect": "ONE_SHOT_CONTROLLER_FOUR_FILE_SELECTIVE_B",
+  "approvedByUserAtKstDate": "2026-11-28",
+  "githubRepositoryOwner": "ansqhd5774-Choi",
+  "githubOwnerNumericId": 327938088,
+  "userApprovalBasis": "User explicitly approved the exact controller B change once, conditional on owner/independent Windows operator authentication, live host CAS, exclusive lease, verified backup and rollback.",
+  "restrictions": [
+    "repository remains public",
+    "do not alter PUBLIC_B_EFFECT_SEPARATE_AUTH_REQUIRED",
+    "no other controller/config/workflow changes",
+    "preserve six runners, supervisor, watchdog, standby, core, writer, DB, D1, DNS",
+    "no operational effects or public private-data disclosures before independent operator verification"
+  ],
+  "statusNote": "Temporary branch metadata to open approval PR. Final PR must contain only the two existing manifest/pin paths, not this draft. No B request/installation."
+}
