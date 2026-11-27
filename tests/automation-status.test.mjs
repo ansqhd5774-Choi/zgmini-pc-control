@@ -532,6 +532,19 @@ test('fixed operating audit correlates two live READY standbys, six children and
  assert.equal(good.providerCalls,0);
  assert.equal(good.d1Writes,0);
  assert.doesNotMatch(JSON.stringify(good),/SENSITIVE|payloadSha|555f957/);
+ // Historical executions retain their attested old source after a valid
+ // Controller upgrade. Current health must still follow the new host source.
+ const upgraded='cde1dd372210e4658ae348cb9e2577967cb11634';
+ const hostKey=path.join(ctrl,'host.json'),supKey=path.join(ctrl,'SUPERVISOR_STATUS.json');
+ const priorHost=docs.get(hostKey),priorSup=docs.get(supKey);
+ put(ctrl,'host.json',{controllerSourceSha:upgraded});
+ docs.set(supKey,JSON.stringify({...JSON.parse(priorSup),sourceSha:upgraded}));
+ assert.equal(audit().status,'PASS');
+ const historicalKey=path.join(ctrl,'ledger/'+specs[0][0]+'.json'),priorHistory=docs.get(historicalKey);
+ const wrong=JSON.parse(priorHistory);wrong.report.actualExecutionSha=upgraded;
+ docs.set(historicalKey,JSON.stringify(wrong));
+ assert.equal(audit().localPostcheckLedgerVerified,false);
+ docs.set(historicalKey,priorHistory);docs.set(hostKey,priorHost);docs.set(supKey,priorSup);
  const changed=(root,p,replacement)=>{
   const k=path.join(root,p),old=docs.get(k);
   docs.set(k,JSON.stringify({...JSON.parse(old),...replacement}));

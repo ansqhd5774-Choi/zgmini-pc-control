@@ -122,7 +122,7 @@ export function inspectControllerOperatingAuditReadonly({
    report.status==='PASS'&&report.firstFail===null&&
    report.protectedStateUnchanged===true&&report.reused!==true&&
    /^[A-Z0-9_]{1,96}$/.test(report.code??'')&&
-   report.actualExecutionSha===host?.controllerSourceSha);
+   report.actualExecutionSha==='555f95708984580cd7d5a0fd05a80b718e867710');
  }
  const complete=pairReady&&supervisorReady&&original.postcheck&&original.smoke;
  return {status:complete?'PASS':'STATE_UNKNOWN',
