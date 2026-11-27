@@ -143,3 +143,39 @@ test('existing private operational job stays gated; public job cannot grant perm
  assert.doesNotMatch(pub,/self-hosted|contents: write|issues: write|controller\\entry\.mjs|maintenance-agent\.mjs/);
  assert.match(pub,/node tools\/public-pc-job-candidate\.mjs/);
 });
+
+test('public job stdout never reveals raw worker payload, private legacy is unchanged',async()=>{
+ const {publicJobLogEnvelope}=await import('../controller/common.mjs');
+ const secret='fixture-hidden-local-evidence-do-not-log';
+ const raw={schema:'ZGMINI_PC_RESULT_V1',jobId:'run-123-1-seat-1',
+   status:'PASS',code:'SENSITIVE_PRIVATE_DETAIL',privateMetadata:secret,
+   arbitrary:{paths:['C:/private/fixture']},operationalWrites:99};
+ const privateView=publicJobLogEnvelope(raw,true);
+ assert.strictEqual(privateView,raw);
+ for(const visibility of [false,null,undefined,'public']){
+   const view=publicJobLogEnvelope(raw,visibility);
+   assert.deepEqual(view,{status:'PASS',code:'PUBLIC_LOCAL_RESULT_REDACTED'});
+   assert.equal(JSON.stringify(view).includes(secret),false);
+   assert.equal(JSON.stringify(view).includes('C:/private'),false);
+   assert.equal(Object.isFrozen(view),true);
+ }
+ assert.deepEqual(publicJobLogEnvelope({status:'unexpected',metadata:secret},false),
+   {status:'BLOCKED',code:'PUBLIC_LOCAL_RESULT_REDACTED'});
+});
+
+test('public-capable PC job has no raw stdout or unprojected Issue headline',()=>{
+ const entry=fs.readFileSync(new URL('../controller/entry.mjs',import.meta.url),'utf8');
+ const upload=fs.readFileSync(new URL('../controller/upload.mjs',import.meta.url),'utf8');
+ const job=fs.readFileSync(new URL('../.github/workflows/pc-job.yml',import.meta.url),'utf8');
+ // Direct stringify of the full Worker report exposes private runtime
+ // inventory to GitHub Actions logs if the public A path is enabled.
+ assert.doesNotMatch(entry,/console\.log\(JSON\.stringify\(result\.report\)\)/);
+ assert.match(entry,/publicJobLogEnvelope\(result\.report,event\?\.repository\?\.private\)/);
+ // The public report projection has to govern the comment title too.
+ assert.doesNotMatch(upload,/\*\*\$\{report\.status\} — \$\{report\.code\}\*\*/);
+ assert.match(upload,/\*\*\$\{publishedReport\.status\} — \$\{publishedReport\.code\}\*\*/);
+ assert.match(upload,/const publishedReport=JSON\.parse\(json\)/);
+ // This is not authorization to remove Private execution checks here.
+ const op=job.split('  approved-pc-job:')[1]?.split('  public-readonly-intake:')[0];
+ assert.match(op??'',/github\.event\.repository\.private == true/);
+});
