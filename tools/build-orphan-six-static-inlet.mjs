@@ -1,4 +1,4 @@
-// Build-only static projection of four existing source modules. No operational effects.
+// Build-only static projection of fixed orphan-six source modules. No operational effects.
 import fs from 'node:fs';
 const specs=[
  [
@@ -58,6 +58,39 @@ const specs=[
     "flat"
    ]
   ]
+ ],
+ [
+  "graceful",
+  "supervisor-orphan-six-graceful-source.mjs",
+  [
+   [
+    "node:crypto",
+    "createHash",
+    "crypto"
+   ]
+  ]
+ ],
+ [
+  "journal",
+  "supervisor-orphan-six-maintenance-journal.mjs",
+  [
+   [
+    "node:crypto",
+    "createHash,randomUUID",
+    "crypto"
+   ]
+  ]
+ ],
+ [
+  "coordinator",
+  "supervisor-orphan-six-graceful-b-coordinator.mjs",
+  [
+   [
+    "./supervisor-orphan-six-graceful-source.mjs",
+    "assessOrphanGracefulSixPreflight,initialOrphanGracefulSixSourceJournal,advanceOrphanGracefulSixSourceJournal",
+    "graceful"
+   ]
+  ]
  ]
 ];
 const start="// BEGIN GENERATED ORPHAN SIX SOURCE INLET — STATIC BUILD ONLY",end="// END GENERATED ORPHAN SIX SOURCE INLET";
@@ -66,6 +99,18 @@ export function render(read=(name)=>fs.readFileSync(new URL('./'+name,import.met
  for(const [alias,file,allowed] of specs){
   const original=read(file);let source=original;
   if(typeof source!=="string"||source.includes("\r"))throw Error("ORPHAN_BUNDLE_SOURCE_FORMAT");
+  // The journal inherits only the existing installed agent's fs/path bindings.
+  // These two exact native defaults are the sole whitelisted default imports.
+  if(alias==='journal'){
+   for(const native of ['fs','path']){
+    const re=native==='fs'
+      ? /^import fs from 'node:fs';[ \t]*$/gm
+      : /^import path from 'node:path';[ \t]*$/gm;
+    const matches=source.match(re)||[];
+    if(matches.length!==1)throw Error('ORPHAN_BUNDLE_DEFAULT_IMPORT_SCOPE');
+    source=source.replace(re,'');
+   }
+  }
   const found=[];
   source=source.replace(/^import\s*\{([\s\S]*?)\}\s*from\s*['"]([^'"]+)['"];[ \t]*$/gm,(_,names,from)=>{
    const keys=names.split(",").map(x=>x.trim()).join(",");
@@ -79,6 +124,8 @@ export function render(read=(name)=>fs.readFileSync(new URL('./'+name,import.met
   if(/^\s*export\b/m.test(source)||!exports.length||new Set(exports).size!==exports.length)throw Error("ORPHAN_BUNDLE_EXPORT_SCOPE");
   parts.push("const orphanSixStatic_"+alias+"=(()=>{\n"+source.trimEnd()+"\nreturn Object.freeze({"+exports.join(",")+"});\n})();");
  }
- parts.push("export const inspectOrphanSixPackagedInletSource=orphanSixStatic_inlet.inspectOrphanSixBMaintainerInletSource;","export const parseOrphanSixPackagedRequest=orphanSixStatic_inlet.parseOrphanSixBFlatRequest;",end);
+ parts.push("export const inspectOrphanSixPackagedInletSource=orphanSixStatic_inlet.inspectOrphanSixBMaintainerInletSource;","export const parseOrphanSixPackagedRequest=orphanSixStatic_inlet.parseOrphanSixBFlatRequest;",
+  "export const runOrphanSixPackagedCoordinatorSource=orphanSixStatic_coordinator.runOrphanSixGracefulB;",
+  "export const createOrphanSixPackagedJournalSource=orphanSixStatic_journal.createOrphanSixMaintenanceJournal;",end);
  return parts.join("\n")+"\n";
 }
