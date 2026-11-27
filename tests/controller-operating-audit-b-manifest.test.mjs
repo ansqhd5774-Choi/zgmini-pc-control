@@ -6,7 +6,7 @@ import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {manifestFingerprint,validateControllerSelectivePin,
-  validateControllerConfigTransition,validateUpdateRequest} from '../tools/maintenance-contract.mjs';
+  validateControllerConfigTransition} from '../tools/maintenance-contract.mjs';
 
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const TARGET='cde1dd372210e4658ae348cb9e2577967cb11634';
@@ -23,6 +23,7 @@ const sha256=b=>createHash('sha256').update(b).digest('hex');
 
 test('proposed operating-audit B manifest has two exact immutable source files, not execution approval',()=>{
  const m=read(specPath),pin=read(pinPath);
+ assert.equal(sha256(fs.readFileSync(specPath)),'211e833de94751b7577356c3304f30b5ddc81171d5ecb44136ee3e3ff41b8ce9');
  assert.equal(m.schema,'ZGMINI_PC_UPDATE_V1');
  assert.equal(m.installedSha,INSTALLED);
  assert.equal(m.targetSha,TARGET);
