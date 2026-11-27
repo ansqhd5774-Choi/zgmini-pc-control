@@ -487,3 +487,48 @@ test('heartbeat monitor timer must never be unrefed in source-only Actor',()=>{
  assert.doesNotMatch(src,/timer\.unref\s*\(/);
  assert.match(src,/clearInterval\(timer\)/);
 });
+
+test('first no-spawn heartbeat can precede release of pinned maintenance lease; renewal cannot',async()=>{
+ let installLeaseHeld=true,writes=0;
+ const a=actor(async()=>{
+  const x=sample();
+  x.installation.installLeaseHeld=installLeaseHeld;
+  if(installLeaseHeld){
+   x.installation.installLeaseProofSource='PRIVATE_INDEPENDENT_MAINTAINER_SAME_HOST';
+   x.installation.installLeaseOwnerMatchesMaintainerVerified=true;
+   x.installation.installLeaseRequestMatchesApprovalVerified=true;
+   x.installation.installLeaseNonceContinuousVerified=true;
+   x.installation.watchdogRecoveryCriticalSectionExcludedVerified=true;
+  }
+  return x;
+ },async()=>{writes++;return true;});
+ assert.equal((await a.tick()).status,'MONITORING');
+ assert.equal(writes,1);
+ // The B maintainer may release its verified lease after first Owner and
+ // heartbeat readback; only then can the established monitor renew.
+ installLeaseHeld=false;
+ assert.equal((await a.tick()).status,'MONITORING');
+ assert.equal(writes,2);
+ a.stop();
+
+ let held=true,renewed=0;
+ const b=actor(async()=>{
+  const x=sample();
+  x.installation.installLeaseHeld=held;
+  if(held){
+   Object.assign(x.installation,{
+    installLeaseProofSource:'PRIVATE_INDEPENDENT_MAINTAINER_SAME_HOST',
+    installLeaseOwnerMatchesMaintainerVerified:true,
+    installLeaseRequestMatchesApprovalVerified:true,
+    installLeaseNonceContinuousVerified:true,
+    watchdogRecoveryCriticalSectionExcludedVerified:true
+   });
+  }
+  return x;
+ },async()=>{renewed++;return true;});
+ assert.equal((await b.tick()).status,'MONITORING');
+ assert.equal((await b.tick()).status,'FAIL_CLOSED');
+ assert.equal(renewed,1);
+ assert.equal((await b.tick()).status,'FAIL_CLOSED');
+ b.stop();
+});
