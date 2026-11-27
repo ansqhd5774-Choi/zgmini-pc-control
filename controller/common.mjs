@@ -94,7 +94,7 @@ export function exactPublicUpdatePostcheckTitle(title,body){
  try{request=JSON.parse(body);}catch{return false;}
  if(!request||typeof request!=='object'||Array.isArray(request))return false;
  const id=request.requestId;
- if(typeof id!=='string'||!/^pc-update-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-postcheck$/.test(id))return false;
+ if(typeof id!=='string'||!/^pc-(?:update-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-postcheck$/.test(id))return false;
  const base=id.slice(0,-'-postcheck'.length);
  return title==='PC Update '+base+' postcheck'&&
   ['core-status','source-audit','fear-greed-archive-status'].includes(request.operation)&&
