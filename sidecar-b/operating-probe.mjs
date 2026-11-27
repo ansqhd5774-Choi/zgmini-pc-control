@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {sha256,TARGET,PREIMAGE} from './contract.mjs';
+import {sha256,TARGET,PREIMAGE,V2_AFTER} from './contract.mjs';
 import {decodeTaskXmlBytes,coreReadyForMaintenance}
  from '../writer-b/windows-guards.mjs';
 import {maintenanceLockStatus} from '../tools/maintenance-lock.mjs';
@@ -147,8 +147,9 @@ export function createOperatingSidecarProbe({manifest,requestId,sourceApproved})
 // Source-only preflight for an approved exact one-file B manifest. This does
 // not claim a lease, pause a Task, run the Sidecar or authorize installation.
 const SHA64=/^[0-9a-f]{64}$/;
-// The verified R3 AFTER is not the original B preimage. This is diagnostic
-// classification only; neither the B contract nor any approval is changed.
+// Classify exactly the observed installed generation. This read-only result
+// cannot approve or execute any B effect; the real transaction verifies live
+// preimage, owner, source, Task/wrapper CAS and leases independently.
 const INSTALLED_R3_AFTER='583297b451f168a32a2a5de4b0b04c9b14449aab9a041c954a420203cf04f188';
 export function projectSidecarBManifestPreimageReadonly(raw){
  const empty={schema:'ZGMINI_CNN_SIDECAR_B_PREIMAGE_PINS_V1',
@@ -166,8 +167,9 @@ export function projectSidecarBManifestPreimageReadonly(raw){
    head:raw.head,configSource:raw.configSource,
    taskDefinitionSha256:raw.taskDefinitionSha256,
    wrapperSha256:raw.wrapperSha256,beforeSha256:raw.targetSha256};
- if(raw.targetSha256!==PREIMAGE)return empty;
- return {...empty,status:'PASS',code:'CNN_B_PREIMAGE_PINS_COLLECTED',
+ if(raw.targetSha256!==PREIMAGE&&raw.targetSha256!==V2_AFTER)return empty;
+ return {...empty,status:'PASS',code:raw.targetSha256===V2_AFTER?
+  'CNN_B_V3_PREIMAGE_PINS_COLLECTED':'CNN_B_PREIMAGE_PINS_COLLECTED',
   head:raw.head,configSource:raw.configSource,
   taskDefinitionSha256:raw.taskDefinitionSha256,
   wrapperSha256:raw.wrapperSha256,beforeSha256:raw.targetSha256};
