@@ -12,6 +12,8 @@ import './supervisor-orphan-six-graceful-source.test.mjs';
 import './supervisor-orphan-six-graceful-b-coordinator.test.mjs';
 // Strict separate B raw request/manifest/live source gate, no effect or installed route.
 import './supervisor-orphan-six-b-admission.test.mjs';
+// Separate source-only receiver: canonical owner PR reviews + installed CAS, never actuation.
+import './supervisor-orphan-six-b-receiver-source.test.mjs';
 // Same-host WMI/ConsoleProcessList six original private birth identity crosscheck.
 import './supervisor-orphan-six-wmi-console-crosscheck.test.mjs';
 // Fixed TEMP-only exact status CAS writer regression; never touches operating root.
