@@ -3,6 +3,7 @@
 // list. Only a separately approved, pinned receiver may supply the callbacks.
 // No lease/file/process/Watchdog mutation, network access, or OS calls here.
 import {createHash} from 'node:crypto';
+import {parseOrphanSixBFlatRequest} from './supervisor-orphan-six-b-flat-request.mjs';
 import {
  ORPHAN_SIX_B_TITLE,ORPHAN_SIX_B_OPERATION,ORPHAN_SIX_B_SCOPE,
  validateOrphanSixBRequest,validateOrphanSixBManifest
@@ -110,7 +111,7 @@ export async function receiveOrphanSixBApprovalSource({
       getInstalledReadback,readOriginalOneUseClaim].some(x=>typeof x!=='function'))
   return deny('ORPHAN_SIX_B_RECEIVER_READ_PORTS_MISSING');
  let request;
- try{request=validateOrphanSixBRequest(JSON.parse(issue.body),{actor:owner,repo});}
+ try{request=validateOrphanSixBRequest(parseOrphanSixBFlatRequest(issue.body),{actor:owner,repo});}
  catch{return deny('ORPHAN_SIX_B_REQUEST_UNVERIFIED');}
  try{
   const existing=await readOriginalOneUseClaim(request.requestId);
@@ -183,7 +184,7 @@ export async function recheckOrphanSixFreshOwnerEffectSource({
       .some(f=>typeof f!=='function'))
   return deny('ORPHAN_SIX_FRESH_DECISION_CONTEXT_UNVERIFIED');
  let request;
- try{request=validateOrphanSixBRequest(JSON.parse(issue.body),{actor:owner,repo});}
+ try{request=validateOrphanSixBRequest(parseOrphanSixBFlatRequest(issue.body),{actor:owner,repo});}
  catch{return deny('ORPHAN_SIX_FRESH_DECISION_REQUEST_UNVERIFIED');}
  if(request.requestId!==expectedRequestId||
     request.approvalManifestSha256!==expectedManifestRawSha256)
