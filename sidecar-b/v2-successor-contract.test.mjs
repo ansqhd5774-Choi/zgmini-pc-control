@@ -7,6 +7,7 @@ import {
  verifyObservation,applyOneFile
 } from './contract.mjs';
 import {V2_SUCCESSOR_CANDIDATE} from './pinned-candidate.mjs';
+import {authorizeSidecarIssue,TITLE,LABEL,REQUEST_SCHEMA} from './admission.mjs';
 
 // The installed V2 SHA was independently confirmed by the existing PC
 // #4270 read-only observation. No runtime Writer SHA is assumed by this test.
@@ -90,4 +91,21 @@ test('existing V2 and R3 approved flows remain distinct from new V3',()=>{
  stop(()=>validateManifest({...m,schema:SUCCESSOR_SCHEMA,afterSha256:m.afterSha256}),
   'SIDECAR_B_SCOPE_STOP');
  stop(()=>verifyCandidateBytes(m,installedV2),'SIDECAR_B_CANDIDATE_HASH_STOP');
+});
+
+test('adding V3 never converts a Public repository Issue into B authorization',()=>{
+ const m=manifest(),manifestBytes=Buffer.from(JSON.stringify(m));
+ const head='f'.repeat(40);
+ const request={schema:REQUEST_SCHEMA,requestId:m.requestId,
+  approvalManifestPath:'approvals/sidecar-b/w06-v3-proposed.json',
+  approvalManifestSha256:sha256(manifestBytes),controlHead:head};
+ const event={repository:{full_name:'ansqhd5774-Choi/zgmini-pc-control',private:false},
+  sender:{login:'ansqhd5774-Choi'},
+  issue:{number:4270,title:TITLE,user:{login:'ansqhd5774-Choi'},
+   labels:[{name:LABEL}],body:JSON.stringify(request)}};
+ const env={GITHUB_REPOSITORY:'ansqhd5774-Choi/zgmini-pc-control',
+  GITHUB_EVENT_NAME:'issues',GITHUB_EVENT_ACTION:'opened',
+  GITHUB_ACTOR:'ansqhd5774-Choi',GITHUB_RUN_ATTEMPT:'1',GITHUB_SHA:head};
+ stop(()=>authorizeSidecarIssue({event,env,manifestBytes,controlHead:head}),
+  'SIDECAR_B_EVENT_ORIGIN_STOP');
 });
