@@ -1148,7 +1148,17 @@ export function classifyMaintenancePostcheckLink({requestId,issueNumber,operatio
  if(['queued','pending','requested','waiting'].includes(run.status))
   return out('RUNNER_QUEUE','POSTCHECK_RUN_WAITING',runId);
  if(!Array.isArray(jobs))return out('STATE_UNKNOWN','POSTCHECK_JOBS_LOOKUP_UNVERIFIED',runId);
- const matched=jobs.filter(job=>job?.run_id===runId&&job.name==='approved-pc-job');
+ // The existing private and proposed Public A Jobs live in one immutable
+ // Workflow. Select only a unique runnable fixed Job; a skipped legacy Job
+ // does not disqualify the verified Public job. Two runnable jobs are ambiguous.
+ const fixed=jobs.filter(job=>job?.run_id===runId&&
+  ['approved-pc-job','public-approved-a'].includes(job.name));
+ if(fixed.length<1||fixed.length>2||new Set(fixed.map(j=>j.name)).size!==fixed.length)
+  return out('STATE_UNKNOWN','POSTCHECK_JOB_IDENTITY_UNVERIFIED',runId);
+ const runnable=fixed.filter(j=>!(j.status==='completed'&&j.conclusion==='skipped'));
+ const matched=runnable.length===1?runnable:
+  runnable.length===0?fixed.filter(j=>j.name==='approved-pc-job'):
+  [];
  if(matched.length!==1)return out('STATE_UNKNOWN','POSTCHECK_JOB_IDENTITY_UNVERIFIED',runId);
  const job=matched[0],jobId=Number.isSafeInteger(job.id)?job.id:null;
  if(run.conclusion==='skipped'||job.conclusion==='skipped')
@@ -1191,6 +1201,68 @@ export function summarizeMaintenancePostcheckLocalPointer({pointer,requestId,iss
   return unknown;
  return {status:'LOCAL_RESULT_MATCHED',code:'POSTCHECK_EXISTING_LOCAL_RESULT_MATCHED',
   resultStatus:report.status,resultCode:report.code};
+}
+
+// Compare only the public summary against a fixed, durable operating-PC
+// request ledger, never against a payload from the public Issue. The private
+// full result must never be returned to a Public repository or log.
+export function summarizeMaintenancePublicPostcheckLedger({
+  publicReport,ledger,issueBody,requestId,issueNumber,runId,attempt,seat,
+  operation,sourceBranch,sourceSha,controllerSha
+}={}){
+ const unknown=()=>Object.freeze({status:'LOCAL_RESULT_UNVERIFIED',
+  code:'POSTCHECK_PUBLIC_LOCAL_PROVENANCE_UNVERIFIED',postSourceVerified:false});
+ if(!Number.isSafeInteger(issueNumber)||issueNumber<1||
+  !Number.isSafeInteger(runId)||runId<1||
+  !Number.isSafeInteger(attempt)||attempt<1||attempt>999||
+  !Number.isSafeInteger(seat)||seat<1||seat>6||
+  !/^pc-update-[a-f0-9-]{36}$/.test(requestId??'')||
+  !/^[a-f0-9]{40}$/.test(sourceSha??'')||
+  !/^[a-f0-9]{40}$/.test(controllerSha??'')||
+  !['core-status','source-audit','fear-greed-archive-status'].includes(operation))
+  return unknown();
+ let request;try{request=JSON.parse(issueBody);}catch{return unknown();}
+ if(!request||typeof request!=='object'||Array.isArray(request)||
+  request.schema!=='ZGMINI_PC_JOB_V1'||
+  request.requestId!==requestId+'-postcheck'||
+  request.operation!==operation||
+  request.sourceRepository!=='ansqhd5774-Choi/zgmini'||
+  request.sourceBranch!==sourceBranch||request.sourceSha!==sourceSha||
+  Object.keys(request).length!==7)
+  return unknown();
+ const jobId=`run-${runId}-${attempt}-seat-${seat}`;
+ const report=ledger?.report;
+ if(!ledger||typeof ledger!=='object'||Array.isArray(ledger)||
+  ledger.payloadSha!==sha256(JSON.stringify(request))||
+  !report||typeof report!=='object'||Array.isArray(report)||
+  report.schema!=='ZGMINI_PC_RESULT_V1'||report.jobId!==jobId||
+  report.requestId!==request.requestId||report.operation!==operation||
+  report.sourceRepository!=='ansqhd5774-Choi/zgmini'||
+  report.sourceBranch!==sourceBranch||report.requestedSourceSha!==sourceSha||
+  report.controlSourceSha!==controllerSha||report.actualExecutionSha!==controllerSha||
+  report.seat!==seat||report.status!=='PASS'||report.firstFail!==null||
+  report.reused===true||report.protectedStateUnchanged!==true)
+  return unknown();
+ // The published view is intentionally only status/source SHA + Job ID. Any
+ // extra/source/inventory field is not a valid public projected receipt.
+ const keys=['schema','jobId','requestId','operation','seat','status','code',
+  'actualExecutionSha','reportTransfer'];
+ if(!publicReport||typeof publicReport!=='object'||Array.isArray(publicReport)||
+  JSON.stringify(Object.keys(publicReport).sort())!==JSON.stringify(keys.sort())||
+  publicReport.schema!=='ZGMINI_PC_RESULT_V1'||
+  publicReport.jobId!==jobId||
+  publicReport.requestId!==request.requestId||
+  publicReport.operation!==operation||publicReport.seat!==seat||
+  publicReport.status!==report.status||
+  publicReport.code!=='PUBLIC_RESULT_CODE_REDACTED'||
+  publicReport.actualExecutionSha!==controllerSha||
+  publicReport.reportTransfer?.status!=='SUMMARY_ONLY'||
+  publicReport.reportTransfer?.code!=='PUBLIC_REPOSITORY_REDACTED'||
+  Object.keys(publicReport.reportTransfer).length!==2)
+  return unknown();
+ return Object.freeze({status:'LOCAL_RESULT_MATCHED',
+  code:'POSTCHECK_PUBLIC_LEDGER_AND_SAFE_RECEIPT_VERIFIED',
+  postSourceVerified:true,actualExecutionSha:controllerSha});
 }
 
 // Read-only GitHub workflow registration evidence for NO_RUN: a workflow may

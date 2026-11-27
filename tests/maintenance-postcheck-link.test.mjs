@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {classifyMaintenancePostcheckLink as classify,
  selectMaintenancePostcheckRun as select,
  summarizeMaintenancePostcheckLocalPointer as localPointer,
+ summarizeMaintenancePublicPostcheckLedger as publicLedger,
  classifyMaintenancePostcheckWorkflowRegistration as registration} from '../tools/maintenance-contract.mjs';
 
 const id='pc-update-11111111-1111-4111-8111-111111111111';
@@ -133,11 +135,15 @@ test('real updater persists exact Issue link through coordinator failure phase',
 test('workflow late-label branch stays opt-in and matches source entry contract',()=>{
  const workflow=fs.readFileSync(fileURLToPath(new URL('../.github/workflows/pc-job.yml',import.meta.url)),'utf8');
  const entry=fs.readFileSync(fileURLToPath(new URL('../controller/entry.mjs',import.meta.url)),'utf8');
+ const common=fs.readFileSync(fileURLToPath(new URL('../controller/common.mjs',import.meta.url)),'utf8');
  assert.match(workflow,/types: \[opened, labeled\]/);
  assert.match(workflow,/vars\.ZGMINI_PC_JOB_LATE_LABEL_ENABLED == 'true'/);
- assert.match(entry,/event\.action==='opened'/);
- assert.match(entry,/event\.action==='labeled'/);
- assert.match(entry,/event\.label\?\.name==='pc-job'/);
+ // Since Public owner identity was centralized in attestOwnerPcJobEvent,
+ // verify the active entry calls the shared authorization, not stale inline text.
+ assert.match(entry,/attestOwnerPcJobEvent\(event,process\.env,policy\)/);
+ assert.match(common,/event\.action==='opened'/);
+ assert.match(common,/event\.action==='labeled'&&event\.label\?\.name==='pc-job'/);
+ assert.match(common,/event\.issue\.user\.id===ownerId/);
 });
 
 test('existing local pointer is correlated to exact postcheck run, source and Controller',()=>{
@@ -246,4 +252,82 @@ test('postcheck result publication makes one bounded read-only Run/Job receipt c
  assert.match(written,/jobId:reportedRunJobLinked\?reportedJobId:/);
  assert.match(src,/const untilAt=openedAt\+900000/);
  assert.match(src,/maxPages:3/);
+});
+
+
+test('public A postcheck binds one runnable fixed Job and ignores skipped Private-only Job',()=>{
+ const legacy=job({status:'completed',conclusion:'skipped'});
+ const pub=job({id:889,name:'public-approved-a',status:'completed',conclusion:'success'});
+ const both=result({jobs:[legacy,pub]});
+ assert.equal(both.state,'UPLOAD_MISSING');
+ assert.equal(both.runId,777);
+ assert.equal(both.jobId,889);
+ assert.equal(result({jobs:[legacy]}).state,'SKIPPED_GATE');
+ assert.equal(result({jobs:[pub]}).jobId,889);
+ assert.equal(result({jobs:[job(),pub]}).code,'POSTCHECK_JOB_IDENTITY_UNVERIFIED');
+ assert.equal(result({jobs:[pub,{...pub,id:890}]}).code,'POSTCHECK_JOB_IDENTITY_UNVERIFIED');
+ const pending=job({id:891,name:'public-approved-a',status:'in_progress',conclusion:null});
+ assert.equal(result({jobs:[legacy,pending]}).state,'RUNNING');
+ assert.equal(result({jobs:[legacy,pending]}).jobId,891);
+});
+
+test('public summary is accepted only with exact protected full-result ledger and verified execution lineage',()=>{
+ const controllerSha='b'.repeat(40),reportId='run-777-1-seat-3';
+ const originalIssue=issue(),request=JSON.parse(originalIssue.body);
+ const report={schema:'ZGMINI_PC_RESULT_V1',jobId:reportId,
+  requestId:id+'-postcheck',operation:'core-status',seat:3,
+  sourceRepository:'ansqhd5774-Choi/zgmini',
+  sourceBranch:'main',requestedSourceSha:source,
+  controlSourceSha:controllerSha,actualExecutionSha:controllerSha,
+  status:'PASS',code:'CORE_READONLY_DIAGNOSIS',firstFail:null,
+  protectedStateUnchanged:true,reused:false,
+  result:{secret:'must remain on operating PC'}};
+ const safe={schema:'ZGMINI_PC_RESULT_V1',jobId:reportId,
+  requestId:id+'-postcheck',operation:'core-status',seat:3,
+  status:'PASS',code:'PUBLIC_RESULT_CODE_REDACTED',
+  actualExecutionSha:controllerSha,
+  reportTransfer:{status:'SUMMARY_ONLY',code:'PUBLIC_REPOSITORY_REDACTED'}};
+ const ledger={payloadSha:createHash('sha256').update(JSON.stringify(request)).digest('hex'),report};
+ const params={publicReport:safe,ledger,issueBody:originalIssue.body,
+  requestId:id,issueNumber:42,runId:777,attempt:1,seat:3,
+  operation:'core-status',sourceBranch:'main',sourceSha:source,controllerSha};
+ const ok=publicLedger(params);
+ assert.deepEqual(ok,{status:'LOCAL_RESULT_MATCHED',
+  code:'POSTCHECK_PUBLIC_LEDGER_AND_SAFE_RECEIPT_VERIFIED',
+  postSourceVerified:true,actualExecutionSha:controllerSha});
+ assert.equal(JSON.stringify(ok).includes('secret'),false);
+ for(const mutate of [
+  p=>p.ledger.report.controlSourceSha='d'.repeat(40),
+  p=>p.ledger.report.requestedSourceSha='d'.repeat(40),
+  p=>p.ledger.report.sourceRepository='attacker/repository',
+  p=>p.ledger.report.actualExecutionSha='d'.repeat(40),
+  p=>p.ledger.report.reused=true,
+  p=>p.ledger.report.protectedStateUnchanged=false,
+  p=>p.ledger.report.firstFail='INCOMPLETE',
+  p=>p.ledger.report.status='FAIL',
+  p=>p.ledger.payloadSha='0'.repeat(64),
+  p=>p.publicReport.actualExecutionSha='d'.repeat(40),
+  p=>p.publicReport.code='CORE_READONLY_DIAGNOSIS',
+  p=>p.publicReport.status='FAIL',
+  p=>p.publicReport.reportTransfer.status='FULL_PRIVATE',
+  p=>p.publicReport.secret='not safe',
+  p=>p.seat=2,
+  p=>p.runId=778,
+  p=>p.issueBody=JSON.stringify({...request,sourceSha:'d'.repeat(40)}),
+ ]){
+  const altered=structuredClone(params);mutate(altered);
+  assert.equal(publicLedger(altered).status,'LOCAL_RESULT_UNVERIFIED');
+  assert.equal(publicLedger(altered).postSourceVerified,false);
+ }
+});
+
+test('installed Public postcheck code cannot promote redacted bot receipt without local ledger',()=>{
+ const source=fs.readFileSync(fileURLToPath(new URL('../tools/update.mjs',import.meta.url)),'utf8');
+ assert.match(source,/summarizeMaintenancePublicPostcheckLedger\(\{/);
+ assert.match(source,/ledgerPath=path\.join\(controlRoot,'ledger',issue\.requestId\+'-postcheck\.json'\)/);
+ assert.match(source,/stat\.isFile\(\)&&!stat\.isSymbolicLink\(\)&&stat\.nlink===1/);
+ assert.match(source,/if\(publicSafeReceipt&&!publicLocalAttested\)continue/);
+ assert.match(source,/\['approved-pc-job','public-approved-a'\]\.includes\(j\.name\)/);
+ assert.match(source,/if\(proof\.status==='LOCAL_RESULT_MATCHED'\)/);
+ assert.doesNotMatch(source,/console\.log\(JSON\.stringify\(localLedger\)\)/);
 });
