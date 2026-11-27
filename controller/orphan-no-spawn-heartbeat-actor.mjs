@@ -117,8 +117,9 @@ export function createNoSpawnHeartbeatActor({
   return first;
  }
  function stop(){
-  // Only stop this observer/timer. Never stop an inherited Runner.
-  if(timer){clearInterval(timer);timer=null;}
+  // Stop is terminal and prevents an in-flight asynchronous proof from
+  // publishing a heartbeat after shutdown. Never touch inherited Runners.
+  halt('NO_SPAWN_ACTOR_STOPPED');
   return result('STOPPED','NO_SPAWN_ACTOR_HEARTBEAT_STOPPED');
  }
  return Object.freeze({tick,start,stop,state:()=>terminal??result(
