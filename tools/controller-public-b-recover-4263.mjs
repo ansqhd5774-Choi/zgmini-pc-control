@@ -64,7 +64,8 @@ function sourceAndOwner(){
  need(user?.id===327938088&&user?.login==='ansqhd5774-Choi'&&
   r?.id===1442936296&&r?.private===false&&r?.owner?.id===327938088,
   'B4263_GITHUB_OWNER_UNVERIFIED');
- need(upstream('pulls/4260')?.merge_commit_sha===APPROVAL_MERGE,
+ const ownerApproval=upstream('pulls/4260');
+ need(ownerApproval?.merged===true&&ownerApproval?.merge_commit_sha===APPROVAL_MERGE,
   'B4263_EFFECT_APPROVAL_UNVERIFIED');
  const sourcePr=upstream('pulls/'+RECOVERY_PR);
  need(sourcePr?.number===RECOVERY_PR&&sourcePr?.merged===true&&
@@ -266,6 +267,11 @@ async function continueOriginal(pre,update){
    post.postSourceVerified===true,'B4263_POSTCHECK_NOT_VERIFIED');
   const host=read(path.join(CONTROL,'host.json'));
   need(host.controllerSourceSha===TARGET&&
+   pre.data.manifest.allowFiles.every(file=>
+    host.controllerFiles?.[file.path]===file.sha256&&
+    goodFile(path.join(CONTROL,file.path))&&
+    hash(fs.readFileSync(path.join(CONTROL,file.path)))===file.sha256)&&
+   update.backlogPauseWindows(read(backlogPath)).every(w=>w.resumedAt!==null)&&
    JSON.stringify(update.protectedSnapshot())===JSON.stringify(pre.originalProtection)&&
    upstream('actions/workflows/pc-job.yml').state==='active',
    'B4263_FINAL_RUNTIME_NOT_VERIFIED');
@@ -273,7 +279,9 @@ async function continueOriginal(pre,update){
    'B4263_LEASE_OWNER_CHANGED');
   record('POSTCHECK_VERIFIED_LEASE_ARCHIVE_PENDING',{postIssueNumber:post.issueNumber});
   const leaseArchived=path.join(receiptRoot,REQUEST+'-switched-recovered.lease');
-  need(!fs.existsSync(leaseArchived),'B4263_RECOVERY_ARCHIVE_EXISTS');
+  const leaseStat=fs.lstatSync(leaseDir);
+  need(leaseStat.isDirectory()&&!leaseStat.isSymbolicLink()&&
+   !fs.existsSync(leaseArchived),'B4263_RECOVERY_ARCHIVE_UNSAFE');
   fs.renameSync(leaseDir,leaseArchived); // archive entire dead lease, never delete
   const result={...read(ledgerPath),status:'PASS',phase:'PASS',lastPass:'PASS',
    code:'APPROVED_UPDATE_AND_DIAGNOSTIC_VERIFIED',
