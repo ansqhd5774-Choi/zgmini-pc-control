@@ -449,3 +449,14 @@
 3. 실패/차단(#8/#9/#10/#12)은 원담당의 실제 처리·후속 이슈 확인 후 별도 정리. Core/실행기 오류를 이슈 담당자가 임의 수리하지 않는다.
 4. 같은 작업의 원격 결과를 반복 검사하지 않도록 이 원장과 Close 상태를 재사용하고, 정리 결과가 충분히 축적된 뒤 신규 요청 자동 Close를 개발한다.
 5. 완료 시 실제 `open/closed` 건수와 이번 `closedReadbackVerified` 건수, 진짜 미해결·보류 수를 별도 보고한다.
+
+
+## 2026-11-28 추가 확인 — 최신 미해결 이슈 및 PR 분리 판정
+
+- 조사 기준: GitHub 연결 계정의 원본 Issue/댓글, PR 검색, 최신 `main@da52580380885ea6c4ba3d68757b79cbe848ac0b` 비교. 본 전용 브랜치는 `main` 대비 `diverged`(ahead 23 / behind 3701). 본 기록 추가는 운영 소스 통합/배포가 아니다.
+- [#4164](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4164): 원본 Run 45909216646 `BLOCKED/SUPERVISOR_OWNERSHIP_LOST`, 동일 요청 replay 금지. 후속 독립 [#4270](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4270) Run 46056098322는 비공개 조회로 `STATE_UNKNOWN/CNN_LOCAL_DAY_INCOMPLETE`, `local=DAY_INCOMPLETE`, `d1=NOT_CHECKED`, `api=NOT_CHECKED` 확인. 실패 단계가 달라 두 Issue 모두 OPEN 보존. 날짜별 로컬 원본/checks 정합성은 W06 소유 범위.
+- [#4270](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4270): 별도 UI 1D 검증 및 #4288 소스 main 병합이 기록돼 있으나, V3 단일 B 효과의 승인/운영 설치/신규 동일 관측 SQLite→D1→API/UI 종단은 미확인. 기존 결과쌍 및 이전 실패를 소급 성공으로 취급하지 않는다. OPEN 보존.
+- [#4117](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4117): 원본 Run 45899164961의 `RESULT_PAIR_REF_CONFLICT_UNTOUCHED`, 공개 JSON/TXT 0/2 유지. #4285의 추가 부정 회귀 17/17 PASS·main 병합, 테스트용 #4286 closed/unmerged는 기존 댓글에 증거가 있다. 소스 회귀 완료와 원본 요청 결과 완료를 분리하여 #4117 OPEN 보존.
+- [#4156](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4156): 과거 Supervisor/Watchdog 회복 증거와 별도로 Public B 설치 및 추가 read-only 감사의 실제 결과는 미확인. 기능 종단 완료로 종료하지 않는다.
+- [#4276](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4276): Public B 소스 Draft/미병합 및 고정 checkout `4d3fe664...`의 `main` 조상 조건 불충족. PR 본문에 #4283/#4287 사용자 승인 및 main 병합 정정 기록 있음. 이슈 담당자가 실행 SHA를 임의 재핀하거나 운영 B 발행·Windows 설치를 수행하지 않는다. 해당 소스 담당자의 정규 pin/검증 후 별도 인증·설치가 필요하다.
+- 이번 회차 신규 Issue Close 0, PR merge 0, PC 요청·실행 0. 이전 207건 누적 직접 종료 실적은 과거 원장 기록이며 이번 회차 실적에 가산하지 않는다. 전체 Open/Closed 현행 총수는 이 제한 조회만으로 산정하지 않는다.
