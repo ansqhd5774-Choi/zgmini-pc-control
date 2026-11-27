@@ -4,7 +4,8 @@ const digest=i=>i.toString(16).padStart(40,'0');
 
 export function createGitPairFixture({rejectRefUpdate=false,throwAfterUpdate=false,
  malformedPatchResponse=false,advanceMainOnFirstPatch=false,
- advanceMainOnSecondPatch=false,advanceMainWithExistingPath=null,divergeMainOnFirstPatch=false,
+ advanceMainOnSecondPatch=false,secondAdvanceWithExistingPath=null,
+ advanceMainWithExistingPath=null,divergeMainOnFirstPatch=false,
  existingPaths=[]}={}){
  const base=digest(10),baseTree=digest(20),advanced=digest(50),
   advancedTree=digest(60),secondAdvanced=digest(51),secondAdvancedTree=digest(61),
@@ -57,6 +58,8 @@ export function createGitPairFixture({rejectRefUpdate=false,throwAfterUpdate=fal
    }
    if(advanceMainOnSecondPatch&&updates===2){
     current=secondAdvanced;
+    if(secondAdvanceWithExistingPath)
+     files.set(secondAdvanceWithExistingPath,Buffer.from('old result'));
     return response(422,{message:'not a fast forward'});
    }
    if(rejectRefUpdate)return response(422,{message:'not a fast forward'});
