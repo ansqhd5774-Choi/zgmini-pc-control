@@ -5,6 +5,10 @@ import os from 'node:os';
 import path from 'node:path';
 import {assessPublicSourceCi,runPublicSourceCiGuard} from '../tools/public-source-ci-guard.mjs';
 // Reuse immutable Public source CI; no workflow byte change or Windows B dispatch.
+// Retain the old V1/V2 source guards alongside the new V2-to-V3 successor.
+import '../sidecar-b/contract.test.mjs';
+import '../sidecar-b/w06-r3-operating-approval.test.mjs';
+import '../sidecar-b/w06-r3-sevenmin-approval.test.mjs';
 import '../sidecar-b/w06-v2-to-v3-pin-only.test.mjs';
 
 const repo='ansqhd5774-Choi/zgmini-pc-control', id=1442936296;
