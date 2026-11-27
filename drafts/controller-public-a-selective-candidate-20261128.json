@@ -1,0 +1,55 @@
+{
+  "schema": "ZGMINI_CONTROLLER_PUBLIC_A_SELECTIVE_CANDIDATE_V1",
+  "status": "SOURCE_ONLY_NOT_APPROVED",
+  "installedSha": "3c7d4cfefacf072fd35cb19706b352c64c5e4fd2",
+  "targetSha": "20d5bbbf305531dca9bf5b74744df83daf37cf17",
+  "sourceMainSha": "f816c498d3aae937698835b29141b14f6ee65ed2",
+  "targetBranch": "codex/public-a-controller-selective-20261128",
+  "targetParentSha": "3c7d4cfefacf072fd35cb19706b352c64c5e4fd2",
+  "allowFiles": [
+    {
+      "path": "controller/common.mjs",
+      "sha256": "bddd2435644d2619360a63b9b252caea3ce5d99583fe4e543b3225ff11496ee1"
+    },
+    {
+      "path": "controller/entry.mjs",
+      "sha256": "1874aa1b0b9c6ce109a15737a608a711b81aecb7e3bdcc475032be8b54c1dca7"
+    },
+    {
+      "path": "controller/preimage-manifest-stager.mjs",
+      "sha256": "806950791803cfc9a1fb387dfdbc4b74757304c48df20e90a2d9b76d52c8cf10"
+    },
+    {
+      "path": "controller/upload.mjs",
+      "sha256": "a0a6065c7f2fd8f816e6b0a9efd9e7aba14e990bd0336aadc6b0be74baaefe8e"
+    }
+  ],
+  "sourceGitBlobIds": {
+    "controller/common.mjs": "b8bafbc0e6a60232be4638d728ca4c7fcd314114",
+    "controller/entry.mjs": "6f9b4125c4264669f1bd0c8da4a5f8b84acc25bd",
+    "controller/preimage-manifest-stager.mjs": "6cebe547c5bda3fe746fee280d4b0ea0ae1032ec",
+    "controller/upload.mjs": "22e25d2721443694144a501455c7f2c21f81d221"
+  },
+  "customPaths": [],
+  "controllerOnlyInstall": true,
+  "approved": false,
+  "operatingInstallationVerified": false,
+  "operatingPreimageRawCasVerified": false,
+  "sourceImportedIntoMain": false,
+  "existingWorkflowUnchanged": true,
+  "publicAWorkflowActivated": false,
+  "publicBEffectAuthorized": false,
+  "futureFormalSelectivePinPath": "approvals/controller-selective-targets/20d5bbbf305531dca9bf5b74744df83daf37cf17.json",
+  "futureFormalControllerUpdatePath": "approvals/controller-updates/20d5bbbf305531dca9bf5b74744df83daf37cf17.json",
+  "handoffSourceApproved": "feaf0a380890663d8881881bea63587576188c76",
+  "handoffInstalledVerified": false,
+  "sourceEvidence": {
+    "overlayCommitParent": "3c7d4cfefacf072fd35cb19706b352c64c5e4fd2",
+    "sourceMainPathHashesDirectlyVerified": true,
+    "reportUploadVerifiedModuleSameOnInstalledAndMain": true,
+    "lastObservedInstalledController": "3c7d4cfefacf072fd35cb19706b352c64c5e4fd2",
+    "lastObservedAtKst": "2026-11-28T00:51:54+09:00",
+    "scope": "immutable source-only; operating PC CAS/receiver origin unverified"
+  },
+  "next": "Need existing protected independently authenticated Windows operator effect-specific approval + fresh manifest/7-file CAS, exact import closure, backup/rollback and local actual execution readback before formal B selective pin/manifest. Do not merge Draft Public A job workflow before installed controller. Preserve Supervisor, six Runners, Watchdog, 2 Standby and UNKNOWN claims."
+}
