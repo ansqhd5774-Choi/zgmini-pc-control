@@ -173,7 +173,22 @@ export function validateRequest(request,policy){
  need(/^[a-f0-9]{40}$/.test(request.sourceSha),'SOURCE_SHA');return request;
 }
 export function under(root,relative){const resolved=path.resolve(root,relative);need(resolved.startsWith(path.resolve(root)+path.sep),'PATH_OUTSIDE_JOB');return resolved;}
-export function writeJson(file,value){const tmp=file+'.'+crypto.randomUUID()+'.tmp';fs.writeFileSync(tmp,JSON.stringify(value,null,2)+'\n',{flag:'wx'});fs.renameSync(tmp,file);}
+export function writeJson(file,value){
+ const tmp=file+'.'+crypto.randomUUID()+'.tmp';
+ let created=false,ioPhase='TEMP_WRITE';
+ try{
+  fs.writeFileSync(tmp,JSON.stringify(value,null,2)+'\n',{flag:'wx'});
+  created=true;
+  ioPhase='ATOMIC_RENAME';
+  fs.renameSync(tmp,file);
+ }catch(error){
+  // Never leave owned temporary files after a failed Windows rename.
+  // Keep the original error; never remove an existing destination/foreign tmp.
+  if(created){try{fs.unlinkSync(tmp);}catch{}}
+  if(error&&typeof error==='object')error.zgminiIoPhase=ioPhase;
+  throw error;
+ }
+}
 // A transient heartbeat write failure must not terminate all Runner seats.
 // Only the Supervisor uses this wrapper; lease/ledger writes remain strict.
 export function createSupervisorStatusWriter({write=writeJson,
@@ -186,6 +201,8 @@ export function createSupervisorStatusWriter({write=writeJson,
    if(!reported){
     reported=true;
     report({code:'SUPERVISOR_HEARTBEAT_WRITE_BLOCKED',ioCode:error.code,
+     ioPhase:['TEMP_WRITE','ATOMIC_RENAME'].includes(error.zgminiIoPhase)
+      ?error.zgminiIoPhase:'UNKNOWN',
      heartbeatUpdated:false});
    }
    // Do not synthesize a fresh heartbeat or relax the installer's freshness
