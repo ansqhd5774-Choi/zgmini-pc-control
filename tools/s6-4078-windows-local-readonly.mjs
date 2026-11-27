@@ -45,8 +45,19 @@ export function readS64078LocalBytes({
      !/^[a-f0-9-]{36}$/.test(claimBody.nonce??''))
    return REFUSED('S6_ORIGINAL_CLAIM_UNVERIFIED');
   const approval=safeFile(path.join(sourceRoot,'approvals','controller-s6',APPROVAL_SHA+'.json'),32768);
-  if(sha(approval)!==APPROVAL_SHA)return REFUSED('S6_APPROVAL_SOURCE_CAS_DRIFT');
-  const approvalBody=JSON.parse(approval.toString('utf8'));
+  // Existing S6 operator's pinned approval permits only CRLF -> LF
+  // canonicalization when *exactly* the reviewed raw hash is recovered.
+  // The source copy remains unchanged and is re-read byte-for-byte below.
+  let canonicalApproval=approval;
+  if(sha(canonicalApproval)!==APPROVAL_SHA){
+   const text=approval.toString('utf8');
+   if(!text.includes('\r\n')||text.replace(/\r\n/g,'').includes('\r'))
+    return REFUSED('S6_APPROVAL_SOURCE_CAS_DRIFT');
+   canonicalApproval=Buffer.from(text.replace(/\r\n/g,'\n'),'utf8');
+   if(sha(canonicalApproval)!==APPROVAL_SHA)
+    return REFUSED('S6_APPROVAL_SOURCE_CAS_DRIFT');
+  }
+  const approvalBody=JSON.parse(canonicalApproval.toString('utf8'));
   if(approvalBody.schema!=='ZGMINI_PC_S6_ONCE_B_APPROVAL_V1'||
     approvalBody.requestId!==FIXED.s6RequestId||
     approvalBody.approval?.approved!==true||
@@ -67,7 +78,7 @@ export function readS64078LocalBytes({
    return REFUSED('S6_LOCAL_OWNER_OR_APPROVAL_CHANGED');
   return {
    status:'READ_ONLY_OBSERVED',code:'S6_4078_LOCAL_BYTES_SAMPLED',
-   claimSha256:sha(claim),approvalSha256:sha(approval),
+   claimSha256:sha(claim),approvalSha256:sha(canonicalApproval),
    supervisorOwnerSha256:sha(owner),
    originalOwnerSha256:approvalBody.ownerSha256,
    originalOwnerMatchesCurrent:sha(owner)===approvalBody.ownerSha256,
