@@ -80,32 +80,41 @@ function sourceAndOwner(){
   fs.readFileSync(fileURLToPath(import.meta.url)).equals(mainBytes(LOCAL,merge))&&
   mainBytes(LOCAL,merge).equals(mainBytes(LOCAL)),
   'B4263_OPERATOR_SOURCE_CAS_FAILED');
- const loaded=async()=>{};
  return merge;
 }
 async function attestedModules(merge){
- // Verify all six pre-existing modules and transitive static imports before
- // evaluating any executable project module.
- const {verifyOperatorSourceClosure}=await import('./controller-public-b-operator-once.mjs');
+ // Trust every transitive local runtime byte BEFORE evaluating any project
+ // module. A GitHub token can attest the reviewed merge; it is not Windows
+ // operator authority. Both independent proofs are required separately.
  const list=['tools/controller-public-b-operator-once.mjs','tools/update.mjs',
   'tools/maintenance-contract.mjs','tools/maintenance-apply.mjs',
   'tools/maintenance-lock.mjs','tools/source-bundle-register.mjs'];
- const readLocal=rel=>{
-  need(list.includes(rel),'B4263_IMPORT_NOT_APPROVED');
-  const p=path.join(SOURCE,rel);
-  need(goodFile(p)&&fs.realpathSync(p).toLowerCase()===path.resolve(p).toLowerCase(),
-   'B4263_DEPENDENCY_UNSAFE');
-  return fs.readFileSync(p);
- };
- const readTrusted=rel=>{
-  const expected=mainBytes(rel,merge);
-  need(expected.equals(mainBytes(rel)),'B4263_MAIN_DEPENDENCY_DRIFT');
-  return expected;
- };
- // The old helper itself was included in the preflight closure, but its
- // import is inert and pure; all local dynamic code remains checked below.
- need(verifyOperatorSourceClosure(readLocal,readTrusted)===true,
-  'B4263_SOURCE_CLOSURE_INVALID');
+ const sources=new Map();
+ for(const rel of list){
+  const file=path.join(SOURCE,rel);
+  need(goodFile(file)&&fs.realpathSync(file).toLowerCase()===
+   path.resolve(file).toLowerCase(),'B4263_DEPENDENCY_UNSAFE');
+  const bytes=fs.readFileSync(file),trusted=mainBytes(rel,merge);
+  need(bytes.equals(trusted)&&trusted.equals(mainBytes(rel)),
+   'B4263_DEPENDENCY_SOURCE_CAS_FAILED');
+  sources.set(rel,bytes.toString('utf8'));
+ }
+ const allowed=new Set(list);
+ for(const [rel,code] of sources){
+  for(const item of code.matchAll(/\\b(?:from\\s+|import\\s+)(['"])([^'"]+)\\1/g)){
+   const spec=item[2];if(spec.startsWith('node:'))continue;
+   need(spec.startsWith('./')||spec.startsWith('../'),
+    'B4263_UNPINNED_IMPORT');
+   const resolved=path.posix.normalize(path.posix.join(path.posix.dirname(rel),spec));
+   need(allowed.has(resolved),'B4263_UNPINNED_IMPORT');
+  }
+  for(const item of code.matchAll(/\\bimport\\s*\\(\\s*(['"])([^'"]+)\\1\\s*\\)/g)){
+   const spec=item[2];
+   need(spec.startsWith('node:')||allowed.has(
+    path.posix.normalize(path.posix.join(path.posix.dirname(rel),spec))),
+    'B4263_UNPINNED_DYNAMIC_IMPORT');
+  }
+ }
  return await import('./update.mjs');
 }
 function verifyLedger(ledger,issue){
