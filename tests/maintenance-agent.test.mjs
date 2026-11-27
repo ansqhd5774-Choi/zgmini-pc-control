@@ -1397,7 +1397,7 @@ test('Public running publisher workflow attestation binds authenticated immutabl
  const api=async route=>{
   if(route==='actions/workflows/ci-approval-controller-b.yml')
    return {id:123456,state:'active',path:workflow};
-  if(route==='contents/'+workflow+'?ref='+env.GITHUB_WORKFLOW_SHA')
+  if(route==='contents/'+workflow+'?ref='+env.GITHUB_WORKFLOW_SHA)
    return {type:'file',path:workflow,encoding:'base64',sha:blob,
     content:bytes.toString('base64')};
   throw Error('denied');
