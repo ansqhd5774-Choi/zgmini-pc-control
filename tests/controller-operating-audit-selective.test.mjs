@@ -4,9 +4,9 @@ import {execFileSync,spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 
 const BASE='555f95708984580cd7d5a0fd05a80b718e867710';
-const TARGET='c73fe5a03a1f31b676c9ce8cf75458ce05b828d5';
+const TARGET='cde1dd372210e4658ae348cb9e2577967cb11634';
 const TESTED_MAIN='89430d68db34716c355f60126a0ed6c1f0753c84';
-const BRANCH='refs/remotes/origin/codex/controller-operating-audit-selective-20261128';
+const BRANCH='refs/remotes/origin/codex/controller-operating-audit-selective-one-20261128';
 const FILES=['config/operations.json','controller/operations.mjs'];
 const DIGESTS={
  'config/operations.json':'177cb15b40ca34fc415a091bf93f8f6ac6d607ce4d6f7f429a77d73c8abdcccf',
