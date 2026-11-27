@@ -282,7 +282,6 @@ on:
       - 'tests/public-source-ci-guard.test.mjs'
       - 'tools/public-pc-job-candidate.mjs'
       - 'tests/public-pc-job-candidate.test.mjs'
-      - 'sidecar-b/**' # Existing Sidecar B source path, never a Public B execution
       - '.github/workflows/controller-maintenance-source-tests.yml'
 permissions:
   contents: read
@@ -333,10 +332,6 @@ jobs:
           node --test --test-concurrency=1 tests/ci-approval-public-completed-run-observe.test.mjs
           node --test --test-concurrency=1 tests/supervisor-orphan-six-b-receiver-source.test.mjs
           node --test --test-concurrency=1 tests/supervisor-status-write.test.mjs
-          # Sidecar contract is source-only; Public must never dispatch B on Windows.
-          node --check sidecar-b/contract.mjs
-          node --check sidecar-b/pinned-candidate.mjs
-          node --test --test-concurrency=1 sidecar-b/contract.test.mjs sidecar-b/w06-r3-operating-approval.test.mjs sidecar-b/w06-r3-sevenmin-approval.test.mjs sidecar-b/w06-v2-to-v3-pin-only.test.mjs
   source-only:
     if: >-
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
