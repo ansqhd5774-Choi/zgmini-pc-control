@@ -1,0 +1,45 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "b08f3a482e9bb39523f47675ae06bc6e02e01d2d",
+  "targetSha": "feaf0a380890663d8881881bea63587576188c76",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "2026-11-28 Owner instruction to continue restoring approved operating-PC workflows while keeping zgmini-pc-control Public. This one-shot handoff only updates the existing independent maintainer's tools/maintenance-agent.mjs to support owner-verified PUBLIC_SOURCE_ONLY metadata intake; all B operational effects stay BLOCKED. The user has not approved a new Public B execution boundary. The approved C/operator-run source-handoff retains installed startup/7-file identity, medium-token origin, preimage hash/CAS, independent controller-install lease, byte-verified backup/rollback and new receiver WMI-origin proof. Nothing in this approval authorizes a new Controller B request, Policy pin rotation, unknown-claim replay, Runner/Supervisor/Watchdog intervention, DB/D1/Writer writes or repo visibility changes.",
+  "files": {
+    "tools/maintenance-contract.mjs": "3e35f49ea0003998853f5f0f41d253c426e3da9904082ae47bb86c3cd0044a27",
+    "tools/maintenance-apply.mjs": "cf0d9c82fa25c343c0d540b6c432c3e6d090c9924474851c22c277867d841096",
+    "tools/maintenance-agent.mjs": "7c3f6318b07844aaba68cc6f24d5bc82a45d4cde9bd5291cd3e9948778c945c2",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "9ebd662cf1fca0ddc1438260f4ece29d1abea5511a0be2e83fc45f49cda04fa6",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "af31ab1f6a159aa1d8467d2585eb16750e8a1a293f9ecfb90b85c388d8640d70",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "23f3709ed0387cfb0132d9546f0fd6e2f10eabfad4212a67a170d5201a4a5de0"
+  },
+  "runtimeChangedFiles": [
+    "tools/maintenance-agent.mjs"
+  ],
+  "checks": {
+    "sourceCi": "Merge PR #4241 at feaf0a380890663d8881881bea63587576188c76, exact PR head 1dd33e45622714821d9ae15ffe27dc32bac048bc GitHub-hosted source CI #46030250470 SUCCESS. Historical approval hash regression fixed without modifying old approval. Operating Windows receiver not tested by this CI.",
+    "byteProvenance": "9/9 target raw SHA256 computed at immutable main ancestor feaf0a380890663d8881881bea63587576188c76; cross-checked eight unchanged files against prior approved b08f3a482e9bb39523f47675ae06bc6e02e01d2d exact raw SHA256; only tools/maintenance-agent.mjs changes 401699eadbd6dfde45ae27cd6c139a1e1f7e54f2b2638df2f398836b709a3d0f -> 7c3f6318b07844aaba68cc6f24d5bc82a45d4cde9bd5291cd3e9948778c945c2.",
+    "installedWindowsEvidence": "2026-11-28 00:51:54 KST user-provided read-only collectAutomationStatus: maintenanceSourceSha b08f3a482e9bb39523f47675ae06bc6e02e01d2d, maintenanceFilesVerified=true, receiverStatus=POLL_WAIT, maintenanceState=UNVERIFIED, actualControllerSha 3c7d4cfefacf072fd35cb19706b352c64c5e4fd2. Historical runtime observation only: fresh on-host manifest raw SHA256, file preimage CAS, receiver identity and lease must be checked before effect.",
+    "ciPolicyPreservation": "No ciControllerBPolicy field in this approval; existing installed CI Controller B policy remains inherited and byte-identical, no workflow pin rotation.",
+    "preflight": "Existing independent tools/handoff-maintenance.mjs only on operator Windows, medium token, outside GitHub Actions/Runner; must verify source target ancestor of main, clean 9 files and approval, original seven installed file SHA256 and startup bytes, receiver WMI origin identity, no conflicting controller-install lease, owner/nonce, path no symlink, prior incomplete handoff absent, exact byte backup and verified rollback, new receiver origin capture.",
+    "runtimeApprovalBoundaries": "PUBLIC_SOURCE_ONLY is never LISTENING full B authorization; B effects remain PUBLIC_B_EFFECT_SEPARATE_AUTH_REQUIRED. Controller update is separate B application and requires independent effect-specific approval and actual host CAS."
+  },
+  "backup": "BYTE_VERIFIED_EXISTING_SEVEN_RUNTIME_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_WHILE_NEW_RECEIVER_NOT_STARTED_AND_PRIOR_RECEIVER_PROVEN_STOPPED; HOLD_FOR_RECOVERY_IF_RECEIVER_ORIGIN_UNVERIFIED",
+  "effects": [
+    "One-shot independent maintainer 7-to-7 V2 handoff, only tools/maintenance-agent.mjs byte changed",
+    "PUBLIC_SOURCE_ONLY poll with immutable owner/repo identity and B operational effect denial",
+    "Full original maintainer manifest and CI policy retained; no Controller or other runtime installed bytes touched"
+  ],
+  "preserve": [
+    "Controller 3c7d4cfefacf072fd35cb19706b352c64c5e4fd2 and Supervisor 6 Runner children, Watchdog HEALTHY, Standby2 READY",
+    "Unfinished UNKNOWN #3947 #4069 #4156 journals/claims untouched",
+    "PC operation result and private inventory never sent to Public Issue before verified safe controller upload",
+    "Repo remains public; Public A workflow stays disabled until separate Controller exact install verified"
+  ],
+  "scopeNote": "A source approval manifest is neither a Windows handoff completion receipt nor Controller install authorization. The independent operator must establish current preimage CAS and new origin/readback; unauthorized/unknown effects remain blocked."
+}
