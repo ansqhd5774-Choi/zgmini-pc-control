@@ -1106,6 +1106,17 @@ export function createMaintenanceAgent({
       return {status:'IGNORED',issueNumber:issue?.number};
     // This inlet checks canonical GitHub approval evidence only. It does not
     // claim an effect, write an approval package, signal a Runner or call apply.
+    // Reuse the existing strict seven-key raw JSON parser to reject duplicate
+    // security-sensitive keys before the source receiver calls JSON.parse.
+    try{
+      if(typeof issue.body!=='string'||Buffer.byteLength(issue.body)>MAX_BODY_BYTES)
+        throw coded('ORPHAN_SIX_B_ISSUE_BODY_INVALID');
+      parseIssueBody(issue.body);
+    }catch{
+      return {status:'BLOCKED',code:'ORPHAN_SIX_B_ISSUE_BODY_INVALID',
+        issueNumber:issue.number,executionStarted:false,
+        runnerStopAuthorized:false,operationalWrites:0};
+    }
     // Re-attest the installed maintainer source at actual reception; startup
     // verification cannot cover subsequent on-disk drift.
     try{verifyInstalledSource();}
