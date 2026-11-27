@@ -1306,9 +1306,17 @@ test('Public publisher reads only independent installed 7-file grant and detects
 
 test('Public B publisher on hosted source CI is default-denied until exact installed policy',async()=>{
  const m=sampleRequest().manifest;
+ // Approved two-file selective overlay: production B still requires a V2
+ // one-effect manifest pin before any Issue POST.
+ m.allowFiles=[
+  {path:'config/operations.json',sha256:'a'.repeat(64)},
+  {path:'controller/operations.mjs',sha256:'c'.repeat(64)}
+ ];
+ m.checks.manifestSha256=manifestFingerprint(m.allowFiles).sha256;
  m.controllerOnlyInstall=true;
  m.selectiveSource={schema:'ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1',
-  branch:'codex/publisher-scope-evidence',mainSha:'f'.repeat(40),customPaths:[]};
+  branch:'codex/publisher-scope-evidence',mainSha:'f'.repeat(40),
+  customPaths:m.allowFiles.map(f=>f.path)};
  const bytes=Buffer.from(JSON.stringify(m));
  const input={targetSha:TARGET,approvalSha256:digest(bytes),runId:765,attempt:1};
  const repo={id:1442936296,full_name:REPO,private:false,
