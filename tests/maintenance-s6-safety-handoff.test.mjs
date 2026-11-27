@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
 import {
   nextRuntimeFiles,requireHandoffApproval,requireSevenToSevenContract,
   handoffFilePlan,approvedHandoffCiPolicy,
@@ -41,8 +42,15 @@ test('S6 stop fail-closed handoff pins only four changed installed runtime modul
   assert.deepEqual(plan.rollbackAdded,[]);
   for(const p of sourcePaths){
     assert.match(target.files[p],/^[a-f0-9]{64}$/);
-    assert.equal(hash(fs.readFileSync(new URL('../'+p,import.meta.url))),
-      target.files[p],'approved target byte mismatch: '+p);
+    // An approved historical B handoff pins its own immutable Git revision.
+    // A newer source-only draft may change the active checkout independently.
+    for(const manifest of [existing,target]){
+      const bytes=execFileSync('git',['show',manifest.targetSha+':'+p],{
+        cwd:new URL('../',import.meta.url),maxBuffer:4*1024*1024,
+      });
+      assert.equal(hash(bytes),manifest.files[p],
+        'approved historical revision byte mismatch: '+manifest.targetSha+':'+p);
+    }
   }
 });
 
