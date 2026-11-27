@@ -31,7 +31,7 @@ const raw=line.slice(line.indexOf(' -e "')+5);
 assert.ok(raw.endsWith('"'));
 const script=raw.slice(0,-1);
 const start="if(h.controllerSourceSha!=='"+old+"')process.exit(2);";
-const replacement="const old='"+old+"',next='"+next+"';if(h.controllerSourceSha!==old&&h.controllerSourceSha!==next)process.exit(2);if(h.controllerSourceSha===next){p['controller/operations.mjs']='"+nextPin['controller/operations.mjs']+"';p['config/operations.json']='"+nextPin['config/operations.json']+"';}";
+const replacement="const next='"+next+"';if(h.controllerSourceSha!==next){if(h.controllerSourceSha!=='"+old+"')process.exit(2);}if(h.controllerSourceSha===next){p['controller/operations.mjs']='"+nextPin['controller/operations.mjs']+"';p['config/operations.json']='"+nextPin['config/operations.json']+"';}";
 
 test('Public A audit transition changes only exact version-pinned guard, never issue admission or other effects',()=>{
  const baseline=gitBytes(sourceBaseline,'.github/workflows/pc-job.yml').toString('utf8');
