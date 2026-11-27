@@ -135,17 +135,39 @@ export function inspectWatchdogReadOnly({filesystem=fs,watchdogHome=watchdogRoot
   ['CONTROLLER_INSTALL_LEASE',flags.controllerInstallLease],
   ['OTHER_CONTROLLER_LEASES',otherControllerLeases],
  ].filter(([,value])=>value===true).map(([name])=>name);
+ // The Watchdog itself publishes R6's second slot. Do not infer two READY
+ // children from the first slot or from a historical, unowned status file.
+ const validRole=value=>['READY','STARTING','PROMOTING','UNVERIFIED'].includes(value)?
+  value:null;
+ const validPid=value=>Number.isSafeInteger(value)&&value>0?value:null;
+ const firstRole=validRole(stateFile?.standbyRole),firstPid=validPid(stateFile?.standbyPid);
+ const secondRole=validRole(stateFile?.secondStandbyRole);
+ const secondPid=validPid(stateFile?.secondStandbyPid);
+ const readyCount=Number.isSafeInteger(stateFile?.standbyReadyCount)&&
+  stateFile.standbyReadyCount>=0&&stateFile.standbyReadyCount<=2?
+   stateFile.standbyReadyCount:null;
+ const hasTwoSlotRecord=stateFile!==null&&
+  ['secondStandbyRole','secondStandbyPid','standbyReadyCount'].some(key=>
+   Object.hasOwn(stateFile,key));
+ const processAlive=pid===null?null:pidAlive(pid);
+ const receiverPidMatches=pid===null||ownerPid===null?null:pid===ownerPid;
+ const standbyPairReadyAtObservation=!hasTwoSlotRecord?null:
+  state==='HEALTHY'&&fresh===true&&processAlive===true&&
+  receiverPidMatches===true&&firstRole==='READY'&&secondRole==='READY'&&
+  readyCount===2&&firstPid!==null&&secondPid!==null&&
+  firstPid!==secondPid&&firstPid!==pid&&secondPid!==pid&&
+  pidAlive(firstPid)===true&&pidAlive(secondPid)===true;
  return {evidenceScope:'READONLY_WATCHDOG_MARKERS_NOT_RECOVERY_AUTHORIZATION',
-  observedAt:at,state,blockedCode,fresh,processAlive:pid===null?null:pidAlive(pid),
-  receiverPidMatches:pid===null||ownerPid===null?null:pid===ownerPid,
+  observedAt:at,state,blockedCode,fresh,processAlive,receiverPidMatches,
   guardianStop:flags.guardianStop,watchdogPause:flags.watchdogPause,
   controllerDrain:flags.controllerDrain,
   controllerInstallLease:flags.controllerInstallLease,
   otherControllerLeases,inhibitors,diagnostics,
-  ...(stateFile?.standbyRole&&['READY','STARTING','PROMOTING','UNVERIFIED'].includes(stateFile.standbyRole)?
-   {standbyRole:stateFile.standbyRole,
-    standbyPid:Number.isSafeInteger(stateFile.standbyPid)&&stateFile.standbyPid>0?
-     stateFile.standbyPid:null}:{} )};
+  ...(firstRole!==null?{standbyRole:firstRole,standbyPid:firstPid}:{}),
+  ...(hasTwoSlotRecord?{
+   secondStandbyRole:secondRole,secondStandbyPid:secondPid,
+   standbyReadyCount:readyCount,standbyPairReadyAtObservation
+  }:{} )};
 }
 
 /** Non-sensitive Supervisor evidence; does not alter health or recovery verdicts. */
