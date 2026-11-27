@@ -67,9 +67,9 @@ function birth(pid){
 const intent=seat=>({source:'PRIVATE_B_DURABLE_STOP_INTENT',
  status:'EXACT_CAS_READBACK_VERIFIED',phase:'STOP_INTENT_RECORDED',
  seat,rawSha256:'b'.repeat(64)});
-const proof=(source,seat)=>({
+const proof=(pid,startedAtUtc,seat)=>({
  source:'PRIVATE_SAME_HOST_B_PRESIGNAL_DOUBLE_READ',
- seat,oldInstancePid:source.pid,oldInstanceBirth:source.startedAtUtc,
+ seat,oldInstancePid:pid,oldInstanceBirth:startedAtUtc,
  maintenanceLeaseOwnedVerified:true,
  oneUseClaimUninterruptedVerified:true,watchdogFenceUninterruptedVerified:true,
  intakeDrainedStillVerified:true,allSixPinsUnchangedVerified:true,
@@ -103,8 +103,9 @@ test('production port cannot be compiled for other hosts or Issue-provided execu
  }
 });
 test('no irreversible event before durable intent and fresh private fence',async()=>{
+ const born='2026-11-27T03:00:00.1234567Z';
  const candidate=prepareOrphanSixFixedConsoleBreak({
-  seat:1,pid:52000,startedAtUtc:'2026-11-27T03:00:00.1234567Z',
+  seat:1,pid:52000,startedAtUtc:born,
   platform:'win32',hostname:'PC'
  });
  let calls=0;
@@ -112,15 +113,15 @@ test('no irreversible event before durable intent and fresh private fence',async
  for(const bad of [
   {exactIntent:{...intent(1),phase:'PREPARED'}},
   {exactIntent:{...intent(2)}},
-  {exactIntent:intent(1),preSignal:{...proof(candidate,1),
+  {exactIntent:intent(1),preSignal:{...proof(52000,born,1),
    watchdogFenceUninterruptedVerified:false}},
-  {exactIntent:intent(1),preSignal:{...proof(candidate,1),
+  {exactIntent:intent(1),preSignal:{...proof(52000,born,1),
    observedAtUtc:'2026-11-27T00:00:00Z'}},
-  {exactIntent:intent(1),preSignal:{...proof(candidate,1),
+  {exactIntent:intent(1),preSignal:{...proof(52000,born,1),
    consoleExclusiveVerified:false}},
  ]){
   const result=await submitOrphanSixCtrlBreakOnce({
-   source:candidate,exactIntent:intent(1),preSignal:proof(candidate,1),
+   source:candidate,exactIntent:intent(1),preSignal:proof(52000,born,1),
    ...bad,platform:'win32',root:'C:\\Windows',run:call
   });
   assert.equal(result.status,'BLOCKED');
@@ -146,13 +147,16 @@ test('synthetic native Windows Ctrl+Break sends once to exact private console on
   children.push(target,peer);
   assert.equal(await waitFile(target.ready),true);
   assert.equal(await waitFile(peer.ready),true);
+  const born=birth(target.pid);
   const pinned=prepareOrphanSixFixedConsoleBreak({
-   seat:1,pid:target.pid,startedAtUtc:birth(target.pid),
+   seat:1,pid:target.pid,startedAtUtc:born,
    platform:process.platform,hostname:os.hostname(),testExe:process.execPath
   });
   assert.equal(pinned.status,'PRIVATE_SOURCE_READY');
+  assert.equal(pinned.script,undefined);
+  assert.equal(pinned.pid,undefined);
   const result=await submitOrphanSixCtrlBreakOnce({
-   source:pinned,exactIntent:intent(1),preSignal:proof(pinned,1)
+   source:pinned,exactIntent:intent(1),preSignal:proof(target.pid,born,1)
   });
   assert.equal(result.status,'SIGNAL_SUBMITTED',result.code);
   assert.equal(result.signalSubmitted,true);
@@ -191,7 +195,7 @@ test('Windows native emitter fails closed if pinned birth changes, without false
   });
   assert.equal(pinned.status,'PRIVATE_SOURCE_READY');
   const r=await submitOrphanSixCtrlBreakOnce({
-   source:pinned,exactIntent:intent(1),preSignal:proof(pinned,1)
+   source:pinned,exactIntent:intent(1),preSignal:proof(target.pid,fake,1)
   });
   assert.equal(r.status,'RECOVERY_REQUIRED');
   assert.equal(r.signalSubmitted,false);
