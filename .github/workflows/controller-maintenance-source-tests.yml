@@ -64,6 +64,7 @@ on:
       - 'tools/supervisor-orphan-six-graceful-source.mjs'
       - 'tools/supervisor-orphan-six-maintenance-journal.mjs'
       - 'tests/supervisor-orphan-six-graceful-source.test.mjs'
+      - 'tools/supervisor-orphan-six-b-admission.mjs'
       - 'tools/supervisor-orphan-six-b-receiver-source.mjs'
       - 'tests/supervisor-orphan-six-b-receiver-source.test.mjs'
       - 'tools/supervisor-orphan-six-b-maintainer-inlet-source.mjs'
