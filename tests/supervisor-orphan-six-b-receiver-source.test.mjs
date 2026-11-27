@@ -7,7 +7,7 @@ import {
  ORPHAN_SIX_B_REQUEST_SCHEMA,ORPHAN_SIX_B_MANIFEST_SCHEMA,
  ORPHAN_SIX_B_SCOPE,ORPHAN_SIX_B_FIXED_EFFECT
 } from '../tools/supervisor-orphan-six-b-admission.mjs';
-import {receiveOrphanSixBApprovalSource}
+import {receiveOrphanSixBApprovalSource,recheckOrphanSixFreshOwnerEffectSource}
  from '../tools/supervisor-orphan-six-b-receiver-source.mjs';
 
 const hash=x=>createHash('sha256').update(x).digest('hex');
@@ -228,4 +228,85 @@ test('receiver is source-only and has no process or filesystem effects',()=>{
   assert.doesNotMatch(src,forbidden);
  assert.match(src,/effectAuthorized:false/);
  assert.match(src,/runnerStopAuthorized:false/);
+});
+
+const freshSeat=(f,seat=1,extra={})=>
+ recheckOrphanSixFreshOwnerEffectSource({
+  issue:f.issue,seat,proposalId:d('e'),
+  expectedJournalSha256:d('f'),
+  expectedRequestId:f.issueBody.requestId,
+  expectedManifestRawSha256:hash(f.raw),
+  getMainManifest:f.ports.getMainManifest,
+  getPullRequest:f.ports.getPullRequest,
+  getOwnerEffectComments:f.ports.getOwnerEffectComments,
+  ...extra
+ });
+
+test('per-seat fresh owner approval re-reads canonical PR, comments and raw bytes; source grants zero effect',async()=>{
+ const f=sample();
+ for(const seat of [1,2,3,4,5,6]){
+  const r=await freshSeat(f,seat);
+  assert.equal(r.status,'CANDIDATE_ONLY');
+  assert.equal(r.code,'ORPHAN_SIX_FRESH_DECISION_REVIEW_ONLY');
+  assert.equal(r.seat,seat);
+  assert.equal(r.manifestRawSha256,hash(f.raw));
+  assert.equal(r.intentReadbackSha256,d('f'));
+  assert.equal(r.effectAuthorized,false);
+  assert.equal(r.runnerStopAuthorized,false);
+  assert.equal(r.operationalWrites,0);
+  assert.equal(r.automaticRetries,0);
+ }
+ for(const kind of ['manifest','pr','comments'])
+  assert.equal(f.calls.filter(x=>x[0]===kind).length,6,kind);
+ assert.equal(f.calls.some(x=>x[0]==='claim'),false);
+});
+test('fresh owner REVOKE between seats prevents every subsequent source candidate',async()=>{
+ const f=sample();
+ assert.equal((await freshSeat(f,1)).status,'CANDIDATE_ONLY');
+ f.comments.push(f.comment('REVOKE',41001,LATER));
+ for(const seat of [2,3,4,5,6]){
+  const result=await freshSeat(f,seat);
+  assert.equal(result.status,'BLOCKED');
+  assert.equal(result.code,'ORPHAN_SIX_FRESH_DECISION_LATEST_OWNER_APPROVAL_UNVERIFIED');
+  assert.equal(result.runnerStopAuthorized,false);
+ }
+ assert.equal(f.calls.filter(x=>x[0]==='comments').length,6);
+});
+test('fresh owner decision rejects missing full comment readback, edited approval and canonical read outage',async()=>{
+ const noPages=sample();
+ noPages.ports.getOwnerEffectComments=async()=>({
+  source:'GITHUB_CANONICAL_ISSUE_COMMENTS_API',
+  complete:false,issueNumber:noPages.issue.number,items:noPages.comments
+ });
+ assert.equal((await freshSeat(noPages)).status,'BLOCKED');
+ const edited=sample();
+ edited.comments[0].updated_at=LATER;
+ assert.equal((await freshSeat(edited)).code,
+  'ORPHAN_SIX_FRESH_DECISION_LATEST_OWNER_APPROVAL_UNVERIFIED');
+ const down=sample();
+ down.ports.getOwnerEffectComments=async()=>{throw Error('canonical API outage');};
+ assert.equal((await freshSeat(down)).code,'ORPHAN_SIX_FRESH_DECISION_READBACK_UNKNOWN');
+});
+test('fresh decision blocks changed raw manifest or merged PR, never allows OS action',async()=>{
+ const raw=sample();
+ raw.ports.getMainManifest=async()=>Buffer.from(JSON.stringify(raw.manifest));
+ assert.equal((await freshSeat(raw)).code,'ORPHAN_SIX_FRESH_DECISION_MANIFEST_CAS_CHANGED');
+ const pr=sample();
+ pr.pr.head.sha='a'.repeat(40);
+ assert.equal((await freshSeat(pr)).code,'ORPHAN_SIX_FRESH_DECISION_MERGED_PR_UNVERIFIED');
+ const invalid=sample();
+ invalid.issueBody.requestId='pc-12345678-1234-4234-9234-ffffffffffff';
+ invalid.issue.body=JSON.stringify(invalid.issueBody);
+ assert.equal((await freshSeat(invalid)).code,'ORPHAN_SIX_FRESH_DECISION_REQUEST_PIN_CHANGED');
+});
+test('fresh decision refuses missing seat/journal/proposal pins before any canonical reads',async()=>{
+ const f=sample();
+ for(const override of [{seat:0},{seat:7},{proposalId:'bad'},
+  {expectedJournalSha256:'bad'},{expectedManifestRawSha256:'bad'},
+  {getOwnerEffectComments:null}]){
+  const r=await freshSeat(f,1,override);
+  assert.equal(r.code,'ORPHAN_SIX_FRESH_DECISION_CONTEXT_UNVERIFIED');
+  assert.equal(r.operationalWrites,0);
+ }
+ assert.equal(f.calls.length,0);
 });
