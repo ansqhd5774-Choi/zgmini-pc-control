@@ -282,3 +282,64 @@ test('static inlet matches original sources and loads from exactly seven install
   assert.equal(out.effectAuthorized,false);assert.equal(out.operationalWrites,0);
  }
 });
+
+test('packaged coordinator and journal match original module denial without OS or file effects',async t=>{
+ const {pathToFileURL}=await import('node:url');
+ const {runOrphanSixGracefulB}=await import('../tools/supervisor-orphan-six-graceful-b-coordinator.mjs');
+ const {createOrphanSixMaintenanceJournal}=await import('../tools/supervisor-orphan-six-maintenance-journal.mjs');
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-orphan-packaged-coordinator-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ fs.mkdirSync(path.join(root,'tools'),{recursive:true});
+ for(const rel of nextRuntimeFiles)
+  fs.copyFileSync(new URL('../'+rel,import.meta.url),path.join(root,rel));
+ assert.equal(fs.readdirSync(path.join(root,'tools')).length,7);
+ const packed=await import(pathToFileURL(path.join(root,'tools/maintenance-agent.mjs')).href);
+ assert.equal(typeof packed.runOrphanSixPackagedCoordinatorSource,'function');
+ assert.equal(typeof packed.createOrphanSixPackagedJournalSource,'function');
+ const requestId='pc-12345678-1234-4234-9234-123456789abc';
+ const approvalManifestSha256='a'.repeat(64);
+ const params={requestId,approvalManifestSha256};
+ assert.deepEqual(await packed.runOrphanSixPackagedCoordinatorSource(params),
+  await runOrphanSixGracefulB(params));
+ assert.equal((await packed.runOrphanSixPackagedCoordinatorSource(params)).code,
+  'ORPHAN_SIX_MAINTAINER_BINDINGS_MISSING');
+ for(const attempt of [packed.createOrphanSixPackagedJournalSource,createOrphanSixMaintenanceJournal]){
+  assert.throws(()=>attempt({root,requestId,approvalManifestSha256}),
+   /ORPHAN_SIX_JOURNAL_CONTEXT_DENIED/);
+ }
+ assert.equal(fs.readdirSync(root).sort().join(','),'tools',
+  'mere import or invalid B context cannot create any journal/lease/write');
+});
+
+test('packaged coordinator never replays a claimed B journal or triggers fake signal ports',async t=>{
+ const {pathToFileURL}=await import('node:url');
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-orphan-packaged-replay-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ fs.mkdirSync(path.join(root,'tools'),{recursive:true});
+ for(const rel of nextRuntimeFiles)
+  fs.copyFileSync(new URL('../'+rel,import.meta.url),path.join(root,rel));
+ const packed=await import(pathToFileURL(path.join(root,'tools/maintenance-agent.mjs')).href);
+ let writes=0,signals=0,ownerReads=0;
+ const journal={read:()=>({sha256:'b'.repeat(64)}),
+  commit:()=>{writes++;throw Error('must not commit');}};
+ const keys=['verifyExactApproval','verifyFreshOwnerEffectDecision',
+  'readPrivateSnapshot','attestPreSignal','attestSeatExit',
+  'sendPrivateGracefulSignal','verifyFinalOldSixAbsent',
+  'releaseFenceForWatchdog','holdForRecovery'];
+ const port=Object.fromEntries(keys.map(key=>[key,async()=>{
+  if(key==='sendPrivateGracefulSignal')signals++;
+  if(key==='verifyFreshOwnerEffectDecision')ownerReads++;
+  throw Error('should not read after durable claim');
+ }]));
+ const result=await packed.runOrphanSixPackagedCoordinatorSource({
+  requestId:'pc-12345678-1234-4234-9234-123456789abc',
+  approvalManifestSha256:'a'.repeat(64),
+  lease:{owner:{pid:process.pid,nonce:'12345678-1234-4234-9234-123456789abc'}},
+  journal,port
+ });
+ assert.equal(result.status,'RECOVERY_REQUIRED');
+ assert.equal(result.code,'ORPHAN_SIX_EXISTING_JOURNAL_RECONCILE_FIRST');
+ assert.equal(result.attemptedSignalCount,0);
+ assert.equal(signals,0);assert.equal(ownerReads,0);assert.equal(writes,0);
+ assert.equal(fs.readdirSync(root).sort().join(','),'tools');
+});
