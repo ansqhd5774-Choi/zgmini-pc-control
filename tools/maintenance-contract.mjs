@@ -721,7 +721,7 @@ export function validateUpdateRequest(issue,manifestBytes,{
   // remain unchanged. The trusted publisher must separately verify business scope.
   if(actor===CI_CONTROLLER_ACTOR&&(raw.purpose!=='pc-controller-maintenance'||
     raw.controllerOnlyInstall!==true||!raw.selectiveSource||
-    !manifest.files.every(f=>/^controller\/[a-z][a-z0-9-]*\.mjs$/.test(f.path))))
+    !manifest.files.every(f=>installablePath(f.path))))
     throw Error('UPDATE_CI_PILOT_SCOPE_DENIED');
   if(!Object.hasOwn(PURPOSE_SCOPE,raw.purpose))throw Error("UPDATE_PURPOSE_NOT_ALLOWED");
   requireKeys(raw.approval,APPROVAL_KEYS,"UPDATE_APPROVAL_FIELDS_INVALID");
