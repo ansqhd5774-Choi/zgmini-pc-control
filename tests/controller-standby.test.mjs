@@ -1,5 +1,7 @@
 // Fixed Windows-only orphan WMI birth/path evidence remains private and read-only.
 import './supervisor-orphan-private-wmi.test.mjs';
+// Fixed TEMP-only exact status CAS writer regression; never touches operating root.
+import './supervisor-orphan-status-temp-writer.test.mjs';
 // Orphan no-spawn Actor: double private read before any isolated heartbeat.
 import './supervisor-orphan-no-spawn-heartbeat-actor.test.mjs';
 import test from 'node:test';
