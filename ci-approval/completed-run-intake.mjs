@@ -5,6 +5,7 @@ import {createHash} from 'node:crypto';
 import fs,{readFileSync} from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import {execFileSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 import {resolveControllerApprovalCI,createCiEffectReceiptStore,submitExistingControllerApprovalFromCi,mergeAndSubmitPreparedControllerApproval} from '../tools/maintenance-request.mjs';
 import {manifestFingerprint,installedControllerBPolicy} from '../tools/maintenance-contract.mjs';
@@ -234,6 +235,36 @@ export async function readAuthenticatedControllerBPublisherWorkflow({
    .update(bytes).digest('hex');
   if(checked!==file.sha)fail();
   return Object.freeze({workflowId:active.id,workflowBlobSha:checked});
+ }catch{fail()}
+}
+
+// The exact checkout used to execute the publisher must have been merged
+// into the reviewed main history before it can submit a Public B effect.
+// A branch-only candidate (including a squash-merged, orphaned PR commit)
+// must not become an operational authority just because a flag is enabled.
+// No GitHub event, PR body or CI variable can substitute its source revision.
+export async function readAuthenticatedPublicBPublisherSourceAncestry({
+ getJson,env=process.env,
+ readCheckoutSha=()=>String(execFileSync('git',['rev-parse','HEAD'],{
+  cwd:env.GITHUB_WORKSPACE,encoding:'utf8',windowsHide:true,
+  timeout:10000,maxBuffer:4096
+ })).trim()
+}={}){
+ const fail=()=>{throw Error('CI_PUBLIC_PUBLISHER_MAIN_ANCESTRY_UNVERIFIED')};
+ if(typeof getJson!=='function'||typeof readCheckoutSha!=='function'||
+    typeof env?.GITHUB_WORKSPACE!=='string'||!path.isAbsolute(env.GITHUB_WORKSPACE)||
+    env.GITHUB_REPOSITORY!==repo||env.GITHUB_REF!=='refs/heads/main'||
+    !sha(env.GITHUB_WORKFLOW_SHA))fail();
+ try{
+  const checkedOut=await readCheckoutSha();
+  if(!sha(checkedOut))fail();
+  const comparison=await getJson('compare/'+checkedOut+'...'+env.GITHUB_WORKFLOW_SHA);
+  if(!['ahead','identical'].includes(comparison?.status)||
+     comparison.behind_by!==0||
+     comparison.base_commit?.sha!==checkedOut||
+     comparison.head_commit?.sha!==env.GITHUB_WORKFLOW_SHA||
+     comparison.merge_base_commit?.sha!==checkedOut)fail();
+  return Object.freeze({sourceSha:checkedOut,mainSha:env.GITHUB_WORKFLOW_SHA});
  }catch{fail()}
 }
 
@@ -686,6 +717,9 @@ export async function main({eventPath=process.env.GITHUB_EVENT_PATH,token=proces
      throw Error('PUBLIC_REPOSITORY_READBACK_MISMATCH');
     const grant=installedControllerBPolicy(readIndependentlyInstalledControllerBPublisherPolicy());
     const current=await readAuthenticatedControllerBPublisherWorkflow({getJson});
+    // The checked-out executor must be a validated ancestor of main, not a
+    // still-unmerged Draft branch SHA or a GitHub Actions event-supplied SHA.
+    await readAuthenticatedPublicBPublisherSourceAncestry({getJson});
     if(grant?.repositoryVisibility!=='public'||grant.workflowId!==current.workflowId||
        grant.workflowBlobSha!==current.workflowBlobSha||
        (policy?.targetSha!==undefined&&grant.targetSha!==policy.targetSha)||
