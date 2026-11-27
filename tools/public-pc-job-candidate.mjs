@@ -10,8 +10,28 @@ const OWNER='ansqhd5774-Choi', OWNER_ID=327938088;
 // Public host-side precheck remains source-only. A maintenance postcheck is
 // a candidate only when its Issue title, requestId and A operation are the
 // exact immutable relationship already produced by tools/update.mjs.
+// The hosted observer must recognize every *existing* grade-A operation
+// accepted by the fixed owner-only PC policy, not just runner-smoke.
+// It only labels a source-only candidate; it can never grant PC execution.
+function fixedGradeACandidate(operation){
+ if(typeof operation!=='string'||!/^[a-z0-9-]{3,80}$/.test(operation))return false;
+ try{
+  const file=new URL('../config/operations.json',import.meta.url);
+  const stat=fs.lstatSync(file);
+  if(!stat.isFile()||stat.isSymbolicLink()||stat.size<2||stat.size>131072)
+   return false;
+  const policy=JSON.parse(fs.readFileSync(file,'utf8'));
+  return policy?.schema==='ZGMINI_PC_OPERATIONS_V1'&&
+   policy.controlRepository===REPO&&policy.sourceRepository===SOURCE_REPO&&
+   policy.mutationsEnabled===false&&policy.maxAutomaticRetries===0&&
+   policy.operations!==null&&typeof policy.operations==='object'&&
+   !Array.isArray(policy.operations)&&
+   Object.hasOwn(policy.operations,operation)&&
+   policy.operations[operation]?.grade==='A';
+ }catch{return false;}
+}
 function isPublicAReviewScope(issue,request){
- if(issue?.title==='pc-job')return request?.operation==='runner-smoke';
+ if(issue?.title==='pc-job')return fixedGradeACandidate(request?.operation);
  if(typeof request?.requestId!=='string'||!/^pc-(?:update-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-postcheck$/.test(request.requestId))return false;
  const base=request.requestId.slice(0,-'-postcheck'.length);
  return issue?.title==='PC Update '+base+' postcheck'&&
