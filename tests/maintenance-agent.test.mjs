@@ -1463,7 +1463,7 @@ test('Public approval main event reaches read-only intake only under explicit ve
  assert.equal(observed.reason,'NO_CONTROLLER_APPROVAL_CHANGE');
  assert.equal(reads,1);assert.equal(observed.canExecute,false);
  const pushed=await publishExistingControllerApprovals(event,{
-  getJson,allowPublic:true,runId:123,attempt:1,
+  getJson,allowPublic:true,publicEffectPin:TARGET,runId:123,attempt:1,
   ports:{createIssue:()=>assert.fail('unrelated source cannot POST')},
   emitReceipt:()=>assert.fail('unrelated source cannot issue receipt')});
  assert.equal(pushed.state,'IGNORED');
@@ -1487,7 +1487,7 @@ test('Public run cannot use legacy Private-only publisher flag or unverified out
  assert.equal(blocked.state,'IGNORED');
  assert.deepEqual(blocked.results,[]);
  const allowed=await publishLateOwnerMergedControllerApproval(event,{
-  allowPublic:true,
+  allowPublic:true,publicEffectPin:TARGET,
   getJson:async route=>route==='actions/runs/'+run.id?run:
    route==='commits/'+run.head_sha+'/pulls?per_page=100'?[]:
    assert.fail('unexpected read'),
@@ -1495,6 +1495,110 @@ test('Public run cannot use legacy Private-only publisher flag or unverified out
   runId:765,attempt:1,emitReceipt:()=>assert.fail('no receipt')});
  assert.equal(allowed.state,'IGNORED');
  assert.deepEqual(allowed.results,[]);
+});
+
+
+test('Public B publisher cannot scan or post without the installed one-effect target pin',async()=>{
+ const repo={id:1442936296,full_name:REPO,private:false};
+ const before='a'.repeat(40),after='d'.repeat(40);
+ const event={repository:repo,ref:'refs/heads/main',deleted:false,
+  forced:false,before,after};
+ let calls=0;
+ const denied=await publishExistingControllerApprovals(event,{
+  allowPublic:true,getJson:async()=>{calls++;throw Error('MUST_NOT_READ');},
+  ports:{createIssue:()=>assert.fail('no Issue')},
+  runId:12,attempt:1,emitReceipt:()=>assert.fail('no receipt')
+ });
+ assert.deepEqual(denied,{state:'EVIDENCE_MISSING',code:'CI_PUBLIC_EFFECT_PIN_REQUIRED',results:[]});
+ assert.equal(calls,0);
+ const run={id:765,run_attempt:1,workflow_id:416355595,
+  path:'.github/workflows/controller-maintenance-source-tests.yml',
+  event:'pull_request',repository:repo,head_repository:repo,
+  head_sha:'e'.repeat(40),status:'completed',conclusion:'success'};
+ const fromRun=await publishLateOwnerMergedControllerApproval({
+  action:'completed',repository:repo,workflow_run:run
+ },{
+  allowPublic:true,getJson:async()=>{calls++;throw Error('MUST_NOT_READ');},
+  ports:{createIssue:()=>assert.fail('no Issue')},
+  runId:12,attempt:1,emitReceipt:()=>assert.fail('no receipt')
+ });
+ assert.equal(fromRun.code,'CI_PUBLIC_EFFECT_PIN_REQUIRED');
+ assert.equal(calls,0);
+});
+
+test('one installed Public B pin isolates two approvals on main push and source completion',async()=>{
+ const repo={id:1442936296,full_name:REPO,private:false};
+ const other='c'.repeat(40),head='e'.repeat(40),merge='f'.repeat(40);
+ const before='a'.repeat(40),after='d'.repeat(40);
+ const wanted='approvals/controller-updates/'+TARGET+'.json';
+ const unrelated='approvals/controller-updates/'+other+'.json';
+ const payload={schema:'ZGMINI_PC_UPDATE_V1',targetSha:TARGET,
+  purpose:'pc-controller-maintenance',controllerOnlyInstall:true,
+  selectiveSource:{branch:'codex/exact-owner-approval'},
+  approval:{ref:'https://github.com/'+REPO+'/pull/28'}};
+ const bytes=Buffer.from(JSON.stringify(payload));
+ const blob=crypto.createHash('sha1').update(Buffer.from('blob '+bytes.length))
+  .update(Buffer.from([0])).update(bytes).digest('hex');
+ const file={type:'file',path:wanted,encoding:'base64',
+  sha:blob,content:bytes.toString('base64')};
+ const pr={number:28,merged:true,merged_at:'2026-11-28T00:00:00Z',
+  merged_by:{login:ACTOR,id:327938088,type:'User'},
+  merge_commit_sha:merge,base:{ref:'main',repo},head:{sha:head,repo}};
+ const run={id:765,run_attempt:1,workflow_id:416355595,
+  path:'.github/workflows/controller-maintenance-source-tests.yml',
+  event:'pull_request',repository:repo,head_repository:repo,
+  head_sha:head,status:'completed',conclusion:'success'};
+ const calls=[],getJson=async route=>{
+  calls.push(route);
+  if(route==='compare/'+before+'...'+after)
+   return {status:'ahead',behind_by:0,base_commit:{sha:before},
+    merge_base_commit:{sha:before},files:[
+      {filename:unrelated,status:'modified',sha:'0'.repeat(40)},
+      {filename:wanted,status:'added',sha:blob}]};
+  if(route==='contents/'+wanted+'?ref='+after||
+     route==='contents/'+wanted+'?ref='+merge||
+     route==='contents/'+wanted+'?ref=main')return file;
+  if(route==='pulls/28')return pr;
+  if(route==='commits/'+head+'/pulls?per_page=100')
+   return [{number:28,merged_at:pr.merged_at}];
+  if(route==='pulls/28/files?per_page=100')
+   return [{filename:unrelated,status:'modified',sha:'0'.repeat(40)},
+    {filename:wanted,status:'added',sha:blob}];
+  if(route==='actions/workflows/416355595/runs?head_sha='+head+
+    '&event=pull_request&status=success&per_page=100')
+   return {workflow_runs:[run]};
+  if(route==='actions/runs/765')return run;
+  throw Error('unexpected API route: '+route);
+ };
+ const pushed={repository:repo,ref:'refs/heads/main',deleted:false,
+  forced:false,before,after};
+ const observed=await observePublishedControllerApprovals(pushed,{
+  getJson,allowPublic:true,publicEffectPin:TARGET});
+ assert.equal(observed.state,'APPROVAL_PUBLICATION_OBSERVED_ONLY');
+ assert.deepEqual(observed.entries.map(x=>x.targetSha),[TARGET]);
+ assert.equal(observed.entries[0].ciState,'SOURCE_CI_MATCH_ONLY');
+ assert.equal(calls.some(x=>x.includes(other)),false);
+ let submits=0;
+ const ports={readRepository:async()=>{submits++;return null;},
+  createIssue:()=>assert.fail('no authorized source may post')};
+ const published=await publishExistingControllerApprovals(pushed,{
+  getJson,ports,allowPublic:true,publicEffectPin:TARGET,
+  runId:123,attempt:1,emitReceipt:()=>assert.fail('no receipt')});
+ assert.equal(published.results.length,1);
+ assert.equal(published.results[0].targetSha,TARGET);
+ assert.equal(published.results[0].code,'MAINTENANCE_CI_REPOSITORY_DENIED');
+ assert.equal(submits,1,'only the installed target enters strict submitter');
+ const event={action:'completed',repository:repo,workflow_run:run};
+ const late=await observeLateOwnerMergedControllerApproval(event,{
+  getJson,allowPublic:true,publicEffectPin:TARGET});
+ assert.equal(late.state,'OWNER_APPROVAL_RUN_OBSERVED_ONLY');
+ assert.deepEqual(late.entries.map(x=>x.targetSha),[TARGET]);
+ assert.equal(calls.some(x=>x.includes(other)),false);
+ const afterLate=await publishLateOwnerMergedControllerApproval(event,{
+  getJson,ports,allowPublic:true,publicEffectPin:TARGET,
+  runId:124,attempt:1,emitReceipt:()=>assert.fail('no receipt')});
+ assert.deepEqual(afterLate.results.map(x=>x.targetSha),[TARGET]);
+ assert.equal(submits,2,'both publication paths stay limited to the same installed target');
 });
 
 test('Public running publisher workflow attestation binds authenticated immutable GitHub API bytes',async()=>{
