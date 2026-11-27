@@ -142,6 +142,25 @@ jobs:
               Write-Output "ORIGIN_KIND=$originKind"
               Write-Output "ORIGIN_HOST_GITHUB=$originHostGithub"
               Write-Output "ORIGIN_REPO_EXACT=$originRepoExact"
+              # A second, direct native-call capture separates a transient Git failure from a detached checkout.
+              $headCheckLines = @(& $git.Source -C $checkout rev-parse HEAD 2>$null)
+              $headCheckExit = $LASTEXITCODE
+              $headCheck = @($headCheckLines | Where-Object { $_ -match '^[a-f0-9]{40}$' } | Select-Object -First 1)
+              $headDirectVerified = $headCheckExit -eq 0 -and $headCheck.Count -eq 1
+              Write-Output "GIT_DIRECT_HEAD_VERIFIED=$headDirectVerified"
+              if ($headDirectVerified) { Write-Output "GIT_DIRECT_HEAD_SHA=$($headCheck[0])" }
+              $refCheckLines = @(& $git.Source -C $checkout symbolic-ref --quiet --short HEAD 2>$null)
+              $refCheckExit = $LASTEXITCODE
+              $refKindDirect = if ($refCheckExit -ne 0) { 'DETACHED_OR_FAILED' } elseif ($refCheckLines -contains 'main') { 'MAIN' } else { 'OTHER_BRANCH' }
+              Write-Output "GIT_DIRECT_REF_KIND=$refKindDirect"
+              $rootCheckLines = @(& $git.Source -C $checkout rev-parse --show-toplevel 2>$null)
+              $rootCheckExit = $LASTEXITCODE
+              $rootDirectReadable = $rootCheckExit -eq 0 -and $rootCheckLines.Count -gt 0
+              Write-Output "GIT_DIRECT_ROOT_READABLE=$rootDirectReadable"
+              $originHasUserInfo = $false
+              if ($originKind -eq 'HTTPS') { try { $originHasUserInfo = -not [string]::IsNullOrEmpty(([Uri]([string]$origin)).UserInfo) } catch {} }
+              Write-Output "ORIGIN_HAS_USERINFO=$originHasUserInfo"
+
               Write-Output "CHECKOUT_ROOT_EXACT=$rootOk"
               Write-Output "CHECKOUT_BRANCH_MAIN=$branchOk"
               Write-Output "CHECKOUT_STATUS_READABLE=$statusOk"
