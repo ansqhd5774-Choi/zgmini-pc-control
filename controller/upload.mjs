@@ -1,4 +1,4 @@
-import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';import {need,exclusive,readAllPages} from './common.mjs';
+import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';import {need,exclusive,readAllPages,publicPcReportProjection} from './common.mjs';
 import {renderBoundedReport,uploadVerifiedReportPair,resolveUploadPolicy,hasVerifiedReportComment,confirmVerifiedReportComment} from './report-upload-verified.mjs';
 import {cleanupVerifiedJobTemps} from './report-temp-retention.mjs';
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -9,9 +9,20 @@ const pointer=JSON.parse(fs.readFileSync(path.join(root,'reports',`${runId}-${at
 let policyBytes=null;try{policyBytes=fs.readFileSync(path.join(root,'config/operations.json'));}catch{}
 const policy=resolveUploadPolicy(policyBytes,{pointer,runId,attempt,seat});
 need(process.env.GITHUB_REPOSITORY===policy.controlRepository,'REPORT_REPOSITORY');
-const report=pointer.report,{json,txt}=renderBoundedReport(report,policy.maxReportBytes);
+const report=pointer.report;
 need(Number.isSafeInteger(pointer.issueNumber),'REPORT_ISSUE');
-const api=async(route,method='GET',body)=>{const response=await fetch('https://api.github.com/repos/'+policy.controlRepository+'/'+route,{method,headers:{accept:'application/vnd.github+json',authorization:'Bearer '+token,'x-github-api-version':'2022-11-28','content-type':'application/json'},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(25000)});let data;try{data=await response.json();}catch{data={};}return {status:response.status,data};};
+const api=async(route,method='GET',body)=>{const response=await fetch('https://api.github.com/repos/'+policy.controlRepository+(route?'/'+route:''),{method,headers:{accept:'application/vnd.github+json',authorization:'Bearer '+token,'x-github-api-version':'2022-11-28','content-type':'application/json'},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(25000)});let data;try{data=await response.json();}catch{data={};}return {status:response.status,data};};
+// Do not trust an Issue payload (or environment variable) to declare this
+// repository private. Confirm actual GitHub repository identity/visibility with
+// the same trusted credential used for the fixed report transport. If the
+// lookup fails, refuse to publish any possibly sensitive local Worker result.
+const repository=await api('');
+need(repository.status===200&&repository.data?.id===1442936296&&
+ repository.data.full_name===policy.controlRepository&&
+ repository.data.owner?.id===327938088&&
+ typeof repository.data.private==='boolean','REPORT_REPOSITORY_UNVERIFIED');
+const {json,txt}=renderBoundedReport(repository.data.private?report:
+ publicPcReportProjection(report),policy.maxReportBytes);
 let releaseUpload;for(let n=0;n<120&&!releaseUpload;n++){try{releaseUpload=exclusive(path.join(root,'leases'),'result-upload');}catch(error){if(error.code!=='LEASE_BUSY')throw error;await new Promise(r=>setTimeout(r,500));}}need(releaseUpload,'REPORT_UPLOAD_QUEUE_TIMEOUT');
 try{
 const files=await uploadVerifiedReportPair({api,repository:policy.controlRepository,runId,attempt,seat,json,txt});
