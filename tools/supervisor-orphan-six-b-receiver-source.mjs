@@ -39,7 +39,10 @@ function exactlyOwnerLabel(issue){
   issue.labels.some(l=>l?.name===label)&&
   typeof issue.body==='string'&&Buffer.byteLength(issue.body)<=16384;
 }
-function reviewedMerge(raw,prNum,sourceSha,reviews){
+function reviewedMerge(raw,prNum,sourceSha,reviewReadback){
+ const reviews=reviewReadback?.items;
+ if(reviewReadback?.complete!==true||reviewReadback?.source!=='GITHUB_CANONICAL_REVIEW_API')
+  return false;
  if(raw?.number!==prNum||raw.state!=='closed'||raw.merged!==true||
     !validDate(raw.merged_at)||raw.base?.repo?.full_name!==repo||
     raw.head?.repo?.full_name!==repo||
