@@ -1357,7 +1357,15 @@ export function createMaintenanceAgent({
       settledIssueCache.delete(number);
       try{
         const issue=await issueDetails(number);
-        const result=visibility==='PUBLIC'
+        // Public owner requests remain non-executable. Only an exact fixed
+        // CI Bot candidate reaches processIssue, where independent installed
+        // V2 policy, original GitHub Run/job/receipt and B-effect CAS decide.
+        // No policy or failed proof still blocks before manifest/updater work.
+        const publicCiCandidate=visibility==='PUBLIC'&&
+          issue?.title===ISSUE_TITLE&&issue.state==='OPEN'&&
+          issue.author?.login===CI_CONTROLLER_ACTOR&&
+          issue.labels?.some(x=>x.name===label);
+        const result=visibility==='PUBLIC'&&!publicCiCandidate
           ?(issueIsTrusted(issue,{allowedActors,title:entry.title,label})
             ?{status:'BLOCKED',code:'PUBLIC_B_EFFECT_SEPARATE_AUTH_REQUIRED',
               issueNumber:issue.number,operationalWrites:0,effectAuthorized:false}
