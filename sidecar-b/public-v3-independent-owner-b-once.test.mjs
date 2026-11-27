@@ -184,7 +184,7 @@ test('unknown lease-release after claimed rollback requires owner reconcile',()=
 test('reviewed W06 operator merge must be owner-authored, main ancestor and not a draft',()=>{
  const sha='a'.repeat(40);
  const pr={
-  number:4292,merged:true,merge_commit_sha:sha,
+  number:4293,merged:true,merge_commit_sha:sha,
   user:{id:327938088},
   head:{repo:{full_name:'ansqhd5774-Choi/zgmini-pc-control'}},
   base:{repo:{full_name:'ansqhd5774-Choi/zgmini-pc-control'},ref:'main'}
@@ -264,4 +264,13 @@ test('actual installed ancestry must match the existing maintenance source recei
   const mutated=structuredClone(proof);edit(mutated);
   assert.equal(verifyW06InstalledAncestryAttestation(mutated),false);
  }
+});
+
+test('known adapter stops retain categorical cause while unknown text is redacted',()=>{
+ for(const code of ['SIDECAR_B_PROBE_RESOURCE_STOP','R17_B_REQUEST_ALREADY_CLAIMED_STOP']) {
+  const r=classifyW06BTerminalFailure({errorCode:code});
+  assert.equal(r.status,'BLOCKED');assert.equal(r.code,code);assert.equal(r.operationalWrites,0);
+ }
+ for(const code of ['arbitrary secret message','ENOENT',null])
+  assert.equal(classifyW06BTerminalFailure({errorCode:code}).code,'W06_PUBLIC_B_UNVERIFIED_STOP');
 });
