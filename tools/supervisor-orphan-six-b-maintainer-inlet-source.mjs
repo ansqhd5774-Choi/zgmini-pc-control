@@ -6,12 +6,17 @@ import {ORPHAN_SIX_B_TITLE,validateOrphanSixBRequest}
  from './supervisor-orphan-six-b-admission.mjs';
 import {receiveOrphanSixBApprovalSource}
  from './supervisor-orphan-six-b-receiver-source.mjs';
+import {parseOrphanSixBFlatRequest} from './supervisor-orphan-six-b-flat-request.mjs';
+export {parseOrphanSixBFlatRequest};
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const OWNER='ansqhd5774-Choi';
 const LABEL='pc-maintenance';
-import {parseOrphanSixBFlatRequest} from './supervisor-orphan-six-b-flat-request.mjs';
-export {parseOrphanSixBFlatRequest};
+const reject=code=>Object.freeze({
+ status:'BLOCKED',code,executionStarted:false,
+ approvalSourceVerified:false,effectAuthorized:false,
+ runnerStopAuthorized:false,operationalWrites:0,automaticRetries:0
+});
 
 export async function inspectOrphanSixBMaintainerInletSource({
  issue,attestCurrentMaintainerSource,readOriginalOneUseClaim,
