@@ -40,7 +40,7 @@ const sample=()=>{
  issue.approvalManifestSha256=sha(raw);
  const proof={number:6200,state:'closed',merged:true,
   headSha:manifest.approval.reviewedSourceSha,
-  baseRepo:issue.controlRepository,reviewedByOwner:true};
+  baseRepo:issue.controlRepository,ownerExactEffectApproved:true};
  return {issue,manifest,raw,proof};
 };
 const approval=({issue,raw,proof})=>validateOrphanSixBManifest(issue,raw,{
@@ -90,7 +90,7 @@ test('raw B manifest bytes and independent reviewed PR identity cannot drift',()
   /ORPHAN_SIX_B_MANIFEST_RAW_DIGEST_MISMATCH/);
  assert.throws(()=>approval({...v,proof:{...v.proof,merged:false}}),
   /ORPHAN_SIX_B_APPROVAL_PR_IDENTITY_UNVERIFIED/);
- assert.throws(()=>approval({...v,proof:{...v.proof,reviewedByOwner:false}}),
+ assert.throws(()=>approval({...v,proof:{...v.proof,ownerExactEffectApproved:false}}),
   /ORPHAN_SIX_B_APPROVAL_PR_IDENTITY_UNVERIFIED/);
  assert.throws(()=>approval({...v,proof:{...v.proof,headSha:'f'.repeat(40)}}),
   /ORPHAN_SIX_B_APPROVAL_PR_IDENTITY_UNVERIFIED/);
