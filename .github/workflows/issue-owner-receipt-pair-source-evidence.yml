@@ -1,0 +1,31 @@
+name: ZGMINI One-Shot Receipt Pair Source Evidence
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - '.github/workflows/issue-owner-receipt-pair-source-evidence.yml'
+permissions: {}
+jobs:
+  test-source-only:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == false &&
+      github.event.pull_request.head.repo.full_name == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.pull_request.head.ref == 'codex/issues-lifecycle-manager-20261118-68-pair-ci-evidence-20261128'
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 23a2e39e1aebd79a9e5d99d90325f9fc225357c1
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify immutable two-file test source under Node
+        run: |
+          node --check writer-config-b/result-pair-atomic.test.mjs
+          node --check writer-config-b/result-pair-test-fixture.mjs
+          node --test writer-config-b/result-pair-atomic.test.mjs
