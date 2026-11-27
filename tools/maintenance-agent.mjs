@@ -521,8 +521,19 @@ export function createMaintenanceAgent({
   async function repositoryAllowed(){
     const info=await githubJson(["repo","view",repo,"--json","isPrivate,nameWithOwner"],
       "GITHUB_REPOSITORY_CHECK_FAILED");
-    if(info?.nameWithOwner!==repo||info?.isPrivate!==true)
-      throw coded("GITHUB_PRIVATE_REPOSITORY_REQUIRED");
+    if(info?.nameWithOwner!==repo)throw coded("GITHUB_REPOSITORY_IDENTITY_UNVERIFIED");
+    if(info.isPrivate===true)return 'PRIVATE';
+    if(info.isPrivate!==false)throw coded("GITHUB_REPOSITORY_IDENTITY_UNVERIFIED");
+    // In Public, only a source intake may run. Authenticate the numeric repo
+    // and owner through the canonical GitHub REST API; this never grants B.
+    const canonical=await githubJson(["api","repos/"+repo],
+      "GITHUB_REPOSITORY_CHECK_FAILED");
+    if(canonical?.id!==1442936296||canonical.full_name!==repo||
+       canonical.owner?.id!==327938088||
+       canonical.owner?.login!=='ansqhd5774-Choi'||
+       canonical.private!==false)
+      throw coded("GITHUB_PUBLIC_REPOSITORY_IDENTITY_UNVERIFIED");
+    return 'PUBLIC';
   }
   async function issueDetails(number){
     if(!Number.isSafeInteger(number)||number<=0)throw coded("INVALID_ISSUE_NUMBER");
@@ -1095,6 +1106,12 @@ export function createMaintenanceAgent({
       reportUploadStatus:stored.reportUploadStatus};
   }
   async function processIssue(issue){
+    if(await repositoryAllowed()==='PUBLIC'){
+      // Read-only intake in the owner's Public source repository. No historical
+      // or new B claim/ledger/approval/OS effect may be interpreted as authority.
+      return {status:'BLOCKED',code:'PUBLIC_B_EFFECT_SEPARATE_AUTH_REQUIRED',
+        issueNumber:issue?.number,operationalWrites:0,effectAuthorized:false};
+    }
     if(issue?.title===S6_ONCE_ISSUE_TITLE)return processS6OnceIssue(issue);
     if(issue?.title===INSTALLED_RECOVERY_ISSUE_TITLE)
       return processInstalledRecoveryIssue(issue);
@@ -1287,11 +1304,13 @@ export function createMaintenanceAgent({
     }catch{return false;}
   }
   async function pollOnce(){
-    await repositoryAllowed();
+    const visibility=await repositoryAllowed();
     const summaries=await githubJson(["issue","list","--repo",repo,"--state","open",
       "--label",label,"--limit","1000","--json","number,title,updatedAt"],"GITHUB_ISSUE_LIST_FAILED");
     if(!Array.isArray(summaries))throw coded("GITHUB_ISSUE_LIST_INVALID");
-    const seen=new Set(),results=[];
+    const seen=new Set(),results=visibility==='PUBLIC'?
+      [{status:'PUBLIC_SOURCE_ONLY',code:'PUBLIC_B_EFFECT_HELD',
+        operationalWrites:0,effectAuthorized:false}]:[];
     // New requests are served first. RUNNING and recovery work is still checked
     // in the same pass, without introducing a new queue or admission gate.
     const newestFirst=[...summaries].sort((a,b)=>(b?.number??0)-(a?.number??0));
@@ -1313,7 +1332,12 @@ export function createMaintenanceAgent({
       settledIssueCache.delete(number);
       try{
         const issue=await issueDetails(number);
-        const result=await processIssue(issue);
+        const result=visibility==='PUBLIC'
+          ?(issueIsTrusted(issue,{allowedActors,title:entry.title,label})
+            ?{status:'BLOCKED',code:'PUBLIC_B_EFFECT_SEPARATE_AUTH_REQUIRED',
+              issueNumber:issue.number,operationalWrites:0,effectAuthorized:false}
+            :{status:'IGNORED',issueNumber:issue?.number})
+          :await processIssue(issue);
         results.push(result);
         if(typeof updatedAt==="string"&&updatedAt.length>0
           &&typeof result?.requestId==="string"
@@ -1391,7 +1415,7 @@ export async function main(args=process.argv.slice(2)){
     const agent=createMaintenanceAgent({stateDir:root,verifyInstalledSource:()=>verifyInstalledTools(root)});
     do{
       if(cooperativeStopRequested(root,lease.owner))break;
-      try{const results=await agent.pollOnce();atomicReplace(path.join(root,'RECEIVER_STATUS.json'),JSON.stringify({at:new Date().toISOString(),pid:process.pid,status:'LISTENING',results})+'\n');}
+      try{const results=await agent.pollOnce();atomicReplace(path.join(root,'RECEIVER_STATUS.json'),JSON.stringify({at:new Date().toISOString(),pid:process.pid,status:results[0]?.code==='PUBLIC_B_EFFECT_HELD'?'PUBLIC_SOURCE_ONLY':'LISTENING',results})+'\n');}
       catch(error){
         if(mode==='--once')throw error;
         // A temporary GitHub outage must not permanently terminate the user
