@@ -26,26 +26,56 @@ async function appears(filename,timeout=6500){
  }
  return false;
 }
+// Start-Process creates a real private console on Windows. In contrast,
+// Node detached:true can create a console-less DETACHED_PROCESS.
+const winPs=()=>path.win32.join(process.env.SystemRoot,'System32',
+ 'WindowsPowerShell','v1.0','powershell.exe');
+const psQuote=value=>"'"+String(value).replaceAll("'","''")+"'";
+const cmdQuote=value=>'"'+String(value).replaceAll('"','')+'"';
+function runFixedPowerShell(command){
+ const out=spawnSync(winPs(),['-NoLogo','-NoProfile','-NonInteractive',
+  '-Command',command],{windowsHide:true,shell:false,encoding:'utf8',
+  timeout:18000,maxBuffer:16384});
+ assert.equal(out.error,undefined,out.error?.code);
+ assert.equal(out.status,0,'TEMP_FIXED_POWERSHELL_FAILED');
+ return (out.stdout??'').trim().split(/\\r?\\n/).at(-1);
+}
 function start(dir,script,seat){
  const ready=path.join(dir,seat+'.ready'),seen=path.join(dir,seat+'.seen');
- const child=spawn(process.execPath,[script,ready,seen],{
-  cwd:dir,detached:true,windowsHide:true,stdio:'ignore'
- });
- const closed=new Promise(resolve=>{
-  child.once('close',(code,signal)=>resolve({code,signal}));
-  child.once('error',error=>resolve({error:error.code??'UNKNOWN'}));
- });
- return {child,ready,seen,closed};
+ const arg=[script,ready,seen].map(cmdQuote).join(' ');
+ const command="$ErrorActionPreference='Stop'; $p=Start-Process -FilePath "+
+  psQuote(process.execPath)+" -ArgumentList "+psQuote(arg)+
+  " -WorkingDirectory "+psQuote(dir)+
+  " -WindowStyle Hidden -PassThru; Write-Output $p.Id";
+ const pid=Number(runFixedPowerShell(command));
+ assert.ok(Number.isSafeInteger(pid)&&pid>0,'TEMP_LAUNCH_PID_UNVERIFIED');
+ return {pid,ready,seen,script};
+}
+function pidAlive(pid){
+ try{process.kill(pid,0);return true;}catch{return false;}
+}
+async function waitGone(pid,timeout=4000){
+ const deadline=Date.now()+timeout;
+ while(Date.now()<deadline){
+  if(!pidAlive(pid))return true;
+  await pause(50);
+ }
+ return !pidAlive(pid);
 }
 async function clean(dir,children){
  for(const c of children){
-  // Only Node children returned by start(), both launched from our TEMP file.
-  if(c?.child?.exitCode===null&&c?.child?.signalCode===null)
-   try{c.child.kill();}catch{}
+  if(!c||!pidAlive(c.pid))continue;
+  // PID alone is insufficient for cleanup. Validate the exact synthetic
+  // executable AND temporary script command line before stopping this fixture.
+  const command="$ErrorActionPreference='Stop';"+
+   " $p=Get-CimInstance Win32_Process -Filter 'ProcessId="+c.pid+
+   "' -ErrorAction Stop;"+
+   " if($null -ne $p -and $p.ExecutablePath -ieq "+psQuote(process.execPath)+
+   " -and $p.CommandLine -like "+psQuote('*'+c.script+'*')+
+   "){Stop-Process -Id "+c.pid+" -Force -ErrorAction Stop}";
+  try{runFixedPowerShell(command);}catch{}
  }
- await Promise.all(children.map(async c=>{
-  if(c)await Promise.race([c.closed,pause(1200)]);
- }));
+ await pause(150);
  fs.rmSync(dir,{recursive:true,force:true});
 }
 // The sender is a fresh PowerShell child, not the test host. It detaches
@@ -55,7 +85,7 @@ const fixedPowerShell=String.raw`
 $ErrorActionPreference='Stop'
 $target=[uint32]__TARGET_PID__
 $control=[uint32]__CONTROL_TYPE__
-$group=[uint32]__PROCESS_GROUP__
+$group=[uint32]0
 $source=@'
 using System;
 using System.Runtime.InteropServices;
@@ -63,7 +93,10 @@ public static class ZgminiTempOnlyCtrl {
  [DllImport("kernel32.dll", SetLastError=true)] public static extern bool FreeConsole();
  [DllImport("kernel32.dll", SetLastError=true)] public static extern bool AttachConsole(uint pid);
  [DllImport("kernel32.dll", SetLastError=true)] public static extern uint GetConsoleProcessList([Out] uint[] processes,uint length);
- [DllImport("kernel32.dll", SetLastError=true)] public static extern bool SetConsoleCtrlHandler(IntPtr handler,bool add);
+ [UnmanagedFunctionPointer(CallingConvention.Winapi)] public delegate bool CtrlHandler(uint signal);
+ private static readonly CtrlHandler keepAlive = signal => true;
+ [DllImport("kernel32.dll", SetLastError=true)] private static extern bool SetConsoleCtrlHandler(CtrlHandler callback,bool add);
+ public static bool ProtectSender() { return SetConsoleCtrlHandler(keepAlive,true); }
  [DllImport("kernel32.dll", SetLastError=true)] public static extern bool GenerateConsoleCtrlEvent(uint type,uint processGroup);
 }
 '@
@@ -85,8 +118,8 @@ try{
   Write-Output '{"status":"BLOCKED","code":"TEMP_CONSOLE_TARGET_UNVERIFIED"}'
   exit 0
  }
- if($control -eq 0 -and -not [ZgminiTempOnlyCtrl]::SetConsoleCtrlHandler([IntPtr]::Zero,$true)){
-  Write-Output '{"status":"BLOCKED","code":"TEMP_CTRL_C_SENDER_FENCE_FAILED"}'
+ if(-not [ZgminiTempOnlyCtrl]::ProtectSender()){
+  Write-Output '{"status":"BLOCKED","code":"TEMP_SENDER_HANDLER_FENCE_FAILED"}'
   exit 0
  }
  if(-not [ZgminiTempOnlyCtrl]::GenerateConsoleCtrlEvent($control,$group)){
@@ -101,19 +134,13 @@ try{
 function sendTestSignal(targetPid,control){
  assert.ok(Number.isSafeInteger(targetPid)&&targetPid>0);
  assert.ok(control===0||control===1);
- const root=process.env.SystemRoot;
- assert.match(root??'',/^[a-z]:[\\/]windows$/i);
- const ps=path.win32.join(root,'System32','WindowsPowerShell','v1.0','powershell.exe');
- assert.equal(fs.statSync(ps).isFile(),true);
+ assert.match(process.env.SystemRoot??'',/^[a-z]:[\\/]windows$/i);
+ assert.equal(fs.statSync(winPs()).isFile(),true);
  const command=fixedPowerShell.replace('__TARGET_PID__',String(targetPid))
   .replace('__CONTROL_TYPE__',String(control))
-  .replace('__PROCESS_GROUP__',control===0?'0':String(targetPid));
+  ;
  // No shell, PID search, arbitrary command, or target override.
- const out=spawnSync(ps,['-NoLogo','-NoProfile','-NonInteractive','-Command',command],
-  {windowsHide:true,shell:false,encoding:'utf8',timeout:18000,maxBuffer:16384});
- assert.equal(out.error,undefined,out.error?.code);
- assert.equal(out.status,0,'TEMP_CONSOLE_SENDER_FAILED');
- const response=JSON.parse((out.stdout??'').trim().split(/\r?\n/).at(-1));
+ const response=JSON.parse(runFixedPowerShell(command));
  assert.equal(response.status,'SENT',response.code);
  return response;
 }
@@ -129,7 +156,7 @@ async function withTwoTempConsoles(fn){
   assert.ok(await appears(children[0].ready)&&await appears(children[1].ready),
    'TEMP_FIXTURE_CHILD_NOT_READY');
   for(const c of children){
-   assert.equal(fs.readFileSync(c.ready,'utf8'),String(c.child.pid));
+   assert.equal(fs.readFileSync(c.ready,'utf8'),String(c.pid));
    assert.equal(fs.existsSync(c.seen),false);
   }
   await fn(children[0],children[1]);
@@ -138,29 +165,28 @@ async function withTwoTempConsoles(fn){
 test('WIN-OC01 CTRL+C route: record actual receipt, never infer targeted group support',windows,
  async()=>{
   await withTwoTempConsoles(async(target,peer)=>{
-   sendTestSignal(target.child.pid,0);
+   sendTestSignal(target.pid,0);
    const received=await appears(target.seen,1500);
    const event=received?fs.readFileSync(target.seen,'utf8'):'NONE';
    assert.ok(event==='NONE'||event==='SIGINT',event);
    assert.equal(fs.existsSync(peer.seen),false,'UNRELATED_TEMP_CONSOLE_SIGNALED');
-   assert.equal(peer.child.exitCode,null,'UNRELATED_TEMP_CHILD_EXITED');
+   assert.equal(pidAlive(peer.pid),true,'UNRELATED_TEMP_CHILD_EXITED');
    // CREATE_NEW_PROCESS_GROUP can ignore CTRL+C. A SENT API return is not
    // evidence that the listener received it; expose the observation instead.
    console.log('WIN_OC01_CTRL_C_RECEIVED='+received);
    console.log('WIN_OC01_CTRL_C_TARGETED_DELIVERY_PROVEN=false');
   });
  });
-test('WIN-OC02 CTRL+BREAK route: only the exact TEMP process group exits',windows,
+test('WIN-OC02 CTRL+BREAK route: only the exclusive TEMP console exits',windows,
  async()=>{
   await withTwoTempConsoles(async(target,peer)=>{
-   sendTestSignal(target.child.pid,1);
+   sendTestSignal(target.pid,1);
    assert.ok(await appears(target.seen,3500),'TEMP_CTRL_BREAK_NOT_DELIVERED');
    assert.equal(fs.readFileSync(target.seen,'utf8'),'SIGBREAK');
-   const outcome=await Promise.race([target.closed,pause(3500).then(()=>null)]);
-   assert.notEqual(outcome,null,'TEMP_SIGNALLED_CHILD_NOT_EXITED');
-   assert.equal(outcome?.code,0,'TEMP_SIGNALLED_CHILD_EXITED_ABNORMALLY');
+   assert.equal(await waitGone(target.pid,3500),true,
+    'TEMP_SIGNALLED_CHILD_NOT_EXITED');
    assert.equal(fs.existsSync(peer.seen),false,'UNRELATED_TEMP_CONSOLE_SIGNALED');
-   assert.equal(peer.child.exitCode,null,'UNRELATED_TEMP_CHILD_EXITED');
-   console.log('WIN_OC02_CTRL_BREAK_SINGLE_TEMP_CHILD_EXIT=PASS');
+   assert.equal(pidAlive(peer.pid),true,'UNRELATED_TEMP_CHILD_EXITED');
+   console.log('WIN_OC02_CTRL_BREAK_EXCLUSIVE_TEMP_CONSOLE_EXIT=PASS');
   });
  });
