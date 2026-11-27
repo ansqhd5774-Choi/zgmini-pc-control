@@ -9,7 +9,7 @@ import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
-import {main as inspectIndependent} from './public-v3-independent-preimage-readonly.mjs';
+// Local preflight is dynamically imported only AFTER its source CAS check.
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const ROOT='E:/ZGmini/projects/zgmini-pc-control';
@@ -160,8 +160,20 @@ export async function main(args=process.argv.slice(2)) {
  need(path.win32.normalize(path.resolve(fileURLToPath(import.meta.url))).toLowerCase()===
   path.win32.normalize(path.resolve(ROOT,ENTRY)).toLowerCase(),
   'W06_PUBLIC_B_OPERATOR_PATH_STOP');
- // Independently verifies Windows PC host, owner Explorer ancestry, GitHub
- // owner/repository, reviewed source lineage and existing 7 trusted modules.
+ // Before evaluating a local dependent module, verify both the operator
+ // source and its first imported preflight against authenticated Public main.
+ // The preflight then checks its own transitive closure before OS probes.
+ need(process.platform==='win32'&&!process.env.GITHUB_ACTIONS&&
+  !process.env.RUNNER_NAME&&!process.env.GITHUB_RUN_ID,
+  'W06_PUBLIC_B_INDEPENDENT_WINDOWS_REQUIRED');
+ const preflightSource='sidecar-b/public-v3-independent-preimage-readonly.mjs';
+ for(const relative of [ENTRY,preflightSource])
+  need(sha(readLocal(relative))===sha(readRemote(relative,'main')),
+   'W06_PUBLIC_B_SOURCE_DRIFT_STOP');
+ const {main:inspectIndependent}=
+  await import('./public-v3-independent-preimage-readonly.mjs');
+ // The verified preflight independently proves owner Explorer ancestry,
+ // reviewed source lineage, current real-PC CAS and its 7 trusted modules.
  const current=await inspectIndependent();
  need(current?.status==='PASS'||(
   current?.status==='DEFERRED'&&

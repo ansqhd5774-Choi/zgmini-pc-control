@@ -94,3 +94,14 @@ test('owner PR merge never substitutes for a separate exact B effect consent',()
  const source=fs.readFileSync(new URL('./public-v3-independent-owner-b-once.mjs',import.meta.url),'utf8');
  assert.match(source,/W06_PUBLIC_B_EXPLICIT_OWNER_EFFECT_CONSENT_STOP/);
 });
+
+test('preflight module cannot be evaluated before its authenticated source CAS',()=>{
+ const source=fs.readFileSync(new URL('./public-v3-independent-owner-b-once.mjs',import.meta.url),'utf8');
+ assert.doesNotMatch(source,/^import\s+.*from\s+['"]\.\/public-v3-independent-preimage-readonly\.mjs['"]/m);
+ const check=source.indexOf('for(const relative of [ENTRY,preflightSource])');
+ const dynamicImport=source.indexOf("await import('./public-v3-independent-preimage-readonly.mjs')");
+ const invoke=source.indexOf('await inspectIndependent()');
+ assert.ok(check>0&&dynamicImport>check&&invoke>dynamicImport);
+ assert.match(source,/W06_PUBLIC_B_SOURCE_DRIFT_STOP/);
+ assert.match(source,/W06_PUBLIC_B_INDEPENDENT_WINDOWS_REQUIRED/);
+});
