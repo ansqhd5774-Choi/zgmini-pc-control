@@ -77,3 +77,16 @@ test('unreadable EnginePID is counted as unknown while the task is running',()=>
   assert.equal(JSON.parse(run.stdout[0]).instances,1);
   assert.equal(JSON.parse(run.stdout[0]).unknownProcessLines,1);
 });
+
+test('unrelated non-launcher command-line mentions are not Core processes',()=>{
+  const run=runProbe({processes:[
+    {ProcessId:610,ParentProcessId:1,Name:'notepad.exe',
+      CommandLine:'notepad.exe C:\\docs\\run-local.mjs'},
+    {ProcessId:611,ParentProcessId:1,Name:'python.exe',
+      CommandLine:'python diagnostics.py --name=local-cycle.mjs'},
+    {ProcessId:612,ParentProcessId:1,Name:'node.exe',
+      CommandLine:'node scripts/pc-writer/run-local.mjs'}
+  ]});
+  assert.deepEqual(JSON.parse(run.stdout[0]),{ok:true,enabled:true,state:3,
+    instances:0,relatedProcesses:1,unknownProcessLines:0});
+});
