@@ -318,7 +318,7 @@ test('public A Issue comment heading uses the same projected bytes as JSON/TXT',
 
 
 test('installed Public A Controller must pass immutable host gate before old PC entry and upload',()=>{
- const target='20d5bbbf305531dca9bf5b74744df83daf37cf17';
+ const target='555f95708984580cd7d5a0fd05a80b718e867710';
  const base='e11ba38a9f03da083b07258a961ee0855c4d3ae9';
  const root=fileURLToPath(new URL('../',import.meta.url));
  assert.ok(publicA,'fixed Public A job candidate must exist on this Draft branch');

@@ -113,3 +113,56 @@ test('exact overlay has full pre-install transitive import closure, without addi
    'unchanged runtime dependency: '+rel);
  }
 });
+
+
+test('stage 5 postcheck-aware overlay is exact four-file installed-parent and not B authorized',()=>{
+ const next=JSON.parse(fs.readFileSync(path.join(repo,
+   'drafts/controller-public-a-postcheck-selective-candidate-20261128.json'),'utf8'));
+ assert.equal(next.approved,false);
+ assert.equal(next.publicBEffectAuthorized,false);
+ assert.equal(next.operatingPreimageRawCasVerified,false);
+ assert.equal(next.operatingInstallationVerified,false);
+ assert.equal(next.publicAWorkflowActiveOnMain,true);
+ assert.equal(next.installedSha,'3c7d4cfefacf072fd35cb19706b352c64c5e4fd2');
+ assert.equal(next.targetSha,'555f95708984580cd7d5a0fd05a80b718e867710');
+ assert.equal(next.sourceMainSha,'9b12c27a341fe3f982e93a631497bdf23547d371');
+ assert.equal(next.targetBranch,'codex/public-a-controller-postcheck-selective-20261128');
+ assert.equal(git(['rev-parse','--verify','refs/remotes/origin/'+next.targetBranch]).trim(),next.targetSha);
+ assert.deepEqual(git(['rev-list','--parents','-n','1',next.targetSha]).trim().split(/\s+/),
+  [next.targetSha,next.installedSha]);
+ assert.deepEqual(git(['diff','--name-only','--no-renames',next.installedSha,next.targetSha,'--'])
+  .trim().split(/\r?\n/).sort(),next.allowFiles.map(x=>x.path).sort());
+ assert.deepEqual(next.allowFiles.map(x=>x.path),[
+  'controller/common.mjs','controller/entry.mjs',
+  'controller/preimage-manifest-stager.mjs','controller/upload.mjs'
+ ]);
+ const oldPaths=['controller/engine.mjs','controller/operations.mjs',
+  'controller/supervisor.mjs','config/operations.json'];
+ for(const rel of oldPaths)
+  assert.ok(bytes(next.installedSha,rel).equals(bytes(next.targetSha,rel)),'unchanged '+rel);
+ for(const item of next.allowFiles){
+  const payload=bytes(next.targetSha,item.path);
+  assert.equal(sha256(payload),item.sha256,'raw hash '+item.path);
+  assert.equal(git(['rev-parse',next.targetSha+':'+item.path]).trim(),
+    next.sourceGitBlobIds[item.path]);
+  assert.ok(payload.equals(bytes(next.sourceMainSha,item.path)), 'approved source main '+item.path);
+ }
+ assert.doesNotThrow(()=>git(['merge-base','--is-ancestor',next.sourceMainSha,'HEAD']));
+ const src=bytes(next.targetSha,'controller/common.mjs').toString('utf8');
+ assert.match(src,/exactPublicUpdatePostcheckTitle\(event\.issue\.title,event\.issue\.body\)/);
+ assert.match(src,/PC Update/);
+ assert.match(src,/publicPcReportProjection/);
+ const wf=fs.readFileSync(path.join(repo,'.github/workflows/pc-job.yml'),'utf8');
+ assert.match(wf,/555f95708984580cd7d5a0fd05a80b718e867710/);
+ for(const f of next.allowFiles)assert.ok(wf.includes("'"+f.path+"':'"+f.sha256+"'"));
+ assert.ok(wf.includes("id: installed_controller"));
+ assert.equal((wf.match(/steps\.installed_controller\.outcome == 'success'/g)||[]).length,3);
+ const scanPaths=git(['ls-tree','-r','--name-only',next.targetSha,'--','controller','config'])
+  .trim().split(/\r?\n/).filter(Boolean);
+ const scan=validateControllerImportClosure(scanPaths,
+  controllerImportScanRoots(next.allowFiles.map(x=>x.path)),
+  rel=>bytes(next.targetSha,rel).toString('utf8'));
+ assert.equal(scan.status,'VERIFIED');
+ assert.equal(validateControllerOnlyInstallDelta(
+  next.allowFiles.map(f=>f.path),next.allowFiles),true);
+});

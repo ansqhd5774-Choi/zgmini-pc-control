@@ -1,0 +1,74 @@
+{
+  "schema": "ZGMINI_CONTROLLER_PUBLIC_A_SELECTIVE_CANDIDATE_V1",
+  "status": "SOURCE_ONLY_NOT_APPROVED",
+  "installedSha": "3c7d4cfefacf072fd35cb19706b352c64c5e4fd2",
+  "targetSha": "555f95708984580cd7d5a0fd05a80b718e867710",
+  "sourceMainSha": "9b12c27a341fe3f982e93a631497bdf23547d371",
+  "targetBranch": "codex/public-a-controller-postcheck-selective-20261128",
+  "targetParentSha": "3c7d4cfefacf072fd35cb19706b352c64c5e4fd2",
+  "allowFiles": [
+    {
+      "path": "controller/common.mjs",
+      "sha256": "9e940a92c0f3ac332ba4d8a5d52b4bac0d647340bdb30863e2628b5b70d27083"
+    },
+    {
+      "path": "controller/entry.mjs",
+      "sha256": "1874aa1b0b9c6ce109a15737a608a711b81aecb7e3bdcc475032be8b54c1dca7"
+    },
+    {
+      "path": "controller/preimage-manifest-stager.mjs",
+      "sha256": "806950791803cfc9a1fb387dfdbc4b74757304c48df20e90a2d9b76d52c8cf10"
+    },
+    {
+      "path": "controller/upload.mjs",
+      "sha256": "a0a6065c7f2fd8f816e6b0a9efd9e7aba14e990bd0336aadc6b0be74baaefe8e"
+    }
+  ],
+  "sourceGitBlobIds": {
+    "controller/common.mjs": "741b1ed7d82b60752ff4fe3596b9947c2e1ca998",
+    "controller/entry.mjs": "6f9b4125c4264669f1bd0c8da4a5f8b84acc25bd",
+    "controller/preimage-manifest-stager.mjs": "6cebe547c5bda3fe746fee280d4b0ea0ae1032ec",
+    "controller/upload.mjs": "22e25d2721443694144a501455c7f2c21f81d221"
+  },
+  "customPaths": [],
+  "controllerOnlyInstall": true,
+  "approved": false,
+  "operatingInstallationVerified": false,
+  "operatingPreimageRawCasVerified": false,
+  "publicBEffectAuthorized": false,
+  "publicAWorkflowActiveOnMain": true,
+  "sourceImportedIntoMain": true,
+  "postcheckContract": {
+    "issueTitle": "PC Update <original pc-UUID or pc-update-UUID> postcheck",
+    "requestId": "<original requestId>-postcheck",
+    "postOperations": [
+      "core-status",
+      "source-audit",
+      "fear-greed-archive-status"
+    ],
+    "originalOwnerAndMainWorkflowOnly": true,
+    "localFullResultRequiredForPublicReceipt": true
+  },
+  "futureFormalSelectivePinPath": "approvals/controller-selective-targets/555f95708984580cd7d5a0fd05a80b718e867710.json",
+  "futureFormalControllerUpdatePath": "approvals/controller-updates/555f95708984580cd7d5a0fd05a80b718e867710.json",
+  "sourceEvidence": {
+    "verifiedSingleParent": true,
+    "verifiedExactFourFileDiff": true,
+    "rawGitBlobsValidated": true,
+    "hostLastObservedAtKst": "2026-11-28T01:50:20+09:00",
+    "hostLastObservedInstalledSha": "3c7d4cfefacf072fd35cb19706b352c64c5e4fd2",
+    "maintainerObservedSha": "3bed26ecabde1ac9046e000b1b32d912fa1ab53b",
+    "maintainerMode": "PUBLIC_SOURCE_ONLY",
+    "publicBEffectBlocked": true
+  },
+  "requiredBeforeBEffect": [
+    "separately approved owner-specific Public B effect and independent authenticated Windows operator source",
+    "exact source target and local installed 7+ file CAS readback immediately before mutation",
+    "formal reviewed selective pin in main and effect-specific approved update manifest with fixed raw SHA256",
+    "existing lease owner and no conflicting installation",
+    "snapshot, protected-state baseline and verified rollback",
+    "bounded drain of active pc-job workflow, Supervisor-owned six Runners and proper reconnect",
+    "re-enable Public A then exact one-shot postcheck Issue/Run/Job/full local ledger/remote safe projection readback"
+  ],
+  "next": "DO NOT run B install, issue a Public pc-maintenance effect, or mark stage 5 approved until explicit effect authorization/Windows origin and actual on-host CAS are verified. Old target 20d5bbbf... is source-only superseded for future postcheck-capable rollout; preserve historical evidence."
+}
