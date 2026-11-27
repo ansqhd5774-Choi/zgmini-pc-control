@@ -2,6 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import path from 'node:path';
 import './controller-operating-audit-selective.test.mjs';
+import './controller-operating-audit-b-manifest.test.mjs';
 import {summarizeAutomation,dedicatedPcRunnersOnline,classifyRunnerQueryError,scopedRunnerRosterCliOptions,safeRuntimeSignals,operatingPcRunnerEvidence,inspectWatchdogReadOnly,summarizeSupervisorReadOnly,summarizeRequestedRecoveryEvidence,summarizeRequestProgress} from '../tools/automation-status.mjs';
 import {inspectControllerOperatingAuditReadonly} from '../controller/operations.mjs';
 const healthy=()=>({installLock:{held:false},actualControllerSha:'a'.repeat(40),
