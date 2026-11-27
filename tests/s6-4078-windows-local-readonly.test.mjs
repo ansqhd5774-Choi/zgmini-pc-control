@@ -60,6 +60,24 @@ test('tampered S6 approval cannot be accepted as current source',t=>{
  assert.equal(r.code,'S6_APPROVAL_SOURCE_CAS_DRIFT');
  assert.equal(r.operationalWrites,0);
 });
+test('CRLF checkout accepted only when canonical exact approval bytes match',t=>{
+ const f=fixture(t);
+ const original=fs.readFileSync(f.approval,'utf8');
+ assert.ok(original.includes('\n'));
+ fs.writeFileSync(f.approval,original.replace(/\n/g,'\r\n'));
+ const r=read(f.paths);
+ assert.equal(r.status,'READ_ONLY_OBSERVED');
+ assert.equal(r.approvalSha256,APPROVAL);
+ assert.equal(r.ownerAndLeaseCasVerified,false);
+});
+test('lone CR in approval file is not normalized',t=>{
+ const f=fixture(t);
+ const original=fs.readFileSync(f.approval,'utf8');
+ fs.writeFileSync(f.approval,original.replace(/\n/g,'\r'));
+ const r=read(f.paths);
+ assert.equal(r.code,'S6_APPROVAL_SOURCE_CAS_DRIFT');
+ assert.equal(r.operationalWrites,0);
+});
 test('claim requestId drift blocks local observation',t=>{
  const f=fixture(t);fs.writeFileSync(path.join(f.ledger,'claim.json'),
   JSON.stringify({schema:'ZGMINI_S6_CLAIM_V1',requestId:'changed',
