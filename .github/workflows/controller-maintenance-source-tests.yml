@@ -61,6 +61,9 @@ on:
       - 'tools/supervisor-orphan-console-readonly.mjs'
       - 'tools/supervisor-orphan-six-wmi-console-crosscheck.mjs'
       - 'tests/supervisor-orphan-six-wmi-console-crosscheck.test.mjs'
+      - 'tools/supervisor-orphan-six-graceful-source.mjs'
+      - 'tools/supervisor-orphan-six-maintenance-journal.mjs'
+      - 'tests/supervisor-orphan-six-graceful-source.test.mjs'
       - 'tools/supervisor-orphan-six-b-receiver-source.mjs'
       - 'tests/supervisor-orphan-six-b-receiver-source.test.mjs'
       - 'tools/supervisor-orphan-six-b-maintainer-inlet-source.mjs'
@@ -446,9 +449,16 @@ jobs:
       - name: Run scoped maintenance and Controller runtime safety regressions
         if: steps.scope.outputs.core == 'true'
         run: node --test --test-concurrency=1 tests/maintenance-agent.test.mjs tests/maintenance-installed-recovery-request.test.mjs tests/maintenance-lock.test.mjs tests/maintenance-contract.test.mjs tests/maintenance-request.test.mjs tests/source-bundle-register.test.mjs tests/controller-heavy-only-install.test.mjs tests/controller-selective-source.test.mjs tests/maintenance-apply.test.mjs tests/core-runtime-source-readonly.test.mjs tests/core-task-observation.test.mjs tests/controller-core-lock-source-contract.test.mjs tests/supervisor-status-write.test.mjs tests/controller-standby.test.mjs tests/runner-watchdog.test.mjs tests/watchdog-b-upgrade.test.mjs tests/watchdog-b-protection-r2.test.mjs tests/watchdog-protected-drift.test.mjs tests/watchdog-guardian-activation.test.mjs tests/watchdog-activation-first-fail.test.mjs tests/watchdog-handoff-firstfail.test.mjs tests/rollback-stalled-claim.test.mjs tests/rollback-first-evidence.test.mjs
+      - name: Verify source-only original six-seat graceful preflight and B deny-by-default receiver
+        if: steps.scope.outputs.core == 'true'
+        run: node --test --test-concurrency=1 tests/supervisor-orphan-six-graceful-source.test.mjs tests/supervisor-orphan-six-b-receiver-source.test.mjs tests/supervisor-orphan-six-graceful-b-coordinator.test.mjs
+      - name: Verify isolated synthetic-only Windows console source guards
+        # Test code only targets synthetic TEMP children on DESKTOP-N62L0NG.
+        if: steps.scope.outputs.core == 'true' && hashFiles('tests/supervisor-orphan-six-windows-ctrlbreak-port.test.mjs') != ''
+        run: node --test --test-concurrency=1 tests/supervisor-orphan-six-windows-ctrlbreak-port.test.mjs
       - name: Verify orphan-six source closure and immutable historical maintenance approval pins
         # Read-only isolated Node test; never installs, signals or edits B policy.
-        if: hashFiles('tests/supervisor-orphan-six-b-maintainer-inlet-source.test.mjs', 'tests/maintenance-handoff.test.mjs', 'tests/maintenance-s6-safety-handoff.test.mjs') != ''
+        if: steps.scope.outputs.core == 'true' && hashFiles('tests/supervisor-orphan-six-b-maintainer-inlet-source.test.mjs', 'tests/maintenance-handoff.test.mjs', 'tests/maintenance-s6-safety-handoff.test.mjs') != ''
         run: node --test --test-concurrency=1 tests/supervisor-orphan-six-b-maintainer-inlet-source.test.mjs tests/maintenance-handoff.test.mjs tests/maintenance-s6-safety-handoff.test.mjs
       - name: Verify unapproved CI Controller B policy-only handoff candidate is non-executable
         if: steps.scope.outputs.core == 'true' && hashFiles('tests/ci-controller-b-policy-only-proposal.test.mjs') != ''
