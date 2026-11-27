@@ -40,6 +40,8 @@ export function assessPublicPcJobCandidate({event,env}={}) {
   const issue=event?.issue;
   if(event?.sender?.id!==OWNER_ID||event.sender.login!==OWNER||
      issue?.user?.id!==OWNER_ID||issue.user.login!==OWNER||
+     (issue.title!=='pc-job'&&
+      !/^PC Update pc-update-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12} postcheck$/.test(issue.title??''))||
      issue.state!=='open'||
      !Number.isSafeInteger(issue.number)||issue.number<=0||
      // GitHub 'issues' webhook identifies the Issue in issue.number;
