@@ -1206,3 +1206,22 @@ test('orphan-six injected source ports cannot substitute an unapproved request b
  assert.equal(f.stats.applies,0);
  assert.equal(f.stats.comments,0);
 });
+
+test('direct orphan-six source invocation cannot bypass the private repository contract',async t=>{
+ const f=fixture(t,{privateRepo:false});
+ f.issue.title='pc-controller-orphan-six-graceful-once';
+ f.issue.body=JSON.stringify({
+  schema:'ZGMINI_PC_ORPHAN_SIX_B_REQUEST_V1',
+  requestId:'pc-12345678-1234-4234-9234-123456789abc',
+  chatId:'chat-source-intake',operation:'controller-orphan-six-graceful-once',
+  controlRepository:REPO,targetControllerSha:INSTALLED,
+  approvalManifestSha256:'a'.repeat(64)
+ });
+ const result=await f.agent.processIssue(f.issue);
+ assert.equal(result.status,'BLOCKED');
+ assert.equal(result.code,'ORPHAN_SIX_B_PRIVATE_REPOSITORY_REQUIRED');
+ assert.equal(result.executionStarted,false);
+ assert.equal(result.operationalWrites,0);
+ assert.equal(f.stats.applies,0);
+ assert.equal(f.stats.comments,0);
+});
