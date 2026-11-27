@@ -45,9 +45,10 @@ function fixture(){
   acquireExclusiveClaim:async()=>{events.push('claim');return {nonce:'12345678-1234-1234-1234-123456789abc'};},
   assertClaimOwned:async()=>{events.push('assert');},
   writePostingCas:async()=>{events.push('posting');},
-  postExactOriginal:async data=>{events.push('post');assert.equal(data.body,originalBody);n++;return {number:8000};},
+  postExactOriginal:async data=>{events.push('post');assert.equal(data.title,'pc-job');
+   assert.deepEqual(data.labels,['pc-job']);assert.equal(data.body,originalBody);n++;return {number:8000};},
   readPostedIssue:async()=>{events.push('read-posted');return {number:8000,
-   title:'Maintenance replay '+FIXED.s6RequestId+' original #4078',
+   title:'pc-job',
    body:originalBody,state:'open',user:{login:'ansqhd5774-Choi'},
    labels:[{name:'pc-job'}]};},
   writeDoneCas:async data=>{events.push('done');assert.equal(data.expectedStatus,'POSTING');},

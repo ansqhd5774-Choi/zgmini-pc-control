@@ -76,7 +76,8 @@ export async function executeApprovedS64078Replay(ports={}){
   // Do not reconstruct or normalize the original issue body.
   phase='GITHUB_POST_ATTEMPT';
   const posted=await ports.postExactOriginal({claim,
-   title:'Maintenance replay '+FIXED.s6RequestId+' original #4078',
+   // Public A intake on the control repository requires the exact pc-job title.
+   title:'pc-job',
    body:fresh.originalIssue.body,labels:['pc-job'],
    originalIssueNumber:FIXED.originalIssue,
    originalRequestId:FIXED.originalRequestId});
@@ -90,8 +91,7 @@ export async function executeApprovedS64078Replay(ports={}){
   // trusting an uncoupled workflow run to prove an issue body was preserved.
   phase='POSTED_ISSUE_READBACK_ATTEMPT';
   const actual=await ports.readPostedIssue({claim,number:posted.number});
-  if(actual?.number!==posted.number||actual?.title!==
-     'Maintenance replay '+FIXED.s6RequestId+' original #4078'||
+  if(actual?.number!==posted.number||actual?.title!=='pc-job'||
      actual?.body!==fresh.originalIssue.body||
      actual?.state!=='open'||actual?.user?.login!=='ansqhd5774-Choi'||
      actual?.pull_request||
