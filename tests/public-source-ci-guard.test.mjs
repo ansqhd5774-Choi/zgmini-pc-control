@@ -10,6 +10,7 @@ import '../sidecar-b/contract.test.mjs';
 import '../sidecar-b/w06-r3-operating-approval.test.mjs';
 import '../sidecar-b/w06-r3-sevenmin-approval.test.mjs';
 import '../sidecar-b/w06-v2-to-v3-pin-only.test.mjs';
+import '../sidecar-b/w06-v3-actual-c8ed53-pin.test.mjs';
 
 const repo='ansqhd5774-Choi/zgmini-pc-control', id=1442936296;
 const owner='ansqhd5774-Choi', ownerId=327938088;
