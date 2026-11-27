@@ -967,6 +967,144 @@ export function createMaintenanceAgent({
     try{return parseJsonOutput(await github(args),code);}
     catch{throw coded(code);}
   }
+  // Canonical read-only source validation belongs exclusively to the
+  // independently launched maintainer. This supplies no B effect ports.
+  function canonicalOrphanSixReadPorts(){
+    const checkout='E:/ZGmini/projects/zgmini-pc-control';
+    const controlRoot='E:/ZGmini/automation/pc-control';
+    const runtime=['tools/maintenance-contract.mjs','tools/maintenance-apply.mjs',
+      'tools/maintenance-agent.mjs','tools/maintenance-lock.mjs',
+      'tools/update.mjs','tools/maintenance-ancestry.vbs',
+      'tools/source-bundle-register.mjs'];
+    const extra=['tools/bootstrap-maintenance.mjs','tools/handoff-maintenance.mjs'];
+    const sha40=x=>typeof x==='string'&&/^[a-f0-9]{40}$/.test(x);
+    const sha64=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
+    const same=(a,b)=>Array.isArray(a)&&a.length===b.length&&
+      a.every((value,i)=>value===b[i]);
+    const pinned=(file,max=131072)=>{
+      const stat=fs.lstatSync(file);
+      if(!stat.isFile()||stat.isSymbolicLink()||stat.nlink!==1||
+        stat.size<1||stat.size>max)throw coded('ORPHAN_SIX_B_PINNED_READ_DENIED');
+      const bytes=fs.readFileSync(file),after=fs.lstatSync(file);
+      if(after.ino!==stat.ino||after.size!==stat.size||
+        after.mtimeMs!==stat.mtimeMs||bytes.length!==stat.size)
+        throw coded('ORPHAN_SIX_B_PINNED_READ_UNSTABLE');
+      return bytes;
+    };
+    const gitRaw=(revision,relative)=>{
+      if(!sha40(revision)||
+        ![...runtime,...extra,
+          'approvals/maintenance-handoffs/'+revision+'.json'].includes(relative))
+        throw coded('ORPHAN_SIX_B_GIT_SCOPE_DENIED');
+      return execFileSync('git',['show',revision+':'+relative],
+        {cwd:checkout,windowsHide:true,timeout:10000,maxBuffer:2000000});
+    };
+    function provenance(){
+      verifyInstalledSource();
+      const m=JSON.parse(pinned(path.join(root,'MAINTENANCE_INSTALL.json')).toString('utf8'));
+      if(m?.schema!=='ZGMINI_PC_MAINTENANCE_INSTALL_V1'||
+        !sha40(m.sourceSha)||!sha64(m.startupSha256)||
+        !m.files||!same(Object.keys(m.files).sort(),[...runtime].sort()))
+        throw coded('ORPHAN_SIX_B_INSTALLED_SEVEN_CAS_DENIED');
+      const a=JSON.parse(gitRaw(m.sourceSha,
+        'approvals/maintenance-handoffs/'+m.sourceSha+'.json').toString('utf8'));
+      if(a?.targetSha!==m.sourceSha||a.approved!==true||
+        a.transition!=='SEVEN_TO_SEVEN'||!a.files||
+        !same(Object.keys(a.files).sort(),[...runtime,...extra].sort()))
+        throw coded('ORPHAN_SIX_B_NINE_SOURCE_PINS_DENIED');
+      for(const relative of runtime)
+        if(!sha64(m.files[relative])||a.files[relative]!==m.files[relative]||
+          sha256(pinned(path.join(root,relative),2000000))!==m.files[relative])
+          throw coded('ORPHAN_SIX_B_INSTALLED_SOURCE_DRIFT');
+      for(const relative of extra)
+        if(!sha64(a.files[relative])||
+          sha256(gitRaw(m.sourceSha,relative))!==a.files[relative])
+          throw coded('ORPHAN_SIX_B_HISTORICAL_PIN_DRIFT');
+      const owner=JSON.parse(pinned(path.join(root,'leases/receiver/owner.json')).toString('utf8'));
+      if(owner?.pid!==process.pid||typeof owner.nonce!=='string'||
+        !/^[a-f0-9-]{36}$/.test(owner.nonce))
+        throw coded('ORPHAN_SIX_B_RECEIVER_ORIGIN_UNKNOWN');
+      const proof=JSON.parse(pinned(path.join(root,'receivers',owner.nonce+'.json')).toString('utf8'));
+      if(proof?.schema!=='ZGMINI_PC_RECEIVER_ORIGIN_V1'||
+        proof.pid!==owner.pid||proof.nonce!==owner.nonce||
+        proof.bootAt!==owner.bootAt||proof.sourceSha!==m.sourceSha||
+        proof.startupSha256!==m.startupSha256)
+        throw coded('ORPHAN_SIX_B_RECEIVER_ORIGIN_UNKNOWN');
+      return m;
+    }
+    const ghApi=route=>githubJson(['api','repos/'+repo+'/'+route],
+      'ORPHAN_SIX_B_CANONICAL_GET_FAILED');
+    return Object.freeze({
+      attestCurrentMaintainerSource:async()=>{
+        provenance();
+        return {origin:'PRIVATE_INDEPENDENT_B_MAINTAINER',
+          verifiedNinePinnedMaintainerFiles:true,
+          currentMaintainerSourceUnchangedVerified:true};
+      },
+      readOriginalOneUseClaim:async(requestId)=>{
+        if(!/^pc-[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(requestId??''))
+          throw coded('ORPHAN_SIX_B_REQUEST_ID_DENIED');
+        const file=path.join(root,'requests','orphan-six-'+sha256(requestId)+'.json');
+        try{pinned(file,8192);return {claimed:true};}
+        catch(e){if(e?.code==='ENOENT')return null;throw e;}
+      },
+      getMainManifest:async(relative,ref)=>{
+        if(ref!=='main'||
+          !/^approvals\/controller-orphan-six\/[a-f0-9]{64}\.json$/.test(relative??''))
+          throw coded('ORPHAN_SIX_B_MANIFEST_PATH_DENIED');
+        const result=await ghApi('contents/'+relative+'?ref=main');
+        if(result?.type!=='file'||result.path!==relative||
+          result.encoding!=='base64'||typeof result.content!=='string'||
+          result.content.length>32768)
+          throw coded('ORPHAN_SIX_B_MANIFEST_RESPONSE_INVALID');
+        const encoded=result.content.replace(/\s/g,'');
+        if(!/^[A-Za-z0-9+/]*={0,2}$/.test(encoded))
+          throw coded('ORPHAN_SIX_B_MANIFEST_RESPONSE_INVALID');
+        return Buffer.from(encoded,'base64');
+      },
+      getPullRequest:async(number)=>{
+        if(!Number.isSafeInteger(number)||number<=0)
+          throw coded('ORPHAN_SIX_B_PR_ID_DENIED');
+        return ghApi('pulls/'+number);
+      },
+      getOwnerEffectComments:async(issueNumber)=>{
+        if(!Number.isSafeInteger(issueNumber)||issueNumber<=0)
+          throw coded('ORPHAN_SIX_B_ISSUE_ID_DENIED');
+        const items=[];
+        for(let page=1;page<=11;page++){
+          const rows=await ghApi('issues/'+issueNumber+'/comments?per_page=100&page='+page);
+          if(!Array.isArray(rows)||rows.length>100||items.length+rows.length>1000)
+            throw coded('ORPHAN_SIX_B_COMMENTS_INCOMPLETE');
+          items.push(...rows);
+          if(rows.length<100)
+            return {source:'GITHUB_CANONICAL_ISSUE_COMMENTS_API',
+              complete:true,issueNumber,items};
+        }
+        throw coded('ORPHAN_SIX_B_COMMENTS_INCOMPLETE');
+      },
+      getInstalledReadback:async()=>{
+        const m=provenance(),ci=installedControllerBPolicy(m);
+        if(ci?.workflowId!==430972394||
+          ci.workflowBlobSha!=='27e48ecde81bdf6f15cccffcffd9b3e70482a5f3')
+          throw coded('ORPHAN_SIX_B_HELD_POLICY_DRIFT');
+        const host=JSON.parse(pinned(path.join(controlRoot,'host.json')).toString('utf8'));
+        if(!sha40(host?.controllerSourceSha)||!host.controllerFiles||
+          INSTALLABLE_FILES.some(relative=>!sha64(host.controllerFiles[relative])))
+          throw coded('ORPHAN_SIX_B_CONTROLLER_CAS_UNKNOWN');
+        for(const [relative,digest] of Object.entries(host.controllerFiles))
+          if(!INSTALLABLE_FILES.includes(relative)||!sha64(digest)||
+            sha256(pinned(path.join(controlRoot,relative),2000000))!==digest)
+            throw coded('ORPHAN_SIX_B_CONTROLLER_CAS_DRIFT');
+        const ordered=Object.keys(m.files).sort().map(relative=>[relative,m.files[relative]]);
+        return {origin:'PRIVATE_INDEPENDENT_B_MAINTAINER',
+          currentInstallVerified:true,sourceFilesVerified:true,
+          controllerBPolicyUnchangedVerified:true,
+          installedControllerSha:host.controllerSourceSha,
+          installedMaintainerSha:m.sourceSha,
+          maintenanceFilesSha256:sha256(Buffer.from(JSON.stringify(ordered)+'\n'))};
+      }
+    });
+  }
   const configuredOrphanSixPorts=enableOrphanSixCanonicalReadPorts
     ?canonicalOrphanSixReadPorts():orphanSixSourcePorts;
   async function updater(args){
