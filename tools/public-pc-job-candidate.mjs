@@ -12,7 +12,7 @@ const OWNER='ansqhd5774-Choi', OWNER_ID=327938088;
 // exact immutable relationship already produced by tools/update.mjs.
 function isPublicAReviewScope(issue,request){
  if(issue?.title==='pc-job')return request?.operation==='runner-smoke';
- if(typeof request?.requestId!=='string'||!/^pc-update-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-postcheck$/.test(request.requestId))return false;
+ if(typeof request?.requestId!=='string'||!/^pc-(?:update-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-postcheck$/.test(request.requestId))return false;
  const base=request.requestId.slice(0,-'-postcheck'.length);
  return issue?.title==='PC Update '+base+' postcheck'&&
    ['core-status','source-audit','fear-greed-archive-status'].includes(request.operation);
@@ -41,7 +41,7 @@ export function assessPublicPcJobCandidate({event,env}={}) {
   if(event?.sender?.id!==OWNER_ID||event.sender.login!==OWNER||
      issue?.user?.id!==OWNER_ID||issue.user.login!==OWNER||
      (issue.title!=='pc-job'&&
-      !/^PC Update pc-update-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12} postcheck$/.test(issue.title??''))||
+      !/^PC Update pc-(?:update-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12} postcheck$/.test(issue.title??''))||
      issue.state!=='open'||
      !Number.isSafeInteger(issue.number)||issue.number<=0||
      // GitHub 'issues' webhook identifies the Issue in issue.number;
