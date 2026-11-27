@@ -82,7 +82,7 @@ test('exact immutable raw B approval/PR is a CANDIDATE, never effect authority',
  assert.equal(a.canInstall,false);
  assert.equal(a.manifestRawSha256,sha(v.raw));
  assert.equal(a.approvalPrNumber,6200);
- assert.doesNotMatch(JSON.stringify(a),/pid|nonce|Runner\.Listener|1234-4234/);
+ assert.doesNotMatch(JSON.stringify(a),/pid|nonce|Runner\.Listener|51101/);
 });
 test('raw B manifest bytes and independent reviewed PR identity cannot drift',()=>{
  const v=sample();
