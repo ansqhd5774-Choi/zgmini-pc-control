@@ -1,0 +1,9 @@
+schema=ZGMINI_PC_RESULT_V1
+jobId=run-46057884020-1-seat-5
+requestId=pc-8a7e1169-3f55-49de-8825-78c464e2ba95
+operation=writer-install-preimage-readonly
+seat=5
+status=PASS
+code=PUBLIC_RESULT_CODE_REDACTED
+actualExecutionSha=555f95708984580cd7d5a0fd05a80b718e867710
+reportTransfer={"status":"SUMMARY_ONLY","code":"PUBLIC_REPOSITORY_REDACTED"}
