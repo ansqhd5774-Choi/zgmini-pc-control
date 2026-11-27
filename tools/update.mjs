@@ -1247,7 +1247,7 @@ const PUBLIC_LINEAGE_OWNER_B=Object.freeze({
  installed:'cde1dd372210e4658ae348cb9e2577967cb11634',
  target:'d3764580fdb08ecddd5f9b1064051eec30f90492',
  approvalPr:4302,
- approvalMerge:'PENDING_PR_4302_APPROVAL_MERGE',
+ approvalMerge:'b7b7eb92802d0e974ee3ad9a2d2689e37ae41bb4',
  selectiveBranch:'codex/controller-audit-4300-selective-20261128',
  paths:['controller/operations.mjs']
 });
