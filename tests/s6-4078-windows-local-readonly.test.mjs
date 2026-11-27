@@ -96,3 +96,24 @@ test('symlinked backlog cannot be read as authoritative source',t=>{
  fs.symlinkSync(replacement,original);
  const r=read(f.paths);assert.equal(r.code,'S6_4078_LOCAL_SOURCE_OR_CAS_UNVERIFIED');
 });
+
+test('journal mutation while reading backlog cannot pass as one S6 snapshot',t=>{
+ const f=fixture(t);
+ const journalPath=path.join(f.ledger,'journal.json');
+ const original=fs.readFileSync(journalPath,'utf8');
+ let backlogReads=0;
+ const io={
+  lstatSync:p=>fs.lstatSync(p),
+  readFileSync:p=>{
+   const bytes=fs.readFileSync(p);
+   if(p.endsWith('backlog.json')&&++backlogReads===2)
+    fs.writeFileSync(journalPath,original+' ');
+   return bytes;
+  }
+ };
+ const r=read({...f.paths,io});
+ assert.equal(r.status,'STATE_UNKNOWN');
+ assert.equal(r.code,'S6_LOCAL_CROSS_FILE_SNAPSHOT_CHANGED');
+ assert.equal(r.mutationAuthorized,false);
+ assert.equal(r.operationalWrites,0);
+});
