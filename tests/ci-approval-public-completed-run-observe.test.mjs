@@ -160,7 +160,7 @@ for(const [name,change] of [
 
 test('actual immutable main workflow bytes equal the reviewed pinned Git blob',async()=>{
  const {createHash}=await import('node:crypto');
- const h=createHash('sha1').update(Buffer.from('blob '+sourceBytes.length+' '))
+ const h=createHash('sha1').update(Buffer.from('blob '+sourceBytes.length))
   .update(Buffer.from([0])).update(sourceBytes).digest('hex');
  assert.equal(h,PIN);
 });
