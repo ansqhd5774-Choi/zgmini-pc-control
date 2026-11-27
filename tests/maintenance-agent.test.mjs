@@ -9,6 +9,7 @@ import {requireHandoffApproval,handoffFilePlan,nextRuntimeFiles} from "../tools/
 
 import {createMaintenanceAgent,failedUpdaterResult,normalizedResult,attachApprovedNativeBReceipt,parseS6NonzeroRecoveryReport} from "../tools/maintenance-agent.mjs";
 import {prepareMaintenanceIssue,submitExistingControllerApprovalFromCi} from '../tools/maintenance-request.mjs';
+import {readIndependentlyInstalledControllerBPublisherPolicy} from '../ci-approval/completed-run-intake.mjs';
 
 test('pre-install child rejection retains exact safe code and current installed SHA',()=>{
  const r=failedUpdaterResult({requestId:'fixture',targetControllerSha:'b'.repeat(40)},
@@ -1248,6 +1249,60 @@ test('public postcheck receiver handoff is exactly two source files with origina
 });
 
 
+
+
+test('Public publisher reads only independent installed 7-file grant and detects source drift',t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-ci-public-installed-read-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const files={};
+ for(const rel of nextRuntimeFiles){
+  const full=path.join(root,...rel.split('/'));
+  fs.mkdirSync(path.dirname(full),{recursive:true});
+  const bytes=Buffer.from('reviewed protected installed file '+rel+'\n');
+  fs.writeFileSync(full,bytes);
+  files[rel]=digest(bytes);
+ }
+ const installed={schema:'ZGMINI_PC_MAINTENANCE_INSTALL_V1',
+  sourceSha:'c'.repeat(40),startupSha256:'d'.repeat(64),files,
+  ciControllerBPolicy:{schema:'ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V2',
+   enabled:true,workflowId:430972394,
+   workflowBlobSha:'f'.repeat(40),
+   workflowPath:'.github/workflows/ci-approval-controller-b.yml',
+   repositoryVisibility:'public',
+   installedSha:INSTALLED,targetSha:TARGET,manifestSha256:'e'.repeat(64)}};
+ const manifestPath=path.join(root,'MAINTENANCE_INSTALL.json');
+ fs.writeFileSync(manifestPath,JSON.stringify(installed));
+ const result=readIndependentlyInstalledControllerBPublisherPolicy({installRoot:root});
+ assert.equal(result.ciControllerBPolicy.targetSha,TARGET);
+ assert.equal(Object.isFrozen(result),true);
+ const source=path.join(root,'tools','maintenance-agent.mjs');
+ fs.appendFileSync(source,'\n// tampered\n');
+ assert.throws(()=>readIndependentlyInstalledControllerBPublisherPolicy({installRoot:root}),
+  /CI_PUBLIC_PUBLISHER_INSTALLED_POLICY_UNVERIFIED/);
+ // Restoring fixture bytes is safe here; the operational files are untouched.
+ fs.writeFileSync(source,'reviewed protected installed file tools/maintenance-agent.mjs\n');
+ const v1=structuredClone(installed);
+ v1.ciControllerBPolicy={
+  schema:'ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V1',
+  enabled:true,workflowId:430972394,workflowBlobSha:'f'.repeat(40),
+  workflowPath:'.github/workflows/ci-approval-controller-b.yml'
+ };
+ fs.writeFileSync(manifestPath,JSON.stringify(v1));
+ assert.throws(()=>readIndependentlyInstalledControllerBPublisherPolicy({installRoot:root}),
+  /CI_PUBLIC_PUBLISHER_INSTALLED_POLICY_UNVERIFIED/);
+ fs.writeFileSync(manifestPath,JSON.stringify(installed));
+ fs.writeFileSync(source,'reviewed protected installed file tools/maintenance-agent.mjs\n');
+ assert.equal(readIndependentlyInstalledControllerBPublisherPolicy({installRoot:root})
+  .ciControllerBPolicy.repositoryVisibility,'public');
+ fs.rmSync(source);
+ try{
+  fs.symlinkSync(path.join(root,'tools','maintenance-contract.mjs'),source,'file');
+  assert.throws(()=>readIndependentlyInstalledControllerBPublisherPolicy({installRoot:root}),
+   /CI_PUBLIC_PUBLISHER_INSTALLED_POLICY_UNVERIFIED/);
+ }catch(e){
+  if(!['EPERM','EACCES','ENOTSUP'].includes(e?.code))throw e;
+ }
+});
 
 test('Public B publisher on hosted source CI is default-denied until exact installed policy',async()=>{
  const m=sampleRequest().manifest;
