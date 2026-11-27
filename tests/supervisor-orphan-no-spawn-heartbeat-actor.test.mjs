@@ -563,3 +563,54 @@ test('unfenced read-only six-seat candidate cannot publish first heartbeat',asyn
   a.stop();
  }
 });
+
+test('an earlier heartbeat commit callback stays revoked during later valid ticks',async()=>{
+ // Without the per-write token this old callback is falsely true whenever
+ // the NEXT tick sets busy=true. No operating files or processes are used.
+ let current=hex('c'),calls=0,firstCanCommit=null;
+ const a=createNoSpawnHeartbeatActor({
+  now:()=>t,
+  attest:async()=>({...sample(calls===0),heartbeatRawObservation:{
+   source:'PRIVATE_FIXED_STATUS_FILE_RAW_BYTES',sha256:current
+  }}),
+  writeStatus:async packet=>{
+   assert.equal(packet.canCommit(),true);
+   if(calls===0)firstCanCommit=packet.canCommit;
+   else{
+    assert.equal(firstCanCommit(),false,'the old CAS capability must never revive');
+    assert.notEqual(firstCanCommit,packet.canCommit);
+   }
+   calls++;
+   current=packet.nextRawSha256;
+   return {status:'EXACT_RAW_CAS_READBACK_VERIFIED',
+    expectedRawSha256:packet.expectedRawSha256,
+    readbackRawSha256:packet.nextRawSha256};
+  }
+ });
+ assert.equal((await a.tick()).status,'MONITORING');
+ assert.equal(firstCanCommit(),false,'a completed write callback must be revoked');
+ assert.equal((await a.tick()).status,'MONITORING');
+ assert.equal(firstCanCommit(),false);
+ assert.equal(calls,2);
+ a.stop();
+ assert.equal(firstCanCommit(),false);
+});
+
+test('a thrown heartbeat writer cannot retain a usable commit callback',async()=>{
+ let saved=null;
+ const a=createNoSpawnHeartbeatActor({
+  now:()=>t,
+  attest:async()=>({...sample(),heartbeatRawObservation:{
+   source:'PRIVATE_FIXED_STATUS_FILE_RAW_BYTES',sha256:hex('c')
+  }}),
+  writeStatus:async packet=>{
+   saved=packet.canCommit;
+   assert.equal(saved(),true);
+   throw Error('SYNTHETIC_WRITER_FAILURE');
+  }
+ });
+ assert.equal((await a.tick()).status,'FAIL_CLOSED');
+ assert.equal(saved(),false);
+ assert.equal((await a.tick()).status,'FAIL_CLOSED');
+ a.stop();
+});

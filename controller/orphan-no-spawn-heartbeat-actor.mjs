@@ -66,6 +66,9 @@ export function createNoSpawnHeartbeatActor({
  // status-file sha is a separate, rolling, exact raw-byte CAS. Reusing the
  // historical sha after our own heartbeat update would self-block forever.
  let baseline=null,expectedCurrentStatusSha=null,terminal=null,busy=false,timer=null;
+ // A previous heartbeat's canCommit closure must NEVER be reactivated just
+ // because a later tick has set busy=true. Fence each write by its own token.
+ let activeWriteToken=null;
  function halt(code){
   if(!terminal)terminal=fail(code);
   if(timer){clearInterval(timer);timer=null;}
@@ -131,13 +134,23 @@ export function createNoSpawnHeartbeatActor({
    const nextRawBytes=Buffer.from(JSON.stringify(heartbeat)+'\n','utf8');
    const nextRawSha256=hashBytes(nextRawBytes);
    const expectedRawSha256=last.currentHeartbeatSha;
-   const written=await writeStatus(Object.freeze({
-    schema:'ZGMINI_ORPHAN_EXACT_HEARTBEAT_CAS_WRITE_V1',
-    fixedFile:'SUPERVISOR_STATUS.json',
-    expectedRawSha256,nextRawSha256,
-    nextRawBytes,
-    canCommit:()=>!terminal&&busy===true
-   }));
+   // An asynchronous fixed-file writer may retain canCommit beyond its
+   // receipt. Only THIS individual write is eligible until it settles;
+   // no later heartbeat tick can revive an earlier authorization callback.
+   const writeToken={};
+   activeWriteToken=writeToken;
+   let written;
+   try{
+    written=await writeStatus(Object.freeze({
+     schema:'ZGMINI_ORPHAN_EXACT_HEARTBEAT_CAS_WRITE_V1',
+     fixedFile:'SUPERVISOR_STATUS.json',
+     expectedRawSha256,nextRawSha256,
+     nextRawBytes,
+     canCommit:()=>!terminal&&busy===true&&activeWriteToken===writeToken
+    }));
+   }finally{
+    if(activeWriteToken===writeToken)activeWriteToken=null;
+   }
    if(terminal)return terminal;
    if(written?.status!=='EXACT_RAW_CAS_READBACK_VERIFIED'||
       written?.expectedRawSha256!==expectedRawSha256||
