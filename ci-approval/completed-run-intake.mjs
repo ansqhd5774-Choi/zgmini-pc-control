@@ -48,7 +48,7 @@ export async function observeCompletedRun(event,{getRun,allowPublic=false}={}){
 // Approval records may be merged after source CI completes. Observe the
 // actual main publication as a second input to the SAME pipeline. Neither
 // publication nor CI success is authority by itself. No request IDs or POSTs.
-export async function observePublishedControllerApprovals(event,{getJson,allowPublic=false}={}){
+export async function observePublishedControllerApprovals(event,{getJson,allowPublic=false,publicEffectPin=null}={}){
  if(!sameRepo(event?.repository,allowPublic)||event.ref!=='refs/heads/main'||event.deleted!==false||
     event.forced!==false||!sha(event.before)||!sha(event.after)||event.before===event.after||
     /^0{40}$/.test(event.before)||/^0{40}$/.test(event.after))
@@ -64,6 +64,9 @@ export async function observePublishedControllerApprovals(event,{getJson,allowPu
   for(const file of diff.files){
    const match=typeof file?.filename==='string'&&file.filename.match(/^approvals\/controller-updates\/([a-f0-9]{40})\.json$/);
    if(!match)continue;
+   // The independent installed Public B policy authorizes one target only.
+   // Ignore unrelated approvals before any content or source CI API reads.
+   if(allowPublic&&sha(publicEffectPin)&&match[1]!==publicEffectPin)continue;
    const item={path:file.filename,targetSha:match[1],revision:after};
    if(file.status!=='added'||!sha(file.sha)){
     entries.push({...item,state:'EXISTING_APPROVAL_CHANGE_REQUIRES_REVIEW'});continue;
@@ -286,9 +289,11 @@ export function createControllerPublicationPorts({getJson,postIssue,store,autoAp
   ...(autoApprovalPolicy?{readAutoApprovalContext:createAutoApprovalContextReader({policy:autoApprovalPolicy,getJson,readJobLogs})}:{}),
  };
 }
-export async function publishExistingControllerApprovals(event,{getJson,ports,runId,attempt,emitReceipt,allowPublic=false}={}){
+export async function publishExistingControllerApprovals(event,{getJson,ports,runId,attempt,emitReceipt,allowPublic=false,publicEffectPin=null}={}){
  if(!id(runId)||!id(attempt)||typeof emitReceipt!=='function')throw Error('CI_PUBLICATION_RUN_INVALID');
- const seen=await observePublishedControllerApprovals(event,{getJson,allowPublic});
+ if(allowPublic&&!sha(publicEffectPin))
+  return {state:'EVIDENCE_MISSING',code:'CI_PUBLIC_EFFECT_PIN_REQUIRED',results:[]};
+ const seen=await observePublishedControllerApprovals(event,{getJson,allowPublic,publicEffectPin});
  if(seen.state!=='APPROVAL_PUBLICATION_OBSERVED_ONLY')return {state:seen.state,code:seen.reason,results:[]};
  const results=[];
  for(const entry of seen.entries){
@@ -320,7 +325,7 @@ export async function publishExistingControllerApprovals(event,{getJson,ports,ru
  * receiver workflow pin are deliberately unchanged until their exact approved
  * B installation. This observer has no write ports or authority.
  */
-export async function observeLateOwnerMergedControllerApproval(event,{getJson,allowPublic=false}={}){
+export async function observeLateOwnerMergedControllerApproval(event,{getJson,allowPublic=false,publicEffectPin=null}={}){
  if(typeof getJson!=='function')
   return out('EVIDENCE_MISSING','AUTHENTICATED_READ_PORT_REQUIRED');
  const observed=await observeCompletedRun(event,{
@@ -359,6 +364,9 @@ export async function observeLateOwnerMergedControllerApproval(event,{getJson,al
     file.filename.match(/^approvals\/controller-updates\/([a-f0-9]{40})\.json$/);
    if(!match)continue;
    const targetSha=match[1];
+   // A shared CI run may cover multiple PRs. One installed Public B grant
+   // cannot turn another target's pending/invalid approval into global failure.
+   if(allowPublic&&sha(publicEffectPin)&&targetSha!==publicEffectPin)continue;
    if(file.status!=='added'||!sha(file.sha))
     return out('EVIDENCE_MISSING','OWNER_APPROVAL_PR_FILE_CHANGED');
    try{
@@ -403,11 +411,13 @@ export async function observeLateOwnerMergedControllerApproval(event,{getJson,al
  * if the earlier main push already submitted the same effect.
  */
 export async function publishLateOwnerMergedControllerApproval(event,{
- getJson,ports,runId,attempt,emitReceipt,allowPublic=false
+ getJson,ports,runId,attempt,emitReceipt,allowPublic=false,publicEffectPin=null
 }={}){
  if(!id(runId)||!id(attempt)||typeof emitReceipt!=='function')
   throw Error('CI_PUBLICATION_RUN_INVALID');
- const seen=await observeLateOwnerMergedControllerApproval(event,{getJson,allowPublic});
+ if(allowPublic&&!sha(publicEffectPin))
+  return {state:'EVIDENCE_MISSING',code:'CI_PUBLIC_EFFECT_PIN_REQUIRED',results:[]};
+ const seen=await observeLateOwnerMergedControllerApproval(event,{getJson,allowPublic,publicEffectPin});
  if(seen.state!=='OWNER_APPROVAL_RUN_OBSERVED_ONLY')
   return {state:seen.state,code:seen.reason,results:[]};
  const results=[];
@@ -667,7 +677,7 @@ export async function main({eventPath=process.env.GITHUB_EVENT_PATH,token=proces
   // Public may interpret an event ONLY after the independent Windows grant
   // and running publisher identity are already verified. Check before any PR
   // staging, Issue POST, or durable effect receipt claim.
-  let allowPublic=false;
+  let allowPublic=false,publicEffectPin=null;
   if(event?.repository?.private===false){
    try{
     const live=await getJson('');
@@ -688,6 +698,7 @@ export async function main({eventPath=process.env.GITHUB_EVENT_PATH,token=proces
     if(policy?.installPlan)
      return {state:'DISABLED',code:'CI_PUBLIC_APPROVAL_STAGING_NOT_AUTHORIZED',results:[]};
     allowPublic=true;
+    publicEffectPin=grant.targetSha;
    }catch{
     return {state:'EVIDENCE_MISSING',code:'CI_PUBLICATION_PUBLIC_GATE_UNVERIFIED',results:[]};
    }
@@ -698,7 +709,7 @@ export async function main({eventPath=process.env.GITHUB_EVENT_PATH,token=proces
    autoApprovalPolicy:allowPublic?null:initialControllerPublicationPolicy(policy),readJobLogs,
    putMerge:(n,body)=>github('pulls/'+n+'/merge',body,'PUT')});
   const opts={getJson,ports,runId:Number(process.env.GITHUB_RUN_ID),
-   attempt:Number(process.env.GITHUB_RUN_ATTEMPT),allowPublic,
+   attempt:Number(process.env.GITHUB_RUN_ATTEMPT),allowPublic,publicEffectPin,
    emitReceipt:marker=>console.log(marker)};
   if(policy&&!allowPublic){
    const stageApprovalPr=policy.installPlan?async()=>{
