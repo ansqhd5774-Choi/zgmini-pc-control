@@ -106,6 +106,12 @@ export async function runOrphanSixGracefulB({
    if(!originalPin)fail('ORPHAN_SIX_PIN_MISSING');
    const first=await port.attestPreSignal({seat,proposalId:proposal.proposalId});
    verifyPresignal(first,seat,proposal.proposalId,now());
+   // Reject an already changed instance BEFORE recording an irreversible
+   // stop intent. Repeat this identity check after the durable CAS below.
+   if(first.oldInstancePid!==originalPin.pid||
+      first.oldInstanceBirth!==originalPin.startedAtUtc||
+      first.oldInstancePathSha256!==originalPin.canonicalPathSha256)
+    fail('ORPHAN_SIX_PRESIGNAL_IDENTITY_CHANGED');
    // Prepare a candidate; only the following actual journal.commit/readback
    // makes it a DURABLE intent. No signal can precede that verified commit.
    const proposed=sourceStep(last,'DURABLE_STOP_INTENT',{
