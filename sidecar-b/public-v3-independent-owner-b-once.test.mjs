@@ -71,7 +71,7 @@ test('future strictly approved evidence is still preflight only, not an executio
 });
 test('sidecar operation reuses existing exact CAS backup rollback adapter but not Private B admission',()=>{
  const s=fs.readFileSync(new URL('./public-v3-independent-owner-b-once.mjs',import.meta.url),'utf8');
- assert.match(s,/applyOneFile\(manifest,verifiedCandidate,io\)/);
+ assert.match(s,/applyOneFile\(manifest,verifiedCandidate,trackedIO\)/);
  assert.match(s,/createOperatingSidecarProbe/);
  assert.match(s,/createWindowsSidecarIO/);
  assert.match(s,/awaitNaturalSidecarIdle/);
