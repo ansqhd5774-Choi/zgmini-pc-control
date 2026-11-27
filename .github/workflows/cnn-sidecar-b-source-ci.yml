@@ -49,3 +49,29 @@ jobs:
           node --check sidecar-b/entry.mjs
           node --check sidecar-b/report.mjs
           node --test sidecar-b/*.test.mjs
+
+  # Public repository: source-only tests on a disposable GitHub-hosted VM.
+  # No self-hosted PC, deployment secrets, approval or B installation effects.
+  public-source-only:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == false &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login == 'ansqhd5774-Choi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify fail-closed Sidecar B source and negative regressions
+        run: |
+          node --check sidecar-b/contract.mjs
+          node --check sidecar-b/pinned-candidate.mjs
+          node --check sidecar-b/admission.mjs
+          node --check sidecar-b/trusted-approval.mjs
+          node --test sidecar-b/*.test.mjs
