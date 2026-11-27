@@ -1407,6 +1407,34 @@ test('verified Public B never enters configured approval PR merge before exact O
  assert.equal(reads,0);assert.equal(merges,0);assert.equal(posts,0);assert.equal(stages,0);
 });
 
+
+test('new Public B submission branch is separately opt-in and bound to installed Windows B pin',()=>{
+ const workflow=fs.readFileSync(new URL('../.github/workflows/ci-approval-controller-b.yml',import.meta.url),'utf8');
+ const section=workflow.slice(workflow.indexOf('  submit-controller-b:'));
+ const trigger=workflow.slice(0,workflow.indexOf('\npermissions:'));
+ assert.match(section,/vars\.ZGMINI_CI_CONTROLLER_B_ENABLED == 'true'/);
+ assert.match(section,/github\.event\.repository\.private == true/);
+ assert.match(section,/github\.event\.repository\.private == false/);
+ assert.match(section,/vars\.ZGMINI_CI_CONTROLLER_B_PUBLIC_EFFECT_APPROVED == 'true'/);
+ assert.match(section,/github\.event\.workflow_run\.workflow_id == 416355595/);
+ assert.match(section,/github\.event\.workflow_run\.conclusion == 'success'/);
+ assert.match(section,/github\.event\.workflow_run\.head_repository\.id == 1442936296/);
+ assert.match(section,/ref: 62249e557c63f9b641b22cdd2213a71a88470d6e/);
+ assert.match(section,/runs-on: \[self-hosted, Windows, X64, zgmini-handoff-ci-isolated\]/);
+ assert.match(section,/persist-credentials: false/);
+ assert.match(section,/run: node ci-approval\/completed-run-intake\.mjs --publish-existing/);
+ assert.doesNotMatch(trigger,/workflow_dispatch:|schedule:|pull_request:/);
+ // This flag merely permits the hosted workflow to reach its fixed caller.
+ // Windows itself must have a separately approved exact V2 one-effect grant.
+ const publisher=fs.readFileSync(new URL('../ci-approval/completed-run-intake.mjs',import.meta.url),'utf8');
+ assert.match(publisher,/readIndependentlyInstalledControllerBPublisherPolicy\(\)/);
+ assert.match(publisher,/readAuthenticatedControllerBPublisherWorkflow\(\{getJson\}\)/);
+ assert.match(publisher,/publicEffectPin=grant\.targetSha/);
+ const receiver=fs.readFileSync(new URL('../tools/maintenance-agent.mjs',import.meta.url),'utf8');
+ assert.match(receiver,/PUBLIC_B_EFFECT_SEPARATE_AUTH_REQUIRED/);
+ assert.match(receiver,/installedControllerBPolicy\(JSON\.parse\(fs\.readFileSync/);
+});
+
 test('Public source event stays Private-only by default but is observable with verified caller scope',async()=>{
  const repo={id:1442936296,full_name:REPO,private:false};
  const run={id:45623579994,run_attempt:1,workflow_id:416355595,
