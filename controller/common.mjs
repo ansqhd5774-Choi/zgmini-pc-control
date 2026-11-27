@@ -81,6 +81,30 @@ export function attestOwnerPcJobEvent(event,env,policy){
   ownerVerified:true,prCodeAllowed:false});
 }
 
+// The public Issues transport may publish a status receipt, never the local
+// Worker result, provenance inventory, installation paths or private DB details.
+// Keep complete results on the operating PC; this is not a data publication API.
+export function publicPcReportProjection(report){
+ need(report?.schema==='ZGMINI_PC_RESULT_V1'&&
+  typeof report.jobId==='string'&&
+  /^run-[0-9]{1,20}-[0-9]{1,3}-seat-[1-6]$/.test(report.jobId),
+  'PUBLIC_REPORT_SCOPE_UNVERIFIED');
+ const safe=(value,pattern)=>typeof value==='string'&&pattern.test(value)?value:null;
+ const status=['PASS','FAIL','BLOCKED','STATE_UNKNOWN'].includes(report.status)?
+  report.status:'BLOCKED';
+ const code=safe(report.code,/^[A-Z][A-Z0-9_]{2,100}$/)??'PUBLIC_RESULT_CODE_REDACTED';
+ return Object.freeze({
+  schema:'ZGMINI_PC_RESULT_V1',jobId:report.jobId,
+  requestId:safe(report.requestId,/^[a-z0-9][a-z0-9-]{7,79}$/),
+  operation:safe(report.operation,/^[a-z0-9][a-z0-9-]{1,79}$/),
+  seat:Number.isSafeInteger(report.seat)&&report.seat>=1&&report.seat<=6?
+   report.seat:null,
+  status,code,
+  actualExecutionSha:safe(report.actualExecutionSha,/^[a-f0-9]{40}$/),
+  reportTransfer:{status:'SUMMARY_ONLY',code:'PUBLIC_REPOSITORY_REDACTED'}
+ });
+}
+
 export function validateRequest(request,policy){
  need(request&&typeof request==='object'&&!Array.isArray(request),'REQUEST_OBJECT');
  const keys=['schema','requestId','chatId','operation','sourceRepository','sourceBranch','sourceSha'];
