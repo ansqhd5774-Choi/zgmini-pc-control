@@ -45,6 +45,32 @@ test('owner public issue becomes a read-only candidate and never a PC authorizat
   assert.equal(JSON.stringify(r).includes(s.event.issue.body),false);
 });
 
+test('hosted observer accepts fixed no-write grade-A CNN and core-status without granting authority',()=>{
+ for(const operation of ['cnn-public-d1-api-readback-readonly','core-status']){
+  const s=good(),request=JSON.parse(s.event.issue.body);
+  request.operation=operation;
+  s.event.issue.body=JSON.stringify(request);
+  const out=assessPublicPcJobCandidate(s);
+  assert.equal(out.status,'CANDIDATE_ONLY');
+  assert.equal(out.code,'PUBLIC_PC_JOB_READONLY_CANDIDATE');
+  assert.equal(out.executionAuthorized,false);
+  assert.equal(out.selfHostedAuthorized,false);
+  assert.equal(out.controllerBAuthorized,false);
+  assert.equal(out.approvalVerified,false);
+  assert.equal(out.operationalWrites,0);
+  assert.equal(out.sourceOnly,true);
+  assert.equal(out.requestDigest,
+   createHash('sha256').update(s.event.issue.body).digest('hex'));
+ }
+ for(const operation of ['controller-update','writer-source-install',
+  'unknown-grade-a-operation','runner-smoke;cmd']){
+  const s=good(),request=JSON.parse(s.event.issue.body);
+  request.operation=operation;
+  s.event.issue.body=JSON.stringify(request);
+  deny(s,'PUBLIC_PC_JOB_CONTRACT_DENIED');
+ }
+});
+
 test('official issues opened webhook may omit redundant top-level number without weakening Issue identity',()=>{
  const sample=good();
  delete sample.event.number;
