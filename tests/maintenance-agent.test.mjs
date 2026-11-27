@@ -1422,7 +1422,7 @@ test('new Public B submission branch is separately opt-in and bound to installed
  assert.match(section,/name: Checkout existing Private B source pin\s+if: github\.event\.repository\.private == true/);
  assert.match(section,/ref: cfe57f3d720219613c87eff21338de0d35edbf6b/);
  assert.match(section,/name: Checkout separately approved Public B candidate source pin\s+if: github\.event\.repository\.private == false/);
- assert.match(section,/ref: 25c300b8a13da5b269b05c76039d077710c66287/);
+ assert.match(section,/ref: 4d3fe664a90f2e8c3dea885559b1ec263df66a24/);
  assert.match(section,/runs-on: \[self-hosted, Windows, X64, zgmini-handoff-ci-isolated\]/);
  assert.match(section,/persist-credentials: false/);
  assert.match(section,/run: node ci-approval\/completed-run-intake\.mjs --publish-existing/);
