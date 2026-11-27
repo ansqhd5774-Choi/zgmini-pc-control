@@ -15,17 +15,30 @@ jobs:
   approved-pc-job:
     if: >-
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
-      github.event.repository.private == true &&
+      github.event.repository.id == 1442936296 &&
+      github.event.repository.owner.id == 327938088 &&
+      github.event_name == 'issues' &&
+      github.ref == 'refs/heads/main' &&
+      github.workflow_ref == 'ansqhd5774-Choi/zgmini-pc-control/.github/workflows/pc-job.yml@refs/heads/main' &&
+      github.run_attempt == 1 &&
       github.actor == 'ansqhd5774-Choi' &&
+      github.actor_id == 327938088 &&
+      github.event.sender.login == 'ansqhd5774-Choi' &&
+      github.event.sender.id == 327938088 &&
       github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.user.id == 327938088 &&
+      github.event.issue.title == 'pc-job' &&
+      github.event.issue.pull_request == null &&
       contains(github.event.issue.labels.*.name, 'pc-job') &&
       (github.event.action == 'opened' ||
        (github.event.action == 'labeled' &&
         github.event.label.name == 'pc-job' &&
         vars.ZGMINI_PC_JOB_LATE_LABEL_ENABLED == 'true'))
-    # Late-label entry is opt-in only after matching fixed Controller and
-    # preimage stager hashes have been installed and verified on operating PC.
-    # Owner-opened pc-job requests retain the existing admission behavior.
+    # Public visibility is not authorization: immutable repo/owner identity,
+    # authenticated owner-created Issue and fixed main Workflow are required.
+    # No PR trigger or checkout. The installed Controller independently checks
+    # the identical origin and permits A grade only on Public.
+    # Late-label entry remains opt-in; duplicate claims are not replayed.
     runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
     timeout-minutes: 8
     defaults:
