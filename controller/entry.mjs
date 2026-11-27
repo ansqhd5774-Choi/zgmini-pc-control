@@ -1,4 +1,4 @@
-import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';import {need,writeJson,errorCode,digest,validateRequest,assertSupervisorOwner,publicJobLogEnvelope} from './common.mjs';
+import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';import {need,writeJson,errorCode,digest,validateRequest,assertSupervisorOwner,attestOwnerPcJobEvent,publicJobLogEnvelope} from './common.mjs';
 const controller=path.dirname(fileURLToPath(import.meta.url)),root=path.dirname(controller);
 let policy,event,importFailureStage='EVENT_OR_REQUEST_VALIDATION';
 const seat=Number(process.env.RUNNER_NAME?.match(/^zgmini-pc-0([1-6])$/)?.[1]);const runId=process.env.GITHUB_RUN_ID,attempt=Number(process.env.GITHUB_RUN_ATTEMPT||1);
@@ -41,13 +41,15 @@ try{
  for(const [rel,sha] of Object.entries(host.controllerFiles))need(digest(fs.readFileSync(path.join(root,rel)))===sha,'CONTROLLER_SOURCE_DRIFT');
  // Guard new work at installed, standby-attested Controller entry only.
  assertSupervisorOwner(root,host);
- need(process.env.GITHUB_REPOSITORY===policy.controlRepository&&event.repository?.private===true,'CONTROL_REPOSITORY_OR_VISIBILITY');
- need(policy.allowedActors.includes(process.env.GITHUB_ACTOR),'ACTOR_NOT_ALLOWED');const validEvent=event.action==='opened' ||
-  (event.action==='labeled'&&event.label?.name==='pc-job');
- need(process.env.GITHUB_EVENT_NAME==='issues'&&validEvent,'EVENT_NOT_ALLOWED');
- need(event.issue?.user?.login==='ansqhd5774-Choi','REQUEST_OWNER_NOT_ALLOWED');
- need(event.issue?.labels?.some(x=>x.name==='pc-job'),'REQUEST_LABEL_REQUIRED');need(!event.issue.pull_request,'PULL_REQUEST_NOT_ALLOWED');
+ const admitted=attestOwnerPcJobEvent(event,process.env,policy);
+ need(policy.allowedActors.includes(process.env.GITHUB_ACTOR),'ACTOR_NOT_ALLOWED');
  const raw=validateRequest(JSON.parse(event.issue.body),policy);
+ // Public source + owner-authenticated Issues is only an A-grade transport.
+ // No generic B effect, source upload, mutation or unbounded replay is admitted.
+ if(admitted.visibility==='PUBLIC')
+  need(policy.operations[raw.operation]?.grade==='A'&&
+   policy.mutationsEnabled===false&&policy.maxAutomaticRetries===0,
+   'PUBLIC_A_ONLY_POLICY_UNVERIFIED');
  if(Object.hasOwn(raw,'preimageManifestPath'))need([
   'controller/preimage-manifest-stager.mjs',
   'controller/preimage-manifest-contract.mjs'].every(x=>
@@ -71,7 +73,5 @@ try{
 }catch(error){
  const missingModule=error?.code==='ERR_MODULE_NOT_FOUND'||error?.code==='MODULE_NOT_FOUND';
  const code=missingModule?'CONTROLLER_IMPORT_MISSING':errorCode(error);
- writeJson(pointer,{issueNumber:event?.issue?.number,report:{schema:'ZGMINI_PC_RESULT_V1',jobId:`run-${runId}-${attempt}-seat-${seat}`,status:'BLOCKED',code,lastPass:'EVENT_RECEIVED',firstFail:missingModule?importFailureStage:code==='CONTROLLER_HOST_MANIFEST_UNAVAILABLE'?'HOST_MANIFEST_READ':'EVENT_OR_REQUEST_VALIDATION',operationalWrites:0,providerCalls:0,d1Writes:0}});// Any failure may occur *before* GitHub event origin is authenticated.
- // Never disclose its raw diagnostic code in a public Actions log.
- // The exact original code remains in the fixed local BLOCKED pointer.
+ writeJson(pointer,{issueNumber:event?.issue?.number,report:{schema:'ZGMINI_PC_RESULT_V1',jobId:`run-${runId}-${attempt}-seat-${seat}`,status:'BLOCKED',code,lastPass:'EVENT_RECEIVED',firstFail:missingModule?importFailureStage:code==='CONTROLLER_HOST_MANIFEST_UNAVAILABLE'?'HOST_MANIFEST_READ':'EVENT_OR_REQUEST_VALIDATION',operationalWrites:0,providerCalls:0,d1Writes:0}});// Before event trust is proven, the failure code is PC-local evidence only.
  console.log(JSON.stringify(publicJobLogEnvelope({status:'BLOCKED',code},false)));process.exitCode=1;}
