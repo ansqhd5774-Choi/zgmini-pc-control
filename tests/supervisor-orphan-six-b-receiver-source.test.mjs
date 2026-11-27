@@ -301,6 +301,37 @@ test('fresh decision blocks changed raw manifest or merged PR, never allows OS a
  assert.equal((await freshSeat(invalid,1,{expectedRequestId:originalRequestId})).code,
   'ORPHAN_SIX_FRESH_DECISION_REQUEST_PIN_CHANGED');
 });
+test('duplicate raw Issue ID is blocked at initial and fresh seat B approval boundaries',async()=>{
+ const f=sample();
+ const initial=await receive(f);
+ assert.equal(initial.status,'CANDIDATE_ONLY');
+ const first=await freshSeat(f,1);
+ assert.equal(first.status,'CANDIDATE_ONLY');
+ // A modified raw Issue body may parse last-key-wins to a valid request,
+ // but neither admission nor any later seat may trust that ambiguous JSON.
+ f.issue.body=f.issue.body.replace(
+  '"requestId":','"requestId":"pc-ffffffff-ffff-ffff-ffff-ffffffffffff","requestId":');
+ const after=await receive(f);
+ assert.equal(after.code,'ORPHAN_SIX_B_REQUEST_UNVERIFIED');
+ const second=await freshSeat(f,2);
+ assert.equal(second.code,'ORPHAN_SIX_FRESH_DECISION_REQUEST_UNVERIFIED');
+ assert.equal(second.operationalWrites,0);
+ assert.equal(second.runnerStopAuthorized,false);
+});
+test('fresh seat B approval rejects trailing comma and malformed raw token',async()=>{
+ for(const change of [
+  raw=>raw.slice(0,-1)+',}',
+  raw=>raw.slice(0,-1)+',"unexpected":"x"}',
+  raw=>raw+'{}'
+ ]){
+  const f=sample();
+  f.issue.body=change(f.issue.body);
+  const r=await freshSeat(f,2);
+  assert.equal(r.code,'ORPHAN_SIX_FRESH_DECISION_REQUEST_UNVERIFIED');
+  assert.equal(f.calls.length,0);
+ }
+});
+
 test('fresh decision refuses missing seat/journal/proposal pins before any canonical reads',async()=>{
  const f=sample();
  for(const override of [{seat:0},{seat:7},{proposalId:'bad'},
