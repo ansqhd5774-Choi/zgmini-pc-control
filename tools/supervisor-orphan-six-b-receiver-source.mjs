@@ -159,3 +159,76 @@ export async function receiveOrphanSixBApprovalSource({
   return positive(candidate);
  }catch{return deny('ORPHAN_SIX_B_APPROVAL_OR_INSTALLED_READBACK_UNKNOWN');}
 }
+
+/**
+ * Source-only, per-seat FRESH owner decision review, designed for the
+ * independently installed B maintainer's private callback boundary.
+ *
+ * This must run after a durable STOP_INTENT readback, once PER seat, reading
+ * the canonical GitHub PR, full Issue comments and exact manifest raw bytes
+ * again. A prior approved candidate must NOT be used as a cached decision.
+ * Its return remains CANDIDATE_ONLY: no source callback can grant Windows
+ * Runner/Watchdog/lease authority or produce the private B decision receipt.
+ */
+export async function recheckOrphanSixFreshOwnerEffectSource({
+ issue,seat,proposalId,expectedJournalSha256,
+ expectedRequestId,expectedManifestRawSha256,
+ getMainManifest,getPullRequest,getOwnerEffectComments
+}={}){
+ if(!exactlyOwnerLabel(issue)||!Number.isInteger(seat)||seat<1||seat>6||
+    !sha64(proposalId)||!sha64(expectedJournalSha256)||
+    !sha64(expectedManifestRawSha256)||
+    typeof expectedRequestId!=='string'||
+    [getMainManifest,getPullRequest,getOwnerEffectComments]
+      .some(f=>typeof f!=='function'))
+  return deny('ORPHAN_SIX_FRESH_DECISION_CONTEXT_UNVERIFIED');
+ let request;
+ try{request=validateOrphanSixBRequest(JSON.parse(issue.body),{actor:owner,repo});}
+ catch{return deny('ORPHAN_SIX_FRESH_DECISION_REQUEST_UNVERIFIED');}
+ if(request.requestId!==expectedRequestId||
+    request.approvalManifestSha256!==expectedManifestRawSha256)
+  return deny('ORPHAN_SIX_FRESH_DECISION_REQUEST_PIN_CHANGED');
+ try{
+  const rel='approvals/controller-orphan-six/'+expectedManifestRawSha256+'.json';
+  const raw=await getMainManifest(rel,'main');
+  if(!Buffer.isBuffer(raw)||raw.length<2||raw.length>16384||
+     digest(raw)!==expectedManifestRawSha256)
+   return deny('ORPHAN_SIX_FRESH_DECISION_MANIFEST_CAS_CHANGED');
+  let manifest;
+  try{manifest=JSON.parse(raw.toString('utf8'));}catch{
+   return deny('ORPHAN_SIX_FRESH_DECISION_MANIFEST_INVALID');
+  }
+  const m=/^https:\/\/github\.com\/ansqhd5774-Choi\/zgmini-pc-control\/pull\/([1-9]\d*)$/
+   .exec(manifest?.approval?.ref??'');
+  if(!m)return deny('ORPHAN_SIX_FRESH_DECISION_PR_IDENTITY_UNVERIFIED');
+  const number=Number(m[1]);
+  if(!Number.isSafeInteger(number)||number<1)
+   return deny('ORPHAN_SIX_FRESH_DECISION_PR_IDENTITY_UNVERIFIED');
+  // Mandatory fresh, independent canonical reads for EACH seat. Their
+  // origin and freshness at effect time remain the private B's obligation.
+  const [pr,comments]=await Promise.all([
+    getPullRequest(number),getOwnerEffectComments(issue.number)
+  ]);
+  if(!pinnedMergedSource(pr,number,manifest?.approval?.reviewedSourceSha))
+   return deny('ORPHAN_SIX_FRESH_DECISION_MERGED_PR_UNVERIFIED');
+  if(!ownerExactBEffectDecision(comments,issue,request,manifest,pr))
+   return deny('ORPHAN_SIX_FRESH_DECISION_LATEST_OWNER_APPROVAL_UNVERIFIED');
+  const checked=validateOrphanSixBManifest(request,raw,{
+   actor:owner,repo,approvalPr:{
+    number,state:pr.state,merged:pr.merged,headSha:pr.head.sha,
+    baseRepo:pr.base.repo.full_name,ownerExactEffectApproved:true
+   }
+  });
+  if(checked.status!=='CANDIDATE_ONLY')
+   return deny('ORPHAN_SIX_FRESH_DECISION_SOURCE_CAS_UNVERIFIED');
+  return Object.freeze({
+   ...deny('ORPHAN_SIX_FRESH_DECISION_REVIEW_ONLY'),
+   status:'CANDIDATE_ONLY',requestId:request.requestId,
+   seat,proposalId,manifestRawSha256:expectedManifestRawSha256,
+   intentReadbackSha256:expectedJournalSha256,
+   nextAction:'PRIVATE_INSTALLED_B_MUST_REATTEST_FULL_CANONICAL_SOURCE_AND_FENCE_AT_SIGNAL'
+  });
+ }catch{
+  return deny('ORPHAN_SIX_FRESH_DECISION_READBACK_UNKNOWN');
+ }
+}
