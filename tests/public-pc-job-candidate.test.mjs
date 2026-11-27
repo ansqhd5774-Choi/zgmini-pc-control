@@ -179,3 +179,15 @@ test('public-capable PC job has no raw stdout or unprojected Issue headline',()=
  const op=job.split('  approved-pc-job:')[1]?.split('  public-readonly-intake:')[0];
  assert.match(op??'',/github\.event\.repository\.private == true/);
 });
+
+
+test('pre-admission Controller failure cannot reveal full diagnostic in Public Actions stdout',async()=>{
+ const {publicJobLogEnvelope}=await import('../controller/common.mjs');
+ const entry=fs.readFileSync(new URL('../controller/entry.mjs',import.meta.url),'utf8');
+ assert.doesNotMatch(entry,/console\.log\(JSON\.stringify\(\{status:'BLOCKED',code\}\)\)/);
+ assert.match(entry,/publicJobLogEnvelope\(\{status:'BLOCKED',code\},false\)/);
+ const secret='PRIVATE_CODE_THAT_MATCHES_VALID_UPPERCASE';
+ const publicResult=publicJobLogEnvelope({status:'BLOCKED',code:secret},false);
+ assert.deepEqual(publicResult,{status:'BLOCKED',code:'PUBLIC_LOCAL_RESULT_REDACTED'});
+ assert.doesNotMatch(JSON.stringify(publicResult),/PRIVATE_CODE_THAT_MATCHES_VALID_UPPERCASE/);
+});
