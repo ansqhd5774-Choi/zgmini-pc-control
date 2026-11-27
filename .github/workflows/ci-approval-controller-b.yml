@@ -44,18 +44,25 @@ jobs:
   submit-controller-b:
     name: submit-controller-b
     # Operational activation remains separate from source review and CI PASS.
+    # A Public B activation flag is NOT an approval: the fixed publisher and
+    # independent Windows maintenance receiver still require a separate,
+    # installed, exact one-effect V2 policy and original source/Run/Job receipt.
     # No pull_request, workflow_dispatch, schedule, or arbitrary target input.
     if: >-
       vars.ZGMINI_CI_CONTROLLER_B_ENABLED == 'true' &&
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
       github.event.repository.id == 1442936296 &&
-      github.event.repository.private == true &&
+      ((github.event.repository.private == true) ||
+       (github.event.repository.private == false &&
+        vars.ZGMINI_CI_CONTROLLER_B_PUBLIC_EFFECT_APPROVED == 'true')) &&
       github.ref == 'refs/heads/main' &&
       ((github.event_name == 'push' &&
         github.event.forced == false &&
         github.event.deleted == false) ||
        (github.event_name == 'workflow_run' &&
-        vars.ZGMINI_CI_CONTROLLER_B_POLICY != '' &&
+        (github.event.repository.private == false ||
+         vars.ZGMINI_CI_CONTROLLER_B_POLICY != '') &&
+        github.event.workflow_run.workflow_id == 416355595 &&
         github.event.workflow_run.event == 'pull_request' &&
         github.event.workflow_run.conclusion == 'success' &&
         github.event.workflow_run.head_repository.id == 1442936296))
@@ -79,9 +86,20 @@ jobs:
     steps:
       # Pin all transitive publisher source at the reviewed commit, not at the
       # event's main revision, candidate PR or mutable branch.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      # Do not replace the existing independently approved Private B source.
+      # Each checkout is a literal immutable source pin, selected only by
+      # GitHub's repository visibility, never by event/PR/Issue input.
+      - name: Checkout existing Private B source pin
+        if: github.event.repository.private == true
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: cfe57f3d720219613c87eff21338de0d35edbf6b
+          persist-credentials: false
+      - name: Checkout separately approved Public B candidate source pin
+        if: github.event.repository.private == false
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 4d3fe664a90f2e8c3dea885559b1ec263df66a24
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:

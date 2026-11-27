@@ -285,7 +285,7 @@ test('submission workflow is activation-gated, source-event driven and pinned to
  assert.match(y,/vars\.ZGMINI_CI_CONTROLLER_B_ENABLED == 'true'/);
  assert.match(y,/name: submit-controller-b/);
  assert.match(y,/name: Record Controller B request receipt/);
- // Only the fixed PR #3963 3/3-green merged publisher source is a candidate.
+ // Only an exact reviewed source commit may be checked out by this B publisher.
  // Activation requires an independently installed exact workflow policy pin.
  assert.match(y,/ref: cfe57f3d720219613c87eff21338de0d35edbf6b\s+persist-credentials: false/);
  assert.match(y,/run: node ci-approval\/completed-run-intake\.mjs --publish-existing/);
@@ -297,6 +297,31 @@ test('submission workflow is activation-gated, source-event driven and pinned to
  assert.match(y,/contents: write/);
  assert.match(y,/pull-requests: write/);
  assert.doesNotMatch(y,/id-token: write|administration: write|persist-credentials: true/);
+});
+
+
+test('separate Public B activation flag never authorizes uninstalled effect or bypasses fixed source',()=>{
+ const y=readFileSync(new URL('../.github/workflows/ci-approval-controller-b.yml',import.meta.url),'utf8');
+ const pub=y.slice(y.indexOf('  submit-controller-b:'),y.indexOf('    permissions:',y.indexOf('  submit-controller-b:')));
+ assert.match(pub,/vars\.ZGMINI_CI_CONTROLLER_B_ENABLED == 'true'/);
+ assert.match(pub,/github\.event\.repository\.private == true/);
+ assert.match(pub,/github\.event\.repository\.private == false/);
+ assert.match(pub,/vars\.ZGMINI_CI_CONTROLLER_B_PUBLIC_EFFECT_APPROVED == 'true'/);
+ assert.match(y,/name: Checkout existing Private B source pin\s+if: github\.event\.repository\.private == true\s+uses: actions\/checkout@[a-f0-9]{40}\s+with:\s+ref: cfe57f3d720219613c87eff21338de0d35edbf6b/);
+ assert.match(y,/name: Checkout separately approved Public B candidate source pin\s+if: github\.event\.repository\.private == false\s+uses: actions\/checkout@[a-f0-9]{40}\s+with:\s+ref: 4d3fe664a90f2e8c3dea885559b1ec263df66a24/);
+ assert.match(pub,/github\.event\.workflow_run\.workflow_id == 416355595/);
+ assert.match(pub,/github\.event\.workflow_run\.event == 'pull_request'/);
+ assert.match(pub,/github\.event\.workflow_run\.head_repository\.id == 1442936296/);
+ assert.match(y,/runs-on: \[self-hosted, Windows, X64, zgmini-handoff-ci-isolated\]/);
+ assert.match(y,/ref: 4d3fe664a90f2e8c3dea885559b1ec263df66a24\s+persist-credentials: false/);
+ const publisher=readFileSync(new URL('../ci-approval/completed-run-intake.mjs',import.meta.url),'utf8');
+ const submitter=readFileSync(new URL('../tools/maintenance-request.mjs',import.meta.url),'utf8');
+ assert.match(publisher,/readIndependentlyInstalledControllerBPublisherPolicy\(\)/);
+ assert.match(publisher,/readAuthenticatedControllerBPublisherWorkflow\(\{getJson\}\)/);
+ assert.match(publisher,/if\(policy&&!allowPublic\)/);
+ assert.match(submitter,/MAINTENANCE_CI_PUBLIC_POLICY_NOT_INSTALLED/);
+ assert.match(submitter,/MAINTENANCE_CI_PUBLIC_PUBLISHER_IDENTITY_MISMATCH/);
+ assert.doesNotMatch(y,/workflow_dispatch:|schedule:|pull_request:/);
 });
 
 test('configured source merge becomes eligible on first main push containing it',async()=>{

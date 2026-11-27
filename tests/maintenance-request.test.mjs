@@ -280,6 +280,160 @@ function workloadPublisherFixture(){
   readIssue:async()=>f.actual};
  return f;
 }
+// This is a source-only simulation of the future isolated publisher. The
+// production publisher does NOT supply this independently installed policy port.
+function publicBPublisherFixture(){
+ const f=workloadPublisherFixture(),original=f.ports.readRepository;
+ f.ports.readRepository=async()=>({...await original(),private:false});
+ const installed={schema:'ZGMINI_PC_MAINTENANCE_INSTALL_V1',
+  sourceSha:'c'.repeat(40),startupSha256:'d'.repeat(64),
+  files:Object.fromEntries(['a','b','c','d','e','f','g'].map(x=>
+    ['tools/'+x+'.mjs','e'.repeat(64)])),
+  ciControllerBPolicy:{
+   schema:'ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V2',
+   enabled:true,workflowId:430972394,
+   workflowBlobSha:'f'.repeat(40),
+   workflowPath:'.github/workflows/ci-approval-controller-b.yml',
+   repositoryVisibility:'public',installedSha:OLD,targetSha:NEXT,
+   manifestSha256:f.input.approvalSha256
+  }};
+ f.ports.readPublisherWorkflowIdentity=async()=>({
+  workflowId:installed.ciControllerBPolicy.workflowId,
+  workflowBlobSha:installed.ciControllerBPolicy.workflowBlobSha
+ });
+ return {f,installed};
+}
+
+test('Public CI publishing is fail-closed without an independently installed V2 policy port',async()=>{
+ const {f}=publicBPublisherFixture();let reads=0;
+ const original=f.ports.readManifest;
+ f.ports.readManifest=async()=>{reads++;return original()};
+ await assert.rejects(()=>submitExistingControllerApprovalFromCi(f.input,f.ports),
+  /MAINTENANCE_CI_PUBLIC_POLICY_NOT_INSTALLED/);
+ assert.equal(reads,0);assert.equal(f.posts,0);assert.equal(f.saved,null);
+});
+
+test('Public CI publisher denies missing or altered current Workflow readback before manifest or POST',async()=>{
+ const mutations=[
+  {name:'missing execution identity',value:undefined,code:'PUBLISHER_IDENTITY_UNVERIFIED'},
+  {name:'incorrect running workflow id',value:{workflowId:1,workflowBlobSha:'f'.repeat(40)},
+   code:'PUBLISHER_IDENTITY_MISMATCH'},
+  {name:'incorrect running workflow sha',value:{workflowId:430972394,workflowBlobSha:'a'.repeat(40)},
+   code:'PUBLISHER_IDENTITY_MISMATCH'},
+  {name:'workflow API unavailable',value:async()=>{throw Error('private token');},
+   code:'PUBLISHER_IDENTITY_UNVERIFIED'}
+ ];
+ for(const change of mutations){
+  const {f,installed}=publicBPublisherFixture();let manifestReads=0;
+  const original=f.ports.readManifest;
+  f.ports.readManifest=async()=>{manifestReads++;return original();};
+  f.ports.readIndependentInstalledCiPolicy=async()=>installed;
+  if(change.value===undefined)delete f.ports.readPublisherWorkflowIdentity;
+  else f.ports.readPublisherWorkflowIdentity=typeof change.value==='function'?
+   change.value:async()=>change.value;
+  await assert.rejects(()=>submitExistingControllerApprovalFromCi(f.input,f.ports),
+   new RegExp(change.code),change.name);
+  assert.equal(f.posts,0,change.name);
+  assert.equal(manifestReads,0,change.name);
+ }
+});
+
+test('Public publisher mock can submit exactly one preapproved B effect with installed V2',async()=>{
+ const {f,installed}=publicBPublisherFixture();let reads=0;
+ f.ports.readIndependentInstalledCiPolicy=async()=>{reads++;return installed;};
+ const first=await submitExistingControllerApprovalFromCi(f.input,f.ports);
+ assert.equal(first.status,'REQUEST_READBACK_VERIFIED');
+ assert.match(first.receiptMarker,/^ZGMINI_CI_CONTROLLER_B_RECEIPT=42:[a-f0-9]{64}$/);
+ assert.equal(reads,1);assert.equal(f.posts,1);
+ assert.equal(f.saved.phase,'READBACK_VERIFIED');
+ const second=await submitExistingControllerApprovalFromCi({...f.input,runId:987},f.ports);
+ assert.equal(second.status,'EXISTING_REQUEST_REUSED');
+ assert.equal(second.receiptMarker,undefined);
+ assert.equal(f.posts,1);
+});
+
+test('Public publisher accepts only exact V2-approved operations config and controller module pair',async()=>{
+ const {f,installed}=publicBPublisherFixture();
+ const approved=JSON.parse(f.bytes);
+ const files=[
+  {path:'config/operations.json',sha256:'1'.repeat(64)},
+  {path:'controller/operations.mjs',sha256:'c'.repeat(64)}
+ ];
+ approved.allowFiles=files;
+ approved.selectiveSource.customPaths=files.map(x=>x.path);
+ approved.checks.manifestSha256=manifestFingerprint(files).sha256;
+ f.bytes=Buffer.from(JSON.stringify(approved));
+ f.input.approvalSha256=createHash('sha256').update(f.bytes).digest('hex');
+ installed.ciControllerBPolicy.manifestSha256=f.input.approvalSha256;
+ f.ports.readIndependentInstalledCiPolicy=async()=>installed;
+ const result=await submitExistingControllerApprovalFromCi(f.input,f.ports);
+ assert.equal(result.status,'REQUEST_READBACK_VERIFIED');
+ assert.equal(f.posts,1);assert.equal(f.saved.phase,'READBACK_VERIFIED');
+ assert.equal((await submitExistingControllerApprovalFromCi({...f.input,runId:999},f.ports)).status,
+  'EXISTING_REQUEST_REUSED');
+ assert.equal(f.posts,1);
+ // A different config filename is never allowed even under a valid one-effect policy.
+ const denied=publicBPublisherFixture(),invalid=JSON.parse(denied.f.bytes);
+ invalid.allowFiles=[{path:'config/secrets.json',sha256:'1'.repeat(64)}];
+ denied.f.bytes=Buffer.from(JSON.stringify(invalid));
+ denied.f.input.approvalSha256=createHash('sha256').update(denied.f.bytes).digest('hex');
+ denied.installed.ciControllerBPolicy.manifestSha256=denied.f.input.approvalSha256;
+ denied.f.ports.readIndependentInstalledCiPolicy=async()=>denied.installed;
+ await assert.rejects(()=>submitExistingControllerApprovalFromCi(denied.f.input,denied.f.ports),
+  /UPDATE_FILE_PATH_NOT_ALLOWED/);
+ assert.equal(denied.f.posts,0);assert.equal(denied.f.saved,null);
+});
+
+test('Public CI publisher never posts for unverified local policy, changed approval or repo',async()=>{
+ const cases=[
+  {name:'no V2 grant',mutate:v=>{delete v.ciControllerBPolicy;},code:'PUBLIC_POLICY_UNVERIFIED'},
+  {name:'legacy private V1',mutate:v=>{v.ciControllerBPolicy={
+   schema:'ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V1',enabled:true,
+   workflowId:430972394,workflowBlobSha:'f'.repeat(40),
+   workflowPath:'.github/workflows/ci-approval-controller-b.yml'
+  };},code:'PUBLIC_POLICY_UNVERIFIED'},
+  {name:'unknown V2 field',mutate:v=>{v.ciControllerBPolicy.allowOther=true;},code:'PUBLIC_POLICY_UNVERIFIED'},
+  {name:'wrong target',mutate:v=>{v.ciControllerBPolicy.targetSha='1'.repeat(40);},code:'PUBLIC_EFFECT_SCOPE_MISMATCH'},
+  {name:'wrong approval bytes hash',mutate:v=>{v.ciControllerBPolicy.manifestSha256='1'.repeat(64);},code:'PUBLIC_EFFECT_SCOPE_MISMATCH'},
+  {name:'wrong installed baseline',mutate:v=>{v.ciControllerBPolicy.installedSha='1'.repeat(40);},code:'PUBLIC_EFFECT_SCOPE_MISMATCH'},
+  {name:'bad policy encoding',mutate:()=>{throw Error('protected local read failed');},code:'PUBLIC_POLICY_UNVERIFIED'}
+ ];
+ for(const c of cases){
+  const {f,installed}=publicBPublisherFixture();
+  let manifestReads=0;const original=f.ports.readManifest;
+  f.ports.readManifest=async()=>{manifestReads++;return original()};
+  f.ports.readIndependentInstalledCiPolicy=async()=>{
+   const v=structuredClone(installed);c.mutate(v);return v;};
+  await assert.rejects(()=>submitExistingControllerApprovalFromCi(f.input,f.ports),
+   new RegExp(c.code),c.name);
+  assert.equal(f.posts,0,c.name);assert.equal(f.saved,null,c.name);
+  assert.equal(manifestReads,c.name==='wrong installed baseline'?1:0,c.name);
+ }
+});
+
+test('Public publisher requires canonical numeric repository and owner before protected reads',async()=>{
+ const {f,installed}=publicBPublisherFixture();const original=f.ports.readRepository;
+ for(const change of [
+  repo=>{repo.id=1;},repo=>{repo.owner.id=4;},
+  repo=>{repo.full_name='attacker/repo';},repo=>{repo.private='false';}
+ ]){
+  f.ports.readRepository=async()=>{const repo=structuredClone(await original());change(repo);return repo;};
+  let called=0;f.ports.readIndependentInstalledCiPolicy=async()=>{called++;return installed;};
+  await assert.rejects(()=>submitExistingControllerApprovalFromCi(f.input,f.ports),
+   /MAINTENANCE_CI_REPOSITORY_DENIED/);
+  assert.equal(called,0);
+  assert.equal(f.posts,0);
+ }
+});
+
+test('Private original CI publisher remains unchanged and ignores untrusted Public grant port',async()=>{
+ const f=workloadPublisherFixture();let called=0;
+ f.ports.readIndependentInstalledCiPolicy=async()=>{called++;throw Error('must not read');};
+ const res=await submitExistingControllerApprovalFromCi(f.input,f.ports);
+ assert.equal(res.status,'REQUEST_READBACK_VERIFIED');
+ assert.equal(called,0);assert.equal(f.posts,1);
+});
+
 test('CI publisher creates exact existing B request once and records request-bound receipt',async()=>{
  const f=workloadPublisherFixture(),result=await submitExistingControllerApprovalFromCi(f.input,f.ports);
  assert.equal(result.status,'REQUEST_READBACK_VERIFIED');assert.equal(f.posts,1);

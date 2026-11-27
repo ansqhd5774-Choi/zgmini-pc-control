@@ -2,11 +2,14 @@
 // code here. The follow-up must independently establish authority, tested tree,
 // exact effect and live preconditions before any operational submission.
 import {createHash} from 'node:crypto';
-import {readFileSync} from 'node:fs';
+import fs,{readFileSync} from 'node:fs';
+import path from 'node:path';
 import os from 'node:os';
+import {execFileSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 import {resolveControllerApprovalCI,createCiEffectReceiptStore,submitExistingControllerApprovalFromCi,mergeAndSubmitPreparedControllerApproval} from '../tools/maintenance-request.mjs';
-import {manifestFingerprint} from '../tools/maintenance-contract.mjs';
+import {manifestFingerprint,installedControllerBPolicy} from '../tools/maintenance-contract.mjs';
+import {nextRuntimeFiles,requireDirectInstalledFiles} from '../tools/handoff-maintenance.mjs';
 import {prepareSelectiveApprovalPublication} from './controller-candidate-review.mjs';
 import {publishExactControllerApprovalPair} from './approval-pr-publisher.mjs';
 
@@ -16,20 +19,25 @@ const workflowId=416355595;
 const workflowPath='.github/workflows/controller-maintenance-source-tests.yml';
 const id=x=>Number.isSafeInteger(x)&&x>0;
 const sha=x=>typeof x==='string'&&/^[a-f0-9]{40}$/.test(x);
-const sameRepo=x=>x?.id===repositoryId&&x.full_name===repo&&x.private===true;
+// Public is admitted only by a separately authenticated caller. A read-only
+// event observer is not itself an execution authorization.
+const sameRepo=(x,allowPublic=false)=>x?.id===repositoryId&&
+ x.full_name===repo&&x.private===(allowPublic?false:true);
 const out=(state,reason,extra={})=>Object.freeze({mode:'READ_ONLY_EVENT_INTAKE',state,reason,canPublish:false,canExecute:false,...extra});
-const validRun=r=>id(r?.id)&&id(r.run_attempt)&&r.workflow_id===workflowId&&
- r.path===workflowPath&&r.event==='pull_request'&&sameRepo(r.repository)&&sameRepo(r.head_repository)&&
+const validRun=(r,allowPublic=false)=>id(r?.id)&&id(r.run_attempt)&&r.workflow_id===workflowId&&
+ r.path===workflowPath&&r.event==='pull_request'&&
+ sameRepo(r.repository,allowPublic)&&sameRepo(r.head_repository,allowPublic)&&
  sha(r.head_sha)&&r.status==='completed'&&r.conclusion==='success';
 
-export async function observeCompletedRun(event,{getRun}={}){
- if(event?.action!=='completed'||!sameRepo(event.repository)||!validRun(event.workflow_run))
+export async function observeCompletedRun(event,{getRun,allowPublic=false}={}){
+ if(event?.action!=='completed'||!sameRepo(event.repository,allowPublic)||
+    !validRun(event.workflow_run,allowPublic))
   return out('IGNORED','NOT_ELIGIBLE_COMPLETED_SOURCE_RUN');
  if(typeof getRun!=='function')return out('EVIDENCE_MISSING','AUTHENTICATED_READ_PORT_REQUIRED');
  const e=event.workflow_run;
  try{
   const r=await getRun(e.id);
-  if(!validRun(r)||r.id!==e.id||r.run_attempt!==e.run_attempt||r.head_sha!==e.head_sha)
+  if(!validRun(r,allowPublic)||r.id!==e.id||r.run_attempt!==e.run_attempt||r.head_sha!==e.head_sha)
    return out('EVIDENCE_MISSING','RUN_EVENT_API_MISMATCH');
   // A current PR association may have moved since the run. Do not infer
   // historical checkout or business authority from pull_requests[] here.
@@ -41,8 +49,8 @@ export async function observeCompletedRun(event,{getRun}={}){
 // Approval records may be merged after source CI completes. Observe the
 // actual main publication as a second input to the SAME pipeline. Neither
 // publication nor CI success is authority by itself. No request IDs or POSTs.
-export async function observePublishedControllerApprovals(event,{getJson}={}){
- if(!sameRepo(event?.repository)||event.ref!=='refs/heads/main'||event.deleted!==false||
+export async function observePublishedControllerApprovals(event,{getJson,allowPublic=false,publicEffectPin=null}={}){
+ if(!sameRepo(event?.repository,allowPublic)||event.ref!=='refs/heads/main'||event.deleted!==false||
     event.forced!==false||!sha(event.before)||!sha(event.after)||event.before===event.after||
     /^0{40}$/.test(event.before)||/^0{40}$/.test(event.after))
   return out('IGNORED','NOT_ELIGIBLE_MAIN_PUBLICATION');
@@ -57,6 +65,9 @@ export async function observePublishedControllerApprovals(event,{getJson}={}){
   for(const file of diff.files){
    const match=typeof file?.filename==='string'&&file.filename.match(/^approvals\/controller-updates\/([a-f0-9]{40})\.json$/);
    if(!match)continue;
+   // The independent installed Public B policy authorizes one target only.
+   // Ignore unrelated approvals before any content or source CI API reads.
+   if(allowPublic&&sha(publicEffectPin)&&match[1]!==publicEffectPin)continue;
    const item={path:file.filename,targetSha:match[1],revision:after};
    if(file.status!=='added'||!sha(file.sha)){
     entries.push({...item,state:'EXISTING_APPROVAL_CHANGE_REQUIRES_REVIEW'});continue;
@@ -162,7 +173,102 @@ export function createAutoApprovalContextReader({policy,getJson,readJobLogs}={})
 export function initialControllerPublicationPolicy(policy){
  return policy?.installPlan ? null : policy;
 }
-export function createControllerPublicationPorts({getJson,postIssue,store,autoApprovalPolicy,readJobLogs,putMerge}){
+// The Public publisher grant is never read from GitHub Variables, an event,
+// a PR checkout, or the receipt directory. The only permitted production
+// input is the independently installed Windows maintenance manifest and its
+// exact 7-file SHA256 closure. It must be installed by the separate approved
+// B handoff, not by a CI job. This is a lazy, read-only port; failures deny POST.
+const INSTALLED_PUBLIC_B_ROOT='E:/ZGmini/automation/pc-maintenance';
+export function readIndependentlyInstalledControllerBPublisherPolicy({
+ installRoot=INSTALLED_PUBLIC_B_ROOT,io=fs
+}={}){
+ const fail=()=>{throw Error('CI_PUBLIC_PUBLISHER_INSTALLED_POLICY_UNVERIFIED')};
+ try{
+  if(typeof installRoot!=='string'||!path.isAbsolute(installRoot)||
+     !io||typeof io.lstatSync!=='function'||
+     typeof io.readFileSync!=='function')fail();
+  const required=[...nextRuntimeFiles,'MAINTENANCE_INSTALL.json'];
+  requireDirectInstalledFiles(installRoot,required,io);
+  const raw=io.readFileSync(path.join(installRoot,'MAINTENANCE_INSTALL.json'));
+  if(!Buffer.isBuffer(raw)||raw.length<2||raw.length>131072)fail();
+  const installed=JSON.parse(raw.toString('utf8'));
+  if(installedControllerBPolicy(installed)?.repositoryVisibility!=='public')fail();
+  const names=Object.keys(installed.files||{});
+  if(names.length!==nextRuntimeFiles.length||
+     nextRuntimeFiles.some(rel=>!Object.hasOwn(installed.files,rel)))fail();
+  for(const rel of nextRuntimeFiles){
+   const bytes=io.readFileSync(path.join(installRoot,...rel.split('/')));
+   if(!Buffer.isBuffer(bytes)||bytes.length<1||bytes.length>1048576||
+      createHash('sha256').update(bytes).digest('hex')!==installed.files[rel])fail();
+  }
+  return Object.freeze(installed);
+ }catch{fail()}
+}
+
+// GitHub's current publisher workflow must itself be the exact source whose
+// independently installed hash was approved. GitHub workflow event variables
+// do not authorize an effect: they only locate a fixed file to read back.
+export async function readAuthenticatedControllerBPublisherWorkflow({
+ getJson,env=process.env
+}={}){
+ const fail=()=>{throw Error('CI_PUBLIC_PUBLISHER_WORKFLOW_UNVERIFIED')};
+ const workflow='.github/workflows/ci-approval-controller-b.yml';
+ const workflowRef=repo+'/'+workflow+'@refs/heads/main';
+ if(typeof getJson!=='function'||env?.GITHUB_REPOSITORY!==repo||
+    env.GITHUB_REF!=='refs/heads/main'||
+    env.GITHUB_WORKFLOW_REF!==workflowRef||
+    env.GITHUB_JOB!=='submit-controller-b'||
+    !sha(env.GITHUB_WORKFLOW_SHA)||!id(Number(env.GITHUB_RUN_ID))||
+    !id(Number(env.GITHUB_RUN_ATTEMPT)))fail();
+ try{
+  const [active,file]=await Promise.all([
+   getJson('actions/workflows/ci-approval-controller-b.yml'),
+   getJson('contents/'+workflow+'?ref='+env.GITHUB_WORKFLOW_SHA)
+  ]);
+  if(!id(active?.id)||active.path!==workflow||active.state!=='active'||
+     file?.type!=='file'||file.path!==workflow||
+     file.encoding!=='base64'||!sha(file.sha)||
+     typeof file.content!=='string'||file.content.length>262144)fail();
+  const bytes=Buffer.from(file.content,'base64');
+  if(bytes.length<10||bytes.length>131072)fail();
+  const checked=createHash('sha1').update(Buffer.from('blob '+bytes.length+'\0'))
+   .update(bytes).digest('hex');
+  if(checked!==file.sha)fail();
+  return Object.freeze({workflowId:active.id,workflowBlobSha:checked});
+ }catch{fail()}
+}
+
+// The exact checkout used to execute the publisher must have been merged
+// into the reviewed main history before it can submit a Public B effect.
+// A branch-only candidate (including a squash-merged, orphaned PR commit)
+// must not become an operational authority just because a flag is enabled.
+// No GitHub event, PR body or CI variable can substitute its source revision.
+export async function readAuthenticatedPublicBPublisherSourceAncestry({
+ getJson,env=process.env,
+ readCheckoutSha=()=>String(execFileSync('git',['rev-parse','HEAD'],{
+  cwd:env.GITHUB_WORKSPACE,encoding:'utf8',windowsHide:true,
+  timeout:10000,maxBuffer:4096
+ })).trim()
+}={}){
+ const fail=()=>{throw Error('CI_PUBLIC_PUBLISHER_MAIN_ANCESTRY_UNVERIFIED')};
+ if(typeof getJson!=='function'||typeof readCheckoutSha!=='function'||
+    typeof env?.GITHUB_WORKSPACE!=='string'||!path.isAbsolute(env.GITHUB_WORKSPACE)||
+    env.GITHUB_REPOSITORY!==repo||env.GITHUB_REF!=='refs/heads/main'||
+    !sha(env.GITHUB_WORKFLOW_SHA))fail();
+ try{
+  const checkedOut=await readCheckoutSha();
+  if(!sha(checkedOut))fail();
+  const comparison=await getJson('compare/'+checkedOut+'...'+env.GITHUB_WORKFLOW_SHA);
+  if(!['ahead','identical'].includes(comparison?.status)||
+     comparison.behind_by!==0||
+     comparison.base_commit?.sha!==checkedOut||
+     comparison.head_commit?.sha!==env.GITHUB_WORKFLOW_SHA||
+     comparison.merge_base_commit?.sha!==checkedOut)fail();
+  return Object.freeze({sourceSha:checkedOut,mainSha:env.GITHUB_WORKFLOW_SHA});
+ }catch{fail()}
+}
+
+export function createControllerPublicationPorts({getJson,postIssue,store,autoApprovalPolicy,readJobLogs,putMerge,readIndependentInstalledCiPolicy,readPublisherWorkflowIdentity}){
  const readBytes=async(target,revision)=>{
   if(!sha(target)||!(revision==='main'||sha(revision)))throw Error('CI_PUBLICATION_SOURCE_INVALID');
   const path='approvals/controller-updates/'+target+'.json';
@@ -204,6 +310,8 @@ export function createControllerPublicationPorts({getJson,postIssue,store,autoAp
   },
   createIssue:expected=>postIssue({title:expected.title,body:expected.body,labels:expected.labels}),
   loadReceipt:store.loadReceipt,saveReceipt:store.saveReceipt,
+  ...(typeof readIndependentInstalledCiPolicy==='function'?{readIndependentInstalledCiPolicy}:{}),
+  ...(typeof readPublisherWorkflowIdentity==='function'?{readPublisherWorkflowIdentity}:{}),
   ...(autoApprovalPolicy&&typeof putMerge==='function'?{mergeApprovalPr:(n,head)=>{
    if(!id(n)||n!==autoApprovalPolicy.approvalPrNumber||!sha(head))
     throw Error('CI_PUBLICATION_PR_INVALID');
@@ -212,9 +320,11 @@ export function createControllerPublicationPorts({getJson,postIssue,store,autoAp
   ...(autoApprovalPolicy?{readAutoApprovalContext:createAutoApprovalContextReader({policy:autoApprovalPolicy,getJson,readJobLogs})}:{}),
  };
 }
-export async function publishExistingControllerApprovals(event,{getJson,ports,runId,attempt,emitReceipt}={}){
+export async function publishExistingControllerApprovals(event,{getJson,ports,runId,attempt,emitReceipt,allowPublic=false,publicEffectPin=null}={}){
  if(!id(runId)||!id(attempt)||typeof emitReceipt!=='function')throw Error('CI_PUBLICATION_RUN_INVALID');
- const seen=await observePublishedControllerApprovals(event,{getJson});
+ if(allowPublic&&!sha(publicEffectPin))
+  return {state:'EVIDENCE_MISSING',code:'CI_PUBLIC_EFFECT_PIN_REQUIRED',results:[]};
+ const seen=await observePublishedControllerApprovals(event,{getJson,allowPublic,publicEffectPin});
  if(seen.state!=='APPROVAL_PUBLICATION_OBSERVED_ONLY')return {state:seen.state,code:seen.reason,results:[]};
  const results=[];
  for(const entry of seen.entries){
@@ -246,11 +356,11 @@ export async function publishExistingControllerApprovals(event,{getJson,ports,ru
  * receiver workflow pin are deliberately unchanged until their exact approved
  * B installation. This observer has no write ports or authority.
  */
-export async function observeLateOwnerMergedControllerApproval(event,{getJson}={}){
+export async function observeLateOwnerMergedControllerApproval(event,{getJson,allowPublic=false,publicEffectPin=null}={}){
  if(typeof getJson!=='function')
   return out('EVIDENCE_MISSING','AUTHENTICATED_READ_PORT_REQUIRED');
  const observed=await observeCompletedRun(event,{
-  getRun:n=>getJson('actions/runs/'+n)});
+  getRun:n=>getJson('actions/runs/'+n),allowPublic});
  if(observed.state!=='CI_COMPLETION_OBSERVED_ONLY')
   return observed;
  const headSha=observed.headSha,entries=[],owner='ansqhd5774-Choi';
@@ -273,7 +383,7 @@ export async function observeLateOwnerMergedControllerApproval(event,{getJson}={
    if(pr?.number!==candidate.number||pr.merged!==true||
       pr.merged_by?.login!==owner||pr.merged_by?.id!==ownerId||
       pr.merged_by?.type!=='User'||pr.base?.ref!=='main'||
-      !sameRepo(pr.base.repo)||!sameRepo(pr.head?.repo)||
+      !sameRepo(pr.base.repo,allowPublic)||!sameRepo(pr.head?.repo,allowPublic)||
       pr.head.sha!==headSha||!sha(pr.merge_commit_sha))
     continue;
    files=await getJson('pulls/'+pr.number+'/files?per_page=100');
@@ -285,6 +395,9 @@ export async function observeLateOwnerMergedControllerApproval(event,{getJson}={
     file.filename.match(/^approvals\/controller-updates\/([a-f0-9]{40})\.json$/);
    if(!match)continue;
    const targetSha=match[1];
+   // A shared CI run may cover multiple PRs. One installed Public B grant
+   // cannot turn another target's pending/invalid approval into global failure.
+   if(allowPublic&&sha(publicEffectPin)&&targetSha!==publicEffectPin)continue;
    if(file.status!=='added'||!sha(file.sha))
     return out('EVIDENCE_MISSING','OWNER_APPROVAL_PR_FILE_CHANGED');
    try{
@@ -329,11 +442,13 @@ export async function observeLateOwnerMergedControllerApproval(event,{getJson}={
  * if the earlier main push already submitted the same effect.
  */
 export async function publishLateOwnerMergedControllerApproval(event,{
- getJson,ports,runId,attempt,emitReceipt
+ getJson,ports,runId,attempt,emitReceipt,allowPublic=false,publicEffectPin=null
 }={}){
  if(!id(runId)||!id(attempt)||typeof emitReceipt!=='function')
   throw Error('CI_PUBLICATION_RUN_INVALID');
- const seen=await observeLateOwnerMergedControllerApproval(event,{getJson});
+ if(allowPublic&&!sha(publicEffectPin))
+  return {state:'EVIDENCE_MISSING',code:'CI_PUBLIC_EFFECT_PIN_REQUIRED',results:[]};
+ const seen=await observeLateOwnerMergedControllerApproval(event,{getJson,allowPublic,publicEffectPin});
  if(seen.state!=='OWNER_APPROVAL_RUN_OBSERVED_ONLY')
   return {state:seen.state,code:seen.reason,results:[]};
  const results=[];
@@ -490,7 +605,12 @@ export function createControllerPrPublicationIo({getJson,github,targetSha}={}){
  };
 }
 
-export async function publishConfiguredControllerApproval(event,{getJson,ports,policy,runId,attempt,emitReceipt,stageApprovalPr}={}){
+export async function publishConfiguredControllerApproval(event,{getJson,ports,policy,runId,attempt,emitReceipt,stageApprovalPr,allowPublic=false}={}){
+ // This function may create or merge an approval PR. A verified Public
+ // one-effect receiver grant is NOT an owner delegation to merge that PR.
+ // Public is allowed to submit only already Owner-merged exact approvals
+ // through the separate existing-publication path.
+ if(allowPublic)return {state:'DISABLED',code:'CI_PUBLIC_CONFIGURED_MERGE_NOT_AUTHORIZED',results:[]};
  if(!policy||!sha(policy.targetSha)||!id(policy.sourcePrNumber)||
     !(id(policy.approvalPrNumber)||typeof stageApprovalPr==='function')||
     !id(runId)||!id(attempt)||typeof emitReceipt!=='function')
@@ -504,10 +624,10 @@ export async function publishConfiguredControllerApproval(event,{getJson,ports,p
   return {state:'IGNORED',code:'CONFIGURED_SOURCE_NOT_MERGED',results:[]};
  let matched=false;
  if(event?.action==='completed'){
-  const seen=await observeCompletedRun(event,{getRun:n=>getJson('actions/runs/'+n)});
+  const seen=await observeCompletedRun(event,{getRun:n=>getJson('actions/runs/'+n),allowPublic});
   if(seen.state==='EVIDENCE_MISSING')return {state:seen.state,code:seen.reason,results:[]};
   matched=seen.state==='CI_COMPLETION_OBSERVED_ONLY'&&seen.headSha===source.head.sha;
- }else if(sameRepo(event?.repository)&&event.ref==='refs/heads/main'&&event.deleted===false&&event.forced===false&&
+ }else if(sameRepo(event?.repository,allowPublic)&&event.ref==='refs/heads/main'&&event.deleted===false&&event.forced===false&&
    sha(event.before)&&sha(event.after)&&event.before!==event.after){
   // Observe source merge becoming reachable on main, not an arbitrary push.
   const [before,after]=await Promise.all([getJson('compare/'+source.merge_commit_sha+'...'+event.before),
@@ -584,12 +704,48 @@ export async function main({eventPath=process.env.GITHUB_EVENT_PATH,token=proces
    if(bytes.length>16000000)throw Error('CI_PUBLICATION_CI_LOG_UNVERIFIED');
    return bytes;
   };
+  // The legacy Private publisher still uses its original source-only intake.
+  // Public may interpret an event ONLY after the independent Windows grant
+  // and running publisher identity are already verified. Check before any PR
+  // staging, Issue POST, or durable effect receipt claim.
+  let allowPublic=false,publicEffectPin=null;
+  if(event?.repository?.private===false){
+   try{
+    const live=await getJson('');
+    if(live?.id!==repositoryId||live.full_name!==repo||live.private!==false||
+       live.owner?.id!==327938088||live.owner?.login!=='ansqhd5774-Choi')
+     throw Error('PUBLIC_REPOSITORY_READBACK_MISMATCH');
+    const grant=installedControllerBPolicy(readIndependentlyInstalledControllerBPublisherPolicy());
+    const current=await readAuthenticatedControllerBPublisherWorkflow({getJson});
+    // The checked-out executor must be a validated ancestor of main, not a
+    // still-unmerged Draft branch SHA or a GitHub Actions event-supplied SHA.
+    await readAuthenticatedPublicBPublisherSourceAncestry({getJson});
+    if(grant?.repositoryVisibility!=='public'||grant.workflowId!==current.workflowId||
+       grant.workflowBlobSha!==current.workflowBlobSha||
+       (policy?.targetSha!==undefined&&grant.targetSha!==policy.targetSha)||
+       (policy?.installPlan?.installedSha!==undefined&&
+        grant.installedSha!==policy.installPlan.installedSha))
+     throw Error('PUBLIC_EFFECT_GATE_MISMATCH');
+    // A newly generated approval pair has not yet been checked against the
+    // installed one-effect Manifest SHA. Do not auto-create or merge that PR
+    // on Public until exact bytes can be verified BEFORE the first write.
+    if(policy?.installPlan)
+     return {state:'DISABLED',code:'CI_PUBLIC_APPROVAL_STAGING_NOT_AUTHORIZED',results:[]};
+    allowPublic=true;
+    publicEffectPin=grant.targetSha;
+   }catch{
+    return {state:'EVIDENCE_MISSING',code:'CI_PUBLICATION_PUBLIC_GATE_UNVERIFIED',results:[]};
+   }
+  }
   const ports=createControllerPublicationPorts({getJson,postIssue:body=>github('issues',body),store,
-   autoApprovalPolicy:initialControllerPublicationPolicy(policy),readJobLogs,
+   readIndependentInstalledCiPolicy:()=>readIndependentlyInstalledControllerBPublisherPolicy(),
+   readPublisherWorkflowIdentity:()=>readAuthenticatedControllerBPublisherWorkflow({getJson}),
+   autoApprovalPolicy:allowPublic?null:initialControllerPublicationPolicy(policy),readJobLogs,
    putMerge:(n,body)=>github('pulls/'+n+'/merge',body,'PUT')});
   const opts={getJson,ports,runId:Number(process.env.GITHUB_RUN_ID),
-   attempt:Number(process.env.GITHUB_RUN_ATTEMPT),emitReceipt:marker=>console.log(marker)};
-  if(policy){
+   attempt:Number(process.env.GITHUB_RUN_ATTEMPT),allowPublic,publicEffectPin,
+   emitReceipt:marker=>console.log(marker)};
+  if(policy&&!allowPublic){
    const stageApprovalPr=policy.installPlan?async()=>{
     const prepared=createConfiguredSelectivePreparer({policy,getJson,readJobLogs});
     const io=createControllerPrPublicationIo({getJson,github,targetSha:policy.targetSha});
@@ -600,7 +756,9 @@ export async function main({eventPath=process.env.GITHUB_EVENT_PATH,token=proces
     const readyPolicy={...policy,approvalPrNumber:staged.prNumber};
     return {state:staged.state,approvalPrNumber:staged.prNumber,
      ports:createControllerPublicationPorts({getJson,postIssue:body=>github('issues',body),
-      store,autoApprovalPolicy:readyPolicy,readJobLogs,
+      store,readIndependentInstalledCiPolicy:()=>readIndependentlyInstalledControllerBPublisherPolicy(),
+      readPublisherWorkflowIdentity:()=>readAuthenticatedControllerBPublisherWorkflow({getJson}),
+      autoApprovalPolicy:readyPolicy,readJobLogs,
       putMerge:(n,body)=>github('pulls/'+n+'/merge',body,'PUT')})};
    }:undefined;
    const result=await publishConfiguredControllerApproval(event,{...opts,policy,stageApprovalPr});

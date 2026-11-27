@@ -1106,9 +1106,15 @@ export function createMaintenanceAgent({
       reportUploadStatus:stored.reportUploadStatus};
   }
   async function processIssue(issue){
-    if(await repositoryAllowed()==='PUBLIC'){
-      // Read-only intake in the owner's Public source repository. No historical
-      // or new B claim/ledger/approval/OS effect may be interpreted as authority.
+    const repositoryVisibility=await repositoryAllowed();
+    const publicCandidate=issue?.title===ISSUE_TITLE&&issue.state==='OPEN'&&
+      Number.isSafeInteger(issue.number)&&issue.number>0&&
+      [CI_CONTROLLER_ACTOR,'app/github-actions'].includes(issue.author?.login)&&
+      issue.labels?.some(x=>x.name===label);
+    if(repositoryVisibility==='PUBLIC'&&!publicCandidate){
+      // Keep every existing Public owner/B/legacy entry blocked. A bot alone
+      // is never enough: a separate installed V2 policy and exact CI receipt
+      // must still pass before any mutation.
       return {status:'BLOCKED',code:'PUBLIC_B_EFFECT_SEPARATE_AUTH_REQUIRED',
         issueNumber:issue?.number,operationalWrites:0,effectAuthorized:false};
     }
@@ -1129,9 +1135,15 @@ export function createMaintenanceAgent({
           throw coded('CI_INSTALLED_POLICY_UNVERIFIED');
         ciPolicy=installedControllerBPolicy(JSON.parse(fs.readFileSync(file,'utf8')));
       }catch{
+        if(repositoryVisibility==='PUBLIC')
+          return {status:'BLOCKED',code:'PUBLIC_B_EFFECT_SEPARATE_AUTH_REQUIRED',
+            issueNumber:issue.number,operationalWrites:0,effectAuthorized:false};
         return {status:'BLOCKED',code:'CI_INSTALLED_POLICY_UNVERIFIED',issueNumber:issue.number};
       }
     }
+    if(repositoryVisibility==='PUBLIC'&&ciPolicy?.repositoryVisibility!=='public')
+      return {status:'BLOCKED',code:'PUBLIC_B_EFFECT_SEPARATE_AUTH_REQUIRED',
+        issueNumber:issue.number,operationalWrites:0,effectAuthorized:false};
     const ciCandidate=ciOrigin&&ciPolicy!==null;
     if(![ISSUE_TITLE,R6_HOST_ISSUE_TITLE,R54_B_ISSUE_TITLE,SOURCE_BUNDLE_ISSUE_TITLE].includes(issue?.title)
       ||(!ciCandidate&&!issueIsTrusted(issue,{allowedActors,title:issue.title,label})))
@@ -1198,6 +1210,19 @@ export function createMaintenanceAgent({
     let approvedBytes,approved;
     try{
       approvedBytes=await manifestBytes(request);
+      if(repositoryVisibility==='PUBLIC'){
+        // Prevent an otherwise matching request/receipt from using a different
+        // installed baseline. The independently protected manifest bytes still
+        // undergo the unchanged original B validation below.
+        let exactManifest;
+        try{exactManifest=JSON.parse(approvedBytes.toString('utf8'));}catch{
+          throw coded('CI_PUBLIC_APPROVAL_MANIFEST_INVALID');
+        }
+        if(exactManifest.installedSha!==ciPolicy.installedSha||
+          request.targetControllerSha!==ciPolicy.targetSha||
+          request.approvalManifestSha256!==ciPolicy.manifestSha256)
+          throw coded('CI_PUBLIC_EFFECT_SCOPE_MISMATCH');
+      }
       const preflight=await updaterStatus(request.requestId,request.operation);
       if(preflight?.installedReadbackCode||preflight?.ledgerReadbackCode||
         preflight?.lockReadbackCode)throw coded('UPDATE_STATUS_RECOVERY_REQUIRED');
@@ -1332,7 +1357,15 @@ export function createMaintenanceAgent({
       settledIssueCache.delete(number);
       try{
         const issue=await issueDetails(number);
-        const result=visibility==='PUBLIC'
+        // Public owner requests remain non-executable. Only an exact fixed
+        // CI Bot candidate reaches processIssue, where independent installed
+        // V2 policy, original GitHub Run/job/receipt and B-effect CAS decide.
+        // No policy or failed proof still blocks before manifest/updater work.
+        const publicCiCandidate=visibility==='PUBLIC'&&
+          issue?.title===ISSUE_TITLE&&issue.state==='OPEN'&&
+          [CI_CONTROLLER_ACTOR,'app/github-actions'].includes(issue.author?.login)&&
+          issue.labels?.some(x=>x.name===label);
+        const result=visibility==='PUBLIC'&&!publicCiCandidate
           ?(issueIsTrusted(issue,{allowedActors,title:entry.title,label})
             ?{status:'BLOCKED',code:'PUBLIC_B_EFFECT_SEPARATE_AUTH_REQUIRED',
               issueNumber:issue.number,operationalWrites:0,effectAuthorized:false}
@@ -1348,6 +1381,12 @@ export function createMaintenanceAgent({
       }catch(error){results.push({issueNumber:number,status:"BLOCKED",
         code:safeCode(error?.code??error?.message)});}
     }
+    // A verified Public B candidate may have completed (or reached an unknown
+    // post-effect state). Do not prepend a blanket "no B effect" summary to
+    // an actual B result. Default-denied Public reads retain that summary.
+    if(visibility==='PUBLIC'&&results.slice(1).some(x=>
+      ['SUCCEEDED','FAILED','UNKNOWN','RUNNING'].includes(x?.status)))
+      results.shift();
     return results;
   }
   return {pollOnce,processIssue,loadLedger,updaterStatus};

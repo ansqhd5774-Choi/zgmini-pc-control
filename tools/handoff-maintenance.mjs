@@ -95,9 +95,16 @@ export function approvedHandoffCiPolicy(before,approval,nextManifest){
 // workflow hash. The installed policy's other identity fields are preserved.
 export function approvedPolicyOnlyHandoff(before,approval,target){
  const prior=before?.ciControllerBPolicy,proposed=approval?.ciControllerBPolicy;
+ // A policy-only rotation may change only the pinned workflow *bytes*.
+ // Public V2's one-effect grant must not be enlarged by this no-file-write
+ // exception. Changing target/manifest/installed baseline requires the
+ // separately approved ordinary maintainer update path instead.
+ const stable=['schema','enabled','workflowId','workflowPath'];
+ if(prior?.schema==='ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V2')
+  stable.push('repositoryVisibility','installedSha','targetSha','manifestSha256');
  if(!prior||!proposed||!/^[a-f0-9]{40}$/.test(prior.workflowBlobSha??'')||
     prior.workflowBlobSha===proposed.workflowBlobSha||
-    ['schema','enabled','workflowId','workflowPath'].some(k=>prior[k]!==proposed[k]))
+    stable.some(k=>prior[k]!==proposed[k]))
   return false;
  try{
   const candidate={...before,sourceSha:target,

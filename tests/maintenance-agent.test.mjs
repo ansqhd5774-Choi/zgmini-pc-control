@@ -8,7 +8,8 @@ import {execFileSync} from "node:child_process";
 import {requireHandoffApproval,handoffFilePlan,nextRuntimeFiles} from "../tools/handoff-maintenance.mjs";
 
 import {createMaintenanceAgent,failedUpdaterResult,normalizedResult,attachApprovedNativeBReceipt,parseS6NonzeroRecoveryReport} from "../tools/maintenance-agent.mjs";
-import {prepareMaintenanceIssue} from '../tools/maintenance-request.mjs';
+import {prepareMaintenanceIssue,submitExistingControllerApprovalFromCi} from '../tools/maintenance-request.mjs';
+import {readIndependentlyInstalledControllerBPublisherPolicy,readAuthenticatedControllerBPublisherWorkflow,readAuthenticatedPublicBPublisherSourceAncestry,observeCompletedRun,observePublishedControllerApprovals,observeLateOwnerMergedControllerApproval,publishExistingControllerApprovals,publishLateOwnerMergedControllerApproval,publishConfiguredControllerApproval} from '../ci-approval/completed-run-intake.mjs';
 
 test('pre-install child rejection retains exact safe code and current installed SHA',()=>{
  const r=failedUpdaterResult({requestId:'fixture',targetControllerSha:'b'.repeat(40)},
@@ -22,7 +23,9 @@ test('unknown stage never claims untouched install and never copies arbitrary st
  const exact=failedUpdaterResult({requestId:'fixture'},{stdout:JSON.stringify({status:'AUTOMATION_BLOCKED',code:'SUPERVISOR_NOT_HEALTHY'})},{ledger:null,installLock:{held:false}});
  assert.equal(exact.status,'UNKNOWN');assert.equal(exact.code,'SUPERVISOR_NOT_HEALTHY');
 });
-import {manifestFingerprint,validateUpdateRequest,R54_B_SOURCE_FILES,R54_B_OPERATION,R54_B_ISSUE_TITLE} from "../tools/maintenance-contract.mjs";
+import {manifestFingerprint,validateUpdateRequest,R54_B_SOURCE_FILES,R54_B_OPERATION,R54_B_ISSUE_TITLE,
+  installedControllerBPolicy,verifyControllerBIdentity,authenticateControllerBIssue,
+  controllerBReceiptMarker,CI_CONTROLLER_ACTOR} from "../tools/maintenance-contract.mjs";
 
 const REPO="ansqhd5774-Choi/zgmini-pc-control";
 const ACTOR="ansqhd5774-Choi";
@@ -62,16 +65,22 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
   verifyInstalledSource=()=>{},statusFaults={},preexistingLedger=null,
   extraIssueSummaries=[],extraIssueDetails=[],progressError=null,
   s6RawManifest=null,s6Status=null,s6ApplyResult=null,s6ApplyError=null,
-  s6ApplyRaw=null,publicMetadataPatch={}}={}){
+  s6ApplyRaw=null,publicMetadataPatch={},requestPatch={},
+  publicCiProof=null,installedCiPolicy=null}={}){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),"zgmini-maintainer-agent-test-"));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const leaseRoot=path.join(root,"leases");fs.mkdirSync(leaseRoot);
   const example=sampleRequest();
   const manifest={...example.manifest,...manifestPatch};
   const rawManifest=Buffer.from(JSON.stringify(manifest));
-  const request={...example.issue,approvalManifestSha256:digest(rawManifest)};
+  const request={...example.issue,approvalManifestSha256:digest(rawManifest),...requestPatch};
   const issue={number:72,title,state:"OPEN",body:JSON.stringify(request),
     author:{login:actor},labels:labels.map(name=>({name})),comments:[],...issuePatch};
+  if(installedCiPolicy){
+    const installed=typeof installedCiPolicy==='function'?
+      installedCiPolicy(issue,rawManifest):installedCiPolicy;
+    fs.writeFileSync(path.join(root,'MAINTENANCE_INSTALL.json'),JSON.stringify(installed));
+  }
   const calls=[],remote=new Map(),stats={applies:0,statusQueries:0,comments:0,
     manifestReads:0,uploadWrites:0,uploadReads:0,issueViews:0};
   const applied=applyResult??{status:"SUCCEEDED",code:"UPDATE_COMMITTED",lastPass:"UPDATE_COMMITTED",
@@ -95,6 +104,20 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
         return {stdout:JSON.stringify(extraIssueDetails.find(row=>row.number===number)??issue)};
       }
       if(args[0]==="api"){
+        if(publicCiProof&&args[1]===`repos/${REPO}/issues/${issue.number}`){
+          return {stdout:JSON.stringify({...publicCiProof.actual,number:issue.number,
+            body:issue.body})};
+        }
+        if(publicCiProof&&args[1].startsWith(`repos/${REPO}/actions/jobs/`)
+          &&args[1].endsWith('/logs')){
+          const jobId=Number(args[1].split('/').at(-2));
+          return {stdout:publicCiProof.readJobLogs(jobId,issue)};
+        }
+        if(publicCiProof&&(args[1].startsWith(`repos/${REPO}/actions/runs/`)
+          ||args[1].startsWith(`repos/${REPO}/contents/.github/workflows/`))){
+          const response=await publicCiProof.getJson(args[1].slice(`repos/${REPO}/`.length));
+          return {stdout:JSON.stringify(response)};
+        }
         if(args[1]==="repos/"+REPO)
           return {stdout:JSON.stringify({id:1442936296,full_name:REPO,
             owner:{id:327938088,login:ACTOR},private:false,...publicMetadataPatch})};
@@ -198,7 +221,7 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
       assert.deepEqual(packaged.manifest,manifest);
       assert.deepEqual(Buffer.from(packaged.manifestRawBase64,"base64"),rawManifest);
       assert.equal(packaged.issueNumber,issue.number);
-      assert.equal(packaged.actor,ACTOR);
+      assert.equal(packaged.actor,publicCiProof?CI_CONTROLLER_ACTOR:actor);
       if(applyError)throw applyError;
       return {stdout:JSON.stringify(applied)};
     }
@@ -1223,4 +1246,731 @@ test('public postcheck receiver handoff is exactly two source files with origina
  assert.match(handoffSource,/HANDOFF_OPERATOR_WINDOWS_REQUIRED/);
  assert.match(handoffSource,/HANDOFF_MAIN_REQUIRED/);
  assert.match(handoffSource,/requireNoUnfinishedHandoff/);
+});
+
+
+
+
+test('Public publisher reads only independent installed 7-file grant and detects source drift',t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-ci-public-installed-read-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const files={};
+ for(const rel of nextRuntimeFiles){
+  const full=path.join(root,...rel.split('/'));
+  fs.mkdirSync(path.dirname(full),{recursive:true});
+  const bytes=Buffer.from('reviewed protected installed file '+rel+'\n');
+  fs.writeFileSync(full,bytes);
+  files[rel]=digest(bytes);
+ }
+ const installed={schema:'ZGMINI_PC_MAINTENANCE_INSTALL_V1',
+  sourceSha:'c'.repeat(40),startupSha256:'d'.repeat(64),files,
+  ciControllerBPolicy:{schema:'ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V2',
+   enabled:true,workflowId:430972394,
+   workflowBlobSha:'f'.repeat(40),
+   workflowPath:'.github/workflows/ci-approval-controller-b.yml',
+   repositoryVisibility:'public',
+   installedSha:INSTALLED,targetSha:TARGET,manifestSha256:'e'.repeat(64)}};
+ const manifestPath=path.join(root,'MAINTENANCE_INSTALL.json');
+ fs.writeFileSync(manifestPath,JSON.stringify(installed));
+ const result=readIndependentlyInstalledControllerBPublisherPolicy({installRoot:root});
+ assert.equal(result.ciControllerBPolicy.targetSha,TARGET);
+ assert.equal(Object.isFrozen(result),true);
+ const source=path.join(root,'tools','maintenance-agent.mjs');
+ fs.appendFileSync(source,'\n// tampered\n');
+ assert.throws(()=>readIndependentlyInstalledControllerBPublisherPolicy({installRoot:root}),
+  /CI_PUBLIC_PUBLISHER_INSTALLED_POLICY_UNVERIFIED/);
+ // Restoring fixture bytes is safe here; the operational files are untouched.
+ fs.writeFileSync(source,'reviewed protected installed file tools/maintenance-agent.mjs\n');
+ const v1=structuredClone(installed);
+ v1.ciControllerBPolicy={
+  schema:'ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V1',
+  enabled:true,workflowId:430972394,workflowBlobSha:'f'.repeat(40),
+  workflowPath:'.github/workflows/ci-approval-controller-b.yml'
+ };
+ fs.writeFileSync(manifestPath,JSON.stringify(v1));
+ assert.throws(()=>readIndependentlyInstalledControllerBPublisherPolicy({installRoot:root}),
+  /CI_PUBLIC_PUBLISHER_INSTALLED_POLICY_UNVERIFIED/);
+ fs.writeFileSync(manifestPath,JSON.stringify(installed));
+ fs.writeFileSync(source,'reviewed protected installed file tools/maintenance-agent.mjs\n');
+ assert.equal(readIndependentlyInstalledControllerBPublisherPolicy({installRoot:root})
+  .ciControllerBPolicy.repositoryVisibility,'public');
+ fs.rmSync(source);
+ try{
+  fs.symlinkSync(path.join(root,'tools','maintenance-contract.mjs'),source,'file');
+  assert.throws(()=>readIndependentlyInstalledControllerBPublisherPolicy({installRoot:root}),
+   /CI_PUBLIC_PUBLISHER_INSTALLED_POLICY_UNVERIFIED/);
+ }catch(e){
+  if(!['EPERM','EACCES','ENOTSUP'].includes(e?.code))throw e;
+ }
+});
+
+test('Public B publisher on hosted source CI is default-denied until exact installed policy',async()=>{
+ const m=sampleRequest().manifest;
+ // Approved two-file selective overlay: production B still requires a V2
+ // one-effect manifest pin before any Issue POST.
+ m.allowFiles=[
+  {path:'config/operations.json',sha256:'a'.repeat(64)},
+  {path:'controller/operations.mjs',sha256:'c'.repeat(64)}
+ ];
+ m.checks.manifestSha256=manifestFingerprint(m.allowFiles).sha256;
+ m.controllerOnlyInstall=true;
+ m.selectiveSource={schema:'ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1',
+  branch:'codex/publisher-scope-evidence',mainSha:'f'.repeat(40),
+  customPaths:m.allowFiles.map(f=>f.path)};
+ const bytes=Buffer.from(JSON.stringify(m));
+ const input={targetSha:TARGET,approvalSha256:digest(bytes),runId:765,attempt:1};
+ const repo={id:1442936296,full_name:REPO,private:false,
+  owner:{id:327938088,login:ACTOR,type:'User'}};
+ let reads=0,posts=0;
+ const ports={readRepository:async()=>repo,
+  readManifest:async()=>{reads++;return bytes;},
+  createIssue:async()=>{posts++;throw Error('UNAUTHORIZED_POST');}};
+ await assert.rejects(()=>submitExistingControllerApprovalFromCi(input,ports),
+  /MAINTENANCE_CI_PUBLIC_POLICY_NOT_INSTALLED/);
+ assert.equal(reads,0);assert.equal(posts,0);
+ const installed=()=>({schema:'ZGMINI_PC_MAINTENANCE_INSTALL_V1',
+  sourceSha:'c'.repeat(40),startupSha256:'d'.repeat(64),
+  files:Object.fromEntries(['a','b','c','d','e','f','g'].map(x=>
+   ['tools/'+x+'.mjs','e'.repeat(64)])),
+  ciControllerBPolicy:{schema:'ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V2',
+   enabled:true,workflowId:430972394,
+   workflowBlobSha:'f'.repeat(40),
+   workflowPath:'.github/workflows/ci-approval-controller-b.yml',
+   repositoryVisibility:'public',installedSha:INSTALLED,
+   targetSha:TARGET,manifestSha256:digest(bytes)}});
+ ports.readIndependentInstalledCiPolicy=async()=>({
+  ...installed(),ciControllerBPolicy:{...installed().ciControllerBPolicy,
+   manifestSha256:'0'.repeat(64)}});
+ await assert.rejects(()=>submitExistingControllerApprovalFromCi(input,ports),
+  /MAINTENANCE_CI_PUBLIC_EFFECT_SCOPE_MISMATCH/);
+ assert.equal(reads,0);assert.equal(posts,0);
+ ports.readIndependentInstalledCiPolicy=async()=>installed();
+ await assert.rejects(()=>submitExistingControllerApprovalFromCi(input,ports),
+  /MAINTENANCE_CI_PUBLIC_PUBLISHER_IDENTITY_UNVERIFIED/);
+ assert.equal(reads,0);assert.equal(posts,0);
+ ports.readPublisherWorkflowIdentity=async()=>({
+  workflowId:installed().ciControllerBPolicy.workflowId,
+  workflowBlobSha:installed().ciControllerBPolicy.workflowBlobSha
+ });
+ const own={id:327938088,login:ACTOR,type:'User'};
+ const pr={number:28,merged:true,merged_by:own,merge_commit_sha:'a'.repeat(40),
+  base:{ref:'main',repo:{full_name:REPO}},
+  head:{sha:'f'.repeat(40),repo:{full_name:REPO}}};
+ const run={id:22,workflow_id:416355595,
+  path:'.github/workflows/controller-maintenance-source-tests.yml',
+  event:'pull_request',status:'completed',conclusion:'success',
+  repository:{id:1442936296,full_name:REPO},head_repository:{id:1442936296},
+  head_sha:pr.head.sha};
+ let saved=null,actual=null;
+ Object.assign(ports,{
+  readMergedManifest:async()=>bytes,
+  readApprovalPr:async()=>pr,listRuns:async()=>({workflow_runs:[run]}),
+  readRun:async()=>run,loadReceipt:async()=>saved,
+  findPriorRequests:async()=>[],
+  saveReceipt:async(_effect,receipt,{exclusive=false}={})=>{
+   if(exclusive&&saved)throw Error('DUPLICATE_RECEIPT');
+   saved=structuredClone(receipt);
+  },
+  createIssue:async envelope=>{
+   posts++;
+   assert.equal(saved.phase,'CREATING');
+   actual={number:42,state:'open',
+    user:{login:CI_CONTROLLER_ACTOR,id:41898282,type:'Bot'},
+    title:envelope.title,body:envelope.body,
+    labels:envelope.labels.map(name=>({name}))};
+   return {number:42};
+  },
+  readIssue:async()=>actual
+ });
+ const done=await submitExistingControllerApprovalFromCi(input,ports);
+ assert.equal(done.status,'REQUEST_READBACK_VERIFIED');
+ assert.equal(saved.phase,'READBACK_VERIFIED');
+ assert.match(done.receiptMarker,/^ZGMINI_CI_CONTROLLER_B_RECEIPT=42:[a-f0-9]{64}$/);
+ assert.equal(posts,1);assert.ok(reads>=1);
+ const reused=await submitExistingControllerApprovalFromCi({...input,runId:777},ports);
+ assert.equal(reused.status,'EXISTING_REQUEST_REUSED');
+ assert.equal(reused.receiptMarker,undefined);
+ assert.equal(posts,1);
+});
+
+
+
+test('verified Public B never enters configured approval PR merge before exact Owner approval',async()=>{
+ const runtime=fs.readFileSync(new URL('../ci-approval/completed-run-intake.mjs',import.meta.url),'utf8');
+ assert.match(runtime,/autoApprovalPolicy:allowPublic\?null:initialControllerPublicationPolicy\(policy\)/);
+ assert.match(runtime,/if\(policy&&!allowPublic\)/);
+ let reads=0,merges=0,posts=0,stages=0;
+ const result=await publishConfiguredControllerApproval({
+  action:'completed',repository:{id:1442936296,full_name:REPO,private:false}
+ },{
+  allowPublic:true,
+  policy:{targetSha:TARGET,sourcePrNumber:10,approvalPrNumber:11},
+  runId:765,attempt:1,
+  getJson:async()=>{reads++;throw Error('PUBLIC_AUTO_MERGE_UNAUTHORIZED');},
+  ports:{mergeApprovalPr:async()=>{merges++},createIssue:async()=>{posts++}},
+  stageApprovalPr:async()=>{stages++;throw Error('PUBLIC_STAGING_UNAUTHORIZED');},
+  emitReceipt:()=>assert.fail('no Public configured receipt')
+ });
+ assert.deepEqual(result,{state:'DISABLED',code:'CI_PUBLIC_CONFIGURED_MERGE_NOT_AUTHORIZED',results:[]});
+ assert.equal(reads,0);assert.equal(merges,0);assert.equal(posts,0);assert.equal(stages,0);
+});
+
+
+test('new Public B submission branch is separately opt-in and bound to installed Windows B pin',()=>{
+ const workflow=fs.readFileSync(new URL('../.github/workflows/ci-approval-controller-b.yml',import.meta.url),'utf8');
+ const section=workflow.slice(workflow.indexOf('  submit-controller-b:'));
+ const trigger=workflow.slice(0,workflow.indexOf('\npermissions:'));
+ assert.match(section,/vars\.ZGMINI_CI_CONTROLLER_B_ENABLED == 'true'/);
+ assert.match(section,/github\.event\.repository\.private == true/);
+ assert.match(section,/github\.event\.repository\.private == false/);
+ assert.match(section,/vars\.ZGMINI_CI_CONTROLLER_B_PUBLIC_EFFECT_APPROVED == 'true'/);
+ assert.match(section,/github\.event\.workflow_run\.workflow_id == 416355595/);
+ assert.match(section,/github\.event\.workflow_run\.conclusion == 'success'/);
+ assert.match(section,/github\.event\.workflow_run\.head_repository\.id == 1442936296/);
+ assert.match(section,/name: Checkout existing Private B source pin\s+if: github\.event\.repository\.private == true/);
+ assert.match(section,/ref: cfe57f3d720219613c87eff21338de0d35edbf6b/);
+ assert.match(section,/name: Checkout separately approved Public B candidate source pin\s+if: github\.event\.repository\.private == false/);
+ assert.match(section,/ref: 4d3fe664a90f2e8c3dea885559b1ec263df66a24/);
+ assert.match(section,/runs-on: \[self-hosted, Windows, X64, zgmini-handoff-ci-isolated\]/);
+ assert.match(section,/persist-credentials: false/);
+ assert.match(section,/run: node ci-approval\/completed-run-intake\.mjs --publish-existing/);
+ assert.doesNotMatch(trigger,/workflow_dispatch:|schedule:|pull_request:/);
+ // This flag merely permits the hosted workflow to reach its fixed caller.
+ // Windows itself must have a separately approved exact V2 one-effect grant.
+ const publisher=fs.readFileSync(new URL('../ci-approval/completed-run-intake.mjs',import.meta.url),'utf8');
+ assert.match(publisher,/readIndependentlyInstalledControllerBPublisherPolicy\(\)/);
+ assert.match(publisher,/readAuthenticatedControllerBPublisherWorkflow\(\{getJson\}\)/);
+ assert.match(publisher,/publicEffectPin=grant\.targetSha/);
+ const receiver=fs.readFileSync(new URL('../tools/maintenance-agent.mjs',import.meta.url),'utf8');
+ assert.match(receiver,/PUBLIC_B_EFFECT_SEPARATE_AUTH_REQUIRED/);
+ assert.match(receiver,/installedControllerBPolicy\(JSON\.parse\(fs\.readFileSync/);
+});
+
+test('Public source event stays Private-only by default but is observable with verified caller scope',async()=>{
+ const repo={id:1442936296,full_name:REPO,private:false};
+ const run={id:45623579994,run_attempt:1,workflow_id:416355595,
+  path:'.github/workflows/controller-maintenance-source-tests.yml',
+  event:'pull_request',repository:repo,head_repository:repo,
+  head_sha:'a'.repeat(40),status:'completed',conclusion:'success'};
+ const event={action:'completed',repository:repo,workflow_run:run};
+ let reads=0;
+ const getRun=async()=>{reads++;return structuredClone(run);};
+ const blocked=await observeCompletedRun(event,{getRun});
+ assert.equal(blocked.state,'IGNORED');assert.equal(reads,0);
+ const seen=await observeCompletedRun(event,{getRun,allowPublic:true});
+ assert.equal(seen.state,'CI_COMPLETION_OBSERVED_ONLY');
+ assert.equal(seen.headSha,run.head_sha);assert.equal(seen.canPublish,false);
+ assert.equal(seen.canExecute,false);assert.equal(reads,1);
+ for(const drift of [
+  e=>e.workflow_run.head_repository.id=123,
+  e=>e.workflow_run.repository.private=true,
+  e=>e.repository.private=true,
+  e=>e.workflow_run.conclusion='failure',
+  e=>e.workflow_run.workflow_id=1
+ ]){
+  const e=structuredClone(event);drift(e);reads=0;
+  const denied=await observeCompletedRun(e,{getRun,allowPublic:true});
+  assert.equal(denied.state,'IGNORED');assert.equal(reads,0);
+ }
+ const late=await observeLateOwnerMergedControllerApproval(event,{
+  getJson:async route=>route==='actions/runs/'+run.id?run:
+   route==='commits/'+run.head_sha+'/pulls?per_page=100'?[]:
+   assert.fail('unexpected API route'),allowPublic:true});
+ assert.equal(late.state,'IGNORED');
+ assert.equal(late.canPublish,false);
+ const lateBlocked=await observeLateOwnerMergedControllerApproval(event,{
+  getJson:()=>assert.fail('default Private does not read a Public event')});
+ assert.equal(lateBlocked.state,'IGNORED');
+});
+
+test('Public approval main event reaches read-only intake only under explicit verified scope',async()=>{
+ const repo={id:1442936296,full_name:REPO,private:false};
+ const before='a'.repeat(40),after='b'.repeat(40);
+ const event={repository:repo,ref:'refs/heads/main',deleted:false,
+  forced:false,before,after};
+ let reads=0;
+ const getJson=async route=>{
+  reads++;
+  assert.equal(route,'compare/'+before+'...'+after);
+  return {status:'ahead',behind_by:0,base_commit:{sha:before},
+   merge_base_commit:{sha:before},files:[]};
+ };
+ assert.equal((await observePublishedControllerApprovals(event,{getJson})).state,'IGNORED');
+ assert.equal(reads,0);
+ const observed=await observePublishedControllerApprovals(event,{getJson,allowPublic:true});
+ assert.equal(observed.state,'IGNORED','unrelated changes do not issue approval');
+ assert.equal(observed.reason,'NO_CONTROLLER_APPROVAL_CHANGE');
+ assert.equal(reads,1);assert.equal(observed.canExecute,false);
+ const pushed=await publishExistingControllerApprovals(event,{
+  getJson,allowPublic:true,publicEffectPin:TARGET,runId:123,attempt:1,
+  ports:{createIssue:()=>assert.fail('unrelated source cannot POST')},
+  emitReceipt:()=>assert.fail('unrelated source cannot issue receipt')});
+ assert.equal(pushed.state,'IGNORED');
+ assert.equal(reads,2);
+ const wrong={...event,repository:{...repo,id:1}};
+ assert.equal((await observePublishedControllerApprovals(wrong,{
+  getJson:()=>assert.fail('foreign repo cannot read'),allowPublic:true})).state,'IGNORED');
+});
+
+test('Public run cannot use legacy Private-only publisher flag or unverified output as authority',async()=>{
+ const repo={id:1442936296,full_name:REPO,private:false};
+ const run={id:765,run_attempt:1,workflow_id:416355595,
+  path:'.github/workflows/controller-maintenance-source-tests.yml',
+  event:'pull_request',repository:repo,head_repository:repo,
+  head_sha:'a'.repeat(40),status:'completed',conclusion:'success'};
+ const event={action:'completed',repository:repo,workflow_run:run};
+ const blocked=await publishLateOwnerMergedControllerApproval(event,{
+  getJson:()=>assert.fail('unverified Public must not read'),
+  ports:{createIssue:()=>assert.fail('unverified Public must not post')},
+  runId:765,attempt:1,emitReceipt:()=>assert.fail('no receipt')});
+ assert.equal(blocked.state,'IGNORED');
+ assert.deepEqual(blocked.results,[]);
+ const allowed=await publishLateOwnerMergedControllerApproval(event,{
+  allowPublic:true,publicEffectPin:TARGET,
+  getJson:async route=>route==='actions/runs/'+run.id?run:
+   route==='commits/'+run.head_sha+'/pulls?per_page=100'?[]:
+   assert.fail('unexpected read'),
+  ports:{createIssue:()=>assert.fail('no approval PR, no post')},
+  runId:765,attempt:1,emitReceipt:()=>assert.fail('no receipt')});
+ assert.equal(allowed.state,'IGNORED');
+ assert.deepEqual(allowed.results,[]);
+});
+
+
+test('Public B publisher cannot scan or post without the installed one-effect target pin',async()=>{
+ const repo={id:1442936296,full_name:REPO,private:false};
+ const before='a'.repeat(40),after='d'.repeat(40);
+ const event={repository:repo,ref:'refs/heads/main',deleted:false,
+  forced:false,before,after};
+ let calls=0;
+ const denied=await publishExistingControllerApprovals(event,{
+  allowPublic:true,getJson:async()=>{calls++;throw Error('MUST_NOT_READ');},
+  ports:{createIssue:()=>assert.fail('no Issue')},
+  runId:12,attempt:1,emitReceipt:()=>assert.fail('no receipt')
+ });
+ assert.deepEqual(denied,{state:'EVIDENCE_MISSING',code:'CI_PUBLIC_EFFECT_PIN_REQUIRED',results:[]});
+ assert.equal(calls,0);
+ const run={id:765,run_attempt:1,workflow_id:416355595,
+  path:'.github/workflows/controller-maintenance-source-tests.yml',
+  event:'pull_request',repository:repo,head_repository:repo,
+  head_sha:'e'.repeat(40),status:'completed',conclusion:'success'};
+ const fromRun=await publishLateOwnerMergedControllerApproval({
+  action:'completed',repository:repo,workflow_run:run
+ },{
+  allowPublic:true,getJson:async()=>{calls++;throw Error('MUST_NOT_READ');},
+  ports:{createIssue:()=>assert.fail('no Issue')},
+  runId:12,attempt:1,emitReceipt:()=>assert.fail('no receipt')
+ });
+ assert.equal(fromRun.code,'CI_PUBLIC_EFFECT_PIN_REQUIRED');
+ assert.equal(calls,0);
+});
+
+test('one installed Public B pin isolates two approvals on main push and source completion',async()=>{
+ const repo={id:1442936296,full_name:REPO,private:false};
+ const other='c'.repeat(40),head='e'.repeat(40),merge='f'.repeat(40);
+ const before='a'.repeat(40),after='d'.repeat(40);
+ const wanted='approvals/controller-updates/'+TARGET+'.json';
+ const unrelated='approvals/controller-updates/'+other+'.json';
+ const payload={schema:'ZGMINI_PC_UPDATE_V1',targetSha:TARGET,
+  purpose:'pc-controller-maintenance',controllerOnlyInstall:true,
+  selectiveSource:{branch:'codex/exact-owner-approval'},
+  approval:{ref:'https://github.com/'+REPO+'/pull/28'}};
+ const bytes=Buffer.from(JSON.stringify(payload));
+ const blob=crypto.createHash('sha1').update(Buffer.from('blob '+bytes.length))
+  .update(Buffer.from([0])).update(bytes).digest('hex');
+ const file={type:'file',path:wanted,encoding:'base64',
+  sha:blob,content:bytes.toString('base64')};
+ const pr={number:28,merged:true,merged_at:'2026-11-28T00:00:00Z',
+  merged_by:{login:ACTOR,id:327938088,type:'User'},
+  merge_commit_sha:merge,base:{ref:'main',repo},head:{sha:head,repo}};
+ const run={id:765,run_attempt:1,workflow_id:416355595,
+  path:'.github/workflows/controller-maintenance-source-tests.yml',
+  event:'pull_request',repository:repo,head_repository:repo,
+  head_sha:head,status:'completed',conclusion:'success'};
+ const calls=[],getJson=async route=>{
+  calls.push(route);
+  if(route==='compare/'+before+'...'+after)
+   return {status:'ahead',behind_by:0,base_commit:{sha:before},
+    merge_base_commit:{sha:before},files:[
+      {filename:unrelated,status:'modified',sha:'0'.repeat(40)},
+      {filename:wanted,status:'added',sha:blob}]};
+  if(route==='contents/'+wanted+'?ref='+after||
+     route==='contents/'+wanted+'?ref='+merge||
+     route==='contents/'+wanted+'?ref=main')return file;
+  if(route==='pulls/28')return pr;
+  if(route==='commits/'+head+'/pulls?per_page=100')
+   return [{number:28,merged_at:pr.merged_at}];
+  if(route==='pulls/28/files?per_page=100')
+   return [{filename:unrelated,status:'modified',sha:'0'.repeat(40)},
+    {filename:wanted,status:'added',sha:blob}];
+  if(route==='actions/workflows/416355595/runs?head_sha='+head+
+    '&event=pull_request&status=success&per_page=100')
+   return {workflow_runs:[run]};
+  if(route==='actions/runs/765')return run;
+  throw Error('unexpected API route: '+route);
+ };
+ const pushed={repository:repo,ref:'refs/heads/main',deleted:false,
+  forced:false,before,after};
+ const observed=await observePublishedControllerApprovals(pushed,{
+  getJson,allowPublic:true,publicEffectPin:TARGET});
+ assert.equal(observed.state,'APPROVAL_PUBLICATION_OBSERVED_ONLY');
+ assert.deepEqual(observed.entries.map(x=>x.targetSha),[TARGET]);
+ assert.equal(observed.entries[0].ciState,'SOURCE_CI_MATCH_ONLY');
+ assert.equal(calls.some(x=>x.includes(other)),false);
+ let submits=0;
+ const ports={readRepository:async()=>{submits++;return null;},
+  createIssue:()=>assert.fail('no authorized source may post')};
+ const published=await publishExistingControllerApprovals(pushed,{
+  getJson,ports,allowPublic:true,publicEffectPin:TARGET,
+  runId:123,attempt:1,emitReceipt:()=>assert.fail('no receipt')});
+ assert.equal(published.results.length,1);
+ assert.equal(published.results[0].targetSha,TARGET);
+ assert.equal(published.results[0].code,'MAINTENANCE_CI_REPOSITORY_DENIED');
+ assert.equal(submits,1,'only the installed target enters strict submitter');
+ const event={action:'completed',repository:repo,workflow_run:run};
+ const late=await observeLateOwnerMergedControllerApproval(event,{
+  getJson,allowPublic:true,publicEffectPin:TARGET});
+ assert.equal(late.state,'OWNER_APPROVAL_RUN_OBSERVED_ONLY');
+ assert.deepEqual(late.entries.map(x=>x.targetSha),[TARGET]);
+ assert.equal(calls.some(x=>x.includes(other)),false);
+ const afterLate=await publishLateOwnerMergedControllerApproval(event,{
+  getJson,ports,allowPublic:true,publicEffectPin:TARGET,
+  runId:124,attempt:1,emitReceipt:()=>assert.fail('no receipt')});
+ assert.deepEqual(afterLate.results.map(x=>x.targetSha),[TARGET]);
+ assert.equal(submits,2,'both publication paths stay limited to the same installed target');
+});
+
+
+test('Public B publisher requires exact checked-out source to be ancestor of authenticated main',async()=>{
+ const source='a'.repeat(40),main='b'.repeat(40);
+ const env={GITHUB_WORKSPACE:'/tmp/ci-isolated-source',
+  GITHUB_REPOSITORY:REPO,GITHUB_REF:'refs/heads/main',
+  GITHUB_WORKFLOW_SHA:main};
+ let reads=0,compares=0;
+ const getJson=async route=>{
+  reads++;
+  assert.equal(route,'compare/'+source+'...'+main);
+  compares++;
+  return {status:'ahead',behind_by:0,
+   base_commit:{sha:source},head_commit:{sha:main},
+   merge_base_commit:{sha:source}};
+ };
+ const accepted=await readAuthenticatedPublicBPublisherSourceAncestry({
+  env,getJson,readCheckoutSha:async()=>source});
+ assert.deepEqual(accepted,{sourceSha:source,mainSha:main});
+ assert.equal(Object.isFrozen(accepted),true);
+ assert.equal(reads,1);
+ const identical=await readAuthenticatedPublicBPublisherSourceAncestry({
+  env,getJson:async route=>{
+   assert.equal(route,'compare/'+main+'...'+main);
+   return {status:'identical',behind_by:0,
+    base_commit:{sha:main},head_commit:{sha:main},
+    merge_base_commit:{sha:main}};
+  },readCheckoutSha:()=>main});
+ assert.equal(identical.sourceSha,main);
+ for(const failure of [
+  {name:'unmerged candidate branch',data:{status:'diverged',behind_by:1,
+   base_commit:{sha:source},head_commit:{sha:main},merge_base_commit:{sha:'c'.repeat(40)}}},
+  {name:'post-squash source not in main ancestry',data:{status:'ahead',
+   behind_by:0,base_commit:{sha:source},head_commit:{sha:main},
+   merge_base_commit:{sha:'c'.repeat(40)}}},
+  {name:'main moved backwards from source',data:{status:'behind',
+   behind_by:2,base_commit:{sha:source},head_commit:{sha:main},
+   merge_base_commit:{sha:main}}},
+  {name:'forged API head',data:{status:'ahead',behind_by:0,
+   base_commit:{sha:source},head_commit:{sha:'c'.repeat(40)},
+   merge_base_commit:{sha:source}}},
+  {name:'missing compare readback',data:null}
+ ]){
+  await assert.rejects(()=>readAuthenticatedPublicBPublisherSourceAncestry({
+   env,readCheckoutSha:()=>source,getJson:async()=>failure.data}),
+   /CI_PUBLIC_PUBLISHER_MAIN_ANCESTRY_UNVERIFIED/,failure.name);
+ }
+ for(const invalid of [
+  {...env,GITHUB_REPOSITORY:'attacker/repo'},
+  {...env,GITHUB_REF:'refs/heads/candidate'},
+  {...env,GITHUB_WORKFLOW_SHA:'bad'},
+  {...env,GITHUB_WORKSPACE:'relative/checkout'}
+ ]){
+  await assert.rejects(()=>readAuthenticatedPublicBPublisherSourceAncestry({
+   env:invalid,readCheckoutSha:()=>{throw Error('must not call git');},
+   getJson:()=>{throw Error('must not read GitHub');}}),
+   /CI_PUBLIC_PUBLISHER_MAIN_ANCESTRY_UNVERIFIED/);
+ }
+ await assert.rejects(()=>readAuthenticatedPublicBPublisherSourceAncestry({
+  env,readCheckoutSha:()=>{throw Error('checkout unknown');},getJson}),
+  /CI_PUBLIC_PUBLISHER_MAIN_ANCESTRY_UNVERIFIED/);
+ assert.equal(compares,1,'only approved provenance triggered the readback');
+});
+
+test('Public running publisher workflow attestation binds authenticated immutable GitHub API bytes',async()=>{
+ const workflow='.github/workflows/ci-approval-controller-b.yml';
+ const bytes=Buffer.from('name: Exact reviewed CI Publisher\non: workflow_run\n');
+ const blob=crypto.createHash('sha1').update(Buffer.from('blob '+bytes.length))
+  .update(Buffer.from([0])).update(bytes).digest('hex');
+ const env={GITHUB_REPOSITORY:REPO,GITHUB_REF:'refs/heads/main',
+  GITHUB_WORKFLOW_REF:REPO+'/'+workflow+'@refs/heads/main',
+  GITHUB_WORKFLOW_SHA:'a'.repeat(40),GITHUB_JOB:'submit-controller-b',
+  GITHUB_RUN_ID:'22',GITHUB_RUN_ATTEMPT:'1'};
+ const api=async route=>{
+  if(route==='actions/workflows/ci-approval-controller-b.yml')
+   return {id:123456,state:'active',path:workflow};
+  if(route==='contents/'+workflow+'?ref='+env.GITHUB_WORKFLOW_SHA)
+   return {type:'file',path:workflow,encoding:'base64',sha:blob,
+    content:bytes.toString('base64')};
+  throw Error('denied');
+ };
+ const proof=await readAuthenticatedControllerBPublisherWorkflow({env,getJson:api});
+ assert.deepEqual(proof,{workflowId:123456,workflowBlobSha:blob});
+ assert.equal(Object.isFrozen(proof),true);
+ for(const patch of [
+  x=>x.GITHUB_WORKFLOW_REF=REPO+'/'+workflow+'@refs/heads/topic',
+  x=>x.GITHUB_JOB='observe-public-source',
+  x=>x.GITHUB_WORKFLOW_SHA='main',
+  x=>x.GITHUB_REPOSITORY='attacker/repo',
+  x=>x.GITHUB_REF='refs/heads/topic',
+  x=>x.GITHUB_RUN_ATTEMPT='0'
+ ]){
+  const v={...env};patch(v);
+  await assert.rejects(()=>readAuthenticatedControllerBPublisherWorkflow({
+   env:v,getJson:()=>assert.fail('untrusted event may not request API')}),
+   /CI_PUBLIC_PUBLISHER_WORKFLOW_UNVERIFIED/);
+ }
+ for(const bad of [
+  {id:222,state:'disabled_manually',path:workflow},
+  {id:222,state:'active',path:'unrelated.yml'}
+ ]){
+  await assert.rejects(()=>readAuthenticatedControllerBPublisherWorkflow({
+   env,getJson:route=>route.startsWith('actions/')?bad:api(route)}),
+   /CI_PUBLIC_PUBLISHER_WORKFLOW_UNVERIFIED/);
+ }
+ for(const file of [
+  {type:'file',path:workflow,encoding:'base64',sha:blob,
+   content:Buffer.from('tampered').toString('base64')},
+  {type:'file',path:workflow,encoding:'base64',sha:'f'.repeat(40),
+   content:bytes.toString('base64')},
+  {type:'file',path:'attacker.yml',encoding:'base64',sha:blob,
+   content:bytes.toString('base64')}
+ ]){
+  await assert.rejects(()=>readAuthenticatedControllerBPublisherWorkflow({
+   env,getJson:route=>route.startsWith('actions/')?{
+    id:123456,state:'active',path:workflow
+   }:file}),/CI_PUBLIC_PUBLISHER_WORKFLOW_UNVERIFIED/);
+ }
+});
+
+test('Public B stays blocked without an independently installed V2 grant, including bot spoof',async t=>{
+ const f=fixture(t,{privateRepo:false,actor:CI_CONTROLLER_ACTOR});
+ const result=await f.agent.processIssue(f.issue);
+ assert.equal(result.status,'BLOCKED');
+ assert.equal(result.code,'PUBLIC_B_EFFECT_SEPARATE_AUTH_REQUIRED');
+ assert.equal(result.effectAuthorized,false);
+ assert.equal(result.operationalWrites,0);
+ assert.equal(f.stats.applies,0);assert.equal(f.stats.manifestReads,0);
+ assert.equal(f.agent.loadLedger(REQUEST_ID),null);
+});
+
+function publicBAuthFixture(){
+ const path='.github/workflows/ci-approval-controller-b.yml';
+ const workflow=Buffer.from('reviewed Public B source workflow fixture\\n');
+ const blob=crypto.createHash('sha1').update(Buffer.from('blob '+workflow.length))
+  .update(Buffer.from([0])).update(workflow).digest('hex');
+ const manifest=sampleRequest(),request={...manifest.issue,chatId:'chat-ci-765-1'};
+ const requestBytes=Buffer.from(JSON.stringify(request));
+ const installed={schema:'ZGMINI_PC_MAINTENANCE_INSTALL_V1',
+  sourceSha:'c'.repeat(40),startupSha256:'d'.repeat(64),
+  files:Object.fromEntries(['a','b','c','d','e','f','g'].map(x=>['tools/'+x+'.mjs','e'.repeat(64)])),
+  ciControllerBPolicy:{schema:'ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V2',
+    enabled:true,workflowId:123456,workflowBlobSha:blob,workflowPath:path,
+    repositoryVisibility:'public',installedSha:INSTALLED,targetSha:TARGET,
+    manifestSha256:request.approvalManifestSha256}};
+ const policy=installedControllerBPolicy(installed);
+ const run={id:765,run_attempt:1,workflow_id:123456,path,
+  repository:{id:1442936296,full_name:REPO,private:false},
+  head_repository:{id:1442936296,full_name:REPO,private:false},
+  head_branch:'main',head_sha:'b'.repeat(40),event:'workflow_run',
+  status:'completed',conclusion:'success'};
+ const job={id:888,run_id:765,run_attempt:1,head_sha:run.head_sha,
+  name:'submit-controller-b',status:'completed',conclusion:'success',
+  steps:[{name:'Record Controller B request receipt',status:'completed',conclusion:'success'}]};
+ const actual={number:42,title:'pc-controller-update',state:'open',
+  user:{id:41898282,type:'Bot',login:CI_CONTROLLER_ACTOR},
+  labels:[{name:'pc-maintenance'}],body:requestBytes.toString('utf8')};
+ const proof={
+  issueNumber:42,requestBytes,runId:765,attempt:1,policy,
+  getJson:async route=>{
+   if(route==='actions/runs/765/attempts/1')return run;
+   if(route==='contents/'+path+'?ref='+run.head_sha)return {type:'file',
+    path,sha:blob,encoding:'base64',content:workflow.toString('base64')};
+   if(route==='actions/runs/765/attempts/1/jobs?per_page=100')
+    return {total_count:1,jobs:[job]};
+   throw Error('unexpected GitHub API route');
+  },
+  readJobLogs:async id=>id===888?
+   '2026-11-28T00:00:00Z '+controllerBReceiptMarker(42,requestBytes)+'\n':''
+ };
+ return {installed,policy,run,job,actual,request,proof};
+}
+
+test('Public receiver poll performs exact installed V2 CI proof, one isolated apply and no retry',async t=>{
+ const p=publicBAuthFixture();
+ const f=fixture(t,{privateRepo:false,actor:'app/github-actions',
+  requestPatch:{chatId:'chat-ci-765-1'},
+  manifestPatch:{controllerOnlyInstall:true,selectiveSource:{
+    schema:'ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1',
+    branch:'codex/ci-public-effect-review',mainSha:'e'.repeat(40),customPaths:[]}},
+  installedCiPolicy:(_issue,raw)=>({...p.installed,ciControllerBPolicy:{
+    ...p.installed.ciControllerBPolicy,manifestSha256:digest(raw)}}),
+  publicCiProof:{actual:p.actual,getJson:p.proof.getJson,
+    readJobLogs:(id,issue)=>id===p.job.id?
+      '2026-11-28T00:00:00Z '+controllerBReceiptMarker(issue.number,Buffer.from(issue.body))+'\n':''}
+ });
+ const observed=await f.agent.pollOnce();
+ const successful=observed.find(x=>x.status==='SUCCEEDED');
+ assert.equal(observed[0]?.status,'SUCCEEDED',
+   'authenticated Public B effect cannot be mislabeled source-only');
+ assert.equal(successful?.code,'UPDATE_COMMITTED',JSON.stringify(observed));
+ assert.equal(f.stats.applies,1);
+ assert.equal(f.stats.manifestReads,1);
+ assert.equal(f.agent.loadLedger(f.request.requestId)?.status,'SUCCEEDED');
+ assert.equal(f.remote.size,2,'sanitized JSON and TXT pair');
+ const again=await f.agent.pollOnce();
+ assert.equal(again.find(x=>x.code==='DUPLICATE_REQUEST_SUPPRESSED')?.status,
+   'SUCCEEDED','existing completed ledger status is preserved on duplicate');
+ assert.equal(f.stats.applies,1,'one approved B effect is never reinstalled');
+});
+
+test('Public receiver accepts exact approved operations config plus Controller module via V2 receipt',async t=>{
+ const p=publicBAuthFixture();
+ const files=[
+  {path:'config/operations.json',sha256:'a'.repeat(64)},
+  {path:'controller/operations.mjs',sha256:'c'.repeat(64)}
+ ];
+ const f=fixture(t,{privateRepo:false,actor:'app/github-actions',
+  requestPatch:{chatId:'chat-ci-765-1'},
+  manifestPatch:{allowFiles:files,checks:{targetSha:TARGET,status:'PASS',
+   manifestSha256:manifestFingerprint(files).sha256},
+   controllerOnlyInstall:true,selectiveSource:{
+    schema:'ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1',
+    branch:'codex/ci-public-effect-review',mainSha:'e'.repeat(40),
+    customPaths:files.map(x=>x.path)}},
+  installedCiPolicy:(_issue,raw)=>({...p.installed,ciControllerBPolicy:{
+   ...p.installed.ciControllerBPolicy,manifestSha256:digest(raw)}}),
+  publicCiProof:{actual:p.actual,getJson:p.proof.getJson,
+   readJobLogs:(id,issue)=>id===p.job.id?
+    '2026-11-28T00:00:00Z '+controllerBReceiptMarker(issue.number,Buffer.from(issue.body))+'\n':''}
+ });
+ const observed=await f.agent.pollOnce();
+ assert.equal(observed.find(x=>x.status==='SUCCEEDED')?.code,'UPDATE_COMMITTED',JSON.stringify(observed));
+ assert.equal(f.stats.applies,1);assert.equal(f.stats.manifestReads,1);
+ assert.equal(f.remote.size,2,'the original JSON/TXT receipt pair remains required');
+ assert.equal(f.agent.loadLedger(f.request.requestId)?.status,'SUCCEEDED');
+});
+
+test('Public receiver rejects spoofed CI issue despite pinned V2 grant without an apply',async t=>{
+ const p=publicBAuthFixture();
+ const f=fixture(t,{privateRepo:false,actor:CI_CONTROLLER_ACTOR,
+  requestPatch:{chatId:'chat-ci-765-1'},
+  installedCiPolicy:(_issue,raw)=>({...p.installed,ciControllerBPolicy:{
+    ...p.installed.ciControllerBPolicy,manifestSha256:'0'.repeat(64)}}),
+  publicCiProof:{actual:p.actual,getJson:p.proof.getJson,
+    readJobLogs:(id,issue)=>id===p.job.id?
+      '2026-11-28T00:00:00Z '+controllerBReceiptMarker(issue.number,Buffer.from(issue.body))+'\n':''}
+ });
+ const observed=await f.agent.pollOnce();
+ assert.equal(observed.find(x=>x.status==='BLOCKED')?.code,
+   'CI_PUBLIC_EFFECT_SCOPE_MISMATCH',JSON.stringify(observed));
+ assert.equal(f.stats.applies,0);assert.equal(f.stats.manifestReads,0);
+ assert.equal(f.agent.loadLedger(f.request.requestId),null);
+});
+
+test('Public GitHub CLI app alias alone cannot spoof REST Bot admission',async t=>{
+ const p=publicBAuthFixture();
+ const f=fixture(t,{privateRepo:false,actor:'app/github-actions',
+  requestPatch:{chatId:'chat-ci-765-1'},
+  installedCiPolicy:(_issue,raw)=>({...p.installed,ciControllerBPolicy:{
+    ...p.installed.ciControllerBPolicy,manifestSha256:digest(raw)}}),
+  publicCiProof:{actual:{...p.actual,user:{...p.actual.user,id:1}},
+    getJson:p.proof.getJson,
+    readJobLogs:(id,issue)=>id===p.job.id?
+      '2026-11-28T00:00:00Z '+controllerBReceiptMarker(issue.number,Buffer.from(issue.body))+'\n':''}
+ });
+ const observed=await f.agent.pollOnce();
+ assert.equal(observed.find(x=>x.status==='BLOCKED')?.code,
+   'CI_ISSUE_ORIGIN_DENIED',JSON.stringify(observed));
+ assert.equal(f.stats.applies,0);
+ assert.equal(f.stats.manifestReads,0);
+ assert.equal(f.agent.loadLedger(f.request.requestId),null);
+});
+
+test('independent installed V2 exact public effect authenticates only original CI workload',async()=>{
+ const f=publicBAuthFixture();
+ assert.deepEqual(Object.keys(f.policy).sort(),
+  ['workflowId','workflowBlobSha','repositoryVisibility','installedSha',
+   'targetSha','manifestSha256'].sort());
+ assert.equal(Object.isFrozen(f.policy),true);
+ const proof=await verifyControllerBIdentity(f.proof);
+ assert.equal(proof.state,'CI_WORKLOAD_IDENTITY_VERIFIED_ONLY');
+ assert.equal(proof.issueNumber,42);
+ assert.equal(proof.canPublish,false);assert.equal(proof.canExecute,false);
+ const admission=await authenticateControllerBIssue(f.actual,{policy:f.policy,
+  getJson:f.proof.getJson,readJobLogs:f.proof.readJobLogs});
+ assert.equal(admission.state,'CI_WORKLOAD_IDENTITY_VERIFIED_ONLY');
+ assert.ok(admission.authorization);
+ assert.equal(admission.canExecute,false);
+ assert.equal((await authenticateControllerBIssue(f.actual,{policy:null,
+  getJson:f.proof.getJson,readJobLogs:f.proof.readJobLogs})).state,'DISABLED');
+});
+
+test('public B installed scope rejects extra fields, malformed pins and implicit visibility',()=>{
+ const f=publicBAuthFixture();
+ const mutate=[
+  x=>x.ciControllerBPolicy.targetSha='f'.repeat(40),
+  x=>x.ciControllerBPolicy.targetSha=x.ciControllerBPolicy.installedSha,
+  x=>x.ciControllerBPolicy.manifestSha256='incorrect',
+  x=>x.ciControllerBPolicy.repositoryVisibility='private',
+  x=>x.ciControllerBPolicy.workflowBlobSha='invalid',
+  x=>x.ciControllerBPolicy.enabled=false,
+  x=>x.ciControllerBPolicy.extra='allow',
+  x=>x.ciControllerBPolicy.workflowPath='not-reviewed.yml',
+  x=>x.sourceSha='invalid',
+  x=>x.files={}
+ ];
+ for(const patch of mutate){
+  const v=structuredClone(f.installed);patch(v);
+  if(v.ciControllerBPolicy.targetSha==='f'.repeat(40)){
+   // A different well-formed target is a *different installed grant*, not
+   // proof of authority for the original target.
+   assert.notEqual(installedControllerBPolicy(v).targetSha,f.policy.targetSha);
+  }else assert.throws(()=>installedControllerBPolicy(v),/CI_INSTALLED_POLICY_INVALID/);
+ }
+});
+
+test('Public B requires exact pinned request, origin and run receipt',async()=>{
+ const f=publicBAuthFixture();
+ const context={policy:f.policy,getJson:f.proof.getJson,
+  readJobLogs:f.proof.readJobLogs};
+ const denied=[
+  [{...f.actual,body:JSON.stringify({...f.request,targetControllerSha:'f'.repeat(40)})},
+   'CI_PUBLIC_EFFECT_SCOPE_MISMATCH'],
+  [{...f.actual,body:JSON.stringify({...f.request,approvalManifestSha256:'0'.repeat(64)})},
+   'CI_PUBLIC_EFFECT_SCOPE_MISMATCH'],
+  [{...f.actual,user:{id:123,type:'Bot',login:CI_CONTROLLER_ACTOR}},
+   'CI_ISSUE_ORIGIN_DENIED'],
+  [{...f.actual,labels:[{name:'bug'}]},'CI_ISSUE_ORIGIN_DENIED'],
+  [{...f.actual,state:'closed'},'CI_ISSUE_ORIGIN_DENIED']
+ ];
+ for(const [issue,code] of denied){
+  const r=await authenticateControllerBIssue(issue,context);
+  assert.equal(r.code,code);assert.equal(r.authorization,undefined);
+ }
+ f.run.repository.private=true;
+ assert.equal((await verifyControllerBIdentity(f.proof)).code,'CI_RUN_IDENTITY_MISMATCH');
+ f.run.repository.private=false;f.run.head_repository.private=true;
+ assert.equal((await verifyControllerBIdentity(f.proof)).code,'CI_RUN_IDENTITY_MISMATCH');
+ f.run.head_repository.private=false;f.job.conclusion='skipped';
+ assert.equal((await verifyControllerBIdentity(f.proof)).code,'CI_JOB_IDENTITY_MISMATCH');
+ f.job.conclusion='success';
+ const swapped=await verifyControllerBIdentity({...f.proof,issueNumber:43});
+ assert.equal(swapped.code,'CI_RECEIPT_ISSUE_OR_BYTES_MISMATCH');
 });

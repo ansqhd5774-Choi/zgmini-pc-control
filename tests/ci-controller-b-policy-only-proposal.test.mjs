@@ -155,3 +155,58 @@ test('original post-R6 Windows evidence does not establish Supervisor, HEALTHY a
  assert.equal(wmi.standbyRunnerWmi.promotionApproved,false);
  assert.equal(proposal.approved,false);
 });
+
+test('Public B policy-only handoff rotates reviewed workflow hash without changing one-effect pin',()=>{
+ const beforeV2={...before(),ciControllerBPolicy:{
+  ...before().ciControllerBPolicy,
+  schema:'ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V2',
+  repositoryVisibility:'public',
+  installedSha:'c'.repeat(40),
+  targetSha:'d'.repeat(40),
+  manifestSha256:'e'.repeat(64)
+ }};
+ const approved={...proposal,approved:true,
+  ciControllerBPolicy:{...beforeV2.ciControllerBPolicy,workflowBlobSha:proposedWorkflow}};
+ assert.equal(requireHandoffApproval(approved,candidateSha,installedSha),'SEVEN_TO_SEVEN');
+ assert.equal(approvedPolicyOnlyHandoff(beforeV2,approved,candidateSha),true);
+ assert.deepEqual(handoffFilePlan('SEVEN_TO_SEVEN',beforeV2.files,approved.files,{
+  before:beforeV2,approval:approved,target:candidateSha
+ }).writes,[]);
+ assert.equal(approvedHandoffCiPolicy(beforeV2,approved,{
+  ...beforeV2,sourceSha:candidateSha
+ }).workflowBlobSha,proposedWorkflow);
+ assert.equal(proposal.approved,false,'historical proposal remains non-executable');
+});
+
+test('policy-only handoff never enlarges a Public B effect while rotating workflow hash',()=>{
+ const beforeV2={...before(),ciControllerBPolicy:{
+  ...before().ciControllerBPolicy,
+  schema:'ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V2',
+  repositoryVisibility:'public',
+  installedSha:'c'.repeat(40),
+  targetSha:'d'.repeat(40),
+  manifestSha256:'e'.repeat(64)
+ }};
+ const base={...proposal,approved:true,
+  ciControllerBPolicy:{...beforeV2.ciControllerBPolicy,workflowBlobSha:proposedWorkflow}};
+ for(const edit of [
+  x=>x.ciControllerBPolicy.installedSha='f'.repeat(40),
+  x=>x.ciControllerBPolicy.targetSha='f'.repeat(40),
+  x=>x.ciControllerBPolicy.manifestSha256='f'.repeat(64),
+  x=>x.ciControllerBPolicy.repositoryVisibility='private',
+  x=>x.ciControllerBPolicy.schema='ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V1',
+  x=>x.ciControllerBPolicy.workflowId=1,
+ ]){
+  const changed=structuredClone(base);edit(changed);
+  assert.equal(approvedPolicyOnlyHandoff(beforeV2,changed,candidateSha),false);
+  assert.throws(()=>handoffFilePlan('SEVEN_TO_SEVEN',beforeV2.files,changed.files,{
+   before:beforeV2,approval:changed,target:candidateSha
+  }),/HANDOFF_NO_RUNTIME_CHANGE/);
+ }
+ // A V1->V2 privilege change is not a mere workflow-SHA rotation.
+ const upgrade={...base};
+ assert.equal(approvedPolicyOnlyHandoff(before(),upgrade,candidateSha),false);
+ assert.throws(()=>handoffFilePlan('SEVEN_TO_SEVEN',before().files,upgrade.files,{
+  before:before(),approval:upgrade,target:candidateSha
+ }),/HANDOFF_NO_RUNTIME_CHANGE/);
+});
