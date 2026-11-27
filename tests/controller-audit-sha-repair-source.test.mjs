@@ -28,9 +28,10 @@ test('new one-file B remains fail closed before distinct B approval merge',()=>{
  assert.ok(entry.includes("'PUBLIC_B_APPROVAL_NOT_PINNED'"));
 });
 
-test('prior two approved effects remain exact and source PR differs from approval PR',()=>{
+test('prior three approved effects remain exact and source PR differs from approval PR',()=>{
  const previous=['555f95708984580cd7d5a0fd05a80b718e867710',
-  'cde1dd372210e4658ae348cb9e2577967cb11634'];
+  'cde1dd372210e4658ae348cb9e2577967cb11634',
+  'd3764580fdb08ecddd5f9b1064051eec30f90492'];
  for(const id of previous){
   const m=JSON.parse(fs.readFileSync('approvals/controller-updates/'+id+'.json','utf8'));
   assert.equal(validatePublicOwnerBExactScope({actor,issue:issue(id),manifest:m}),true);
