@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import {spawn} from 'node:child_process';
 import {createNoSpawnHeartbeatActor} from '../controller/orphan-no-spawn-heartbeat-actor.mjs';
 import {createIsolatedOrphanStatusWriter} from '../tools/supervisor-orphan-status-temp-writer.mjs';
 
@@ -411,4 +412,78 @@ test('raw observation is mandatory even with synthetic six good seats',async()=>
   assert.equal((await a.tick()).status,'FAIL_CLOSED');
   assert.equal(writes,0);
  }
+});
+
+
+test('standalone no-spawn monitor stays alive after first verified heartbeat without an unrelated event-loop handle',async()=>{
+ // This is a throwaway Node subprocess under Windows/Linux SOURCE CI. It
+ // imports the Actor, but neither accesses the operating controller path
+ // nor starts run.cmd or a GitHub Runner. A previously unref'ed 15-second
+ // timer let this valid monitor exit before its next heartbeat.
+ const moduleUri=new URL('../controller/orphan-no-spawn-heartbeat-actor.mjs',import.meta.url).href;
+ const childSource=[
+  'import {createNoSpawnHeartbeatActor} from '+JSON.stringify(moduleUri)+';',
+  'const t='+t+';',
+  'const hex='+hex.toString()+';',
+  'const seats='+seats.toString()+';',
+  'const sample='+sample.toString()+';',
+  "let current='c'.repeat(64);",
+  'const a=createNoSpawnHeartbeatActor({',
+  ' now:()=>t,',
+  " attest:async()=>({...sample(),heartbeatRawObservation:{source:'PRIVATE_FIXED_STATUS_FILE_RAW_BYTES',sha256:current}}),",
+  ' writeStatus:async packet=>{',
+  "  if(packet.expectedRawSha256!==current||packet.canCommit()!==true)throw Error('BAD_FENCE');",
+  '  current=packet.nextRawSha256;',
+  "  return {status:'EXACT_RAW_CAS_READBACK_VERIFIED',expectedRawSha256:packet.expectedRawSha256,readbackRawSha256:current};",
+  ' }',
+  '});',
+  "const first=await a.start();",
+  "if(first.status!=='MONITORING')throw Error('NO_FIRST_HEARTBEAT');",
+  "process.stdout.write('MONITOR_ACTIVE\\n');"
+ ].join('\n');
+ const child=spawn(process.execPath,['--input-type=module','--eval',childSource],{
+  cwd:process.cwd(),stdio:['ignore','pipe','pipe'],windowsHide:true
+ });
+ let exited=false,out='',err='';
+ child.once('exit',()=>{exited=true;});
+ child.stderr.on('data',chunk=>{err+=chunk.toString();});
+ const ready=new Promise((resolve,reject)=>{
+  const limit=setTimeout(()=>reject(Error('NO_ACTOR_CHILD_READY '+err.slice(0,400))),12000);
+  child.stdout.on('data',chunk=>{
+   out+=chunk.toString();
+   if(out.includes('MONITOR_ACTIVE')){
+    clearTimeout(limit);resolve();
+   }
+  });
+  child.once('error',e=>{clearTimeout(limit);reject(e);});
+  child.once('exit',(code)=>{
+   if(!out.includes('MONITOR_ACTIVE')){
+    clearTimeout(limit);reject(Error('ACTOR_CHILD_EARLY_EXIT '+code+' '+err.slice(0,400)));
+   }
+  });
+ });
+ try{
+  await ready;
+  await new Promise(resolve=>setTimeout(resolve,400));
+  assert.equal(exited,false,'the monitored interval must keep a standalone actor process alive');
+  assert.equal(child.exitCode,null);
+  assert.match(out,/MONITOR_ACTIVE/);
+  assert.doesNotMatch(out,/Runner.Listener|ZGMINI_SUPERVISOR_NONCE|owner.json|5100/);
+ }finally{
+  if(!exited){
+   child.kill();
+   await Promise.race([
+    new Promise(resolve=>child.once('exit',resolve)),
+    new Promise(resolve=>setTimeout(resolve,4000))
+   ]);
+   if(!exited)child.kill();
+  }
+ }
+});
+
+test('heartbeat monitor timer must never be unrefed in source-only Actor',()=>{
+ const src=source();
+ assert.match(src,/timer=setInterval\(\(\)=>\{void tick\(\);\},15000\)/);
+ assert.doesNotMatch(src,/timer\.unref\s*\(/);
+ assert.match(src,/clearInterval\(timer\)/);
 });
