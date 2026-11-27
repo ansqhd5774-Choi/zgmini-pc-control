@@ -22,7 +22,7 @@ export function assessNoSpawnMonitorSnapshot({
  now=Date.now(),observedAt,preimage,approvedPreimage,installed,oldOwner,newOwner,
  watcher,privateLineage,controllerSeatPins,liveWmi,
  gitHubRoster,lease,relatedLeases,installation,
- activeControllerWorkers
+ activeControllerWorkers,monitorPhase='INITIAL_OWNER_ADOPTION',ongoingJobs
 }={}){
  if(!Number.isFinite(now)||!iso(observedAt)||Date.parse(observedAt)>now||
     now-Date.parse(observedAt)>15000)
@@ -80,7 +80,23 @@ export function assessNoSpawnMonitorSnapshot({
     lease?.singleRecoveryOperatorVerified!==true||
     lease?.uninterruptedRecoveryLeaseVerified!==true)
   return deny('NO_SPAWN_MONITOR_NEW_OWNER_LEASE_CAS_UNVERIFIED');
- if(relatedLeases!==0||installation?.installLeaseHeld!==false||
+ // INITIAL_OWNER_ADOPTION still requires zero related leases. After a
+ // verified owner handoff, normal Controller jobs create seat/request leases.
+ // A renewal can tolerate them ONLY with independent same-host private proof
+ // that every related lease is bound to the original six seats. This proof
+ // is not available from a GitHub Issue body or from Runner Online status.
+ const verifiedJobLeaseRenewal=monitorPhase==='ESTABLISHED_MONITOR_RENEWAL'&&
+  Number.isSafeInteger(relatedLeases)&&relatedLeases>0&&relatedLeases<=18&&
+  ongoingJobs?.source==='PRIVATE_SAME_HOST_CONTROLLER_JOB_LEASES'&&
+  ongoingJobs?.observedRelatedLeaseCount===relatedLeases&&
+  ongoingJobs?.allRelatedLeasesAccountedFor===true&&
+  ongoingJobs?.allBoundToOriginalSixSeatsVerified===true&&
+  ongoingJobs?.workerProcessLineageVerified===true&&
+  ongoingJobs?.noInstallRecoveryOrExternalLeaseVerified===true&&
+  ongoingJobs?.jobOwnerNonceContinuityVerified===true&&
+  ongoingJobs?.activeWorkerCount===activeControllerWorkers;
+ if((relatedLeases!==0&&!verifiedJobLeaseRenewal)||
+    installation?.installLeaseHeld!==false||
     installation?.workflowState!=='active'||
     gitHubRoster?.fixedSixOnline!==true)
   return deny('NO_SPAWN_MONITOR_RESOURCE_OR_ROSTER_UNVERIFIED');
