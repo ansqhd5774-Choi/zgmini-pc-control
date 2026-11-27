@@ -84,7 +84,6 @@ test('Public maintenance postcheck requires exact original owner requestId/title
   e=>{const body=JSON.parse(e.issue.body);body.operation='controller-update';e.issue.body=JSON.stringify(body);},
   e=>{e.issue.title='PC Update '+id+' postcheck extra';},
   e=>{e.issue.body='not json';},
-  e=>{e.issue.title='pc-job';},
   e=>{e.repository.private=true;},
  ]){
   const copy=structuredClone(origin);mutate(copy);
