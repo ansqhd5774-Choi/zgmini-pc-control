@@ -64,7 +64,18 @@ export function safeWriterBIdleObservation(error){
   x.maxReadyStreak<0||x.maxReadyStreak>1||
   x.maxReadyStreak>x.readySamples||
   (x.readySamples>0)!==(x.maxReadyStreak===1))return null;
- return Object.fromEntries(keys.map(k=>[k,x[k]]));
+ const last=x.lastBlocker;
+ const validLast=last&&typeof last==='object'&&!Array.isArray(last)&&
+  Object.keys(last).length===6&&
+  typeof last.enabled==='boolean'&&
+  typeof last.cycleLockPresent==='boolean'&&
+  ['state','instances','relatedProcesses','unknownProcessLines'].every(k=>
+   Number.isSafeInteger(last[k])&&last[k]>=0&&last[k]<=100000)&&
+  last.state<=4;
+ return {...Object.fromEntries(keys.map(k=>[k,x[k]])),
+  ...(validLast?{lastBlocker:Object.fromEntries(
+   ['enabled','state','instances','relatedProcesses',
+    'unknownProcessLines','cycleLockPresent'].map(k=>[k,last[k]]))}:{})};
 }
 
 export function verifyWriterBPreimage(manifest,preimage){

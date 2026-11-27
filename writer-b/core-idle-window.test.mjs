@@ -82,8 +82,10 @@ test('safe timeout evidence counts intermittent READY and ACTIVE without exposin
  await assert.rejects(awaitNaturalCoreIdle(opts,{windowMs:6000}),error=>{
   assert.equal(error.code,'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED');
   assert.deepEqual(error.idleObservation,{windowMs:6000,samples:4,
-   readySamples:2,activeSamples:2,otherSamples:0,maxReadyStreak:1});
-  assert.equal(JSON.stringify(error).includes('relatedProcesses'),false);
+   readySamples:2,activeSamples:2,otherSamples:0,maxReadyStreak:1,
+   lastBlocker:{enabled:true,state:4,instances:0,relatedProcesses:2,
+    unknownProcessLines:0,cycleLockPresent:true}});
+  assert.doesNotMatch(JSON.stringify(error.idleObservation),/privateCommandLine|pid|commandLine/i);
   return true;
  });
 });
@@ -101,4 +103,20 @@ test('post-prepare natural idle is bounded to 90 seconds inside 12-minute job',a
   {code:'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED'});
  assert.equal(calls.samples,60);
  assert.equal(calls.sleeps,60);
+});
+
+// The bounded failure evidence identifies the last blocker, not the historical
+// cause of any earlier sample. No process metadata may escape this field.
+test('idle failure captures only last numeric task and lock observation',async()=>{
+ const probe={enabled:true,state:4,instances:1,relatedProcesses:2,
+  unknownProcessLines:0,privateCommandLine:'never-export'};
+ const options={sample:async()=>({probe,lock:true}),wait:async()=>{},
+  clock:(()=>{let t=0;return()=>t+=1500;})(),isReady:()=>false,
+  blockCode:()=> 'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED'};
+ await assert.rejects(awaitNaturalCoreIdle(options,{windowMs:6000}),err=>{
+  assert.deepEqual(err.idleObservation.lastBlocker,{enabled:true,state:4,
+   instances:1,relatedProcesses:2,unknownProcessLines:0,cycleLockPresent:true});
+  assert.doesNotMatch(JSON.stringify(err.idleObservation),/privateCommandLine|never-export/);
+  return true;
+ });
 });

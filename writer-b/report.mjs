@@ -126,6 +126,14 @@ function textResult(result){return [
   `IDLE_ACTIVE_SAMPLES=${result.idleObservation.activeSamples}`,
   `IDLE_OTHER_SAMPLES=${result.idleObservation.otherSamples}`,
   `IDLE_MAX_READY_STREAK=${result.idleObservation.maxReadyStreak}`,
+  ...(result.idleObservation.lastBlocker?[
+   `IDLE_LAST_TASK_ENABLED=${result.idleObservation.lastBlocker.enabled}`,
+   `IDLE_LAST_TASK_STATE=${result.idleObservation.lastBlocker.state}`,
+   `IDLE_LAST_TASK_INSTANCES=${result.idleObservation.lastBlocker.instances}`,
+   `IDLE_LAST_RELATED_PROCESSES=${result.idleObservation.lastBlocker.relatedProcesses}`,
+   `IDLE_LAST_UNKNOWN_PROCESSES=${result.idleObservation.lastBlocker.unknownProcessLines}`,
+   `IDLE_LAST_CORE_LOCK=${result.idleObservation.lastBlocker.cycleLockPresent}`,
+  ]:[]),
  ]:[]),
  ...(result.diagnostic?[
   `IMPORT_SOURCE_KIND=${result.diagnostic.sourceKind}`,

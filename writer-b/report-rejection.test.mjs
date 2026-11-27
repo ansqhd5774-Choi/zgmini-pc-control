@@ -178,3 +178,19 @@ test('rejected request cannot claim delivery if comment POST fails',async()=>{
  {code:'WRITER_B_REPORT_COMMENT_STOP'});
  assert.equal(calls,1);
 });
+
+test('bounded last-blocker details are sanitized, never permit raw process data',()=>{
+ const counts={windowMs:6000,samples:4,readySamples:0,activeSamples:4,
+  otherSamples:0,maxReadyStreak:0};
+ const blocker={enabled:true,state:4,instances:1,relatedProcesses:2,
+  unknownProcessLines:0,cycleLockPresent:true};
+ const raw={status:'WRITER_B_PREFLIGHT_STOP',requestId:REQUEST_ID,
+  code:'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED',idleObservation:{...counts,
+   lastBlocker:{...blocker,secret:'do-not-publish'}}};
+ const cleaned=sanitizeWriterBResult(raw,REQUEST_ID,RUN_ID,'a'.repeat(64));
+ assert.equal(cleaned.idleObservation.lastBlocker,undefined);
+ const good=sanitizeWriterBResult({...raw,idleObservation:{...counts,
+  lastBlocker:blocker}},REQUEST_ID,RUN_ID,'a'.repeat(64));
+ assert.deepEqual(good.idleObservation.lastBlocker,blocker);
+ assert.doesNotMatch(JSON.stringify(good),/do-not-publish/);
+});
