@@ -1,5 +1,7 @@
 // Fixed one-shot Windows read-only process/operating-mode inventory.
-// Never read process command lines, full environment, secrets, user profiles, credentials or DB content.
+// Never capture or publish process command lines, the full environment, secrets,
+// user profiles, credentials or DB content. The sole fixed orphan self-nonce
+// diagnostic performs an in-process equality comparison without returning either value.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -31,6 +33,7 @@ import {inspectW06TaskCadenceReadonly,PROBE as W06_TASK_CADENCE_PROBE} from '../
 import {inspectW043409SourcePreflightReadonly} from './w04-3409-source-preflight-readonly.mjs';
 import {inspectOrphanSeatMapReadonly} from './supervisor-orphan-seat-readonly.mjs';
 import {inspectOrphanOwnerPreimageReadonly} from './supervisor-orphan-owner-preimage-readonly.mjs';
+import {inspectOrphanRunnerSelfNonceReadonly} from './supervisor-orphan-runner-self-nonce-readonly.mjs';
 import {inspect3409ArchivedReceiptReadonly} from './w04-3409-archive-receipt-readonly.mjs';
 import {inspect3516ArchivedReceiptReadonly} from './w04-3516-archive-receipt-readonly.mjs';
 import {inspect3409OperatorFileSafetyReadonly} from './w04-3409-operator-file-safety-readonly.mjs';
@@ -67,6 +70,14 @@ const R3_WATCHDOG_PREIMAGE_PROBE='controller-standby-watchdog-preimage-readonly'
 const R3_WMI_PROBE='controller-standby-runner-wmi-readonly';
 const ORPHAN_SEAT_MAP_PROBE='controller-orphan-seat-map-readonly';
 const ORPHAN_OWNER_CAS_PROBE='controller-orphan-owner-cas-readonly';
+// Existing 2026-11-26T23:34:48Z operating #4171: historical old-owner
+// raw bytes only. Read-only CAS pins, NEVER a new Owner B approval.
+const ORPHAN_SELF_NONCE_PROBE='controller-orphan-runner-self-nonce-readonly';
+const ORPHAN_SELF_NONCE_PREIMAGE=Object.freeze({
+ ownerSha256:'4fd973b5db9a291a8fa7359e3dc65f32488fb5aa2039fd3d3f425004b5ff4dc3',
+ hostSha256:'da40637d29d699891fb9199b5e35cc91fc9a2046bbb3257f48a59c231ad25588',
+ heartbeatSha256:'fce43d7d5d89c03a316af098b9c3475000b94def65d803e8e10b7978f9fced7e'
+});
 const R4_RUNTIME_PROBE='controller-standby-r4-runtime-readonly';
 const R5_RUNTIME_PROBE='controller-standby-r5-runtime-readonly';
 const R6_RUNTIME_PROBE='controller-standby-r6-runtime-readonly';
@@ -785,6 +796,7 @@ export function authenticateProcess(event,env,role){
  const isR3Wmi=withW05&&raw.probe===R3_WMI_PROBE;
  const isOrphanSeatMap=withW05&&raw.probe===ORPHAN_SEAT_MAP_PROBE;
  const isOrphanOwnerCas=withW05&&raw.probe===ORPHAN_OWNER_CAS_PROBE;
+ const isOrphanSelfNonce=withW05&&raw.probe===ORPHAN_SELF_NONCE_PROBE;
  const isR4Runtime=withW05&&raw.probe===R4_RUNTIME_PROBE;
  const isR5Runtime=withW05&&raw.probe===R5_RUNTIME_PROBE;
  const isR6Runtime=withW05&&raw.probe===R6_RUNTIME_PROBE;
@@ -802,7 +814,7 @@ export function authenticateProcess(event,env,role){
  const allowedOperatingProbe=isOperator||is2960||is3409||isEr1Postcheck||is3516||
   isD05Writer||isD05PrivateReceipt||isD05Theme||isD05Registration||is3160||
   isCnnStaticGuard||isCnnGitPredicates||isCnnBPins||isCnnBResources||
-  isCnnBCore||isW06Task||isR3Watchdog||isR3Wmi||isOrphanSeatMap||isOrphanOwnerCas||isR4Runtime||isR5Runtime||isR6Runtime||isS6Preimage||isS6NextPreimage||isS6Predrain||isS6Journal||isS6CurrentJournal||isS6ReceiverLedger||isR4GuardianOrigin||isCiPolicyCas;
+  isCnnBCore||isW06Task||isR3Watchdog||isR3Wmi||isOrphanSeatMap||isOrphanOwnerCas||isOrphanSelfNonce||isR4Runtime||isR5Runtime||isR6Runtime||isS6Preimage||isS6NextPreimage||isS6Predrain||isS6Journal||isS6CurrentJournal||isS6ReceiverLedger||isR4GuardianOrigin||isCiPolicyCas;
  const acceptedProbe=(role==='operating'&&allowedOperatingProbe)||
   (role==='handoff'&&(isCiReceiptRoot||isCiActivation||isCiNativeLocal));
  if(!raw||(!basic&&!withJobs&&!withW05)||
@@ -838,6 +850,7 @@ export function authenticateProcess(event,env,role){
   ...(isR3Wmi?{standbyRunnerWmi:true}:{}),
    ...(isOrphanSeatMap?{orphanSeatMap:true}:{}),
    ...(isOrphanOwnerCas?{orphanOwnerCas:true}:{}),
+   ...(isOrphanSelfNonce?{orphanSelfNonce:true}:{}),
   ...(isR4Runtime?{watchdogR4Runtime:true}:{}),
   ...(isR5Runtime?{watchdogR5Runtime:true}:{}),
   ...(isR6Runtime?{watchdogR6Runtime:true}:{}),
@@ -3567,6 +3580,17 @@ export function collect(role,ctx,env=process.env){
   const proof=inspectR4StandbyRuntimeReadonly();
   return {...base,status:proof.status,code:proof.code,watchdogR4Runtime:proof};
  }
+ if(ctx.orphanSelfNonce===true){
+  // The operating A job reads only its own worker process nonce and the
+  // three original pinned private files. A PASS is ONLY this single seat's
+  // non-publishing read observation, not six-Listener ancestry or B authority.
+  const proof=inspectOrphanRunnerSelfNonceReadonly({
+   env,expected:ORPHAN_SELF_NONCE_PREIMAGE
+  });
+  return {...base,
+   status:proof.status==='OBSERVED'?'PASS':'STATE_UNKNOWN',
+   code:proof.code,orphanSelfNonce:proof};
+ }
  if(ctx.orphanOwnerCas===true){
   const proof=inspectOrphanOwnerPreimageReadonly();
   return {...base,status:proof.status,code:proof.code,orphanOwnerCas:proof};
@@ -3762,6 +3786,11 @@ export function toText(r){
   ...(r.c3160LocalPreflight?[
    'c3160LocalApproval='+r.c3160LocalPreflight.localApproval,
    'c3160RecoveryClaim='+r.c3160LocalPreflight.recoveryClaim]:[]),
+  ...(r.orphanSelfNonce?[
+   'orphanSelfNonce='+r.orphanSelfNonce.code,
+   'orphanSelfNonceObserved='+(r.orphanSelfNonce.status==='OBSERVED'),
+   'orphanSelfNonceInheritanceVerified=false',
+   'orphanSelfNonceEffectAuthorized=false']:[]),
   ...(r.orphanOwnerCas?[
    'orphanOwnerCas='+r.orphanOwnerCas.code,
    'orphanOldOwnerDead='+(r.orphanOwnerCas.oldOwnerDeadVerified??'UNKNOWN'),
