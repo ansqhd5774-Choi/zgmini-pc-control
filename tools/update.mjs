@@ -1241,11 +1241,22 @@ const PUBLIC_AUDIT_OWNER_B=Object.freeze({
  selectiveBranch:'codex/controller-operating-audit-selective-one-20261128',
  paths:['config/operations.json','controller/operations.mjs']
 });
+// New PR #4302 one-file SHA lineage repair is never admitted without an
+// actual reviewed owner approval merge and the existing Windows CAS checks.
+const PUBLIC_LINEAGE_OWNER_B=Object.freeze({
+ installed:'cde1dd372210e4658ae348cb9e2577967cb11634',
+ target:'d3764580fdb08ecddd5f9b1064051eec30f90492',
+ approvalPr:4302,
+ approvalMerge:'PENDING_PR_4302_APPROVAL_MERGE',
+ selectiveBranch:'codex/controller-audit-4300-selective-20261128',
+ paths:['controller/operations.mjs']
+});
 function approvedPublicOwnerEffect(data){
  const {issue,manifest}=data??{};
  const effect=issue?.targetControllerSha===PUBLIC_OWNER_B.target?
   PUBLIC_OWNER_B:issue?.targetControllerSha===PUBLIC_AUDIT_OWNER_B.target?
-  PUBLIC_AUDIT_OWNER_B:null;
+  PUBLIC_AUDIT_OWNER_B:issue?.targetControllerSha===PUBLIC_LINEAGE_OWNER_B.target?
+  PUBLIC_LINEAGE_OWNER_B:null;
  need(effect!==null&&data?.actor==='ansqhd5774-Choi'&&
   issue?.operation==='controller-update'&&issue?.controlRepository===controlRepository&&
   manifest?.installedSha===effect.installed&&
