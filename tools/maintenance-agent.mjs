@@ -15,7 +15,7 @@ import {validateMaintenanceRequest,validateUpdateRequest,
   R54_B_ISSUE_TITLE,R54_B_OPERATION,R54_B_SOURCE_FILES,
   SOURCE_BUNDLE_OPERATION,SOURCE_BUNDLE_ISSUE_TITLE,
   validateSourceBundleIssueEnvelope,validateSourceBundleBApproval,
-  S6_ONCE_ISSUE_TITLE,S6_ONCE_OPERATION,
+  S6_ONCE_ISSUE_TITLE,S6_ONCE_OPERATION,INSTALLABLE_FILES,
   validateS6OnceIssueEnvelope,validateS6OnceBManifest} from "./maintenance-contract.mjs";
 import {acquireMaintenanceLock} from "./maintenance-lock.mjs";
 
@@ -936,11 +936,14 @@ export function createMaintenanceAgent({
   verifyInstalledSource=()=>{},verifyRecoverySource=verifyInstalledRecoveryLocalSource,
   // Read-only source admission dependency ports; never a B effect executor.
   orphanSixSourcePorts=null,
+  enableOrphanSixCanonicalReadPorts=false,
   installedShaFromStatus=result=>result?.actualControllerSha,
   ghTimeoutMs=20_000,updateTimeoutMs=0,
   now=()=>new Date().toISOString(),
 }={}){
   const root=assertTrustedRoot(stateDir);
+  if(enableOrphanSixCanonicalReadPorts&&orphanSixSourcePorts!==null)
+    throw coded('ORPHAN_SIX_B_PORT_SOURCE_CONFLICT');
   if(repo!==CONTROL_REPOSITORY||!Array.isArray(allowedActors)||!allowedActors.length
     ||typeof updateScript!=="string"||!path.isAbsolute(updateScript)
     ||typeof leaseRoot!=="string"||!path.isAbsolute(leaseRoot)
@@ -964,6 +967,8 @@ export function createMaintenanceAgent({
     try{return parseJsonOutput(await github(args),code);}
     catch{throw coded(code);}
   }
+  const configuredOrphanSixPorts=enableOrphanSixCanonicalReadPorts
+    ?canonicalOrphanSixReadPorts():orphanSixSourcePorts;
   async function updater(args){
     // Check the immutable installed maintainer files again at the point of use:
     // the long-lived receiver must never execute a drifted updater.
@@ -1607,13 +1612,13 @@ export function createMaintenanceAgent({
     if(typeof issue.body!=='string'||Buffer.byteLength(issue.body)>16384)
       return blocked('ORPHAN_SIX_B_RAW_REQUEST_INVALID');
     // No port means no private install/origin evidence. Never manufacture it.
-    if(!orphanSixSourcePorts||typeof orphanSixSourcePorts!=='object'||
-      Array.isArray(orphanSixSourcePorts))
+    if(!configuredOrphanSixPorts||typeof configuredOrphanSixPorts!=='object'||
+      Array.isArray(configuredOrphanSixPorts))
       return blocked('ORPHAN_SIX_B_SOURCE_READ_PORTS_MISSING');
     try{
       verifyInstalledSource();
       const inspected=await inspectOrphanSixPackagedInletSource({
-        ...orphanSixSourcePorts,issue
+        ...configuredOrphanSixPorts,issue
       });
       // Convert every unexpected port return to a closed source-only result.
       if(!inspected||!['BLOCKED','CANDIDATE_ONLY'].includes(inspected.status)||
@@ -1925,7 +1930,9 @@ export async function main(args=process.argv.slice(2)){
   catch(error){if(error?.code==='MAINTENANCE_LOCK_BUSY_OR_RECOVERY_REQUIRED')return;throw error;}
   try{
     attestReceiverOrigin(root,lease.owner);
-    const agent=createMaintenanceAgent({stateDir:root,verifyInstalledSource:()=>verifyInstalledTools(root)});
+    const agent=createMaintenanceAgent({stateDir:root,
+      verifyInstalledSource:()=>verifyInstalledTools(root),
+      enableOrphanSixCanonicalReadPorts:true});
     do{
       if(cooperativeStopRequested(root,lease.owner))break;
       try{const results=await agent.pollOnce();atomicReplace(path.join(root,'RECEIVER_STATUS.json'),JSON.stringify({at:new Date().toISOString(),pid:process.pid,status:'LISTENING',results})+'\n');}
