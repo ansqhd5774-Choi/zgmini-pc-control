@@ -124,3 +124,16 @@ export async function readAllPages(readPage,{maxPages=100}={}){
  }
  need(false,'PAGINATION_INCOMPLETE');
 }
+
+/**
+ * Preserve private operational diagnostics on the legacy private path.
+ * Public (or unverifiable) visibility must never stream the raw worker report
+ * into publicly readable GitHub Actions logs. This is a log projection only;
+ * the original receipt remains available to the protected local ledger.
+ */
+export function publicJobLogEnvelope(report,repositoryPrivate){
+ if(repositoryPrivate===true)return report;
+ const status=['PASS','FAIL','BLOCKED','STATE_UNKNOWN'].includes(report?.status)
+   ?report.status:'BLOCKED';
+ return Object.freeze({status,code:'PUBLIC_LOCAL_RESULT_REDACTED'});
+}
