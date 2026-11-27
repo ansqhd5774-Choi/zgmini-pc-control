@@ -6,6 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {validateControllerImportClosure,controllerImportScanRoots,validateControllerOnlyInstallDelta} from '../tools/maintenance-contract.mjs';
+import './controller-audit-public-a-dual-pin.test.mjs';
 
 const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const candidate=JSON.parse(fs.readFileSync(
