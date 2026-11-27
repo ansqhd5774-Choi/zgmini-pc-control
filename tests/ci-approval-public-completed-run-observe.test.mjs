@@ -87,3 +87,26 @@ test('missing/failed authenticated read is neither approval nor execution',async
  assert.equal(broken.operationalWrites,0);
  assert.doesNotMatch(JSON.stringify(broken),/token or network unavailable/);
 });
+
+test('Public CI observer is hosted and read-only; original Private B gate remains',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const {URL}=await import('node:url');
+ const y=readFileSync(new URL('../.github/workflows/ci-approval-controller-b.yml',import.meta.url),'utf8');
+ const hosted=y.split('  observe-public-source:')[1]?.split('  submit-controller-b:')[0];
+ const existing=y.split('  submit-controller-b:')[1];
+ assert.ok(hosted);
+ assert.ok(existing);
+ assert.match(hosted,/github\.event\.repository\.private == false/);
+ assert.match(hosted,/github\.event_name == 'workflow_run'/);
+ assert.match(hosted,/runs-on: ubuntu-latest/);
+ assert.match(hosted,/contents: read/);
+ assert.match(hosted,/actions: read/);
+ assert.match(hosted,/node ci-approval\/public-completed-run-observe\.mjs/);
+ assert.doesNotMatch(hosted,/self-hosted|contents: write|issues: write|pull-requests: write|workflow_dispatch/);
+ assert.match(existing,/github\.event\.repository\.private == true/);
+ assert.match(existing,/vars\.ZGMINI_CI_CONTROLLER_B_ENABLED == 'true'/);
+ assert.match(existing,/runs-on: \[self-hosted, Windows, X64, zgmini-handoff-ci-isolated\]/);
+ const verify=readFileSync(new URL('../.github/workflows/controller-maintenance-source-tests.yml',import.meta.url),'utf8');
+ const publicCi=verify.split('  public-source-only:')[1]?.split('  source-only:')[0];
+ assert.match(publicCi,/node --test --test-concurrency=1 tests\/ci-approval-public-completed-run-observe\.test\.mjs/);
+});
