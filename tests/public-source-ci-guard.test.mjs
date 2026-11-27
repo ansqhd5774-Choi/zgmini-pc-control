@@ -16,6 +16,8 @@ import '../sidecar-b/operating-probe.test.mjs';
 import '../sidecar-b/public-v3-independent-preimage-readonly.test.mjs';
 // Public B new operator remains disabled until separately approved exact effect.
 import '../sidecar-b/public-v3-independent-owner-b-once.test.mjs';
+// Exact approved Controller audit two-file B source-only regression.
+import './controller-audit-public-b-operator-once.test.mjs';
 
 const repo='ansqhd5774-Choi/zgmini-pc-control', id=1442936296;
 const owner='ansqhd5774-Choi', ownerId=327938088;
@@ -99,12 +101,12 @@ test('fixed source-CI gate rejects malformed and missing event files',t=>{
 
 // Exact approval pin acceptance belongs to the existing hosted source CI;
 // this does not invoke any Windows operator or grant an operational lease.
-test('W06 V3 operator pins owner merged effect #4289 and reviewed source #4290',()=>{
+test('W06 V3 operator pins owner merged effect #4289 and latest reviewed source #4293',()=>{
  const op=fs.readFileSync(new URL('../sidecar-b/public-v3-independent-owner-b-once.mjs',import.meta.url),'utf8');
  const manifest=JSON.parse(fs.readFileSync(new URL('../approvals/sidecar-b/w06-cnn-v2-to-v3-20261128.json',import.meta.url),'utf8'));
  assert.match(op,/const APPROVAL_PR=4289;/);
  assert.match(op,/const APPROVAL_MERGE='1c0e8b2e3b032548548b42df535dc060a40ff64c';/);
- assert.match(op,/const REVIEWED_SOURCE_PR=4290;/);
+ assert.match(op,/const REVIEWED_SOURCE_PR=4293;/);
  assert.equal(manifest.status,'APPROVED_B');
  assert.equal(manifest.schema,'ZGMINI_CNN_SIDECAR_ONEFILE_B_V3');
  assert.equal(manifest.beforeSha256,'eb3c43bf8fba6ea4e51f3e84b77f9ec13000db9d9e38077ffd914950d7080b6b');
