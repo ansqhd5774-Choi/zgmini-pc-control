@@ -273,6 +273,8 @@ on:
       - 'inflation-census-api-b/report.test.mjs'
       - 'tools/public-source-ci-guard.mjs'
       - 'tests/public-source-ci-guard.test.mjs'
+      - 'tools/public-pc-job-candidate.mjs'
+      - 'tests/public-pc-job-candidate.test.mjs'
       - '.github/workflows/controller-maintenance-source-tests.yml'
 permissions:
   contents: read
@@ -307,6 +309,7 @@ jobs:
       - name: Verify public source/runner isolation and deferred B approval
         run: |
           node --test --test-concurrency=1 tests/public-source-ci-guard.test.mjs
+          node --test --test-concurrency=1 tests/public-pc-job-candidate.test.mjs
           node --test --test-concurrency=1 tests/ci-controller-b-policy-only-proposal.test.mjs
   source-only:
     if: >-
