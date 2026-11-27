@@ -9,7 +9,7 @@ import {requireHandoffApproval,handoffFilePlan,nextRuntimeFiles} from "../tools/
 
 import {createMaintenanceAgent,failedUpdaterResult,normalizedResult,attachApprovedNativeBReceipt,parseS6NonzeroRecoveryReport} from "../tools/maintenance-agent.mjs";
 import {prepareMaintenanceIssue,submitExistingControllerApprovalFromCi} from '../tools/maintenance-request.mjs';
-import {readIndependentlyInstalledControllerBPublisherPolicy,readAuthenticatedControllerBPublisherWorkflow,observeCompletedRun,observePublishedControllerApprovals,observeLateOwnerMergedControllerApproval,publishExistingControllerApprovals,publishLateOwnerMergedControllerApproval,publishConfiguredControllerApproval} from '../ci-approval/completed-run-intake.mjs';
+import {readIndependentlyInstalledControllerBPublisherPolicy,readAuthenticatedControllerBPublisherWorkflow,readAuthenticatedPublicBPublisherSourceAncestry,observeCompletedRun,observePublishedControllerApprovals,observeLateOwnerMergedControllerApproval,publishExistingControllerApprovals,publishLateOwnerMergedControllerApproval,publishConfiguredControllerApproval} from '../ci-approval/completed-run-intake.mjs';
 
 test('pre-install child rejection retains exact safe code and current installed SHA',()=>{
  const r=failedUpdaterResult({requestId:'fixture',targetControllerSha:'b'.repeat(40)},
@@ -1630,6 +1630,69 @@ test('one installed Public B pin isolates two approvals on main push and source 
   runId:124,attempt:1,emitReceipt:()=>assert.fail('no receipt')});
  assert.deepEqual(afterLate.results.map(x=>x.targetSha),[TARGET]);
  assert.equal(submits,2,'both publication paths stay limited to the same installed target');
+});
+
+
+test('Public B publisher requires exact checked-out source to be ancestor of authenticated main',async()=>{
+ const source='a'.repeat(40),main='b'.repeat(40);
+ const env={GITHUB_WORKSPACE:'/tmp/ci-isolated-source',
+  GITHUB_REPOSITORY:REPO,GITHUB_REF:'refs/heads/main',
+  GITHUB_WORKFLOW_SHA:main};
+ let reads=0,compares=0;
+ const getJson=async route=>{
+  reads++;
+  assert.equal(route,'compare/'+source+'...'+main);
+  compares++;
+  return {status:'ahead',behind_by:0,
+   base_commit:{sha:source},head_commit:{sha:main},
+   merge_base_commit:{sha:source}};
+ };
+ const accepted=await readAuthenticatedPublicBPublisherSourceAncestry({
+  env,getJson,readCheckoutSha:async()=>source});
+ assert.deepEqual(accepted,{sourceSha:source,mainSha:main});
+ assert.equal(Object.isFrozen(accepted),true);
+ assert.equal(reads,1);
+ const identical=await readAuthenticatedPublicBPublisherSourceAncestry({
+  env,getJson:async route=>{
+   assert.equal(route,'compare/'+main+'...'+main);
+   return {status:'identical',behind_by:0,
+    base_commit:{sha:main},head_commit:{sha:main},
+    merge_base_commit:{sha:main}};
+  },readCheckoutSha:()=>main});
+ assert.equal(identical.sourceSha,main);
+ for(const failure of [
+  {name:'unmerged candidate branch',data:{status:'diverged',behind_by:1,
+   base_commit:{sha:source},head_commit:{sha:main},merge_base_commit:{sha:'c'.repeat(40)}}},
+  {name:'post-squash source not in main ancestry',data:{status:'ahead',
+   behind_by:0,base_commit:{sha:source},head_commit:{sha:main},
+   merge_base_commit:{sha:'c'.repeat(40)}}},
+  {name:'main moved backwards from source',data:{status:'behind',
+   behind_by:2,base_commit:{sha:source},head_commit:{sha:main},
+   merge_base_commit:{sha:main}}},
+  {name:'forged API head',data:{status:'ahead',behind_by:0,
+   base_commit:{sha:source},head_commit:{sha:'c'.repeat(40)},
+   merge_base_commit:{sha:source}}},
+  {name:'missing compare readback',data:null}
+ ]){
+  await assert.rejects(()=>readAuthenticatedPublicBPublisherSourceAncestry({
+   env,readCheckoutSha:()=>source,getJson:async()=>failure.data}),
+   /CI_PUBLIC_PUBLISHER_MAIN_ANCESTRY_UNVERIFIED/,failure.name);
+ }
+ for(const invalid of [
+  {...env,GITHUB_REPOSITORY:'attacker/repo'},
+  {...env,GITHUB_REF:'refs/heads/candidate'},
+  {...env,GITHUB_WORKFLOW_SHA:'bad'},
+  {...env,GITHUB_WORKSPACE:'relative/checkout'}
+ ]){
+  await assert.rejects(()=>readAuthenticatedPublicBPublisherSourceAncestry({
+   env:invalid,readCheckoutSha:()=>{throw Error('must not call git');},
+   getJson:()=>{throw Error('must not read GitHub');}}),
+   /CI_PUBLIC_PUBLISHER_MAIN_ANCESTRY_UNVERIFIED/);
+ }
+ await assert.rejects(()=>readAuthenticatedPublicBPublisherSourceAncestry({
+  env,readCheckoutSha:()=>{throw Error('checkout unknown');},getJson}),
+  /CI_PUBLIC_PUBLISHER_MAIN_ANCESTRY_UNVERIFIED/);
+ assert.equal(compares,1,'only approved provenance triggered the readback');
 });
 
 test('Public running publisher workflow attestation binds authenticated immutable GitHub API bytes',async()=>{
