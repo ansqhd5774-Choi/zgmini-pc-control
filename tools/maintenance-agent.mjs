@@ -1106,6 +1106,13 @@ export function createMaintenanceAgent({
       return {status:'IGNORED',issueNumber:issue?.number};
     // This inlet checks canonical GitHub approval evidence only. It does not
     // claim an effect, write an approval package, signal a Runner or call apply.
+    // Re-attest the installed maintainer source at actual reception; startup
+    // verification cannot cover subsequent on-disk drift.
+    try{verifyInstalledSource();}
+    catch{return {status:'BLOCKED',
+      code:'ORPHAN_SIX_B_RECEIVER_INSTALLED_SOURCE_UNVERIFIED',
+      issueNumber:issue.number,executionStarted:false,
+      runnerStopAuthorized:false,operationalWrites:0};}
     const readOriginalOneUseClaim=async requestId=>{
       if(!/^pc-[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(requestId))
         throw coded('ORPHAN_SIX_B_CLAIM_ID_INVALID');
