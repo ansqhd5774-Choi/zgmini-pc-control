@@ -89,7 +89,9 @@ test('draft new Windows owner adapter cannot execute without independently pinne
  assert.ok(entry.includes("const TARGET='"+TARGET+"'"));
  assert.ok(entry.includes("const INSTALLED='"+BASE+"'"));
  assert.ok(entry.includes("const APPROVAL_MERGE=null;"));
- assert.ok(entry.includes("const SOURCE_PR=4303;"));
+ assert.ok(entry.includes("const SOURCE_PR=null;"));
+ assert.ok(entry.includes("'PUBLIC_B_OPERATOR_SOURCE_PR_NOT_PINNED'"));
+ assert.ok(entry.includes("SOURCE_PR!==4303"));
  assert.ok(entry.includes(" 'controller/operations.mjs'"));
  assert.ok(entry.includes("'PUBLIC_B_APPROVAL_NOT_PINNED'"));
  assert.ok(entry.includes("!process.env.GITHUB_ACTIONS&&!process.env.RUNNER_NAME"));
@@ -124,4 +126,17 @@ test('old exact owner B effects remain admitted while draft SHA repair stays den
  assert.throws(()=>validatePublicOwnerBExactScope({actor,manifest,issue:{
   operation:'controller-update',controlRepository,targetControllerSha:TARGET
  }}),/PUBLIC_B_EFFECT_SCOPE_DENIED/);
+});
+
+test('approved B effect and independently reviewed operator source must have different PR roots',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const code=readFileSync('tools/controller-audit-sha-repair-public-b-operator-once.mjs','utf8');
+ const manifest=JSON.parse(readFileSync('approvals/controller-updates/'+TARGET+'.json','utf8'));
+ assert.equal(manifest.approval.ref,'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4303');
+ assert.ok(code.includes("const SOURCE_PR=null;"));
+ assert.ok(code.includes("SOURCE_PR!==4303"));
+ assert.ok(code.includes("approved.equals(readMain(rel))"));
+ assert.ok(code.includes("approved=readRevision(rel,sourceMerge)"));
+ assert.ok(code.includes("sourcePr?.merged===true"));
+ assert.ok(code.includes("sourceLineage?.behind_by===0"));
 });
