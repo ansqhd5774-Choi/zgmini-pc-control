@@ -74,6 +74,10 @@ const proof=(pid,startedAtUtc,seat)=>({
  oneUseClaimUninterruptedVerified:true,watchdogFenceUninterruptedVerified:true,
  intakeDrainedStillVerified:true,allSixPinsUnchangedVerified:true,
  originalCASUnchangedVerified:true,consoleExclusiveVerified:true,
+ afterFreshOwnerDecisionDoubleReadVerified:true,
+ zeroActiveWorkersStillVerified:true,activeControllerWorkerCount:0,
+ completeRelatedLeaseEnumerationStillVerified:true,relatedControllerLeaseCount:0,
+ noUncertainWorkOutcomeStillVerified:true,
  observedAtUtc:new Date().toISOString()
 });
 
@@ -128,6 +132,46 @@ test('no irreversible event before durable intent and fresh private fence',async
   assert.equal(result.signalSubmitted,false);
  }
  assert.equal(calls,0);
+});
+test('new Worker, lease, incomplete enumeration or stale approval blocks effect port',async()=>{
+ const born='2026-11-27T03:00:00.1234567Z',pid=52000;
+ const source=prepareOrphanSixFixedConsoleBreak({seat:1,pid,
+  startedAtUtc:born,platform:'win32',hostname:'PC'});
+ let calls=0;
+ const changes=[
+  {afterFreshOwnerDecisionDoubleReadVerified:false},
+  {zeroActiveWorkersStillVerified:false},
+  {activeControllerWorkerCount:1},
+  {completeRelatedLeaseEnumerationStillVerified:false},
+  {relatedControllerLeaseCount:1},
+  {noUncertainWorkOutcomeStillVerified:false}
+ ];
+ for(const changed of changes){
+  const result=await submitOrphanSixCtrlBreakOnce({
+   source,exactIntent:intent(1),
+   preSignal:{...proof(pid,born,1),...changed},
+   platform:'win32',root:'C:\\Windows',
+   run:()=>{calls++;throw Error('MUST_NOT_RUN');}
+  });
+  assert.equal(result.status,'BLOCKED',JSON.stringify(changed));
+  assert.equal(result.code,'ORPHAN_SIX_BREAK_DURABLE_INTENT_OR_FENCE_UNVERIFIED');
+  assert.equal(result.signalSubmitted,false);
+ }
+ assert.equal(calls,0);
+});
+test('fixed native Windows effect source checks Controller Workers before CTRL+BREAK',()=>{
+ const src=fs.readFileSync(new URL(
+  '../tools/supervisor-orphan-six-windows-ctrlbreak-port.mjs',import.meta.url),'utf8');
+ const start=src.indexOf("if($kind -eq 'RUNNER')");
+ const worker=src.indexOf("$workers=@(Get-CimInstance Win32_Process -Filter",start);
+ const stop=src.indexOf("CONTROLLER_WORKER_STILL_ACTIVE");
+ const signal=src.indexOf("GenerateConsoleCtrlEvent([uint32]1");
+ assert.ok(start>=0&&worker>start&&stop>worker&&signal>stop,
+  'MISSING_PRE_SIGNAL_WORKER_WMI_CHECK');
+ assert.match(src,/WORKER_PATH_UNVERIFIED/);
+ assert.match(src,/afterFreshOwnerDecisionDoubleReadVerified/);
+ assert.match(src,/completeRelatedLeaseEnumerationStillVerified/);
+ assert.match(src,/if\(pin\.mode==='RUNNER'\)\s*return denied\('ORPHAN_SIX_BREAK_INSTALLED_B_AUTHORITY_UNAVAILABLE'\)/);
 });
 test('forged or JSON-copied source cannot invoke PowerShell, even with fake B flags',async()=>{
  const born='2026-11-27T03:00:00.1234567Z';
