@@ -6,7 +6,8 @@ export const FIXED=Object.freeze({
  originalRequestId:'pc-usbreadthr2-resource-window-20261127-01',
  s6RequestId:'pc-s6-63afb126-72dc-4ec5-a721-4819771fa9ee',
  originalCreatedAt:'2026-11-26T19:14:52Z',
- originalBodySha256:'ebacec26ec6477d49bfc598e5f87116fe44d202c33479601ef7acc4b0ad7f8d7'
+ originalBodySha256:'ebacec26ec6477d49bfc598e5f87116fe44d202c33479601ef7acc4b0ad7f8d7',
+ s6BodySha256:'cc4e478d06f00c9b7dd8a80f81108e70c50ebae2559a0d188dd515e493bef6f9'
 });
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const blocked=code=>({status:'BLOCKED',code,mutationAuthorized:false,operationalWrites:0});
@@ -14,6 +15,8 @@ export function inspectS64078BacklogOnly(e){
  if(e?.s6Issue?.number!==FIXED.s6Issue||e.s6Issue.state!=='open'||
     e.s6Issue.user?.login!=='ansqhd5774-Choi')
   return blocked('S6_ORIGINAL_ISSUE_UNVERIFIED');
+ if(typeof e.s6Issue.body!=='string'||sha(e.s6Issue.body)!==FIXED.s6BodySha256)
+  return blocked('S6_ORIGINAL_BODY_CAS_FAILED');
  let s6;try{s6=JSON.parse(e.s6Issue.body);}catch{return blocked('S6_BODY_INVALID');}
  if(s6.schema!=='ZGMINI_PC_MAINTENANCE_REQUEST_V1'||
     s6.requestId!==FIXED.s6RequestId||s6.operation!=='controller-s6-failover-once')
