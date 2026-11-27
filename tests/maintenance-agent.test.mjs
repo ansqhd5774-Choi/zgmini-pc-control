@@ -2023,3 +2023,14 @@ test('S6 #4078 backlog recovery is source-only and never self-authorizes replay'
  assert.equal(refused.code,'S6_BACKLOG_OR_REPLAY_DRIFT');
  assert.equal(refused.mutationAuthorized,false);
 });
+
+/* Source-only integration of the fixed S6 replay coordinator. Existing
+ * hosted CI has no operational ports, so mutation must remain impossible. */
+import {executeApprovedS64078Replay} from '../tools/s6-4078-backlog-only-transaction.mjs';
+test('S6 #4078 transaction denies any unbound operating effect on public CI',async()=>{
+ const result=await executeApprovedS64078Replay({});
+ assert.equal(result.status,'BLOCKED');
+ assert.equal(result.code,'S6_4078_INDEPENDENT_PORT_UNAVAILABLE');
+ assert.equal(result.operationalSuccess,false);
+ assert.equal(result.replayIssueNumber,null);
+});
