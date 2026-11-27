@@ -20,7 +20,8 @@ const reported=(status,reason,extra={})=>Object.freeze({
  runnerStarts:0,automaticRetries:0,providerCalls:0,d1Writes:0,
  ...extra
 });
-const essential=['verifyExactApproval','readPrivateSnapshot','attestPreSignal',
+const essential=['verifyExactApproval','verifyFreshOwnerEffectDecision',
+ 'readPrivateSnapshot','attestPreSignal',
  'attestSeatExit','sendPrivateGracefulSignal','verifyFinalOldSixAbsent',
  'releaseFenceForWatchdog','holdForRecovery'];
 function stateRecord(source,requestId,digest){
@@ -131,6 +132,29 @@ export async function runOrphanSixGracefulB({
       lastProof.oldInstanceBirth!==originalPin.startedAtUtc||
       lastProof.oldInstancePathSha256!==originalPin.canonicalPathSha256)
     fail('ORPHAN_SIX_PRESIGNAL_IDENTITY_CHANGED');
+   // A source-only CANDIDATE is never a durable effect authorization.
+   // The installed independent maintainer must re-read canonical OWNER
+   // APPROVE/REVOKE (complete pages, unedited, exact SHA) for EVERY seat,
+   // including after prior signals. A stale/cached/unknown readback blocks.
+   const decision=await port.verifyFreshOwnerEffectDecision({
+    seat,proposalId:proposal.proposalId,requestId,
+    approvalManifestSha256,afterIntentReadbackSha256:lastHash
+   });
+   const checkedAt=Date.parse(decision?.observedAtUtc);
+   const instant=now();
+   if(decision?.source!=='PRIVATE_B_FRESH_CANONICAL_OWNER_EFFECT_DECISION'||
+      decision?.status!=='CURRENT_OWNER_APPROVE_VERIFIED'||
+      decision?.seat!==seat||decision?.proposalId!==proposal.proposalId||
+      decision?.requestId!==requestId||
+      decision?.manifestRawSha256!==approvalManifestSha256||
+      decision?.intentReadbackSha256!==lastHash||
+      decision?.completeCanonicalCommentsReadbackVerified!==true||
+      decision?.latestOwnerDecisionApprovedUnrevokedVerified!==true||
+      decision?.unchangedOwnerCommentVerified!==true||
+      decision?.watchdogFenceUninterruptedVerified!==true||
+      !Number.isFinite(checkedAt)||!Number.isFinite(instant)||
+      checkedAt>instant||instant-checkedAt>5000)
+    fail('ORPHAN_SIX_FRESH_OWNER_EFFECT_APPROVAL_UNVERIFIED');
    // The one-use private B adapter owns the actual Windows signaling and
    // must compare PID/birth/console group at the instant of the effect.
    // RETURNING "SENT" does not prove exit or Runner graceful handling.
