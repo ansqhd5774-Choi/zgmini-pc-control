@@ -49,6 +49,8 @@ on:
       - 'controller/supervisor.mjs'
       - 'controller/standby.mjs'
       - 'tests/controller-standby.test.mjs'
+      - 'tools/supervisor-orphan-lease-temp-fixture.mjs'
+      - 'tests/supervisor-orphan-lease-temp-fixture.test.mjs'
       - 'tests/controller-standby-windows-isolation.test.mjs'
       - 'tests/controller-standby-ipc-windows-isolation.test.mjs'
       - 'controller/pc-source-readonly.mjs'
