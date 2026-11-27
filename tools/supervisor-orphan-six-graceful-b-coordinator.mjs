@@ -44,6 +44,15 @@ function verifyPresignal(p,seat,proposalId,instant){
     p?.watchdogFenceUninterruptedVerified!==true||
     p?.nextSeatIdentityStillLiveVerified!==true||
     p?.remainingOriginalSeatsUnchangedVerified!==true||
+    // No worker, related lease, unknown in-flight work or intake changes
+    // may arise AFTER the initial snapshot. A seat-by-seat OS signal must
+    // fail closed whenever the live job drain is no longer provable.
+    p?.intakeDrainStillVerified!==true||
+    p?.zeroActiveWorkersStillVerified!==true||
+    p?.activeControllerWorkerCount!==0||
+    p?.completeRelatedLeaseEnumerationStillVerified!==true||
+    p?.relatedControllerLeaseCount!==0||
+    p?.noUncertainWorkOutcomeStillVerified!==true||
     typeof p?.observedAtUtc!=='string'||
     !Number.isFinite(Date.parse(p.observedAtUtc))||
     Date.parse(p.observedAtUtc)>instant||
@@ -155,8 +164,22 @@ export async function runOrphanSixGracefulB({
       !Number.isFinite(checkedAt)||!Number.isFinite(instant)||
       checkedAt>instant||instant-checkedAt>5000)
     fail('ORPHAN_SIX_FRESH_OWNER_EFFECT_APPROVAL_UNVERIFIED');
-   // The one-use private B adapter owns the actual Windows signaling and
-   // must compare PID/birth/console group at the instant of the effect.
+   // Canonical owner approval recheck may take several seconds. Re-read
+   // same-host Worker/lease/intake and the exact old seat AFTER that network
+   // decision. A former zero-worker snapshot is never an effect-time gate.
+   const finalProof=await port.attestPreSignal({seat,
+    proposalId:proposal.proposalId,afterIntentReadbackSha256:lastHash,
+    afterFreshOwnerDecision:true});
+   verifyPresignal(finalProof,seat,proposal.proposalId,now());
+   if(finalProof.afterFreshOwnerDecisionDoubleReadVerified!==true||
+      Date.parse(finalProof.observedAtUtc)<checkedAt||
+      finalProof.oldInstancePid!==originalPin.pid||
+      finalProof.oldInstanceBirth!==originalPin.startedAtUtc||
+      finalProof.oldInstancePathSha256!==originalPin.canonicalPathSha256)
+    fail('ORPHAN_SIX_FINAL_LIVE_DRAIN_OR_IDENTITY_CHANGED');
+   // The one-use private B adapter still must repeat these exact checks
+   // at the Windows console effect boundary; this coordinator proof is not
+   // an authorization to signal an installed Runner.
    // RETURNING "SENT" does not prove exit or Runner graceful handling.
    attemptedSignalCount++;
    const signal=await port.sendPrivateGracefulSignal({
