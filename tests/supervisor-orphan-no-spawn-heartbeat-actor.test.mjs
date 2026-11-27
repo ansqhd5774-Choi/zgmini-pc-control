@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {createNoSpawnHeartbeatActor} from '../controller/orphan-no-spawn-heartbeat-actor.mjs';
+import {createIsolatedOrphanStatusWriter} from '../tools/supervisor-orphan-status-temp-writer.mjs';
 
 const t=Date.parse('2026-11-26T23:45:12Z');
 const hex=c=>c.repeat(64);
@@ -178,7 +179,9 @@ test('attestor exception and missing bindings fail closed without source side ef
 test('Windows TEMP exact-file atomic CAS permits real three-tick rotating readback',async()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-orphan-fixture-'));
  try{
-  const file=path.join(root,'SUPERVISOR_STATUS.json');
+  const control=path.join(root,'pc-control');
+  fs.mkdirSync(path.join(control,'leases','supervisor'),{recursive:true});
+  const file=path.join(control,'SUPERVISOR_STATUS.json');
   const initial=Buffer.from(JSON.stringify({
    at:'2026-11-26T23:00:00Z',pid:999999,sourceSha:'a'.repeat(40),
    mode:'LISTENING',children:seats().map(x=>({seat:x.seat,pid:x.pid}))
@@ -202,18 +205,9 @@ test('Windows TEMP exact-file atomic CAS permits real three-tick rotating readba
    now:()=>clock,
    attest:async()=>sampleOnDisk(),
    writeStatus:async packet=>{
-    if(packet.fixedFile!=='SUPERVISOR_STATUS.json'||!packet.canCommit())
-     return false;
-    if(hash(fs.readFileSync(file))!==packet.expectedRawSha256||
-       hash(packet.nextRawBytes)!==packet.nextRawSha256)return false;
-    const stage=path.join(root,'SUPERVISOR_STATUS.'+(++commits)+'.tmp');
-    fs.writeFileSync(stage,packet.nextRawBytes,{flag:'wx'});
-    if(!packet.canCommit())return false;
-    fs.renameSync(stage,file);
-    const readback=hash(fs.readFileSync(file));
-    return {status:'EXACT_RAW_CAS_READBACK_VERIFIED',
-     expectedRawSha256:packet.expectedRawSha256,
-     readbackRawSha256:readback};
+    const outcome=await createIsolatedOrphanStatusWriter({root})(packet);
+    if(outcome.status==='EXACT_RAW_CAS_READBACK_VERIFIED')commits++;
+    return outcome;
    }
   });
   for(let i=0;i<3;i++){
