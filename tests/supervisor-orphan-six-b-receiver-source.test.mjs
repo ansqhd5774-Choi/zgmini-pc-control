@@ -146,6 +146,25 @@ test('dismissed exact-head review is not approval',async()=>{
  assert.equal(r.status,'BLOCKED');
  assert.equal(r.runnerStopAuthorized,false);
 });
+test('latest exact-head owner approval is independent of API review order',async()=>{
+ const later='2026-11-27T03:59:45Z';
+ const between='2026-11-27T03:59:30Z';
+ const f=sample();
+ f.reviews.unshift({user:{login:'ansqhd5774-Choi'},state:'APPROVED',
+  commit_id:f.pr.head.sha,submitted_at:later});
+ f.reviews.push({user:{login:'ansqhd5774-Choi'},state:'DISMISSED',
+  commit_id:f.pr.head.sha,submitted_at:between});
+ const ok=await receiveOrphanSixBApprovalSource({issue:f.issue,...f.ports});
+ assert.equal(ok.status,'CANDIDATE_ONLY');
+ assert.equal(ok.effectAuthorized,false);
+ assert.equal(ok.runnerStopAuthorized,false);
+ f.reviews.push({user:{login:'ansqhd5774-Choi'},state:'DISMISSED',
+  commit_id:f.pr.head.sha,submitted_at:later});
+ const blocked=await receiveOrphanSixBApprovalSource({issue:f.issue,...f.ports});
+ assert.equal(blocked.code,'ORPHAN_SIX_B_APPROVAL_REVIEW_OR_MERGE_UNVERIFIED');
+ assert.equal(blocked.effectAuthorized,false);
+});
+
 test('manifest byte drift, arbitrary digest or fabricated B effect fail closed',async()=>{
  const f=sample();
  f.ports.getMainManifest=async()=>Buffer.from(JSON.stringify(f.manifest));
