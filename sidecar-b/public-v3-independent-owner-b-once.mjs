@@ -22,7 +22,7 @@ const APPROVAL_PR=4289;
 const APPROVAL_MERGE='1c0e8b2e3b032548548b42df535dc060a40ff64c';
 // Executable bytes must come from this reviewed source PR's immutable merge.
 // A later unrelated main update must never silently replace approved code.
-const REVIEWED_SOURCE_PR=4290;
+const REVIEWED_SOURCE_PR=4292;
 const FIXED={
  schema:'ZGMINI_CNN_SIDECAR_ONEFILE_B_V3',
  target:'E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\archive-run.mjs',
@@ -90,7 +90,7 @@ export function classifyW06PublicBEffect(e) {
  return out('READY','W06_PUBLIC_B_EFFECT_PREFLIGHT_READY_ONLY');
 }
 
-const api=route=>JSON.parse(execFileSync(GH,['api',route],{
+const api=route=>JSON.parse(execFileSync(GH,['api',route,...(route.includes('/compare/')?['--jq','{behind_by, merge_base_commit: {sha: .merge_base_commit.sha}}']:[])],{
  encoding:'utf8',windowsHide:true,timeout:25000,maxBuffer:500000
 }));
 function readRemote(relative,revision) {
