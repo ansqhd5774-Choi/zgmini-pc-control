@@ -4,6 +4,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import {runInNewContext} from 'node:vm';
+import {execFileSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import {executeJob} from '../controller/engine.mjs';
 import {attestOwnerPcJobEvent,publicPcReportProjection,publicJobLogEnvelope} from '../controller/common.mjs';
 import {stagePreimageManifest} from '../controller/preimage-manifest-stager.mjs';
@@ -282,4 +285,90 @@ test('public A Issue comment heading uses the same projected bytes as JSON/TXT',
  const headline=`**${publishedReport.status} — ${publishedReport.code}**`;
  assert.equal(headline,'**PASS — PUBLIC_RESULT_CODE_REDACTED**');
  assert.doesNotMatch(headline,/DO_NOT_PUBLISH_TEST_SECRET/);
+});
+
+
+test('installed Public A Controller must pass immutable host gate before old PC entry and upload',()=>{
+ const target='20d5bbbf305531dca9bf5b74744df83daf37cf17';
+ const base='e11ba38a9f03da083b07258a961ee0855c4d3ae9';
+ const root=fileURLToPath(new URL('../',import.meta.url));
+ assert.ok(publicA,'fixed Public A job candidate must exist on this Draft branch');
+ const gate=publicA.match(/- name: Verify pinned installed Public A Controller before all host actions\n\s+id: installed_controller\n\s+run: >-\n\s+"E:\\ZGmini\\runtime\\node\.exe" -e "([^"\n]+)"/);
+ assert.ok(gate,'one fixed installed-file preflight must precede every host action');
+ const script=gate[1];
+ assert.doesNotMatch(script,/fetch\(|https?:|process\.env|spawn|execFile|writeFile|unlink|rename/);
+ assert.match(script,/h\.controllerSourceSha!==/);
+ assert.match(script,/lstatSync/);
+ assert.match(script,/createHash\('sha256'\)/);
+ assert.match(script,/process\.exit\(2\)/);
+ assert.match(script,/catch\{process\.exitCode=2\}/);
+ const privateHead=wf.slice(0,wf.indexOf('  public-approved-a:'));
+ const original=execFileSync('git',['show',base+':.github/workflows/pc-job.yml'],
+  {cwd:root,encoding:'utf8',maxBuffer:1_000_000}).replace(/\r\n/g,'\n');
+ assert.equal(privateHead,original.slice(0,original.indexOf('  public-approved-a:')),
+  'legacy Private job and owner admission must remain byte-identical');
+ const publicTail=wf.slice(wf.indexOf('  # Public issue observation'));
+ assert.equal(publicTail,original.slice(original.indexOf('  # Public issue observation')),
+  'GitHub-hosted Public source observation must remain byte-identical');
+ const exactPaths=[
+  'controller/common.mjs','controller/entry.mjs',
+  'controller/preimage-manifest-stager.mjs','controller/upload.mjs'];
+ const files=Object.fromEntries(exactPaths.map(rel=>[
+  rel,execFileSync('git',['show',target+':'+rel],{cwd:root,maxBuffer:1_000_000})]));
+ const digests=Object.fromEntries(Object.entries(files).map(([rel,bytes])=>[
+  rel,createHash('sha256').update(bytes).digest('hex')]));
+ for(const [rel,expected] of Object.entries(digests)){
+  assert.ok(script.includes("'"+rel+"':'"+expected+"'"),'literal exact target SHA256 '+rel);
+ }
+ assert.ok(script.includes("h.controllerSourceSha!=='"+target+"'"));
+ const baseHost={controllerSourceSha:target,controllerFiles:digests};
+ const guard=({host=baseHost,fileMap=files,symlink=null,missing=null}={})=>{
+  const proc={exitCode:0,exit(code){this.exitCode=code;throw Error('EXPECTED_EXIT');}};
+  const fakeFs={
+   readFileSync(path){
+    if(path==='E:/ZGmini/automation/pc-control/host.json')
+     return JSON.stringify(host);
+    const prefix='E:/ZGmini/automation/pc-control/';
+    if(!path.startsWith(prefix))throw Error('WRONG_PATH');
+    const rel=path.slice(prefix.length);
+    if(rel===missing||!(rel in fileMap))throw Error('MISSING_FILE');
+    return fileMap[rel];
+   },
+   lstatSync(path){
+    const prefix='E:/ZGmini/automation/pc-control/';
+    const rel=path.slice(prefix.length);
+    if(rel===missing)throw Error('MISSING_FILE');
+    return {isFile:()=>true,isSymbolicLink:()=>rel===symlink};
+   }
+  };
+  runInNewContext(script,{require(name){
+   if(name==='node:fs')return fakeFs;
+   if(name==='node:crypto')return {createHash};
+   throw Error('UNPINNED_IMPORT');
+  },process:proc},{timeout:2000});
+  return proc.exitCode;
+ };
+ assert.equal(guard(),0,'exact approved installed target may proceed');
+ assert.equal(guard({host:{...baseHost,controllerSourceSha:'3c7d4cfefacf072fd35cb19706b352c64c5e4fd2'}}),2,
+  'old installed Controller must not execute');
+ for(const rel of exactPaths){
+  assert.equal(guard({host:{...baseHost,controllerFiles:{...digests,[rel]:'0'.repeat(64)}}}),2,
+   'forged host manifest hash fails: '+rel);
+  assert.equal(guard({fileMap:{...files,[rel]:Buffer.from('changed')}}),2,
+   'changed installed bytes fail: '+rel);
+  assert.equal(guard({symlink:rel}),2,'symlink install file fails: '+rel);
+  assert.equal(guard({missing:rel}),2,'missing file fails: '+rel);
+ }
+ assert.equal(guard({host:{controllerSourceSha:target}}),2,'truncated host fails');
+ assert.equal(guard({host:null}),2,'missing host fails');
+ const scope=publicA.slice(publicA.indexOf('    steps:\n'));
+ const stage=scope.slice(scope.indexOf('      - name: Stage approved'),scope.indexOf('      - name: Execute fixed'));
+ const execute=scope.slice(scope.indexOf('      - name: Execute fixed'),scope.indexOf('      - name: Upload sanitized'));
+ const upload=scope.slice(scope.indexOf('      - name: Upload sanitized'));
+ assert.match(stage,/if: steps\.installed_controller\.outcome == 'success' && contains/);
+ assert.match(execute,/if: steps\.installed_controller\.outcome == 'success'/);
+ assert.match(upload,/if: always\(\) && steps\.installed_controller\.outcome == 'success'/);
+ assert.ok(scope.indexOf('id: installed_controller')<scope.indexOf('Stage approved'));
+ assert.ok(scope.indexOf('Stage approved')<scope.indexOf('Execute fixed'));
+ assert.ok(scope.indexOf('Execute fixed')<scope.indexOf('Upload sanitized'));
 });
