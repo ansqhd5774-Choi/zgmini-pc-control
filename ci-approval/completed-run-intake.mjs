@@ -196,7 +196,40 @@ export function readIndependentlyInstalledControllerBPublisherPolicy({
  }catch{fail()}
 }
 
-export function createControllerPublicationPorts({getJson,postIssue,store,autoApprovalPolicy,readJobLogs,putMerge,readIndependentInstalledCiPolicy}){
+// GitHub's current publisher workflow must itself be the exact source whose
+// independently installed hash was approved. GitHub workflow event variables
+// do not authorize an effect: they only locate a fixed file to read back.
+export async function readAuthenticatedControllerBPublisherWorkflow({
+ getJson,env=process.env
+}={}){
+ const fail=()=>{throw Error('CI_PUBLIC_PUBLISHER_WORKFLOW_UNVERIFIED')};
+ const workflow='.github/workflows/ci-approval-controller-b.yml';
+ const workflowRef=repo+'/'+workflow+'@refs/heads/main';
+ if(typeof getJson!=='function'||env?.GITHUB_REPOSITORY!==repo||
+    env.GITHUB_REF!=='refs/heads/main'||
+    env.GITHUB_WORKFLOW_REF!==workflowRef||
+    env.GITHUB_JOB!=='submit-controller-b'||
+    !sha(env.GITHUB_WORKFLOW_SHA)||!id(Number(env.GITHUB_RUN_ID))||
+    !id(Number(env.GITHUB_RUN_ATTEMPT)))fail();
+ try{
+  const [active,file]=await Promise.all([
+   getJson('actions/workflows/ci-approval-controller-b.yml'),
+   getJson('contents/'+workflow+'?ref='+env.GITHUB_WORKFLOW_SHA)
+  ]);
+  if(!id(active?.id)||active.path!==workflow||active.state!=='active'||
+     file?.type!=='file'||file.path!==workflow||
+     file.encoding!=='base64'||!sha(file.sha)||
+     typeof file.content!=='string'||file.content.length>262144)fail();
+  const bytes=Buffer.from(file.content,'base64');
+  if(bytes.length<10||bytes.length>131072)fail();
+  const checked=createHash('sha1').update(Buffer.from('blob '+bytes.length+'\0'))
+   .update(bytes).digest('hex');
+  if(checked!==file.sha)fail();
+  return Object.freeze({workflowId:active.id,workflowBlobSha:checked});
+ }catch{fail()}
+}
+
+export function createControllerPublicationPorts({getJson,postIssue,store,autoApprovalPolicy,readJobLogs,putMerge,readIndependentInstalledCiPolicy,readPublisherWorkflowIdentity}){
  const readBytes=async(target,revision)=>{
   if(!sha(target)||!(revision==='main'||sha(revision)))throw Error('CI_PUBLICATION_SOURCE_INVALID');
   const path='approvals/controller-updates/'+target+'.json';
@@ -239,6 +272,7 @@ export function createControllerPublicationPorts({getJson,postIssue,store,autoAp
   createIssue:expected=>postIssue({title:expected.title,body:expected.body,labels:expected.labels}),
   loadReceipt:store.loadReceipt,saveReceipt:store.saveReceipt,
   ...(typeof readIndependentInstalledCiPolicy==='function'?{readIndependentInstalledCiPolicy}:{}),
+  ...(typeof readPublisherWorkflowIdentity==='function'?{readPublisherWorkflowIdentity}:{}),
   ...(autoApprovalPolicy&&typeof putMerge==='function'?{mergeApprovalPr:(n,head)=>{
    if(!id(n)||n!==autoApprovalPolicy.approvalPrNumber||!sha(head))
     throw Error('CI_PUBLICATION_PR_INVALID');
@@ -621,6 +655,7 @@ export async function main({eventPath=process.env.GITHUB_EVENT_PATH,token=proces
   };
   const ports=createControllerPublicationPorts({getJson,postIssue:body=>github('issues',body),store,
    readIndependentInstalledCiPolicy:()=>readIndependentlyInstalledControllerBPublisherPolicy(),
+   readPublisherWorkflowIdentity:()=>readAuthenticatedControllerBPublisherWorkflow({getJson}),
    autoApprovalPolicy:initialControllerPublicationPolicy(policy),readJobLogs,
    putMerge:(n,body)=>github('pulls/'+n+'/merge',body,'PUT')});
   const opts={getJson,ports,runId:Number(process.env.GITHUB_RUN_ID),
@@ -637,6 +672,7 @@ export async function main({eventPath=process.env.GITHUB_EVENT_PATH,token=proces
     return {state:staged.state,approvalPrNumber:staged.prNumber,
      ports:createControllerPublicationPorts({getJson,postIssue:body=>github('issues',body),
       store,readIndependentInstalledCiPolicy:()=>readIndependentlyInstalledControllerBPublisherPolicy(),
+      readPublisherWorkflowIdentity:()=>readAuthenticatedControllerBPublisherWorkflow({getJson}),
       autoApprovalPolicy:readyPolicy,readJobLogs,
       putMerge:(n,body)=>github('pulls/'+n+'/merge',body,'PUT')})};
    }:undefined;
