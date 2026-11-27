@@ -1,0 +1,17 @@
+{
+  "schema": "ZGMINI_CONTROLLER_SELECTIVE_PIN_V1",
+  "installedSha": "cde1dd372210e4658ae348cb9e2577967cb11634",
+  "targetSha": "f03febc06f32a553676622ecf049e7dd90e2b7d5",
+  "sourceMainSha": "82549812dc92e8ec19b9b6afe2f2084d63cb6c5c",
+  "targetBranch": "codex/issues-lifecycle-manager-20261118-72-audit-sha-overlay",
+  "customPaths": [
+    "controller/operations.mjs"
+  ],
+  "allowFiles": [
+    {
+      "path": "controller/operations.mjs",
+      "sha256": "6c0441108c244d1d5dd58e7793b785a371169a9d96b69e606200d905e8f59966"
+    }
+  ],
+  "approvalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4303"
+}
