@@ -18,7 +18,7 @@ const MAINT='E:/ZGmini/automation/pc-maintenance';
 const TARGET='d3764580fdb08ecddd5f9b1064051eec30f90492';
 const INSTALLED='cde1dd372210e4658ae348cb9e2577967cb11634';
 const APPROVAL_MERGE='PENDING_PR_4302_APPROVAL_MERGE';
-const SOURCE_PR=0; // Fail closed until exact reviewed source PR merges.
+const SOURCE_PR=4304; // Reviewed source must merge; unmerged Draft is denied.
 const GH='C:/Program Files/GitHub CLI/gh.exe';
 const PATHS=Object.freeze([
  'controller/operations.mjs'
