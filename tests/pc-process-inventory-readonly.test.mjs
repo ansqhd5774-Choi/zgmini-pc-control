@@ -3750,7 +3750,7 @@ test('orphan self-nonce A probe uses existing exact operating-only envelope',()=
  const raw=JSON.parse(old.issue.body);
  const make=(value,role='operating')=>({...event(role),issue:{
   ...event(role).issue,body:JSON.stringify({...raw,role,probe:value})}
- }});
+ });
  const valid=make('controller-orphan-runner-self-nonce-readonly');
  const scope=authenticateProcess(valid,env,'operating');
  assert.equal(scope.orphanSelfNonce,true);
