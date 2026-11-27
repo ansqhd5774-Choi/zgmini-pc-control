@@ -9,7 +9,8 @@ const UNKNOWN=(code,phase)=>({status:'RECOVERY_REQUIRED',code,phase,
  originalIssueNumber:FIXED.originalIssue,replayIssueNumber:null,
  operationalSuccess:false,next:'READ_ORIGINAL_CLAIM_AND_REPLAY_LEDGER_NO_RETRY'});
 const required=['readEvidence','verifyIndependentAuthority','acquireExclusiveClaim',
- 'assertClaimOwned','writePostingCas','postExactOriginal','writeDoneCas','archiveClaim'];
+ 'assertClaimOwned','writePostingCas','postExactOriginal','readPostedIssue',
+ 'writeDoneCas','archiveClaim'];
 const exactApproval=a=>a?.authorized===true&&
  a.effect==='S6_4078_BACKLOG_ONLY_REPLAY'&&
  a.s6RequestId===FIXED.s6RequestId&&
@@ -83,6 +84,20 @@ export async function executeApprovedS64078Replay(ports={}){
     posted.number===FIXED.originalIssue)
    throw Error('S6_4078_REPLAY_ISSUE_UNVERIFIED');
   phase='REPLAY_ISSUE_CREATED';
+  await ports.assertClaimOwned(claim);
+  // A successful POST response with only an issue number is not provenance.
+  // Read back this *exact* Issue, rather than searching another request or
+  // trusting an uncoupled workflow run to prove an issue body was preserved.
+  phase='POSTED_ISSUE_READBACK_ATTEMPT';
+  const actual=await ports.readPostedIssue({claim,number:posted.number});
+  if(actual?.number!==posted.number||actual?.title!==
+     'Maintenance replay '+FIXED.s6RequestId+' original #4078'||
+     actual?.body!==fresh.originalIssue.body||
+     actual?.state!=='open'||actual?.user?.login!=='ansqhd5774-Choi'||
+     actual?.pull_request||
+     !Array.isArray(actual.labels)||
+     !actual.labels.some(label=>(typeof label==='string'?label:label?.name)==='pc-job'))
+   throw Error('S6_4078_POSTED_ISSUE_MISMATCH');
   await ports.assertClaimOwned(claim);
   phase='DONE_CAS_ATTEMPT';
   await ports.writeDoneCas({claim,originalIssueNumber:FIXED.originalIssue,
