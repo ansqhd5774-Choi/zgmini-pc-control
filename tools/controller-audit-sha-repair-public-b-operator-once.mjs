@@ -18,7 +18,7 @@ const MAINT='E:/ZGmini/automation/pc-maintenance';
 const TARGET='f03febc06f32a553676622ecf049e7dd90e2b7d5';
 const INSTALLED='cde1dd372210e4658ae348cb9e2577967cb11634';
 const APPROVAL_MERGE=null; // Must be pinned after separate owner approval.
-const SOURCE_PR=4303;
+const SOURCE_PR=null; // Pin the distinct reviewed operator-source PR after approval merge.
 const GH='C:/Program Files/GitHub CLI/gh.exe';
 const PATHS=Object.freeze([
  'controller/operations.mjs'
@@ -128,6 +128,8 @@ async function sourceAndOwner(){
  // Never trust a moving main as executable source authority. Bind every
  // runtime dependency to the *merged* reviewed source PR and check main still
  // serves those immutable bytes, even if unrelated main commits advance.
+ need(Number.isSafeInteger(SOURCE_PR)&&SOURCE_PR>0&&SOURCE_PR!==4303,
+  'PUBLIC_B_OPERATOR_SOURCE_PR_NOT_PINNED');
  const sourcePr=api('repos/'+REPO+'/pulls/'+SOURCE_PR);
  need(SOURCE_PR>0&&sourcePr?.number===SOURCE_PR&&sourcePr?.merged===true&&
   sourcePr?.user?.id===327938088&&
