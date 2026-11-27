@@ -15,30 +15,17 @@ jobs:
   approved-pc-job:
     if: >-
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
-      github.event.repository.id == 1442936296 &&
-      github.event.repository.owner.id == 327938088 &&
-      github.event_name == 'issues' &&
-      github.ref == 'refs/heads/main' &&
-      github.workflow_ref == 'ansqhd5774-Choi/zgmini-pc-control/.github/workflows/pc-job.yml@refs/heads/main' &&
-      github.run_attempt == 1 &&
+      github.event.repository.private == true &&
       github.actor == 'ansqhd5774-Choi' &&
-      github.actor_id == 327938088 &&
-      github.event.sender.login == 'ansqhd5774-Choi' &&
-      github.event.sender.id == 327938088 &&
       github.event.issue.user.login == 'ansqhd5774-Choi' &&
-      github.event.issue.user.id == 327938088 &&
-      github.event.issue.title == 'pc-job' &&
-      github.event.issue.pull_request == null &&
       contains(github.event.issue.labels.*.name, 'pc-job') &&
       (github.event.action == 'opened' ||
        (github.event.action == 'labeled' &&
         github.event.label.name == 'pc-job' &&
         vars.ZGMINI_PC_JOB_LATE_LABEL_ENABLED == 'true'))
-    # Public visibility is not authorization: immutable repo/owner identity,
-    # authenticated owner-created Issue and fixed main Workflow are required.
-    # No PR trigger or checkout. The installed Controller independently checks
-    # the identical origin and permits A grade only on Public.
-    # Late-label entry remains opt-in; duplicate claims are not replayed.
+    # Late-label entry is opt-in only after matching fixed Controller and
+    # preimage stager hashes have been installed and verified on operating PC.
+    # Owner-opened pc-job requests retain the existing admission behavior.
     runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
     timeout-minutes: 8
     defaults:
@@ -92,3 +79,53 @@ jobs:
         run: |
           node --check tools/public-pc-job-candidate.mjs
           node tools/public-pc-job-candidate.mjs
+
+  public-approved-a:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == false &&
+      github.event.repository.id == 1442936296 &&
+      github.event.repository.owner.id == 327938088 &&
+      github.event_name == 'issues' &&
+      github.ref == 'refs/heads/main' &&
+      github.workflow_ref == 'ansqhd5774-Choi/zgmini-pc-control/.github/workflows/pc-job.yml@refs/heads/main' &&
+      github.run_attempt == 1 &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.actor_id == 327938088 &&
+      github.event.sender.login == 'ansqhd5774-Choi' &&
+      github.event.sender.id == 327938088 &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.user.id == 327938088 &&
+      github.event.issue.title == 'pc-job' &&
+      github.event.issue.pull_request == null &&
+      contains(github.event.issue.labels.*.name, 'pc-job') &&
+      (github.event.action == 'opened' ||
+       (github.event.action == 'labeled' &&
+        github.event.label.name == 'pc-job' &&
+        vars.ZGMINI_PC_JOB_LATE_LABEL_ENABLED == 'true'))
+    # Public visibility is not authorization: immutable repo/owner identity,
+    # authenticated owner-created Issue and fixed main Workflow are required.
+    # No PR trigger or checkout. The installed Controller independently checks
+    # the identical origin and permits A grade only on Public.
+    # Late-label entry remains opt-in; duplicate claims are not replayed.
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 8
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Stage approved read-only preimage scope
+        if: contains(github.event.issue.body, 'preimageManifestPath')
+        # The fixed Controller entry must still produce a BLOCKED JSON/TXT
+        # when staging itself fails before an attestable scope is available.
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "E:\ZGmini\automation\pc-control\controller\preimage-manifest-stager.mjs"'
+      - name: Execute fixed host allowlist entry
+        run: '"E:\ZGmini\runtime\node.exe" "E:\ZGmini\automation\pc-control\controller\entry.mjs"'
+      - name: Upload sanitized TXT JSON and issue result
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "E:\ZGmini\automation\pc-control\controller\upload.mjs"'
