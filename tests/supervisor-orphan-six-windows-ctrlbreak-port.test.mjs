@@ -129,6 +129,24 @@ test('no irreversible event before durable intent and fresh private fence',async
  }
  assert.equal(calls,0);
 });
+test('forged or JSON-copied source cannot invoke PowerShell, even with fake B flags',async()=>{
+ const born='2026-11-27T03:00:00.1234567Z';
+ const original=prepareOrphanSixFixedConsoleBreak({seat:1,pid:52000,
+  startedAtUtc:born,platform:'win32',hostname:'PC'});
+ let calls=0;
+ const copied=JSON.parse(JSON.stringify(original));
+ const forgery={...copied,pid:52000,startedAtUtc:born,mode:'TEMP',
+  script:'arbitrary shell'};
+ const result=await submitOrphanSixCtrlBreakOnce({
+  source:forgery,exactIntent:intent(1),preSignal:proof(52000,born,1),
+  platform:'win32',root:'C:\\Windows',run:()=>{calls++;throw Error('MUST_NOT_RUN');}
+ });
+ assert.equal(result.status,'BLOCKED');
+ assert.equal(result.signalSubmitted,false);
+ assert.equal(calls,0);
+ assert.equal(original.pid,undefined);
+ assert.equal(original.script,undefined);
+});
 test('synthetic native Windows Ctrl+Break sends once to exact private console only',
  windows,async()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-six-break-temp-'));
