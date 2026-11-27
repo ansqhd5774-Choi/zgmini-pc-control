@@ -109,11 +109,22 @@ function verifyNewDependencyClosure() {
 // rollback and an unknown result after the atomic replacement was attempted.
 // This is a report classification only; it grants no new execution authority.
 export function classifyW06BTerminalFailure({
- errorCode,replacementAttempted=false,rollbackVerified=false
+ errorCode,replacementAttempted=false,rollbackVerified=false,
+ leaseReleaseFailed=false
 }={}) {
- const recovered=rollbackVerified===true&&
-  errorCode!=='SIDECAR_B_RECOVERY_UNVERIFIED_STOP';
- if(replacementAttempted===true&&!recovered)
+ // A failed lease release must not be described as a clean BLOCKED or
+ // ROLLED_BACK result even if the original bytes were restored.
+ if(leaseReleaseFailed===true)
+  return out('RECOVERY_REQUIRED','W06_PUBLIC_B_LEASE_OUTCOME_UNVERIFIED',{
+   operationalWrites:replacementAttempted===true?null:0,
+   changedFileCount:null,requiresOwnerReconcile:true
+  });
+ if(replacementAttempted===true&&rollbackVerified===true&&
+    errorCode!=='SIDECAR_B_RECOVERY_UNVERIFIED_STOP')
+  return out('ROLLED_BACK','W06_PUBLIC_B_ROLLBACK_VERIFIED',{
+   operationalWrites:null,changedFileCount:0,rollbackVerified:true
+  });
+ if(replacementAttempted===true)
   return out('RECOVERY_REQUIRED','W06_PUBLIC_B_EFFECT_OUTCOME_UNVERIFIED',{
    operationalWrites:null,changedFileCount:null,requiresOwnerReconcile:true
   });
@@ -224,23 +235,37 @@ export async function main(args=process.argv.slice(2)) {
  const io=createWindowsSidecarIO({
   requestId:manifest.requestId,observeProtected
  });
- const tx={replacementAttempted:false,rollbackVerified:false};
+ const tx={replacementAttempted:false,rollbackVerified:false,
+  verifiedReadback:false,leaseReleaseFailed:false};
  const trackedIO={...io,
   async atomicReplace(...args) {
    tx.replacementAttempted=true;
    return io.atomicReplace(...args);
   },
+  // The existing applyOneFile verifies these bytes WHILE IT HOLDS THE LEASE.
+  // Do not read TARGET again after its finally block releases that lease.
+  async readbackSha256(...args) {
+   const observed=await io.readbackSha256(...args);
+   if(tx.replacementAttempted&&observed===FIXED.afterSha256)
+    tx.verifiedReadback=true;
+   return observed;
+  },
   async restoreBackup(...args) {
    const restored=await io.restoreBackup(...args);
    tx.rollbackVerified=true;
    return restored;
+  },
+  async release(...args) {
+   try{return await io.release(...args);}
+   catch(error){tx.leaseReleaseFailed=true;throw error;}
   }
  };
  try {
   const installed=await applyOneFile(manifest,verifiedCandidate,trackedIO);
   need(installed.status==='APPLIED_SOURCE_ONLY'&&
-   sha256(fs.readFileSync(TARGET))===FIXED.afterSha256,
-   'W06_PUBLIC_B_POSTINSTALL_READBACK_STOP');
+   installed.afterSha256===FIXED.afterSha256&&
+   tx.verifiedReadback===true,
+   'W06_PUBLIC_B_PROTECTED_READBACK_UNVERIFIED');
   return out('PASS','W06_PUBLIC_B_V3_ONE_FILE_INSTALLED_VERIFIED',{
    effectAuthorized:true,operationalWrites:1,
    beforeSha256:FIXED.beforeSha256,afterSha256:FIXED.afterSha256,
@@ -250,7 +275,8 @@ export async function main(args=process.argv.slice(2)) {
   const classified=classifyW06BTerminalFailure({
    errorCode:error?.code,
    replacementAttempted:tx.replacementAttempted,
-   rollbackVerified:tx.rollbackVerified
+   rollbackVerified:tx.rollbackVerified,
+   leaseReleaseFailed:tx.leaseReleaseFailed
   });
   throw Object.assign(new Error(classified.code),{
    code:classified.code,terminalReport:classified

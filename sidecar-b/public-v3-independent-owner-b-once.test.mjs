@@ -130,13 +130,15 @@ test('uncertain replacement and failed postcheck require owner reconciliation',(
   assert.equal(r.requiresOwnerReconcile,true);
  }
 });
-test('verified rollback is reported separately, never as a completed install',()=>{
+test('verified rollback is not misreported as a zero-write rejection',()=>{
  const r=classifyW06BTerminalFailure({
   errorCode:'SIDECAR_B_READBACK_STOP',
   replacementAttempted:true,rollbackVerified:true
  });
- assert.equal(r.status,'BLOCKED');
- assert.equal(r.operationalWrites,0);
+ assert.equal(r.status,'ROLLED_BACK');
+ assert.equal(r.operationalWrites,null);
+ assert.equal(r.changedFileCount,0);
+ assert.equal(r.rollbackVerified,true);
  const unknown=classifyW06BTerminalFailure({
   errorCode:'SIDECAR_B_RECOVERY_UNVERIFIED_STOP',
   replacementAttempted:true,rollbackVerified:true
@@ -149,5 +151,29 @@ test('real transaction wraps atomic replace, rollback and postcheck; CLI retains
  assert.match(s,/tx\.rollbackVerified=true/);
  assert.match(s,/terminalReport:classified/);
  assert.match(s,/error\?\.terminalReport/);
- assert.match(s,/W06_PUBLIC_B_POSTINSTALL_READBACK_STOP/);
+ assert.match(s,/W06_PUBLIC_B_PROTECTED_READBACK_UNVERIFIED/);
+});
+
+test('post-install byte proof is captured inside applyOneFile lease, not read after release',()=>{
+ const s=fs.readFileSync(new URL('./public-v3-independent-owner-b-once.mjs',import.meta.url),'utf8');
+ assert.match(s,/async readbackSha256\(\.\.\.args\)/);
+ assert.match(s,/tx\.verifiedReadback=true/);
+ assert.match(s,/installed\.afterSha256===FIXED\.afterSha256&&\s*tx\.verifiedReadback===true/);
+ assert.doesNotMatch(s,/sha256\(fs\.readFileSync\(TARGET\)\)/);
+ assert.match(s,/async release\(\.\.\.args\)/);
+});
+test('unknown lease-release after claimed rollback requires owner reconcile',()=>{
+ const rolledBack=classifyW06BTerminalFailure({
+  errorCode:'SIDECAR_B_LOCK_OWNER_STOP',replacementAttempted:true,
+  rollbackVerified:true,leaseReleaseFailed:true
+ });
+ assert.equal(rolledBack.status,'RECOVERY_REQUIRED');
+ assert.equal(rolledBack.code,'W06_PUBLIC_B_LEASE_OUTCOME_UNVERIFIED');
+ assert.equal(rolledBack.changedFileCount,null);
+ const noReplace=classifyW06BTerminalFailure({
+  errorCode:'SIDECAR_B_LOCK_OWNER_STOP',replacementAttempted:false,
+  leaseReleaseFailed:true
+ });
+ assert.equal(noReplace.status,'RECOVERY_REQUIRED');
+ assert.equal(noReplace.operationalWrites,0);
 });
