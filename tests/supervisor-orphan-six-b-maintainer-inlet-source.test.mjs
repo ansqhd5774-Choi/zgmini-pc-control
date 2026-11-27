@@ -343,3 +343,38 @@ test('packaged coordinator never replays a claimed B journal or triggers fake si
  assert.equal(signals,0);assert.equal(ownerReads,0);assert.equal(writes,0);
  assert.equal(fs.readdirSync(root).sort().join(','),'tools');
 });
+
+test('orphan-six source CI detects every packaged module and executes isolated regressions',()=>{
+ const workflow=fs.readFileSync(new URL('../.github/workflows/controller-maintenance-source-tests.yml',import.meta.url),'utf8');
+ for(const source of [
+  'tools/build-orphan-six-static-inlet.mjs',
+  'tools/supervisor-orphan-six-b-flat-request.mjs',
+  'tools/supervisor-orphan-six-b-admission.mjs',
+  'tools/supervisor-orphan-six-b-receiver-source.mjs',
+  'tools/supervisor-orphan-six-b-maintainer-inlet-source.mjs',
+  'tools/supervisor-orphan-six-graceful-source.mjs',
+  'tools/supervisor-orphan-six-maintenance-journal.mjs',
+  'tools/supervisor-orphan-six-graceful-b-coordinator.mjs',
+  'tools/maintenance-agent.mjs'
+ ]){
+  assert.ok(workflow.includes("      - '"+source+"'"),
+    'ORPHAN_SIX_CI_SOURCE_NOT_WATCHED: '+source);
+ }
+ for(const suite of [
+  'tests/maintenance-agent.test.mjs',
+  'tests/supervisor-orphan-six-b-maintainer-inlet-source.test.mjs',
+  'tests/supervisor-orphan-six-graceful-source.test.mjs',
+  'tests/supervisor-orphan-six-b-receiver-source.test.mjs',
+  'tests/supervisor-orphan-six-graceful-b-coordinator.test.mjs',
+  'tests/supervisor-orphan-six-windows-ctrlbreak-port.test.mjs',
+  'tests/maintenance-handoff.test.mjs',
+  'tests/maintenance-s6-safety-handoff.test.mjs'
+ ]){
+  const active=workflow.split('\n').some(line=>line.trimStart().startsWith('run: node --test')&&
+   line.includes(suite));
+  assert.ok(active,'ORPHAN_SIX_CI_SUITE_NOT_EXECUTED: '+suite);
+ }
+ assert.match(workflow,/github\.event\.repository\.private == true/);
+ assert.match(workflow,/runs-on: \[self-hosted, Windows, X64, zgmini-handoff-ci-isolated\]/);
+ assert.match(workflow,/fetch-depth: 0/);
+});
