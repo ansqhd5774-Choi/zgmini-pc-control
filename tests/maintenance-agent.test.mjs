@@ -1251,3 +1251,13 @@ test('orphan-six B installed source drift blocks before GitHub approval read',as
   assert.equal(result.operationalWrites,0);
   assert.equal(f.calls.filter(c=>c.args[0]==='api').length,0);
 });
+
+test('orphan-six B duplicate request JSON key blocks before canonical GitHub access',async t=>{
+  const f=orphanSixInletFixture(t);
+  f.issue.body=f.issue.body.slice(0,-1)+',"requestId":"pc-ffffffff-ffff-ffff-ffff-ffffffffffff"}';
+  const result=(await f.agent.pollOnce())[0];
+  assert.equal(result.status,'BLOCKED');
+  assert.equal(result.code,'ORPHAN_SIX_B_ISSUE_BODY_INVALID');
+  assert.equal(result.operationalWrites,0);
+  assert.equal(f.calls.filter(c=>c.args[0]==='api').length,0);
+});
