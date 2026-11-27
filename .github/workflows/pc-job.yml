@@ -66,7 +66,7 @@ jobs:
       github.event.issue.user.login == 'ansqhd5774-Choi' &&
       github.event.issue.user.id == 327938088 &&
       (github.event.issue.title == 'pc-job' ||
-       (startsWith(github.event.issue.title, 'PC Update pc-update-') &&
+       (startsWith(github.event.issue.title, 'PC Update pc-') &&
         endsWith(github.event.issue.title, ' postcheck'))) &&
       github.event.issue.pull_request == null &&
       contains(github.event.issue.labels.*.name, 'pc-job') &&
