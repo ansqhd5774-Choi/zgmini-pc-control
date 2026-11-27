@@ -19,6 +19,504 @@ import {validateMaintenanceRequest,validateUpdateRequest,
   validateS6OnceIssueEnvelope,validateS6OnceBManifest} from "./maintenance-contract.mjs";
 import {acquireMaintenanceLock} from "./maintenance-lock.mjs";
 
+// BEGIN GENERATED ORPHAN SIX SOURCE INLET — STATIC BUILD ONLY
+const orphanSixStatic_flat=(()=>{
+// Common source-only strict parser for orphan-six B Issue body. No OS/IO.
+const FIELDS=['schema','requestId','chatId','operation','controlRepository',
+ 'targetControllerSha','approvalManifestSha256'];
+const ws=ch=>ch===' '||ch==='\n'||ch==='\r'||ch==='\t';
+
+// The existing maintainer's request shape is a flat seven-field JSON object.
+// Tokenize raw bytes, not JSON.parse alone: duplicate keys must never survive
+// the last-key-wins JSON parser behavior.
+function parseOrphanSixBFlatRequest(raw){
+ if(typeof raw!=='string'||Buffer.byteLength(raw)>16384)throw Error('ORPHAN_SIX_B_RAW_REQUEST_DENIED');
+ let i=0;
+ const skip=()=>{while(i<raw.length&&ws(raw[i]))i++;};
+ const value=()=>{
+  skip();
+  if(raw[i]!=='"')throw Error('ORPHAN_SIX_B_RAW_REQUEST_DENIED');
+  const start=i++;
+  let escape=false;
+  for(;i<raw.length;i++){
+   const ch=raw[i];
+   if(escape){escape=false;continue;}
+   if(ch==='\\'){escape=true;continue;}
+   if(ch==='"'){i++;const token=raw.slice(start,i);return JSON.parse(token);}
+  }
+  throw Error('ORPHAN_SIX_B_RAW_REQUEST_DENIED');
+ };
+ skip();
+ if(raw[i++]!=='{')throw Error('ORPHAN_SIX_B_RAW_REQUEST_DENIED');
+ const out=Object.create(null);
+ skip();
+ if(raw[i]==='}')throw Error('ORPHAN_SIX_B_RAW_REQUEST_DENIED');
+ while(i<raw.length){
+  const key=value();
+  if(!FIELDS.includes(key)||Object.hasOwn(out,key))
+   throw Error('ORPHAN_SIX_B_RAW_REQUEST_DENIED');
+  skip();
+  if(raw[i++]!==':')throw Error('ORPHAN_SIX_B_RAW_REQUEST_DENIED');
+  out[key]=value();
+  skip();
+  if(raw[i]==='}'){i++;break;}
+  if(raw[i++]!==',')throw Error('ORPHAN_SIX_B_RAW_REQUEST_DENIED');
+ }
+ skip();
+ if(i!==raw.length||Object.keys(out).length!==FIELDS.length||
+    FIELDS.some(x=>typeof out[x]!=='string'))
+  throw Error('ORPHAN_SIX_B_RAW_REQUEST_DENIED');
+ return Object.freeze(Object.assign({},out));
+}
+return Object.freeze({parseOrphanSixBFlatRequest});
+})();
+const orphanSixStatic_admission=(()=>{
+// Source-only admission gate for a NEW and SEPARATELY approved B effect:
+// orphaned six GitHub Runner.Listener processes, graceful stop / existing R6.
+// This module is not imported by the installed maintenance agent and has no
+// CLI, Windows process control, lease mutation, network, or install effect.
+const {createHash}=crypto;
+
+const ORPHAN_SIX_B_TITLE='pc-controller-orphan-six-graceful-once';
+const ORPHAN_SIX_B_OPERATION='controller-orphan-six-graceful-once';
+const ORPHAN_SIX_B_REQUEST_SCHEMA='ZGMINI_PC_ORPHAN_SIX_B_REQUEST_V1';
+const ORPHAN_SIX_B_MANIFEST_SCHEMA='ZGMINI_PC_ORPHAN_SIX_B_APPROVAL_V1';
+const ORPHAN_SIX_B_SCOPE='SEPARATELY_APPROVED_ORPHAN_GRACEFUL_SIX_B';
+const REPO='ansqhd5774-Choi/zgmini-pc-control',ACTOR='ansqhd5774-Choi';
+const reqId=/^pc-[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/;
+const sha40=x=>typeof x==='string'&&/^[a-f0-9]{40}$/.test(x);
+const sha64=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
+const obj=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
+const exact=(x,keys)=>obj(x)&&Object.keys(x).sort().join(',')===
+ [...keys].sort().join(',');
+const deny=code=>Object.freeze({status:'BLOCKED',code,
+ permission:false,actuationAllowed:false,runnerStopAuthorized:false,
+ operationalWrites:0,automaticRetries:0,canInstall:false});
+const candidate=(code,extra={})=>Object.freeze({...deny(code),
+ status:'CANDIDATE_ONLY',...extra});
+const requestKeys=['schema','operation','controlRepository','requestId',
+ 'chatId','targetControllerSha','approvalManifestSha256'];
+const manifestKeys=['schema','operation','requestId','installedControllerSha',
+ 'installedMaintainerSha','maintenanceFilesSha256','watchdogSourceSha256',
+ 'oldOwnerRawSha256','heartbeatRawSha256','hostRawSha256',
+ 'privateOriginalSixSeatDigestSha256','approval','effect'];
+const effect=Object.freeze({
+ mode:'SIX_ORPHAN_LISTENER_GRACEFUL_STOP_ONCE',
+ stop:'EXACT_PINNED_PRIVATE_ORIGINAL_SIX_ONLY',
+ signal:'CTRL_BREAK_ON_EXCLUSIVE_PINNED_CONSOLE_ONLY',
+ independentMaintainer:true,
+ preserveControllerBPolicy:true,
+ noForceKill:true,
+ noAutomaticRetry:true,
+ requireDrainedJobs:true,
+ requireWatchdogFenced:true,
+ requireOriginalCAS:true,
+ requireCrashSafeJournal:true,
+ postcheck:'FRESH_R6_HEALTHY_STANDBY_2_READY_AND_RUNNER_SMOKE'
+});
+const ORPHAN_SIX_B_FIXED_EFFECT=effect;
+function digest(bytes){return createHash('sha256').update(bytes).digest('hex');}
+function sanitized(x){return typeof x==='string'&&x.length>0&&x.length<=128&&
+ /^[A-Za-z0-9:_-]+$/.test(x);}
+function fail(code){throw Object.assign(Error(code),{code});}
+function validateOrphanSixBRequest(request,{actor=null,repo=REPO}={}){
+ if(actor!==ACTOR||repo!==REPO)fail('ORPHAN_SIX_REQUEST_ACTOR_DENIED');
+ if(!exact(request,requestKeys)||request.schema!==ORPHAN_SIX_B_REQUEST_SCHEMA||
+    request.operation!==ORPHAN_SIX_B_OPERATION||
+    request.controlRepository!==REPO||!reqId.test(request.requestId??'')||
+    !sanitized(request.chatId)||!sha40(request.targetControllerSha)||
+    !sha64(request.approvalManifestSha256))
+  fail('ORPHAN_SIX_REQUEST_SCHEMA_DENIED');
+ return Object.freeze({...request});
+}
+// The canonical approved raw bytes must be committed to main and tied to the
+// independently authenticated merged source PR and exact user-authored B
+// effect comment. Neither an Issue body nor a self-merged PR approves B.
+// The result remains CANDIDATE_ONLY with all execution rights false.
+function validateOrphanSixBManifest(request,bytes,{
+ actor=null,repo=REPO,approvalPr=null
+}={}){
+ const checked=validateOrphanSixBRequest(request,{actor,repo});
+ if(!(Buffer.isBuffer(bytes)||typeof bytes==='string')||
+    Buffer.byteLength(bytes)<2||Buffer.byteLength(bytes)>16384)
+  fail('ORPHAN_SIX_B_MANIFEST_BYTES_INVALID');
+ const raw=Buffer.from(bytes);
+ if(digest(raw)!==checked.approvalManifestSha256)
+  fail('ORPHAN_SIX_B_MANIFEST_RAW_DIGEST_MISMATCH');
+ let m;
+ try{m=JSON.parse(raw.toString('utf8'));}catch{
+  fail('ORPHAN_SIX_B_MANIFEST_JSON_INVALID');
+ }
+ if(!exact(m,manifestKeys)||m.schema!==ORPHAN_SIX_B_MANIFEST_SCHEMA||
+    m.operation!==ORPHAN_SIX_B_OPERATION||
+    m.requestId!==checked.requestId||
+    m.installedControllerSha!==checked.targetControllerSha||
+    !sha40(m.installedControllerSha)||!sha40(m.installedMaintainerSha)||
+    !sha64(m.maintenanceFilesSha256)||!sha64(m.watchdogSourceSha256)||
+    !sha64(m.oldOwnerRawSha256)||!sha64(m.heartbeatRawSha256)||
+    !sha64(m.hostRawSha256)||!sha64(m.privateOriginalSixSeatDigestSha256))
+  fail('ORPHAN_SIX_B_MANIFEST_CAS_DENIED');
+ if(!exact(m.effect,Object.keys(effect))||
+    Object.entries(effect).some(([key,value])=>m.effect[key]!==value))
+  fail('ORPHAN_SIX_B_EFFECT_SCOPE_DENIED');
+ const ap=m.approval;
+ if(!exact(ap,['approved','grade','scope','ref','reviewedSourceSha'])||
+    ap.approved!==true||ap.grade!=='B'||ap.scope!==ORPHAN_SIX_B_SCOPE||
+    !sha40(ap.reviewedSourceSha)||
+    !/^https:\/\/github\.com\/ansqhd5774-Choi\/zgmini-pc-control\/pull\/[1-9]\d*$/.test(ap.ref??''))
+  fail('ORPHAN_SIX_B_SEPARATE_APPROVAL_REQUIRED');
+ const prNum=Number(ap.ref.split('/').at(-1));
+ if(!approvalPr||approvalPr.number!==prNum||
+    approvalPr.state!=='closed'||approvalPr.merged!==true||
+    approvalPr.headSha!==ap.reviewedSourceSha||
+    approvalPr.baseRepo!==REPO||
+    approvalPr.ownerExactEffectApproved!==true)
+  fail('ORPHAN_SIX_B_APPROVAL_PR_IDENTITY_UNVERIFIED');
+ // Do not expose private pins. Return only the raw approval identifier.
+ return candidate('ORPHAN_SIX_B_EXACT_APPROVAL_SOURCE_CANDIDATE',{
+  requestId:checked.requestId,manifestRawSha256:digest(raw),
+  scope:ORPHAN_SIX_B_SCOPE,
+  installedControllerSha:m.installedControllerSha,
+  installedMaintainerSha:m.installedMaintainerSha,
+  approvalPrNumber:prNum
+ });
+}
+
+// A second boundary after source/approval validation: exact current private
+// same-host state. Even a structurally positive record is NOT an operating-PC
+// authorization. The installed B receiver must attest its own origin/lease,
+// a frozen one-use claim, and the real Windows API at actual effect time.
+function assessOrphanSixBPrivatePreflight(candidateApproval,live,{
+ now=Date.now()
+}={}){
+ if(candidateApproval?.status!=='CANDIDATE_ONLY'||
+    candidateApproval.code!=='ORPHAN_SIX_B_EXACT_APPROVAL_SOURCE_CANDIDATE'||
+    !sha64(candidateApproval.manifestRawSha256))
+  return deny('ORPHAN_SIX_B_APPROVAL_SOURCE_NOT_VERIFIED');
+ if(!obj(live)||live.source!=='PRIVATE_INDEPENDENT_WINDOWS_B'||
+    live.host!=='PC'||live.installedMaintainerSha!==candidateApproval.installedMaintainerSha||
+    live.installedControllerSha!==candidateApproval.installedControllerSha||
+    live.verifiedMaintainerOrigin!==true||live.oneUseEffectClaimHeld!==true||
+    live.currentInstallLeaseOwned!==true||live.oldOwnerDeadVerified!==true||
+    live.originalSixSeatIdentityPinned!==true||live.exclusiveSixConsolesVerified!==true||
+    live.currentWorkerCount!==0||live.relatedLeaseCount!==0||
+    live.completeLeaseEnumerationVerified!==true||
+    live.intakePausedAndDrainedVerified!==true||
+    live.watchdogInFlightRecoveryExcludedVerified!==true||
+    live.originalRawCASUnchangedVerified!==true||
+    live.controllerBPolicyUnchangedVerified!==true||
+    typeof live.observedAtUtc!=='string'||
+    !Number.isFinite(Date.parse(live.observedAtUtc))||
+    !Number.isFinite(now)||Date.parse(live.observedAtUtc)>now||
+    now-Date.parse(live.observedAtUtc)>5000)
+  return deny('ORPHAN_SIX_B_LIVE_OWNER_CAS_FENCE_UNVERIFIED');
+ return candidate('ORPHAN_SIX_B_SAME_HOST_PREFLIGHT_CANDIDATE',{
+  requestId:candidateApproval.requestId,
+  manifestRawSha256:candidateApproval.manifestRawSha256,
+  nextAction:'INSTALLED_INDEPENDENT_B_ONE_USE_EFFECT_CLAIM_AND_FRESH_ATTESTATION_REQUIRED'
+ });
+}
+return Object.freeze({ORPHAN_SIX_B_TITLE,ORPHAN_SIX_B_OPERATION,ORPHAN_SIX_B_REQUEST_SCHEMA,ORPHAN_SIX_B_MANIFEST_SCHEMA,ORPHAN_SIX_B_SCOPE,ORPHAN_SIX_B_FIXED_EFFECT,validateOrphanSixBRequest,validateOrphanSixBManifest,assessOrphanSixBPrivatePreflight});
+})();
+const orphanSixStatic_receiver=(()=>{
+// Source-only read path for a new, distinct orphan-six B request. This is
+// NOT installed in the independent maintainer or wired to its live polling
+// list. Only a separately approved, pinned receiver may supply the callbacks.
+// No lease/file/process/Watchdog mutation, network access, or OS calls here.
+const {createHash}=crypto;
+const {parseOrphanSixBFlatRequest}=orphanSixStatic_flat;
+const {ORPHAN_SIX_B_TITLE,ORPHAN_SIX_B_OPERATION,ORPHAN_SIX_B_SCOPE,validateOrphanSixBRequest,validateOrphanSixBManifest}=orphanSixStatic_admission;
+
+const repo='ansqhd5774-Choi/zgmini-pc-control';
+const owner='ansqhd5774-Choi';
+const label='pc-maintenance';
+const sha40=x=>typeof x==='string'&&/^[a-f0-9]{40}$/.test(x);
+const sha64=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
+const digest=x=>createHash('sha256').update(x).digest('hex');
+const deny=code=>Object.freeze({
+ status:'BLOCKED',code,executionStarted:false,
+ effectAuthorized:false,runnerStopAuthorized:false,
+ operationalWrites:0,automaticRetries:0,approvalSourceVerified:false
+});
+const positive=(candidate)=>Object.freeze({
+ ...deny('ORPHAN_SIX_B_REVIEWED_SOURCE_ONLY'),
+ status:'CANDIDATE_ONLY',approvalSourceVerified:true,
+ requestId:candidate.requestId,
+ manifestRawSha256:candidate.manifestRawSha256,
+ installedControllerSha:candidate.installedControllerSha,
+ installedMaintainerSha:candidate.installedMaintainerSha,
+ approvalPrNumber:candidate.approvalPrNumber,
+ nextAction:'SEPARATELY_APPROVED_INSTALLED_B_PRIVATE_RUNTIME_ATTESTATION_REQUIRED'
+});
+const validDate=x=>typeof x==='string'&&Number.isFinite(Date.parse(x));
+function exactlyOwnerLabel(issue){
+ return issue?.title===ORPHAN_SIX_B_TITLE&&
+  (issue?.state==='open'||issue?.state==='OPEN')&&
+  Number.isSafeInteger(issue.number)&&issue.number>0&&
+  issue?.author?.login===owner&&
+  Array.isArray(issue.labels)&&
+  issue.labels.some(l=>l?.name===label)&&
+  typeof issue.body==='string'&&Buffer.byteLength(issue.body)<=16384;
+}
+const ownerDecisionSchema='ZGMINI_ORPHAN_SIX_B_OWNER_DECISION_V1';
+const decisionFields=['schema','decision','requestId',
+ 'approvalManifestSha256','reviewedSourceSha','scope',
+ 'operation','effect','installedControllerSha'];
+const exact=(obj,keys)=>obj&&typeof obj==='object'&&!Array.isArray(obj)&&
+ Object.keys(obj).sort().join(',')===[...keys].sort().join(',');
+function pinnedMergedSource(pr,number,sha){
+ return pr?.number===number&&pr.state==='closed'&&pr.merged===true&&
+  validDate(pr.merged_at)&&pr.base?.repo?.full_name===repo&&
+  pr.head?.repo?.full_name===repo&&pr.head.sha===sha&&sha40(sha);
+}
+function ownerExactBEffectDecision(readback,issue,request,manifest,pr){
+ if(readback?.source!=='GITHUB_CANONICAL_ISSUE_COMMENTS_API'||
+    readback?.complete!==true||readback?.issueNumber!==issue.number||
+    !Array.isArray(readback.items)||readback.items.length>1000)
+  return false;
+ const decisions=[];
+ for(const item of readback.items){
+  if(item?.user?.login!==owner)continue;
+  if(!Number.isSafeInteger(item.id)||item.id<=0||
+     typeof item.body!=='string'||Buffer.byteLength(item.body)>2048)
+   return false;
+  let record;
+  try{record=JSON.parse(item.body);}catch{continue;}
+  if(record?.schema!==ownerDecisionSchema)continue;
+  // A malformed OWNER decision cannot be silently skipped.
+  if(!exact(record,decisionFields)||
+     !['APPROVE','REVOKE'].includes(record.decision)||
+     record.operation!==ORPHAN_SIX_B_OPERATION||
+     record.scope!==ORPHAN_SIX_B_SCOPE||
+     record.effect!=='SIX_ORPHAN_LISTENER_GRACEFUL_STOP_ONCE'||
+     record.requestId!==request.requestId||
+     record.approvalManifestSha256!==request.approvalManifestSha256||
+     record.reviewedSourceSha!==manifest.approval.reviewedSourceSha||
+     record.installedControllerSha!==manifest.installedControllerSha||
+     item.html_url!=='https://github.com/'+repo+'/issues/'+issue.number+
+       '#issuecomment-'+item.id||
+     !validDate(item.created_at)||item.updated_at!==item.created_at||
+     Date.parse(item.created_at)<=Date.parse(pr.merged_at)||
+     Date.parse(item.created_at)>Date.now())
+   return false;
+  decisions.push({at:Date.parse(item.created_at),id:item.id,decision:record.decision});
+ }
+ if(decisions.length===0)return false;
+ // Exact second-resolution ties are ambiguous even when an API order differs.
+ decisions.sort((a,b)=>a.at-b.at||a.id-b.id);
+ const last=decisions.at(-1);
+ if(decisions.length>1&&decisions.at(-2).at===last.at)return false;
+ return last.decision==='APPROVE';
+}
+/**
+ * Dependency callbacks are READ-only ports exposed by a separately
+ * authenticated installed independent maintainer. An OWNER comment attesting
+ * exact B effect is distinct from merging code or approving one's own PR.
+ * Passing forged callback results never creates an OS execution permission.
+ *
+ * getMainManifest: exact canonical approval path -> bytes (not parsed JSON)
+ * getPullRequest / getOwnerEffectComments: canonical GitHub API readbacks
+ * getInstalledReadback: same-host pinned local installation only
+ * readOriginalOneUseClaim: existing durable effect ledger check
+ */
+async function receiveOrphanSixBApprovalSource({
+ issue,getMainManifest,getPullRequest,getOwnerEffectComments,
+ getInstalledReadback,readOriginalOneUseClaim
+}={}){
+ if(!exactlyOwnerLabel(issue))
+  return deny('ORPHAN_SIX_B_ISSUE_ORIGIN_UNVERIFIED');
+ if([getMainManifest,getPullRequest,getOwnerEffectComments,
+      getInstalledReadback,readOriginalOneUseClaim].some(x=>typeof x!=='function'))
+  return deny('ORPHAN_SIX_B_RECEIVER_READ_PORTS_MISSING');
+ let request;
+ try{request=validateOrphanSixBRequest(parseOrphanSixBFlatRequest(issue.body),{actor:owner,repo});}
+ catch{return deny('ORPHAN_SIX_B_REQUEST_UNVERIFIED');}
+ try{
+  const existing=await readOriginalOneUseClaim(request.requestId);
+  // A readback error is NOT absence, so a thrown callback blocks.
+  if(existing!==null)return deny('ORPHAN_SIX_B_ORIGINAL_CLAIM_RECONCILE_FIRST');
+  const canonicalPath='approvals/controller-orphan-six/'+
+    request.approvalManifestSha256+'.json';
+  const raw=await getMainManifest(canonicalPath,'main');
+  if(!Buffer.isBuffer(raw)||raw.length<2||raw.length>16384||
+      digest(raw)!==request.approvalManifestSha256)
+   return deny('ORPHAN_SIX_B_APPROVAL_RAW_BYTES_UNVERIFIED');
+  let manifest;
+  try{manifest=JSON.parse(raw.toString('utf8'));}
+  catch{return deny('ORPHAN_SIX_B_APPROVAL_JSON_INVALID');}
+  const ref=manifest?.approval?.ref;
+  const matched=/^https:\/\/github\.com\/ansqhd5774-Choi\/zgmini-pc-control\/pull\/([1-9]\d*)$/.exec(ref??'');
+  if(!matched)return deny('ORPHAN_SIX_B_APPROVAL_PR_REF_INVALID');
+  const num=Number(matched[1]);
+  if(!Number.isSafeInteger(num)||num<=0)return deny('ORPHAN_SIX_B_APPROVAL_PR_REF_INVALID');
+  const [pr,comments,installed]=await Promise.all([
+    getPullRequest(num),getOwnerEffectComments(issue.number),getInstalledReadback()
+  ]);
+  if(!pinnedMergedSource(pr,num,manifest?.approval?.reviewedSourceSha))
+   return deny('ORPHAN_SIX_B_MERGED_SOURCE_UNVERIFIED');
+  if(!ownerExactBEffectDecision(comments,issue,request,manifest,pr))
+   return deny('ORPHAN_SIX_B_OWNER_EXACT_EFFECT_APPROVAL_UNVERIFIED');
+  if(installed?.origin!=='PRIVATE_INDEPENDENT_B_MAINTAINER'||
+     installed?.currentInstallVerified!==true||
+     installed?.sourceFilesVerified!==true||
+     installed?.controllerBPolicyUnchangedVerified!==true||
+     installed?.installedControllerSha!==manifest.installedControllerSha||
+     installed?.installedMaintainerSha!==manifest.installedMaintainerSha||
+     installed?.maintenanceFilesSha256!==manifest.maintenanceFilesSha256)
+   return deny('ORPHAN_SIX_B_INSTALLED_SOURCE_CAS_UNVERIFIED');
+  const candidate=validateOrphanSixBManifest(request,raw,{
+    actor:owner,repo,approvalPr:{
+      number:num,state:pr.state,merged:pr.merged,
+      headSha:pr.head.sha,baseRepo:pr.base.repo.full_name,
+      ownerExactEffectApproved:true
+    }
+  });
+  if(candidate.status!=='CANDIDATE_ONLY'||
+     candidate.scope!==ORPHAN_SIX_B_SCOPE||
+     candidate.installedMaintainerSha!==installed.installedMaintainerSha)
+   return deny('ORPHAN_SIX_B_SOURCE_CANDIDATE_UNVERIFIED');
+  return positive(candidate);
+ }catch{return deny('ORPHAN_SIX_B_APPROVAL_OR_INSTALLED_READBACK_UNKNOWN');}
+}
+
+/**
+ * Source-only, per-seat FRESH owner decision review, designed for the
+ * independently installed B maintainer's private callback boundary.
+ *
+ * This must run after a durable STOP_INTENT readback, once PER seat, reading
+ * the canonical GitHub PR, full Issue comments and exact manifest raw bytes
+ * again. A prior approved candidate must NOT be used as a cached decision.
+ * Its return remains CANDIDATE_ONLY: no source callback can grant Windows
+ * Runner/Watchdog/lease authority or produce the private B decision receipt.
+ */
+async function recheckOrphanSixFreshOwnerEffectSource({
+ issue,seat,proposalId,expectedJournalSha256,
+ expectedRequestId,expectedManifestRawSha256,
+ getMainManifest,getPullRequest,getOwnerEffectComments
+}={}){
+ if(!exactlyOwnerLabel(issue)||!Number.isInteger(seat)||seat<1||seat>6||
+    !sha64(proposalId)||!sha64(expectedJournalSha256)||
+    !sha64(expectedManifestRawSha256)||
+    typeof expectedRequestId!=='string'||
+    [getMainManifest,getPullRequest,getOwnerEffectComments]
+      .some(f=>typeof f!=='function'))
+  return deny('ORPHAN_SIX_FRESH_DECISION_CONTEXT_UNVERIFIED');
+ let request;
+ try{request=validateOrphanSixBRequest(parseOrphanSixBFlatRequest(issue.body),{actor:owner,repo});}
+ catch{return deny('ORPHAN_SIX_FRESH_DECISION_REQUEST_UNVERIFIED');}
+ if(request.requestId!==expectedRequestId||
+    request.approvalManifestSha256!==expectedManifestRawSha256)
+  return deny('ORPHAN_SIX_FRESH_DECISION_REQUEST_PIN_CHANGED');
+ try{
+  const rel='approvals/controller-orphan-six/'+expectedManifestRawSha256+'.json';
+  const raw=await getMainManifest(rel,'main');
+  if(!Buffer.isBuffer(raw)||raw.length<2||raw.length>16384||
+     digest(raw)!==expectedManifestRawSha256)
+   return deny('ORPHAN_SIX_FRESH_DECISION_MANIFEST_CAS_CHANGED');
+  let manifest;
+  try{manifest=JSON.parse(raw.toString('utf8'));}catch{
+   return deny('ORPHAN_SIX_FRESH_DECISION_MANIFEST_INVALID');
+  }
+  const m=/^https:\/\/github\.com\/ansqhd5774-Choi\/zgmini-pc-control\/pull\/([1-9]\d*)$/
+   .exec(manifest?.approval?.ref??'');
+  if(!m)return deny('ORPHAN_SIX_FRESH_DECISION_PR_IDENTITY_UNVERIFIED');
+  const number=Number(m[1]);
+  if(!Number.isSafeInteger(number)||number<1)
+   return deny('ORPHAN_SIX_FRESH_DECISION_PR_IDENTITY_UNVERIFIED');
+  // Mandatory fresh, independent canonical reads for EACH seat. Their
+  // origin and freshness at effect time remain the private B's obligation.
+  const [pr,comments]=await Promise.all([
+    getPullRequest(number),getOwnerEffectComments(issue.number)
+  ]);
+  if(!pinnedMergedSource(pr,number,manifest?.approval?.reviewedSourceSha))
+   return deny('ORPHAN_SIX_FRESH_DECISION_MERGED_PR_UNVERIFIED');
+  if(!ownerExactBEffectDecision(comments,issue,request,manifest,pr))
+   return deny('ORPHAN_SIX_FRESH_DECISION_LATEST_OWNER_APPROVAL_UNVERIFIED');
+  const checked=validateOrphanSixBManifest(request,raw,{
+   actor:owner,repo,approvalPr:{
+    number,state:pr.state,merged:pr.merged,headSha:pr.head.sha,
+    baseRepo:pr.base.repo.full_name,ownerExactEffectApproved:true
+   }
+  });
+  if(checked.status!=='CANDIDATE_ONLY')
+   return deny('ORPHAN_SIX_FRESH_DECISION_SOURCE_CAS_UNVERIFIED');
+  return Object.freeze({
+   ...deny('ORPHAN_SIX_FRESH_DECISION_REVIEW_ONLY'),
+   status:'CANDIDATE_ONLY',requestId:request.requestId,
+   seat,proposalId,manifestRawSha256:expectedManifestRawSha256,
+   intentReadbackSha256:expectedJournalSha256,
+   nextAction:'PRIVATE_INSTALLED_B_MUST_REATTEST_FULL_CANONICAL_SOURCE_AND_FENCE_AT_SIGNAL'
+  });
+ }catch{
+  return deny('ORPHAN_SIX_FRESH_DECISION_READBACK_UNKNOWN');
+ }
+}
+return Object.freeze({receiveOrphanSixBApprovalSource,recheckOrphanSixFreshOwnerEffectSource});
+})();
+const orphanSixStatic_inlet=(()=>{
+// Source-only candidate adapter for a future independently approved B maintainer.
+// No installed receiver route, CLI, GitHub calls, filesystem, lease, Windows
+// signal, or change to the nine pinned maintenance files is made here.
+// All callbacks are read-only. A CANDIDATE_ONLY result grants NO OS authority.
+const {ORPHAN_SIX_B_TITLE,validateOrphanSixBRequest}=orphanSixStatic_admission;
+const {receiveOrphanSixBApprovalSource}=orphanSixStatic_receiver;
+const {parseOrphanSixBFlatRequest}=orphanSixStatic_flat;
+
+
+const REPO='ansqhd5774-Choi/zgmini-pc-control';
+const OWNER='ansqhd5774-Choi';
+const LABEL='pc-maintenance';
+const reject=code=>Object.freeze({
+ status:'BLOCKED',code,executionStarted:false,
+ approvalSourceVerified:false,effectAuthorized:false,
+ runnerStopAuthorized:false,operationalWrites:0,automaticRetries:0
+});
+
+async function inspectOrphanSixBMaintainerInletSource({
+ issue,attestCurrentMaintainerSource,readOriginalOneUseClaim,
+ getMainManifest,getPullRequest,getOwnerEffectComments,getInstalledReadback
+}={}){
+ // A future trusted installed maintainer still owns every OS/write boundary.
+ if(issue?.title!==ORPHAN_SIX_B_TITLE||
+    (issue.state!=='OPEN'&&issue.state!=='open')||
+    !Number.isSafeInteger(issue.number)||issue.number<1||
+    issue.author?.login!==OWNER||
+    !Array.isArray(issue.labels)||!issue.labels.some(x=>x?.name===LABEL))
+  return reject('ORPHAN_SIX_B_UNTRUSTED_ISSUE');
+ try{
+  const parsed=parseOrphanSixBFlatRequest(issue.body);
+  validateOrphanSixBRequest(parsed,{actor:OWNER,repo:REPO});
+ }catch{return reject('ORPHAN_SIX_B_RAW_REQUEST_INVALID');}
+ if([attestCurrentMaintainerSource,readOriginalOneUseClaim,
+    getMainManifest,getPullRequest,getOwnerEffectComments,
+    getInstalledReadback].some(x=>typeof x!=='function'))
+  return reject('ORPHAN_SIX_B_SOURCE_READ_PORTS_MISSING');
+ try{
+  // A source-only test may inject this attestation, but the adapter neither
+  // creates evidence nor permits an install/signal. Real source must be
+  // attested by the installed independent B maintainer before use.
+  const installed=await attestCurrentMaintainerSource();
+  if(installed?.origin!=='PRIVATE_INDEPENDENT_B_MAINTAINER'||
+     installed.verifiedNinePinnedMaintainerFiles!==true||
+     installed.currentMaintainerSourceUnchangedVerified!==true)
+   return reject('ORPHAN_SIX_B_MAINTAINER_SOURCE_UNVERIFIED');
+  const result=await receiveOrphanSixBApprovalSource({issue,
+   readOriginalOneUseClaim,getMainManifest,getPullRequest,
+   getOwnerEffectComments,getInstalledReadback});
+  // Even a verified source candidate MUST remain non-executable.
+  if(result?.status!=='CANDIDATE_ONLY')return reject(result?.code??'ORPHAN_SIX_B_SOURCE_BLOCKED');
+  return Object.freeze({...reject(result.code),status:'CANDIDATE_ONLY',
+   approvalSourceVerified:true,requestId:result.requestId,
+   manifestRawSha256:result.manifestRawSha256,
+   nextAction:'SEPARATE_INSTALLED_B_PRIVATE_CAS_AND_EFFECT_APPROVAL_REQUIRED'});
+ }catch{return reject('ORPHAN_SIX_B_SOURCE_READBACK_UNKNOWN');}
+}
+return Object.freeze({inspectOrphanSixBMaintainerInletSource,parseOrphanSixBFlatRequest});
+})();
+export const inspectOrphanSixPackagedInletSource=orphanSixStatic_inlet.inspectOrphanSixBMaintainerInletSource;
+export const parseOrphanSixPackagedRequest=orphanSixStatic_inlet.parseOrphanSixBFlatRequest;
+// END GENERATED ORPHAN SIX SOURCE INLET
+
 const CONTROL_REPOSITORY="ansqhd5774-Choi/zgmini-pc-control";
 const ISSUE_TITLE="pc-controller-update";
 const R6_HOST_ISSUE_TITLE="pc-r6-host-register";
