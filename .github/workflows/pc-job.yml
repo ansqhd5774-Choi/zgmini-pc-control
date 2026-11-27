@@ -83,8 +83,15 @@ jobs:
       run:
         shell: cmd
     steps:
+      # This read-only guard prevents old Controller modules from ever running
+      # on a Public owner Issue before the exact selective B installation.
+      # A failed check emits no private result; it cannot authorize B effects.
+      - name: Verify pinned installed Public A Controller before all host actions
+        id: installed_controller
+        run: >-
+          "E:\ZGmini\runtime\node.exe" -e "try{const f=require('node:fs'),c=require('node:crypto'),r='E:/ZGmini/automation/pc-control';const h=JSON.parse(f.readFileSync(r+'/host.json','utf8'));const p={'controller/common.mjs':'bddd2435644d2619360a63b9b252caea3ce5d99583fe4e543b3225ff11496ee1','controller/entry.mjs':'1874aa1b0b9c6ce109a15737a608a711b81aecb7e3bdcc475032be8b54c1dca7','controller/preimage-manifest-stager.mjs':'806950791803cfc9a1fb387dfdbc4b74757304c48df20e90a2d9b76d52c8cf10','controller/upload.mjs':'a0a6065c7f2fd8f816e6b0a9efd9e7aba14e990bd0336aadc6b0be74baaefe8e'};if(h.controllerSourceSha!=='20d5bbbf305531dca9bf5b74744df83daf37cf17')process.exit(2);if(!h.controllerFiles||typeof h.controllerFiles!=='object'||Array.isArray(h.controllerFiles))process.exit(2);for(const [n,d] of Object.entries(p)){if(h.controllerFiles[n]!==d)process.exit(2);const t=f.lstatSync(r+'/'+n);if(!t.isFile()||t.isSymbolicLink())process.exit(2);if(c.createHash('sha256').update(f.readFileSync(r+'/'+n)).digest('hex')!==d)process.exit(2)}}catch{process.exitCode=2}"
       - name: Stage approved read-only preimage scope
-        if: contains(github.event.issue.body, 'preimageManifestPath')
+        if: steps.installed_controller.outcome == 'success' && contains(github.event.issue.body, 'preimageManifestPath')
         # The fixed Controller entry must still produce a BLOCKED JSON/TXT
         # when staging itself fails before an attestable scope is available.
         continue-on-error: true
@@ -92,9 +99,10 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: '"E:\ZGmini\runtime\node.exe" "E:\ZGmini\automation\pc-control\controller\preimage-manifest-stager.mjs"'
       - name: Execute fixed host allowlist entry
+        if: steps.installed_controller.outcome == 'success'
         run: '"E:\ZGmini\runtime\node.exe" "E:\ZGmini\automation\pc-control\controller\entry.mjs"'
       - name: Upload sanitized TXT JSON and issue result
-        if: always()
+        if: always() && steps.installed_controller.outcome == 'success'
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: '"E:\ZGmini\runtime\node.exe" "E:\ZGmini\automation\pc-control\controller\upload.mjs"'
