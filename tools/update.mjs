@@ -1241,22 +1241,22 @@ const PUBLIC_AUDIT_OWNER_B=Object.freeze({
  selectiveBranch:'codex/controller-operating-audit-selective-one-20261128',
  paths:['config/operations.json','controller/operations.mjs']
 });
-const PUBLIC_AUDIT_SHA_REPAIR_B=Object.freeze({
+// New PR #4302 one-file SHA lineage repair is never admitted without an
+// actual reviewed owner approval merge and the existing Windows CAS checks.
+const PUBLIC_LINEAGE_OWNER_B=Object.freeze({
  installed:'cde1dd372210e4658ae348cb9e2577967cb11634',
- target:'f03febc06f32a553676622ecf049e7dd90e2b7d5',
- approvalPr:4303,
- // Fail closed until the exact, separately approved PR merge SHA is pinned.
- // A draft manifest, owner identity, or successful source CI cannot set this.
- approvalMerge:null,
- selectiveBranch:'codex/issues-lifecycle-manager-20261118-72-audit-sha-overlay',
+ target:'d3764580fdb08ecddd5f9b1064051eec30f90492',
+ approvalPr:4302,
+ approvalMerge:'b7b7eb92802d0e974ee3ad9a2d2689e37ae41bb4',
+ selectiveBranch:'codex/controller-audit-4300-selective-20261128',
  paths:['controller/operations.mjs']
 });
 function approvedPublicOwnerEffect(data){
  const {issue,manifest}=data??{};
  const effect=issue?.targetControllerSha===PUBLIC_OWNER_B.target?
   PUBLIC_OWNER_B:issue?.targetControllerSha===PUBLIC_AUDIT_OWNER_B.target?
-  PUBLIC_AUDIT_OWNER_B:issue?.targetControllerSha===PUBLIC_AUDIT_SHA_REPAIR_B.target?
-  PUBLIC_AUDIT_SHA_REPAIR_B:null;
+  PUBLIC_AUDIT_OWNER_B:issue?.targetControllerSha===PUBLIC_LINEAGE_OWNER_B.target?
+  PUBLIC_LINEAGE_OWNER_B:null;
  need(effect!==null&&data?.actor==='ansqhd5774-Choi'&&
   issue?.operation==='controller-update'&&issue?.controlRepository===controlRepository&&
   manifest?.installedSha===effect.installed&&
@@ -1265,7 +1265,6 @@ function approvedPublicOwnerEffect(data){
   manifest?.approval?.grade==='B'&&
   manifest?.approval?.scope==='PC_CONTROL_CONTROLLER_UPDATE'&&
   manifest?.approval?.ref==='https://github.com/'+controlRepository+'/pull/'+effect.approvalPr&&
-  /^[a-f0-9]{40}$/.test(effect.approvalMerge??'')&&
   manifest?.postOperation==='core-status'&&
   manifest?.selectiveSource?.branch===effect.selectiveBranch&&
   Array.isArray(manifest?.allowFiles)&&
