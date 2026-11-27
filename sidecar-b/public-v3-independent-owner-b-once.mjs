@@ -90,7 +90,7 @@ export function classifyW06PublicBEffect(e) {
  return out('READY','W06_PUBLIC_B_EFFECT_PREFLIGHT_READY_ONLY');
 }
 
-const api=route=>JSON.parse(execFileSync(GH,['api',route],{
+const api=route=>JSON.parse(execFileSync(GH,['api',route,...(route.includes('/compare/')?['--jq','{behind_by, merge_base_commit: {sha: .merge_base_commit.sha}}']:[])],{
  encoding:'utf8',windowsHide:true,timeout:25000,maxBuffer:500000
 }));
 function readRemote(relative,revision) {

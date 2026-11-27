@@ -69,7 +69,7 @@ export function assessPublicV3PreimageReadonly(e){
 }
 
 function api(route){
- const raw=execFileSync(GH,['api',route],{
+ const raw=execFileSync(GH,['api',route,...(route.includes('/compare/')?['--jq','{behind_by, merge_base_commit: {sha: .merge_base_commit.sha}}']:[])],{
   encoding:'utf8',windowsHide:true,timeout:25000,maxBuffer:262144
  });
  return JSON.parse(raw);
