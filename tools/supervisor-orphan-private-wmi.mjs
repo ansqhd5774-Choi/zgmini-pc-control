@@ -17,7 +17,8 @@ const pid=x=>Number.isSafeInteger(x)&&x>0;
 // Three-digit synthetic fixtures remain accepted; comparison uses exact text.
 const stamp=x=>typeof x==='string'&&
  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.(?:\d{3}|\d{7})Z$/.test(x)&&
- Number.isFinite(Date.parse(x))&&new Date(x).toISOString()===x;
+ Number.isFinite(Date.parse(x))&&
+ new Date(x).toISOString()===x.slice(0,23)+'Z';
 const base={schema:'ZGMINI_ORPHAN_PRIVATE_WMI_READ_V1',
  effectAuthorized:false,adoptionAuthorized:false,nonceVerified:false,
  leaseMutationAuthorized:false,heartbeatWriteAuthorized:false,
