@@ -934,6 +934,8 @@ export function createMaintenanceAgent({
   leaseRoot=FIXED_LEASE_ROOT,leaseAttempts=120,leaseWaitMs=500,
   updateScript=path.join(path.dirname(fileURLToPath(import.meta.url)),"update.mjs"),
   verifyInstalledSource=()=>{},verifyRecoverySource=verifyInstalledRecoveryLocalSource,
+  // Read-only source admission dependency ports; never a B effect executor.
+  orphanSixSourcePorts=null,
   installedShaFromStatus=result=>result?.actualControllerSha,
   ghTimeoutMs=20_000,updateTimeoutMs=0,
   now=()=>new Date().toISOString(),
@@ -1592,7 +1594,43 @@ export function createMaintenanceAgent({
       s6ExecutionStatus:result.s6ExecutionStatus??null,
       reportUploadStatus:stored.reportUploadStatus};
   }
+  // Separate source-only orphan-six intake. No updater, lease, journal write,
+  // Runner signal, comment, or installer is callable through this route.
+  // Real B effect admission remains a distinct unimplemented private lane.
+  async function processOrphanSixSourceIssue(issue){
+    const base={issueNumber:issue?.number??null,executionStarted:false,
+      effectAuthorized:false,runnerStopAuthorized:false,operationalWrites:0,
+      automaticRetries:0};
+    const blocked=code=>({...base,status:'BLOCKED',code});
+    if(!issueIsTrusted(issue,{allowedActors,title:orphanSixStatic_admission.ORPHAN_SIX_B_TITLE,label}))
+      return blocked('ORPHAN_SIX_B_UNTRUSTED_ISSUE');
+    if(typeof issue.body!=='string'||Buffer.byteLength(issue.body)>16384)
+      return blocked('ORPHAN_SIX_B_RAW_REQUEST_INVALID');
+    // No port means no private install/origin evidence. Never manufacture it.
+    if(!orphanSixSourcePorts||typeof orphanSixSourcePorts!=='object'||
+      Array.isArray(orphanSixSourcePorts))
+      return blocked('ORPHAN_SIX_B_SOURCE_READ_PORTS_MISSING');
+    try{
+      verifyInstalledSource();
+      const inspected=await inspectOrphanSixPackagedInletSource({
+        issue,...orphanSixSourcePorts
+      });
+      // Convert every unexpected port return to a closed source-only result.
+      if(!inspected||!['BLOCKED','CANDIDATE_ONLY'].includes(inspected.status)||
+        inspected.effectAuthorized!==false||
+        inspected.runnerStopAuthorized!==false||
+        inspected.operationalWrites!==0)
+        return blocked('ORPHAN_SIX_B_SOURCE_RESULT_UNVERIFIED');
+      return {...base,status:inspected.status,code:inspected.code,
+        requestId:inspected.status==='CANDIDATE_ONLY'?inspected.requestId:undefined,
+        approvalSourceVerified:inspected.status==='CANDIDATE_ONLY'};
+    }catch{
+      return blocked('ORPHAN_SIX_B_SOURCE_READBACK_UNKNOWN');
+    }
+  }
   async function processIssue(issue){
+    if(issue?.title===orphanSixStatic_admission.ORPHAN_SIX_B_TITLE)
+      return processOrphanSixSourceIssue(issue);
     if(issue?.title===S6_ONCE_ISSUE_TITLE)return processS6OnceIssue(issue);
     if(issue?.title===INSTALLED_RECOVERY_ISSUE_TITLE)
       return processInstalledRecoveryIssue(issue);
@@ -1799,7 +1837,8 @@ export function createMaintenanceAgent({
       // Summary filtering avoids unnecessary reads; processIssue still verifies
       // the full Issue actor, label, request body and approval before applying.
       if(![ISSUE_TITLE,R6_HOST_ISSUE_TITLE,R54_B_ISSUE_TITLE,SOURCE_BUNDLE_ISSUE_TITLE,
-        INSTALLED_RECOVERY_ISSUE_TITLE,S6_ONCE_ISSUE_TITLE].includes(entry?.title))continue;
+        INSTALLED_RECOVERY_ISSUE_TITLE,S6_ONCE_ISSUE_TITLE,
+        orphanSixStatic_admission.ORPHAN_SIX_B_TITLE].includes(entry?.title))continue;
       seen.add(number);
       const cached=settledIssueCache.get(number);
       const updatedAt=entry?.updatedAt;
