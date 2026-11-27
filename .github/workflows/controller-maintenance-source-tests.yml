@@ -61,6 +61,8 @@ on:
       - 'tools/supervisor-orphan-console-readonly.mjs'
       - 'tools/supervisor-orphan-six-wmi-console-crosscheck.mjs'
       - 'tests/supervisor-orphan-six-wmi-console-crosscheck.test.mjs'
+      - 'tools/supervisor-orphan-six-b-receiver-source.mjs'
+      - 'tests/supervisor-orphan-six-b-receiver-source.test.mjs'
       - 'tests/controller-standby.test.mjs'
       - 'tools/supervisor-orphan-lease-temp-fixture.mjs'
       - 'tests/supervisor-orphan-lease-temp-fixture.test.mjs'
