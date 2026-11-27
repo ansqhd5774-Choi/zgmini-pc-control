@@ -54,10 +54,10 @@ function heartbeatFrom(sample,now){
 }
 
 export function createNoSpawnHeartbeatActor({
- attest,writeStatus,now=()=>Date.now(),selfPid=process.pid
+ attest,writeStatus,now=()=>Date.now()
 }={}){
  if(typeof attest!=='function'||typeof writeStatus!=='function'||
-    typeof now!=='function'||!validPid(selfPid))
+    typeof now!=='function')
   throw Error('NO_SPAWN_ACTOR_PRIVATE_BINDINGS_REQUIRED');
  let baseline=null,terminal=null,busy=false,timer=null;
  function halt(code){
@@ -73,7 +73,7 @@ export function createNoSpawnHeartbeatActor({
   const assessed=assessNoSpawnMonitorSnapshot({...sample,now:instant});
   if(assessed.status!=='CANDIDATE_ONLY'||
      assessed.exactSeatIdentityCount!==6||
-     !validPid(sample?.newOwner?.pid)||sample.newOwner.pid!==selfPid)
+     !validPid(sample?.newOwner?.pid)||sample.newOwner.pid!==process.pid)
    throw Error('NO_SPAWN_ACTOR_LIVE_ATTESTATION_REJECTED');
   return {sample,instant,fingerprint:exactContinuityFingerprint(sample)};
  }
