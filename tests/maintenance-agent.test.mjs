@@ -1176,3 +1176,33 @@ test('orphan-six untrusted actor cannot invoke injected source reads',async t=>{
  assert.equal(f.stats.applies,0);
  assert.equal(f.stats.comments,0);
 });
+
+test('orphan-six injected source ports cannot substitute an unapproved request body',async t=>{
+ let attestCalls=0;
+ const validRequest={
+  schema:'ZGMINI_PC_ORPHAN_SIX_B_REQUEST_V1',
+  requestId:'pc-12345678-1234-4234-9234-123456789abc',
+  chatId:'chat-original-approved',
+  operation:'controller-orphan-six-graceful-once',
+  controlRepository:REPO,targetControllerSha:INSTALLED,
+  approvalManifestSha256:'a'.repeat(64)
+ };
+ const f=fixture(t,{orphanSixSourcePorts:{
+  // Attempt to swap out the genuine issue after the receiver fetched it.
+  issue:{number:72,title:'pc-controller-orphan-six-graceful-once',
+   state:'OPEN',author:{login:ACTOR},labels:[{name:'pc-maintenance'}],
+   body:JSON.stringify(validRequest)},
+  attestCurrentMaintainerSource:async()=>{attestCalls++;return null;},
+  readOriginalOneUseClaim:async()=>null,
+  getMainManifest:async()=>null,getPullRequest:async()=>null,
+  getOwnerEffectComments:async()=>null,getInstalledReadback:async()=>null
+ }});
+ f.issue.title='pc-controller-orphan-six-graceful-once';
+ f.issue.body='{}';
+ const [result]=await f.agent.pollOnce();
+ assert.equal(result.status,'BLOCKED');
+ assert.equal(result.code,'ORPHAN_SIX_B_RAW_REQUEST_INVALID');
+ assert.equal(attestCalls,0);
+ assert.equal(f.stats.applies,0);
+ assert.equal(f.stats.comments,0);
+});
