@@ -39,47 +39,74 @@ function exactlyOwnerLabel(issue){
   issue.labels.some(l=>l?.name===label)&&
   typeof issue.body==='string'&&Buffer.byteLength(issue.body)<=16384;
 }
-function reviewedMerge(raw,prNum,sourceSha,reviewReadback){
- const reviews=reviewReadback?.items;
- if(reviewReadback?.complete!==true||reviewReadback?.source!=='GITHUB_CANONICAL_REVIEW_API')
+const ownerDecisionSchema='ZGMINI_ORPHAN_SIX_B_OWNER_DECISION_V1';
+const decisionFields=['schema','decision','requestId',
+ 'approvalManifestSha256','reviewedSourceSha','scope',
+ 'operation','effect','installedControllerSha'];
+const exact=(obj,keys)=>obj&&typeof obj==='object'&&!Array.isArray(obj)&&
+ Object.keys(obj).sort().join(',')===[...keys].sort().join(',');
+function pinnedMergedSource(pr,number,sha){
+ return pr?.number===number&&pr.state==='closed'&&pr.merged===true&&
+  validDate(pr.merged_at)&&pr.base?.repo?.full_name===repo&&
+  pr.head?.repo?.full_name===repo&&pr.head.sha===sha&&sha40(sha);
+}
+function ownerExactBEffectDecision(readback,issue,request,manifest,pr){
+ if(readback?.source!=='GITHUB_CANONICAL_ISSUE_COMMENTS_API'||
+    readback?.complete!==true||readback?.issueNumber!==issue.number||
+    !Array.isArray(readback.items)||readback.items.length>1000)
   return false;
- if(raw?.number!==prNum||raw.state!=='closed'||raw.merged!==true||
-    !validDate(raw.merged_at)||raw.base?.repo?.full_name!==repo||
-    raw.head?.repo?.full_name!==repo||
-    raw.head.sha!==sourceSha||!sha40(raw.head.sha)||
-    !Array.isArray(reviews)||reviews.length>100)
-  return false;
- // The canonical GitHub API (not Issue/manifest) supplies the review
- // provenance. Require an OWNER approval on the exact final head.
- // A later dismissal of the same review makes it ineligible.
- const accepted=reviews.filter(r=>r?.user?.login===owner&&
-  r.commit_id===sourceSha&&r.state==='APPROVED'&&
-  validDate(r.submitted_at)&&Date.parse(r.submitted_at)<=Date.parse(raw.merged_at));
- if(accepted.length===0)return false;
- // API readback may not be in submitted_at order. A later exact-head
- // approval supersedes an earlier dismissal; ties fail closed.
- const latestApprovedAt=Math.max(...accepted.map(r=>Date.parse(r.submitted_at)));
- return !reviews.some(r=>r?.user?.login===owner&&r.commit_id===sourceSha&&
-   r.state==='DISMISSED'&&validDate(r.submitted_at)&&
-   Date.parse(r.submitted_at)>=latestApprovedAt);
+ const decisions=[];
+ for(const item of readback.items){
+  if(item?.user?.login!==owner)continue;
+  if(!Number.isSafeInteger(item.id)||item.id<=0||
+     typeof item.body!=='string'||Buffer.byteLength(item.body)>2048)
+   return false;
+  let record;
+  try{record=JSON.parse(item.body);}catch{continue;}
+  if(record?.schema!==ownerDecisionSchema)continue;
+  // A malformed OWNER decision cannot be silently skipped.
+  if(!exact(record,decisionFields)||
+     !['APPROVE','REVOKE'].includes(record.decision)||
+     record.operation!==ORPHAN_SIX_B_OPERATION||
+     record.scope!==ORPHAN_SIX_B_SCOPE||
+     record.effect!=='SIX_ORPHAN_LISTENER_GRACEFUL_STOP_ONCE'||
+     record.requestId!==request.requestId||
+     record.approvalManifestSha256!==request.approvalManifestSha256||
+     record.reviewedSourceSha!==manifest.approval.reviewedSourceSha||
+     record.installedControllerSha!==manifest.installedControllerSha||
+     item.html_url!=='https://github.com/'+repo+'/issues/'+issue.number+
+       '#issuecomment-'+item.id||
+     !validDate(item.created_at)||item.updated_at!==item.created_at||
+     Date.parse(item.created_at)<=Date.parse(pr.merged_at)||
+     Date.parse(item.created_at)>Date.now())
+   return false;
+  decisions.push({at:Date.parse(item.created_at),id:item.id,decision:record.decision});
+ }
+ if(decisions.length===0)return false;
+ // Exact second-resolution ties are ambiguous even when an API order differs.
+ decisions.sort((a,b)=>a.at-b.at||a.id-b.id);
+ const last=decisions.at(-1);
+ if(decisions.length>1&&decisions.at(-2).at===last.at)return false;
+ return last.decision==='APPROVE';
 }
 /**
  * Dependency callbacks are READ-only ports exposed by a separately
- * authenticated installed independent maintainer. Passing forged callback
- * results never creates an OS execution permission.
+ * authenticated installed independent maintainer. An OWNER comment attesting
+ * exact B effect is distinct from merging code or approving one's own PR.
+ * Passing forged callback results never creates an OS execution permission.
  *
  * getMainManifest: exact canonical approval path -> bytes (not parsed JSON)
- * getPullRequest / getReviews: canonical GitHub API readbacks
+ * getPullRequest / getOwnerEffectComments: canonical GitHub API readbacks
  * getInstalledReadback: same-host pinned local installation only
  * readOriginalOneUseClaim: existing durable effect ledger check
  */
 export async function receiveOrphanSixBApprovalSource({
- issue,getMainManifest,getPullRequest,getReviews,
+ issue,getMainManifest,getPullRequest,getOwnerEffectComments,
  getInstalledReadback,readOriginalOneUseClaim
 }={}){
  if(!exactlyOwnerLabel(issue))
   return deny('ORPHAN_SIX_B_ISSUE_ORIGIN_UNVERIFIED');
- if([getMainManifest,getPullRequest,getReviews,
+ if([getMainManifest,getPullRequest,getOwnerEffectComments,
       getInstalledReadback,readOriginalOneUseClaim].some(x=>typeof x!=='function'))
   return deny('ORPHAN_SIX_B_RECEIVER_READ_PORTS_MISSING');
  let request;
@@ -103,11 +130,13 @@ export async function receiveOrphanSixBApprovalSource({
   if(!matched)return deny('ORPHAN_SIX_B_APPROVAL_PR_REF_INVALID');
   const num=Number(matched[1]);
   if(!Number.isSafeInteger(num)||num<=0)return deny('ORPHAN_SIX_B_APPROVAL_PR_REF_INVALID');
-  const [pr,reviews,installed]=await Promise.all([
-    getPullRequest(num),getReviews(num),getInstalledReadback()
+  const [pr,comments,installed]=await Promise.all([
+    getPullRequest(num),getOwnerEffectComments(issue.number),getInstalledReadback()
   ]);
-  if(!reviewedMerge(pr,num,manifest?.approval?.reviewedSourceSha,reviews))
-   return deny('ORPHAN_SIX_B_APPROVAL_REVIEW_OR_MERGE_UNVERIFIED');
+  if(!pinnedMergedSource(pr,num,manifest?.approval?.reviewedSourceSha))
+   return deny('ORPHAN_SIX_B_MERGED_SOURCE_UNVERIFIED');
+  if(!ownerExactBEffectDecision(comments,issue,request,manifest,pr))
+   return deny('ORPHAN_SIX_B_OWNER_EXACT_EFFECT_APPROVAL_UNVERIFIED');
   if(installed?.origin!=='PRIVATE_INDEPENDENT_B_MAINTAINER'||
      installed?.currentInstallVerified!==true||
      installed?.sourceFilesVerified!==true||
@@ -120,7 +149,7 @@ export async function receiveOrphanSixBApprovalSource({
     actor:owner,repo,approvalPr:{
       number:num,state:pr.state,merged:pr.merged,
       headSha:pr.head.sha,baseRepo:pr.base.repo.full_name,
-      reviewedByOwner:true
+      ownerExactEffectApproved:true
     }
   });
   if(candidate.status!=='CANDIDATE_ONLY'||
