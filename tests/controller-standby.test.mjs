@@ -10,6 +10,8 @@ import './supervisor-orphan-console-signal-windows-isolation.test.mjs';
 import './supervisor-orphan-six-graceful-source.test.mjs';
 // Uses TEMP-only existing maintenance-lock and no operating B receiver invocation.
 import './supervisor-orphan-six-graceful-b-coordinator.test.mjs';
+// Strict separate B raw request/manifest/live source gate, no effect or installed route.
+import './supervisor-orphan-six-b-admission.test.mjs';
 // Fixed TEMP-only exact status CAS writer regression; never touches operating root.
 import './supervisor-orphan-status-temp-writer.test.mjs';
 // Cross-module readback boundary: Watchdog HEALTHY is not old six-listener B admission.
