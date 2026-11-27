@@ -2045,3 +2045,8 @@ import './s6-4078-windows-local-readonly.test.mjs';
 // Public GitHub-hosted source-only CI runs the fixed Writer B COM probe
 // in Node vm with injected fixtures; no Windows API/PC action is invoked.
 import '../r17-writer-b/r17-b-windows-probe.test.mjs';
+
+// #4135: ensure the existing hosted source CI runs the Writer B idle
+// evidence and sanitized JSON/TXT regression suites on the exact PR HEAD.
+import '../writer-b/core-idle-window.test.mjs';
+import '../writer-b/report-rejection.test.mjs';
