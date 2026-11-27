@@ -5,7 +5,8 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
 import {prepareControllerUpdateRequest,validateMaintenanceRequest,validateUpdateRequest,
- CONTROL_ACTOR,CONTROL_REPOSITORY,CI_CONTROLLER_ACTOR,controllerBReceiptMarker} from './maintenance-contract.mjs';
+ CONTROL_ACTOR,CONTROL_REPOSITORY,CI_CONTROLLER_ACTOR,controllerBReceiptMarker,
+ installedControllerBPolicy} from './maintenance-contract.mjs';
 
 const TITLE='pc-controller-update',LABEL='pc-maintenance';
 const fail=code=>{throw Error(code)};
@@ -256,11 +257,33 @@ export async function submitExistingControllerApprovalFromCi({targetSha,approval
     !Number.isSafeInteger(runId)||runId<=0||!Number.isSafeInteger(attempt)||attempt<=0)
   fail('MAINTENANCE_CI_PUBLISH_INPUT_INVALID');
  const repo=await ports.readRepository();
- if(repo?.id!==1442936296||repo.full_name!==CONTROL_REPOSITORY||repo.private!==true||
-    !ownerIdentity(repo.owner))fail('MAINTENANCE_CI_REPOSITORY_DENIED');
+ if(repo?.id!==1442936296||repo.full_name!==CONTROL_REPOSITORY||
+    ![true,false].includes(repo.private)||!ownerIdentity(repo.owner))
+  fail('MAINTENANCE_CI_REPOSITORY_DENIED');
+ const publicMode=repo.private===false;
+ let publicPolicy=null;
+ if(publicMode){
+  // Not the CI variable, candidate PR, event, or Issue: production must bind
+  // this port to the independently installed, protected Windows 7-file
+  // maintenance manifest. Default production ports do not expose it, so Public
+  // remains disabled until that *separate* operator-approved connection.
+  if(typeof ports.readIndependentInstalledCiPolicy!=='function')
+   fail('MAINTENANCE_CI_PUBLIC_POLICY_NOT_INSTALLED');
+  let installed;
+  try{installed=await ports.readIndependentInstalledCiPolicy();
+   publicPolicy=installedControllerBPolicy(installed);
+  }catch{fail('MAINTENANCE_CI_PUBLIC_POLICY_UNVERIFIED');}
+  if(publicPolicy?.repositoryVisibility!=='public')
+   fail('MAINTENANCE_CI_PUBLIC_POLICY_UNVERIFIED');
+  if(publicPolicy.targetSha!==targetSha||
+     publicPolicy.manifestSha256!==approvalSha256)
+   fail('MAINTENANCE_CI_PUBLIC_EFFECT_SCOPE_MISMATCH');
+ }
  const bytes=await ports.readManifest(targetSha);
  if(!Buffer.isBuffer(bytes)||digest(bytes)!==approvalSha256)fail('MAINTENANCE_CI_MANIFEST_PIN_MISMATCH');
  const manifest=JSON.parse(bytes.toString('utf8'));
+ if(publicMode&&manifest.installedSha!==publicPolicy.installedSha)
+  fail('MAINTENANCE_CI_PUBLIC_EFFECT_SCOPE_MISMATCH');
  // This is schema validation, not a live CAS assertion. Both receiver and
  // updater independently read the actual installed SHA before any mutation.
  const expected=prepareMaintenanceIssue(bytes,{installedSha:manifest.installedSha,chatId:'chat-ci-'+runId+'-'+attempt});
