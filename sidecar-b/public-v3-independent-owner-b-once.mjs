@@ -104,6 +104,24 @@ function verifyNewDependencyClosure() {
   need(sha(readLocal(relative))===sha(readRemote(relative,'main')),
    'W06_PUBLIC_B_SOURCE_DRIFT_STOP');
 }
+
+// Preserve the distinction between a pre-replacement rejection, a verified
+// rollback and an unknown result after the atomic replacement was attempted.
+// This is a report classification only; it grants no new execution authority.
+export function classifyW06BTerminalFailure({
+ errorCode,replacementAttempted=false,rollbackVerified=false
+}={}) {
+ const recovered=rollbackVerified===true&&
+  errorCode!=='SIDECAR_B_RECOVERY_UNVERIFIED_STOP';
+ if(replacementAttempted===true&&!recovered)
+  return out('RECOVERY_REQUIRED','W06_PUBLIC_B_EFFECT_OUTCOME_UNVERIFIED',{
+   operationalWrites:null,changedFileCount:null,requiresOwnerReconcile:true
+  });
+ const code=/^W06_PUBLIC_B_[A-Z0-9_]{2,80}$/.test(errorCode??'')?
+  errorCode:'W06_PUBLIC_B_UNVERIFIED_STOP';
+ return out('BLOCKED',code);
+}
+
 // Separates an owner-merged source PR from explicit approval of these
 // exact effect bytes. A PR merge alone is never B execution consent.
 export function matchesExactW06OwnerEffectComment(comment,expected,mergedAt) {
@@ -206,22 +224,45 @@ export async function main(args=process.argv.slice(2)) {
  const io=createWindowsSidecarIO({
   requestId:manifest.requestId,observeProtected
  });
- const installed=await applyOneFile(manifest,verifiedCandidate,io);
- need(installed.status==='APPLIED_SOURCE_ONLY'&&
-  sha256(fs.readFileSync(TARGET))===FIXED.afterSha256,
-  'W06_PUBLIC_B_POSTINSTALL_READBACK_STOP');
- return out('PASS','W06_PUBLIC_B_V3_ONE_FILE_INSTALLED_VERIFIED',{
-  effectAuthorized:true,operationalWrites:1,
-  beforeSha256:FIXED.beforeSha256,afterSha256:FIXED.afterSha256,
-  changedFileCount:1,requestId:manifest.requestId
- });
+ const tx={replacementAttempted:false,rollbackVerified:false};
+ const trackedIO={...io,
+  async atomicReplace(...args) {
+   tx.replacementAttempted=true;
+   return io.atomicReplace(...args);
+  },
+  async restoreBackup(...args) {
+   const restored=await io.restoreBackup(...args);
+   tx.rollbackVerified=true;
+   return restored;
+  }
+ };
+ try {
+  const installed=await applyOneFile(manifest,verifiedCandidate,trackedIO);
+  need(installed.status==='APPLIED_SOURCE_ONLY'&&
+   sha256(fs.readFileSync(TARGET))===FIXED.afterSha256,
+   'W06_PUBLIC_B_POSTINSTALL_READBACK_STOP');
+  return out('PASS','W06_PUBLIC_B_V3_ONE_FILE_INSTALLED_VERIFIED',{
+   effectAuthorized:true,operationalWrites:1,
+   beforeSha256:FIXED.beforeSha256,afterSha256:FIXED.afterSha256,
+   changedFileCount:1,requestId:manifest.requestId
+  });
+ }catch(error) {
+  const classified=classifyW06BTerminalFailure({
+   errorCode:error?.code,
+   replacementAttempted:tx.replacementAttempted,
+   rollbackVerified:tx.rollbackVerified
+  });
+  throw Object.assign(new Error(classified.code),{
+   code:classified.code,terminalReport:classified
+  });
+ }
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
  try{console.log(JSON.stringify(await main()));}
  catch(error){
-  const code=/^W06_PUBLIC_B_[A-Z0-9_]{2,80}$/.test(error?.code??'')?
-   error.code:'W06_PUBLIC_B_UNVERIFIED_STOP';
-  console.log(JSON.stringify(out('BLOCKED',code)));
+  const result=error?.terminalReport??
+   classifyW06BTerminalFailure({errorCode:error?.code});
+  console.log(JSON.stringify(result));
   process.exitCode=2;
  }
 }

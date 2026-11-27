@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {classifyW06PublicBEffect,matchesExactW06OwnerEffectComment} from './public-v3-independent-owner-b-once.mjs';
+import {classifyW06PublicBEffect,matchesExactW06OwnerEffectComment,classifyW06BTerminalFailure} from './public-v3-independent-owner-b-once.mjs';
 
 const fixture=()=>({
  approvedMergePinned:true,ownerApprovalVerified:true,
@@ -104,4 +104,50 @@ test('preflight module cannot be evaluated before its authenticated source CAS',
  assert.ok(check>0&&dynamicImport>check&&invoke>dynamicImport);
  assert.match(source,/W06_PUBLIC_B_SOURCE_DRIFT_STOP/);
  assert.match(source,/W06_PUBLIC_B_INDEPENDENT_WINDOWS_REQUIRED/);
+});
+
+test('pre-replacement rejection never invents an operational file write',()=>{
+ const r=classifyW06BTerminalFailure({
+  errorCode:'SIDECAR_B_PREIMAGE_STOP',replacementAttempted:false
+ });
+ assert.equal(r.status,'BLOCKED');
+ assert.equal(r.operationalWrites,0);
+ assert.equal(r.changedFileCount,undefined);
+});
+test('uncertain replacement and failed postcheck require owner reconciliation',()=>{
+ for(const errorCode of [
+  'SIDECAR_B_RECOVERY_UNVERIFIED_STOP',
+  'W06_PUBLIC_B_POSTINSTALL_READBACK_STOP',
+  'SIDECAR_B_LOCK_OWNER_STOP'
+ ]) {
+  const r=classifyW06BTerminalFailure({
+   errorCode,replacementAttempted:true,rollbackVerified:false
+  });
+  assert.equal(r.status,'RECOVERY_REQUIRED',errorCode);
+  assert.equal(r.code,'W06_PUBLIC_B_EFFECT_OUTCOME_UNVERIFIED');
+  assert.equal(r.operationalWrites,null);
+  assert.equal(r.changedFileCount,null);
+  assert.equal(r.requiresOwnerReconcile,true);
+ }
+});
+test('verified rollback is reported separately, never as a completed install',()=>{
+ const r=classifyW06BTerminalFailure({
+  errorCode:'SIDECAR_B_READBACK_STOP',
+  replacementAttempted:true,rollbackVerified:true
+ });
+ assert.equal(r.status,'BLOCKED');
+ assert.equal(r.operationalWrites,0);
+ const unknown=classifyW06BTerminalFailure({
+  errorCode:'SIDECAR_B_RECOVERY_UNVERIFIED_STOP',
+  replacementAttempted:true,rollbackVerified:true
+ });
+ assert.equal(unknown.status,'RECOVERY_REQUIRED');
+});
+test('real transaction wraps atomic replace, rollback and postcheck; CLI retains recovery report',()=>{
+ const s=fs.readFileSync(new URL('./public-v3-independent-owner-b-once.mjs',import.meta.url),'utf8');
+ assert.match(s,/tx\.replacementAttempted=true/);
+ assert.match(s,/tx\.rollbackVerified=true/);
+ assert.match(s,/terminalReport:classified/);
+ assert.match(s,/error\?\.terminalReport/);
+ assert.match(s,/W06_PUBLIC_B_POSTINSTALL_READBACK_STOP/);
 });
