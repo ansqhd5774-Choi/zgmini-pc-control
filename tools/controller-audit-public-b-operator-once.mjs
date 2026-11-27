@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Separate exact, one-shot independent Windows owner entry for approved PR #4283.
-// SOURCE_PR=0 is intentionally fail-closed until this source is reviewed and merged.
+// Reviewed source PR #4295 must be owner-merged into main; draft source cannot execute.
 // Public maintenance Issue polling remains B-denied. This is a C/operator-run
 // source path, not a GitHub Actions/Runner job and not a general B dispatcher.
 import fs from 'node:fs';
@@ -18,7 +18,7 @@ const MAINT='E:/ZGmini/automation/pc-maintenance';
 const TARGET='cde1dd372210e4658ae348cb9e2577967cb11634';
 const INSTALLED='555f95708984580cd7d5a0fd05a80b718e867710';
 const APPROVAL_MERGE='f96187723c25d2059a53e587d9b31717deaab277';
-const SOURCE_PR=0;
+const SOURCE_PR=4295;
 const GH='C:/Program Files/GitHub CLI/gh.exe';
 const PATHS=Object.freeze([
  'config/operations.json','controller/operations.mjs'
