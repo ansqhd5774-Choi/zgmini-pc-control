@@ -141,7 +141,10 @@ function preflight(update){
  update.validateControllerSelectivePin(manifest,pin);
  need(manifest.installedSha===OLD&&manifest.targetSha===TARGET&&
   manifest.approval?.ref==='https://github.com/'+REPO+'/pull/4260'&&
-  manifest.controllerOnlyInstall===true,'B4263_APPROVAL_SCOPE_CHANGED');
+  manifest.controllerOnlyInstall===true&&
+  Array.isArray(manifest.allowFiles)&&manifest.allowFiles.length===4&&
+  manifest.checks?.manifestSha256===update.manifestFingerprint(manifest.allowFiles).sha256,
+  'B4263_APPROVAL_SCOPE_CHANGED');
  const data={actor:'ansqhd5774-Choi',issue:JSON.parse(issue.body),
   manifest,manifestRawBase64:manifestRaw.toString('base64')};
  const ownerRaw=fs.readFileSync(leaseOwner),owner=JSON.parse(ownerRaw);
@@ -154,6 +157,14 @@ function preflight(update){
  const host=read(path.join(CONTROL,'host.json'));
  need(host.controllerSourceSha===TARGET&&update.prevalidationInventory(host)!==null,
   'B4263_INSTALLED_TARGET_UNVERIFIED');
+ // A self-consistent host.json is NOT independent proof of the four approved
+ // target bytes; compare each live source directly with the merged B manifest.
+ for(const file of manifest.allowFiles){
+  const live=path.join(CONTROL,file.path);
+  need(host.controllerFiles[file.path]===file.sha256&&goodFile(live)&&
+   hash(fs.readFileSync(live))===file.sha256,
+   'B4263_TARGET_FOUR_FILE_SHA256_MISMATCH');
+ }
  for(const [rel,h] of Object.entries(host.controllerFiles)){
   need(/^(?:controller\/[a-z0-9-]+\.mjs|config\/operations\.json)$/.test(rel)&&
    /^[a-f0-9]{64}$/.test(h)&&goodFile(path.join(CONTROL,rel))&&
@@ -177,11 +188,18 @@ function preflight(update){
  const snapshot=read(path.join(backupDir,'snapshot/host.json'));
  const previous=read(path.join(backupDir,'previous-host.json'));
  need(snapshot.controllerSourceSha===OLD&&
+  update.prevalidationInventory(snapshot)!==null&&
   JSON.stringify(snapshot)===JSON.stringify(previous)&&
   Object.entries(snapshot.controllerFiles??{}).every(([rel,d])=>
    goodFile(path.join(backupDir,'snapshot',rel))&&
    hash(fs.readFileSync(path.join(backupDir,'snapshot',rel)))===d),
   'B4263_SNAPSHOT_NOT_VERIFIED');
+ // The previous Supervisor owner was moved by the original switch. Never
+ // mistake an unchanged six-Runner tree for a completed version handoff.
+ const priorOwner=read(path.join(backupDir,'previous-supervisor-lease/owner.json'));
+ need(Number.isSafeInteger(priorOwner.pid)&&priorOwner.pid>0&&
+  priorOwner.nonce!==supervisor.nonce&&priorOwner.pid!==supervisor.pid&&
+  stillRunning(priorOwner.pid)===false,'B4263_PREVIOUS_SUPERVISOR_UNVERIFIED');
  const originalProtection=read(path.join(backupDir,'PROTECTED_BEFORE.json'));
  need(JSON.stringify(originalProtection)===JSON.stringify(update.protectedSnapshot()),
   'B4263_PROTECTED_STATE_DRIFT');
@@ -226,6 +244,8 @@ async function continueOriginal(pre,update){
   originalLedgerSha256:hash(pre.ledgerRaw)});
  try{
   validateUnchanged(pre);
+  need(upstream('actions/workflows/pc-job.yml').state==='disabled_manually',
+   'B4263_PRE_EFFECT_WORKFLOW_DRIFT');
   record('WORKFLOW_ENABLE_ATTEMPTED');
   await ports.resumeIntake();
   need(upstream('actions/workflows/pc-job.yml').state==='active',
@@ -292,7 +312,14 @@ export async function main(args=process.argv.slice(2)){
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  try{const r=await main();console.log(JSON.stringify(r));if(r.status!=='PASS')process.exitCode=2;}
- catch(e){console.log(JSON.stringify({status:'BLOCKED',
-  code:/^[A-Z0-9_]{2,100}$/.test(e?.code??'')?e.code:'B4263_PRE_EFFECT_UNVERIFIED',
-  operationalWrites:0}));process.exitCode=2;}
+ catch(e){
+  const attempted=fs.existsSync(claimDir)||
+   fs.existsSync(path.join(ROOT,'recovery',REQUEST+'-switched-recovery-claim'))||
+   fs.existsSync(path.join(ROOT,'recovery',REQUEST+'-switched-recovered.lease'));
+  console.log(JSON.stringify({status:attempted?'RECOVERY_REQUIRED':'BLOCKED',
+   code:attempted?'B4263_OUTCOME_RECONCILE_NO_RETRY':
+    /^[A-Z0-9_]{2,100}$/.test(e?.code??'')?e.code:'B4263_PRE_EFFECT_UNVERIFIED',
+   operationalWrites:attempted?null:0}));
+  process.exitCode=2;
+ }
 }
