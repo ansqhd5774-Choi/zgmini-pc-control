@@ -50,6 +50,8 @@ on:
       - 'controller/standby.mjs'
       - 'controller/orphan-no-spawn-heartbeat-actor.mjs'
       - 'tests/supervisor-orphan-no-spawn-heartbeat-actor.test.mjs'
+      - 'tools/supervisor-orphan-status-temp-writer.mjs'
+      - 'tests/supervisor-orphan-status-temp-writer.test.mjs'
       - 'tests/controller-standby.test.mjs'
       - 'tools/supervisor-orphan-lease-temp-fixture.mjs'
       - 'tests/supervisor-orphan-lease-temp-fixture.test.mjs'
