@@ -314,6 +314,7 @@ jobs:
           node --test --test-concurrency=1 tests/controller-entry-import-receipt.test.mjs
           node --test --test-concurrency=1 tests/maintenance-agent.test.mjs
           node --test --test-concurrency=1 tests/ci-controller-b-policy-only-proposal.test.mjs
+          node --test --test-concurrency=1 tests/supervisor-orphan-six-b-receiver-source.test.mjs
   source-only:
     if: >-
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
