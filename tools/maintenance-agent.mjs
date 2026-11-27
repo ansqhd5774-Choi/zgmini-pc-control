@@ -1613,7 +1613,7 @@ export function createMaintenanceAgent({
     try{
       verifyInstalledSource();
       const inspected=await inspectOrphanSixPackagedInletSource({
-        issue,...orphanSixSourcePorts
+        ...orphanSixSourcePorts,issue
       });
       // Convert every unexpected port return to a closed source-only result.
       if(!inspected||!['BLOCKED','CANDIDATE_ONLY'].includes(inspected.status)||
