@@ -34,8 +34,8 @@ test('W06 Public B operation is unreachable without separately pinned owner merg
  assert.equal(r.code,'W06_PUBLIC_B_EFFECT_NOT_APPROVED');
  ensureNoEffect(r);
  const s=fs.readFileSync(new URL('./public-v3-independent-owner-b-once.mjs',import.meta.url),'utf8');
- assert.match(s,/const APPROVAL_PR=0;/);
- assert.match(s,/const APPROVAL_MERGE=null;/);
+ assert.match(s,/const APPROVAL_PR=4289;/);
+ assert.match(s,/const APPROVAL_MERGE='1c0e8b2e3b032548548b42df535dc060a40ff64c';/);
  assert.match(s,/W06_PUBLIC_B_EFFECT_APPROVAL_REQUIRED/);
 });
 test('source, owner, independent Windows identity, candidate and CAS are individually required',()=>{
@@ -184,7 +184,7 @@ test('unknown lease-release after claimed rollback requires owner reconcile',()=
 test('reviewed W06 operator merge must be owner-authored, main ancestor and not a draft',()=>{
  const sha='a'.repeat(40);
  const pr={
-  number:4288,merged:true,merge_commit_sha:sha,
+  number:4290,merged:true,merge_commit_sha:sha,
   user:{id:327938088},
   head:{repo:{full_name:'ansqhd5774-Choi/zgmini-pc-control'}},
   base:{repo:{full_name:'ansqhd5774-Choi/zgmini-pc-control'},ref:'main'}
