@@ -65,8 +65,6 @@ on:
       - 'tests/supervisor-orphan-six-wmi-console-crosscheck.test.mjs'
       - 'tools/supervisor-orphan-six-b-receiver-source.mjs'
       - 'tests/supervisor-orphan-six-b-receiver-source.test.mjs'
-      - 'tools/s6-4078-backlog-only-plan.mjs'
-      - 'tests/s6-4078-backlog-only-plan.test.mjs'
       - 'tools/supervisor-orphan-six-b-maintainer-inlet-source.mjs'
       - 'tools/supervisor-orphan-six-b-flat-request.mjs'
       - 'tools/supervisor-orphan-six-installed-seven-cas-readonly.mjs'
@@ -333,7 +331,6 @@ jobs:
           node --check ci-approval/public-completed-run-observe.mjs
           node --test --test-concurrency=1 tests/ci-approval-public-completed-run-observe.test.mjs
           node --test --test-concurrency=1 tests/supervisor-orphan-six-b-receiver-source.test.mjs
-          node --test --test-concurrency=1 tests/s6-4078-backlog-only-plan.test.mjs
           node --test --test-concurrency=1 tests/supervisor-status-write.test.mjs
   source-only:
     if: >-
