@@ -24,7 +24,8 @@ export function inspectS64078BacklogOnly(e){
  const original=e?.originalIssue;
  if(original?.number!==FIXED.originalIssue||original.state!=='open'||
    original.user?.login!=='ansqhd5774-Choi'||
-   !original.labels?.some(x=>(typeof x==='string'?x:x.name)==='pc-job')||
+   !Array.isArray(original.labels)||
+   !original.labels.some(x=>(typeof x==='string'?x:x?.name)==='pc-job')||
    original.created_at!==FIXED.originalCreatedAt||
    typeof original.body!=='string'||sha(original.body)!==FIXED.originalBodySha256)
   return blocked('BACKLOG_4078_ORIGINAL_CAS_FAILED');
