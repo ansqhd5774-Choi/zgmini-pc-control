@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import {test} from "node:test";
 
-import {createMaintenanceAgent,failedUpdaterResult,normalizedResult,attachApprovedNativeBReceipt,parseS6NonzeroRecoveryReport} from "../tools/maintenance-agent.mjs";
+import {createMaintenanceAgent,failedUpdaterResult,normalizedResult,attachApprovedNativeBReceipt,parseS6NonzeroRecoveryReport,readOrphanSixPinnedHistoricalSource} from "../tools/maintenance-agent.mjs";
 import {prepareMaintenanceIssue} from '../tools/maintenance-request.mjs';
 
 test('pre-install child rejection retains exact safe code and current installed SHA',()=>{
@@ -1224,4 +1224,56 @@ test('direct orphan-six source invocation cannot bypass the private repository c
  assert.equal(result.operationalWrites,0);
  assert.equal(f.stats.applies,0);
  assert.equal(f.stats.comments,0);
+});
+
+test('orphan-six historic B source uses exact GitHub commit read without local Git checkout',async()=>{
+ const sourceSha='b08f3a482e9bb39523f47675ae06bc6e02e01d2d';
+ const content=Buffer.from('historical approved source bytes\n');
+ const allowed=['tools/bootstrap-maintenance.mjs','tools/handoff-maintenance.mjs'];
+ const routes=[];
+ const getJson=async(route)=>{
+  routes.push(route);
+  return {type:'file',path:route.split('?')[0].slice('contents/'.length),
+   encoding:'base64',content:content.toString('base64')};
+ };
+ for(const relative of allowed){
+  const raw=await readOrphanSixPinnedHistoricalSource({sourceSha,relative,getJson});
+  assert.deepEqual(raw,content);
+ }
+ assert.deepEqual(routes,allowed.map(x=>'contents/'+x+'?ref='+sourceSha));
+});
+
+test('orphan-six pinned historical source fails closed on paths, digest source or API drift',async()=>{
+ const sourceSha='b08f3a482e9bb39523f47675ae06bc6e02e01d2d';
+ const relative='tools/handoff-maintenance.mjs';
+ const base={sourceSha,relative};
+ const calls=[];
+ const valid=async route=>{
+  calls.push(route);
+  return {type:'file',path:relative,encoding:'base64',
+    content:Buffer.from('pinned source').toString('base64')};
+ };
+ const denied=[
+  {...base,relative:'../tools/update.mjs',getJson:valid},
+  {...base,relative:'tools/update.mjs',getJson:valid},
+  {...base,sourceSha:'main',getJson:valid},
+  {...base,sourceSha:'0'.repeat(40),relative:'tools/evil.mjs',getJson:valid},
+  {...base,getJson:null}
+ ];
+ for(const params of denied)
+  await assert.rejects(readOrphanSixPinnedHistoricalSource(params),
+   /ORPHAN_SIX_B_GIT_SCOPE_DENIED/);
+ assert.equal(calls.length,0);
+ const altered=[
+  {type:'dir',path:relative,encoding:'base64',content:'YWJj'},
+  {type:'file',path:'tools/update.mjs',encoding:'base64',content:'YWJj'},
+  {type:'file',path:relative,encoding:'utf8',content:'YWJj'},
+  {type:'file',path:relative,encoding:'base64',content:'****'},
+  {type:'file',path:relative,encoding:'base64',content:'YQ'},
+  {type:'file',path:relative,encoding:'base64',content:'YQ==YQ=='}
+ ];
+ for(const item of altered)
+  await assert.rejects(readOrphanSixPinnedHistoricalSource({
+   ...base,getJson:async()=>item
+  }),/ORPHAN_SIX_B_HISTORICAL_SOURCE_UNVERIFIED/);
 });
