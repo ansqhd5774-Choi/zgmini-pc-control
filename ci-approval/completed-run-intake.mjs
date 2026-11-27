@@ -658,13 +658,43 @@ export async function main({eventPath=process.env.GITHUB_EVENT_PATH,token=proces
    if(bytes.length>16000000)throw Error('CI_PUBLICATION_CI_LOG_UNVERIFIED');
    return bytes;
   };
+  // The legacy Private publisher still uses its original source-only intake.
+  // Public may interpret an event ONLY after the independent Windows grant
+  // and running publisher identity are already verified. Check before any PR
+  // staging, Issue POST, or durable effect receipt claim.
+  let allowPublic=false;
+  if(event?.repository?.private===false){
+   try{
+    const live=await getJson('');
+    if(live?.id!==repositoryId||live.full_name!==repo||live.private!==false||
+       live.owner?.id!==327938088||live.owner?.login!=='ansqhd5774-Choi')
+     throw Error('PUBLIC_REPOSITORY_READBACK_MISMATCH');
+    const grant=installedControllerBPolicy(readIndependentlyInstalledControllerBPublisherPolicy());
+    const current=await readAuthenticatedControllerBPublisherWorkflow({getJson});
+    if(grant?.repositoryVisibility!=='public'||grant.workflowId!==current.workflowId||
+       grant.workflowBlobSha!==current.workflowBlobSha||
+       (policy?.targetSha!==undefined&&grant.targetSha!==policy.targetSha)||
+       (policy?.installPlan?.installedSha!==undefined&&
+        grant.installedSha!==policy.installPlan.installedSha))
+     throw Error('PUBLIC_EFFECT_GATE_MISMATCH');
+    // A newly generated approval pair has not yet been checked against the
+    // installed one-effect Manifest SHA. Do not auto-create or merge that PR
+    // on Public until exact bytes can be verified BEFORE the first write.
+    if(policy?.installPlan)
+     return {state:'DISABLED',code:'CI_PUBLIC_APPROVAL_STAGING_NOT_AUTHORIZED',results:[]};
+    allowPublic=true;
+   }catch{
+    return {state:'EVIDENCE_MISSING',code:'CI_PUBLICATION_PUBLIC_GATE_UNVERIFIED',results:[]};
+   }
+  }
   const ports=createControllerPublicationPorts({getJson,postIssue:body=>github('issues',body),store,
    readIndependentInstalledCiPolicy:()=>readIndependentlyInstalledControllerBPublisherPolicy(),
    readPublisherWorkflowIdentity:()=>readAuthenticatedControllerBPublisherWorkflow({getJson}),
    autoApprovalPolicy:initialControllerPublicationPolicy(policy),readJobLogs,
    putMerge:(n,body)=>github('pulls/'+n+'/merge',body,'PUT')});
   const opts={getJson,ports,runId:Number(process.env.GITHUB_RUN_ID),
-   attempt:Number(process.env.GITHUB_RUN_ATTEMPT),emitReceipt:marker=>console.log(marker)};
+   attempt:Number(process.env.GITHUB_RUN_ATTEMPT),allowPublic,
+   emitReceipt:marker=>console.log(marker)};
   if(policy){
    const stageApprovalPr=policy.installPlan?async()=>{
     const prepared=createConfiguredSelectivePreparer({policy,getJson,readJobLogs});
