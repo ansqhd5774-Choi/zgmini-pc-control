@@ -96,3 +96,19 @@ test('fixed source-CI gate rejects malformed and missing event files',t=>{
  fs.writeFileSync(file,JSON.stringify(s.event));
  assert.equal(runPublicSourceCiGuard({...s.env,GITHUB_EVENT_PATH:file}).status,'PASS');
 });
+
+// Exact approval pin acceptance belongs to the existing hosted source CI;
+// this does not invoke any Windows operator or grant an operational lease.
+test('W06 V3 operator pins owner merged effect #4289 and reviewed source #4290',()=>{
+ const op=fs.readFileSync(new URL('../sidecar-b/public-v3-independent-owner-b-once.mjs',import.meta.url),'utf8');
+ const manifest=JSON.parse(fs.readFileSync(new URL('../approvals/sidecar-b/w06-cnn-v2-to-v3-20261128.json',import.meta.url),'utf8'));
+ assert.match(op,/const APPROVAL_PR=4289;/);
+ assert.match(op,/const APPROVAL_MERGE='1c0e8b2e3b032548548b42df535dc060a40ff64c';/);
+ assert.match(op,/const REVIEWED_SOURCE_PR=4290;/);
+ assert.equal(manifest.status,'APPROVED_B');
+ assert.equal(manifest.schema,'ZGMINI_CNN_SIDECAR_ONEFILE_B_V3');
+ assert.equal(manifest.beforeSha256,'eb3c43bf8fba6ea4e51f3e84b77f9ec13000db9d9e38077ffd914950d7080b6b');
+ assert.equal(manifest.afterSha256,'894411dea16462c4ee305f7ec80102d81662063f5f76c8a8384f04977e860ac3');
+ assert.equal(manifest.runCount,1);
+ for(const key of ['allowProviderCalls','allowDbChanges','allowD1Writes','allowTaskChanges'])assert.equal(manifest[key],false);
+});
