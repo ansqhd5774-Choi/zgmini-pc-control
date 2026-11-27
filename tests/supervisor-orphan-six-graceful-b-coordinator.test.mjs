@@ -115,7 +115,7 @@ function fixture(t,{denyApproval=false,failBeforeSignalAt=null,
  // This fixture is temporary; it never points into operating E:.
  t.after(()=>{fs.rmSync(root,{recursive:true,force:true});});
  const run=()=>runOrphanSixGracefulB({
-  requestId,approvalManifestSha256,lease,journal,port
+  requestId,approvalManifestSha256:manifestRawSha256,lease,journal,port
  });
  return {root,requestId,manifestRawSha256,lease,journal,port,run,events,sent,gone};
 }
