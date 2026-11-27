@@ -1,0 +1,14 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-46056098322-1-seat-2",
+  "requestId": "pc-9711ef93-ca84-488c-b093-f165e542075c",
+  "operation": "cnn-public-d1-api-readback-readonly",
+  "seat": 2,
+  "status": "STATE_UNKNOWN",
+  "code": "PUBLIC_RESULT_CODE_REDACTED",
+  "actualExecutionSha": "555f95708984580cd7d5a0fd05a80b718e867710",
+  "reportTransfer": {
+    "status": "SUMMARY_ONLY",
+    "code": "PUBLIC_REPOSITORY_REDACTED"
+  }
+}
