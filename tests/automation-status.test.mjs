@@ -279,6 +279,54 @@ test('watchdog marker source remains independent of healthy six-runner verdict',
  assert.equal(summarizeAutomation({...healthy(),watchdog:result}).runtimeState,'HEALTHY');
 });
 
+test('R6 two-standby READY requires fresh owner-matched watchdog and two live distinct children',()=>{
+ const status={at:'2026-11-14T01:00:00.000Z',pid:2026,state:'HEALTHY',
+  standbyRole:'READY',standbyPid:3101,
+  secondStandbyRole:'READY',secondStandbyPid:3102,standbyReadyCount:2};
+ const {result}=watchdogFixture({status,pidAlive:pid=>[2026,3101,3102].includes(pid)});
+ assert.equal(result.standbyRole,'READY');
+ assert.equal(result.secondStandbyRole,'READY');
+ assert.equal(result.standbyReadyCount,2);
+ assert.equal(result.standbyPairReadyAtObservation,true);
+ assert.equal(result.secondStandbyPid,3102);
+ assert.equal(result.receiverPidMatches,true);
+ assert.deepEqual(result.diagnostics,[]);
+ assert.equal(JSON.stringify(result).includes('test-only'),false);
+});
+
+test('two-standby readback never upgrades missing, stale or malformed evidence to READY',()=>{
+ const base={at:'2026-11-14T01:00:00.000Z',pid:2026,state:'HEALTHY',
+  standbyRole:'READY',standbyPid:3101,
+  secondStandbyRole:'READY',secondStandbyPid:3102,standbyReadyCount:2};
+ const invalid=[
+  {status:{...base,standbyReadyCount:1}},
+  {status:{...base,standbyReadyCount:'2'}},
+  {status:{...base,secondStandbyPid:3101}},
+  {status:{...base,secondStandbyRole:'STARTING'}},
+  {status:{...base,secondStandbyRole:'PRIVATE_VALUE'}},
+  {status:{...base,secondStandbyPid:2026}},
+  {status:{...base,state:'PAUSED'}},
+  {status:base,receiver:{pid:2027}},
+  {status:base,clock:()=>Date.parse('2026-11-14T01:02:00.000Z')},
+  {status:base,pidAlive:pid=>pid===3102?false:true},
+  {status:base,pidAlive:pid=>pid===3102?null:true},
+ ];
+ for(const fixture of invalid){
+  const {result}=watchdogFixture(fixture);
+  assert.equal(result.standbyPairReadyAtObservation,false,
+   'a malformed, stale, unowned or dead second slot must not pass');
+ }
+ const legacy=watchdogFixture({status:{
+  at:'2026-11-14T01:00:00.000Z',pid:2026,state:'HEALTHY',
+  standbyRole:'READY',standbyPid:3101
+ }}).result;
+ assert.equal(legacy.standbyPairReadyAtObservation,undefined);
+ assert.equal(legacy.secondStandbyRole,undefined);
+ assert.equal(legacy.standbyReadyCount,undefined);
+ const missing=watchdogFixture({status:null}).result;
+ assert.equal(missing.standbyPairReadyAtObservation,undefined);
+});
+
 test('guardian STOP, PAUSE, DRAIN, install lease and other leases have separate origins',()=>{
  const {result,docs}=watchdogFixture({status:{at:'2026-11-14T01:00:00.000Z',pid:2026,state:'PAUSED'},
   flags:['guardianStop','watchdogPause','controllerDrain','controllerInstallLease'],
