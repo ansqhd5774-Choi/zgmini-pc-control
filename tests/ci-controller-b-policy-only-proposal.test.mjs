@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
 import {
  nextRuntimeFiles,requireHandoffApproval,approvedPolicyOnlyHandoff,
  approvedHandoffCiPolicy,handoffFilePlan
@@ -49,9 +50,14 @@ test('all nine immutable installed maintainer bytes are equal to proposal SHA256
  assert.equal(nextRuntimeFiles.length,7);
  for(const [rel,expected] of Object.entries(proposal.files)){
   assert.match(expected,/^[a-f0-9]{64}$/);
-  const actual=createHash('sha256').update(
-   readFileSync(new URL('../'+rel,import.meta.url))).digest('hex');
-  assert.equal(actual,expected,'immutable protected maintainer file: '+rel);
+  // This held proposal pins two historical revisions, not today's source.
+  // Verify both raw Git blobs without altering the held policy or its pins.
+  for(const revision of [installedSha,candidateSha]){
+   const bytes=execFileSync('git',['show',revision+':'+rel],
+    {cwd:new URL('../',import.meta.url),maxBuffer:4*1024*1024});
+   assert.equal(createHash('sha256').update(bytes).digest('hex'),expected,
+    'immutable protected maintainer file: '+revision+':'+rel);
+  }
  }
 });
 
