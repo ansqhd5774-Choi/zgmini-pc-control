@@ -48,37 +48,6 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: '"E:\ZGmini\runtime\node.exe" "E:\ZGmini\automation\pc-control\controller\upload.mjs"'
 
-  # Public issue observation uses ONLY a GitHub-hosted runner and never
-  # dispatches any A/B effect or uploads a private PC result.
-  public-readonly-intake:
-    if: >-
-      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
-      github.event.repository.private == false &&
-      github.actor == 'ansqhd5774-Choi' &&
-      github.event.issue.user.login == 'ansqhd5774-Choi' &&
-      contains(github.event.issue.labels.*.name, 'pc-job') &&
-      (github.event.action == 'opened' ||
-       (github.event.action == 'labeled' &&
-        github.event.label.name == 'pc-job' &&
-        vars.ZGMINI_PC_JOB_LATE_LABEL_ENABLED == 'true'))
-    runs-on: ubuntu-latest
-    timeout-minutes: 3
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: '22'
-      - name: Verify public Issue as read-only candidate, never PC execution
-        env:
-          ZGMINI_PC_JOB_LATE_LABEL_ENABLED: ${{ vars.ZGMINI_PC_JOB_LATE_LABEL_ENABLED }}
-        run: |
-          node --check tools/public-pc-job-candidate.mjs
-          node tools/public-pc-job-candidate.mjs
 
   public-approved-a:
     if: >-
@@ -129,3 +98,35 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: '"E:\ZGmini\runtime\node.exe" "E:\ZGmini\automation\pc-control\controller\upload.mjs"'
+
+  # Public issue observation uses ONLY a GitHub-hosted runner and never
+  # dispatches any A/B effect or uploads a private PC result.
+  public-readonly-intake:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == false &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      contains(github.event.issue.labels.*.name, 'pc-job') &&
+      (github.event.action == 'opened' ||
+       (github.event.action == 'labeled' &&
+        github.event.label.name == 'pc-job' &&
+        vars.ZGMINI_PC_JOB_LATE_LABEL_ENABLED == 'true'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify public Issue as read-only candidate, never PC execution
+        env:
+          ZGMINI_PC_JOB_LATE_LABEL_ENABLED: ${{ vars.ZGMINI_PC_JOB_LATE_LABEL_ENABLED }}
+        run: |
+          node --check tools/public-pc-job-candidate.mjs
+          node tools/public-pc-job-candidate.mjs
