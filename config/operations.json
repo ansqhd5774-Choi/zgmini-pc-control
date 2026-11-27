@@ -6,6 +6,7 @@
   "seats": 6,
   "operations": {
     "runner-smoke": {"grade":"A","timeoutSeconds":60,"resource":"light"},
+    "controller-operating-audit-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "core-status": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "d05-lineage-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "sector-r3-dated-ledger-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
