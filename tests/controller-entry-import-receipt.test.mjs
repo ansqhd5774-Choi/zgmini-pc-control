@@ -46,12 +46,17 @@ test('missing engine dependency or host manifest yields uploadable BLOCKED point
    chatId:'chat-test-import-failure',operation:'core-status',
    sourceRepository:'ansqhd5774-Choi/zgmini',sourceBranch:'main',sourceSha:'a'.repeat(40)};
   const event=path.join(root,'event.json');
-  fs.writeFileSync(event,JSON.stringify({action:'opened',repository:{private:true},
-   issue:{number:2506,user:{login:'ansqhd5774-Choi'},labels:[{name:'pc-job'}],
+  fs.writeFileSync(event,JSON.stringify({action:'opened',
+   sender:{login:'ansqhd5774-Choi',id:327938088},
+   repository:{id:1442936296,full_name:repository,private:true,
+    owner:{login:'ansqhd5774-Choi',id:327938088}},
+   issue:{number:2506,title:'pc-job',user:{login:'ansqhd5774-Choi',id:327938088},labels:[{name:'pc-job'}],
     body:JSON.stringify(request)}}));
   const runId='99999999999',seat='2';
   const env={...process.env,GITHUB_EVENT_PATH:event,GITHUB_REPOSITORY:repository,
    GITHUB_ACTOR:'ansqhd5774-Choi',GITHUB_EVENT_NAME:'issues',
+   GITHUB_REF:'refs/heads/main',
+   GITHUB_WORKFLOW_REF:repository+'/.github/workflows/pc-job.yml@refs/heads/main',
    GITHUB_RUN_ID:runId,GITHUB_RUN_ATTEMPT:'1',RUNNER_NAME:'zgmini-pc-02'};
   const out=spawnSync(process.execPath,[path.join(root,'controller','entry.mjs')],{
    encoding:'utf8',env
@@ -66,7 +71,6 @@ test('missing engine dependency or host manifest yields uploadable BLOCKED point
   assert.equal(pointer.report.operationalWrites,0);
   assert.equal(pointer.report.providerCalls,0);
   assert.equal(pointer.report.d1Writes,0);
-  // Exact failure remains on PC pointer, but public Actions stdout is bounded.
   assert.match(out.stdout,/PUBLIC_LOCAL_RESULT_REDACTED/);
   assert.doesNotMatch(out.stdout,/CONTROLLER_IMPORT_MISSING/);
   // Missing, invalid JSON and valid JSON with invalid host shape all need an uploadable
@@ -132,8 +136,11 @@ test('missing engine dependency or host manifest yields uploadable BLOCKED point
   const preimageRequest={...request,operation:'writer-install-preimage-readonly',
    preimageManifestPath:'approvals/writer-preimage/test-scope.json',
    preimageManifestSha256:'c'.repeat(64)};
-  fs.writeFileSync(event,JSON.stringify({action:'opened',repository:{private:true},
-   issue:{number:2506,user:{login:'ansqhd5774-Choi'},labels:[{name:'pc-job'}],
+  fs.writeFileSync(event,JSON.stringify({action:'opened',
+   sender:{login:'ansqhd5774-Choi',id:327938088},
+   repository:{id:1442936296,full_name:repository,private:true,
+    owner:{login:'ansqhd5774-Choi',id:327938088}},
+   issue:{number:2506,title:'pc-job',user:{login:'ansqhd5774-Choi',id:327938088},labels:[{name:'pc-job'}],
     body:JSON.stringify(preimageRequest)}}));
   fs.rmSync(reportFile,{force:true});
   const scoped=spawnSync(process.execPath,[path.join(root,'controller','entry.mjs')],
@@ -148,8 +155,11 @@ test('missing engine dependency or host manifest yields uploadable BLOCKED point
   assert.equal(scopedReceipt.report.providerCalls,0);
   assert.equal(scopedReceipt.report.d1Writes,0);
   // Restore the normal request for the policy corruption checks below.
-  fs.writeFileSync(event,JSON.stringify({action:'opened',repository:{private:true},
-   issue:{number:2506,user:{login:'ansqhd5774-Choi'},labels:[{name:'pc-job'}],
+  fs.writeFileSync(event,JSON.stringify({action:'opened',
+   sender:{login:'ansqhd5774-Choi',id:327938088},
+   repository:{id:1442936296,full_name:repository,private:true,
+    owner:{login:'ansqhd5774-Choi',id:327938088}},
+   issue:{number:2506,title:'pc-job',user:{login:'ansqhd5774-Choi',id:327938088},labels:[{name:'pc-job'}],
     body:JSON.stringify(request)}}));
   assert.equal(receipt.report.operationalWrites,0);
   assert.equal(receipt.report.providerCalls,0);
