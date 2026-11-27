@@ -1109,7 +1109,7 @@ export function createMaintenanceAgent({
     const repositoryVisibility=await repositoryAllowed();
     const publicCandidate=issue?.title===ISSUE_TITLE&&issue.state==='OPEN'&&
       Number.isSafeInteger(issue.number)&&issue.number>0&&
-      issue.author?.login===CI_CONTROLLER_ACTOR&&
+      [CI_CONTROLLER_ACTOR,'app/github-actions'].includes(issue.author?.login)&&
       issue.labels?.some(x=>x.name===label);
     if(repositoryVisibility==='PUBLIC'&&!publicCandidate){
       // Keep every existing Public owner/B/legacy entry blocked. A bot alone
@@ -1363,7 +1363,7 @@ export function createMaintenanceAgent({
         // No policy or failed proof still blocks before manifest/updater work.
         const publicCiCandidate=visibility==='PUBLIC'&&
           issue?.title===ISSUE_TITLE&&issue.state==='OPEN'&&
-          issue.author?.login===CI_CONTROLLER_ACTOR&&
+          [CI_CONTROLLER_ACTOR,'app/github-actions'].includes(issue.author?.login)&&
           issue.labels?.some(x=>x.name===label);
         const result=visibility==='PUBLIC'&&!publicCiCandidate
           ?(issueIsTrusted(issue,{allowedActors,title:entry.title,label})
