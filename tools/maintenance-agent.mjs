@@ -1381,6 +1381,12 @@ export function createMaintenanceAgent({
       }catch(error){results.push({issueNumber:number,status:"BLOCKED",
         code:safeCode(error?.code??error?.message)});}
     }
+    // A verified Public B candidate may have completed (or reached an unknown
+    // post-effect state). Do not prepend a blanket "no B effect" summary to
+    // an actual B result. Default-denied Public reads retain that summary.
+    if(visibility==='PUBLIC'&&results.slice(1).some(x=>
+      ['SUCCEEDED','FAILED','UNKNOWN','RUNNING'].includes(x?.status)))
+      results.shift();
     return results;
   }
   return {pollOnce,processIssue,loadLedger,updaterStatus};
