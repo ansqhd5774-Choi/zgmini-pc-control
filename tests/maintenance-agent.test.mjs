@@ -109,7 +109,7 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
         }
         if(publicCiProof&&args[1].startsWith(`repos/${REPO}/actions/jobs/`)
           &&args[1].endsWith('/logs')){
-          const jobId=Number(args[1].match(/\\/jobs\\/(\\d+)\\/logs$/)?.[1]);
+          const jobId=Number(args[1].split('/').at(-2));
           return {stdout:publicCiProof.readJobLogs(jobId,issue)};
         }
         if(publicCiProof&&(args[1].startsWith(`repos/${REPO}/actions/runs/`)
@@ -1300,6 +1300,48 @@ function publicBAuthFixture(){
  };
  return {installed,policy,run,job,actual,request,proof};
 }
+
+test('Public receiver poll performs exact installed V2 CI proof, one isolated apply and no retry',async t=>{
+ const p=publicBAuthFixture();
+ const f=fixture(t,{privateRepo:false,actor:CI_CONTROLLER_ACTOR,
+  requestPatch:{chatId:'chat-ci-765-1'},
+  manifestPatch:{controllerOnlyInstall:true,selectiveSource:{
+    schema:'ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1',
+    branch:'codex/ci-public-effect-review',mainSha:'e'.repeat(40),customPaths:[]}},
+  installedCiPolicy:(_issue,raw)=>({...p.installed,ciControllerBPolicy:{
+    ...p.installed.ciControllerBPolicy,manifestSha256:digest(raw)}}),
+  publicCiProof:{actual:p.actual,getJson:p.proof.getJson,
+    readJobLogs:(id,issue)=>id===p.job.id?
+      '2026-11-28T00:00:00Z '+controllerBReceiptMarker(issue.number,Buffer.from(issue.body))+'\n':''}
+ });
+ const observed=await f.agent.pollOnce();
+ const successful=observed.find(x=>x.status==='SUCCEEDED');
+ assert.equal(successful?.code,'UPDATE_COMMITTED',JSON.stringify(observed));
+ assert.equal(f.stats.applies,1);
+ assert.equal(f.stats.manifestReads,1);
+ assert.equal(f.agent.loadLedger(f.request.requestId)?.status,'SUCCEEDED');
+ assert.equal(f.remote.size,2,'sanitized JSON and TXT pair');
+ const again=await f.agent.pollOnce();
+ assert.equal(again.filter(x=>x.status==='SUCCEEDED').length,0);
+ assert.equal(f.stats.applies,1,'one approved B effect is never reinstalled');
+});
+
+test('Public receiver rejects spoofed CI issue despite pinned V2 grant without an apply',async t=>{
+ const p=publicBAuthFixture();
+ const f=fixture(t,{privateRepo:false,actor:CI_CONTROLLER_ACTOR,
+  requestPatch:{chatId:'chat-ci-765-1'},
+  installedCiPolicy:(_issue,raw)=>({...p.installed,ciControllerBPolicy:{
+    ...p.installed.ciControllerBPolicy,manifestSha256:'0'.repeat(64)}}),
+  publicCiProof:{actual:p.actual,getJson:p.proof.getJson,
+    readJobLogs:(id,issue)=>id===p.job.id?
+      '2026-11-28T00:00:00Z '+controllerBReceiptMarker(issue.number,Buffer.from(issue.body))+'\n':''}
+ });
+ const observed=await f.agent.pollOnce();
+ assert.equal(observed.find(x=>x.status==='BLOCKED')?.code,
+   'CI_PUBLIC_EFFECT_SCOPE_MISMATCH',JSON.stringify(observed));
+ assert.equal(f.stats.applies,0);assert.equal(f.stats.manifestReads,0);
+ assert.equal(f.agent.loadLedger(f.request.requestId),null);
+});
 
 test('independent installed V2 exact public effect authenticates only original CI workload',async()=>{
  const f=publicBAuthFixture();
