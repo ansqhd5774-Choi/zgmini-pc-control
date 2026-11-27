@@ -57,7 +57,8 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
   title="pc-controller-update",issuePatch={},manifestPatch={},
   applyError=null,applyResult=null,afterTimeout=null,commentError=null,
   uploadFailure=null,uploadAfterCommitError=null,installLock={held:false},
-  verifyInstalledSource=()=>{},statusFaults={},preexistingLedger=null,
+  verifyInstalledSource=()=>{},orphanSixSourcePorts=null,
+  statusFaults={},preexistingLedger=null,
   extraIssueSummaries=[],extraIssueDetails=[],progressError=null,
   s6RawManifest=null,s6Status=null,s6ApplyResult=null,s6ApplyError=null,
   s6ApplyRaw=null}={}){
@@ -200,7 +201,8 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
     throw Error("unexpected updater command");
   };
   const agent=createMaintenanceAgent({stateDir:root,leaseRoot,
-    leaseAttempts:1,leaseWaitMs:0,execFileImpl:fakeExec,verifyInstalledSource});
+    leaseAttempts:1,leaseWaitMs:0,execFileImpl:fakeExec,
+    verifyInstalledSource,orphanSixSourcePorts});
   return {root,leaseRoot,agent,stats,remote,calls,issue,request,manifest,rawManifest,fakeExec};
 }
 
@@ -1103,4 +1105,74 @@ test('ordinary B result never gains CI-native permission from updater stdout',as
  assert.equal(output.status,'SUCCEEDED');
  assert.equal(output.ciNativeEffect,undefined);
  assert.equal(output.ciNativePolicySha256,undefined);
+});
+
+test('orphan-six private source intake is discovered but never executes absent read ports',async t=>{
+ const f=fixture(t);
+ f.issue.title='pc-controller-orphan-six-graceful-once';
+ f.issue.body=JSON.stringify({
+  schema:'ZGMINI_PC_ORPHAN_SIX_B_REQUEST_V1',
+  requestId:'pc-12345678-1234-4234-9234-123456789abc',
+  chatId:'chat-source-intake',
+  operation:'controller-orphan-six-graceful-once',
+  controlRepository:REPO,targetControllerSha:INSTALLED,
+  approvalManifestSha256:'a'.repeat(64)
+ });
+ const [result]=await f.agent.pollOnce();
+ assert.equal(result.status,'BLOCKED');
+ assert.equal(result.code,'ORPHAN_SIX_B_SOURCE_READ_PORTS_MISSING');
+ assert.equal(result.effectAuthorized,false);
+ assert.equal(result.runnerStopAuthorized,false);
+ assert.equal(result.executionStarted,false);
+ assert.equal(result.operationalWrites,0);
+ assert.equal(f.stats.applies,0);
+ assert.equal(f.stats.comments,0);
+ assert.equal(fs.readdirSync(path.join(f.root,'requests')).length,0);
+});
+
+test('orphan-six source intake checks independent attestation and never dispatches updater',async t=>{
+ let checked=0;
+ const f=fixture(t,{orphanSixSourcePorts:{
+  attestCurrentMaintainerSource:async()=>{checked++;return {
+   origin:'PRIVATE_INDEPENDENT_B_MAINTAINER',
+   verifiedNinePinnedMaintainerFiles:false,
+   currentMaintainerSourceUnchangedVerified:true
+  }},
+  readOriginalOneUseClaim:async()=>null,
+  getMainManifest:async()=>{throw Error('must not fetch after failed attestation');},
+  getPullRequest:async()=>{throw Error('must not fetch');},
+  getOwnerEffectComments:async()=>{throw Error('must not fetch');},
+  getInstalledReadback:async()=>{throw Error('must not fetch');}
+ }});
+ f.issue.title='pc-controller-orphan-six-graceful-once';
+ f.issue.body=JSON.stringify({
+  schema:'ZGMINI_PC_ORPHAN_SIX_B_REQUEST_V1',
+  requestId:'pc-12345678-1234-4234-9234-123456789abc',
+  chatId:'chat-source-intake',
+  operation:'controller-orphan-six-graceful-once',
+  controlRepository:REPO,targetControllerSha:INSTALLED,
+  approvalManifestSha256:'a'.repeat(64)
+ });
+ const [result]=await f.agent.pollOnce();
+ assert.equal(checked,1);
+ assert.equal(result.status,'BLOCKED');
+ assert.equal(result.code,'ORPHAN_SIX_B_MAINTAINER_SOURCE_UNVERIFIED');
+ assert.equal(result.effectAuthorized,false);
+ assert.equal(result.operationalWrites,0);
+ assert.equal(f.stats.applies,0);
+ assert.equal(f.stats.comments,0);
+});
+
+test('orphan-six untrusted actor cannot invoke injected source reads',async t=>{
+ let called=false;
+ const f=fixture(t,{actor:'github-actions[bot]',orphanSixSourcePorts:{
+  attestCurrentMaintainerSource:async()=>{called=true;throw Error('forbidden');}
+ }});
+ f.issue.title='pc-controller-orphan-six-graceful-once';
+ const [result]=await f.agent.pollOnce();
+ assert.equal(result.status,'BLOCKED');
+ assert.equal(result.code,'ORPHAN_SIX_B_UNTRUSTED_ISSUE');
+ assert.equal(called,false);
+ assert.equal(f.stats.applies,0);
+ assert.equal(f.stats.comments,0);
 });
