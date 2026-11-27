@@ -2,6 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import path from 'node:path';
 import {summarizeAutomation,dedicatedPcRunnersOnline,classifyRunnerQueryError,scopedRunnerRosterCliOptions,safeRuntimeSignals,operatingPcRunnerEvidence,inspectWatchdogReadOnly,summarizeSupervisorReadOnly,summarizeRequestedRecoveryEvidence,summarizeRequestProgress} from '../tools/automation-status.mjs';
+import {inspectControllerOperatingAuditReadonly} from '../controller/operations.mjs';
 const healthy=()=>({installLock:{held:false},actualControllerSha:'a'.repeat(40),
  controllerFilesVerified:true,supervisorAlive:true,supervisorIdentityVerified:true,
  supervisorFresh:true,supervisorChildrenVerified:true,runnerSetOnline:true,workflowState:'active',installedOperations:['core-status']});
@@ -481,4 +482,79 @@ test('request progress never returns unbounded journal text or private payloads'
   firstFail:'sensitive arbitrary text',updatedAt:'invalid',payload:'PRIVATE'});
  assert.equal(r.requestId,null);assert.equal(r.phase,null);assert.equal(r.updatedAt,null);
  assert.doesNotMatch(JSON.stringify(r),/SECRET|PRIVATE|@/);
+});
+
+test('fixed operating audit correlates two live READY standbys, six children and two private A ledgers',()=>{
+ const ctrl='E:/ZGmini/automation/pc-control',wd='E:/ZGmini/automation/pc-watchdog';
+ const clock=Date.parse('2026-11-27T19:47:46.062Z'),sha='555f95708984580cd7d5a0fd05a80b718e867710';
+ const supervisorPid=15776,watchdogPid=43904;
+ const children=Array.from({length:6},(_,i)=>({seat:i+1,pid:6101+i,alive:true}));
+ const docs=new Map();
+ const put=(root,p,obj)=>docs.set(path.join(root,p),JSON.stringify(obj));
+ put(wd,'STATUS.json',{at:new Date(clock).toISOString(),pid:watchdogPid,state:'HEALTHY',
+  standbyRole:'READY',standbyPid:12580,secondStandbyRole:'READY',
+  secondStandbyPid:16268,standbyReadyCount:2,supervisorPid,
+  heartbeatAt:'2026-11-27T19:47:42.562Z'});
+ put(wd,'receiver/owner.json',{pid:watchdogPid,nonce:'SENSITIVE_WD_NONCE'});
+ put(ctrl,'SUPERVISOR_STATUS.json',{at:'2026-11-27T19:47:42.562Z',pid:supervisorPid,
+  mode:'LISTENING',sourceSha:sha,children});
+ put(ctrl,'leases/supervisor/owner.json',{pid:supervisorPid,nonce:'SENSITIVE_OWNER_NONCE'});
+ put(ctrl,'host.json',{controllerSourceSha:sha});
+ const specs=[
+  ['pc-update-3f1c0413-37dd-4b44-900e-75c709d492ff-postcheck',
+   'core-status','run-46051863226-1-seat-6'],
+  ['pc-stage5-4263-recovery-smoke-20261128-01',
+   'runner-smoke','run-46052065337-1-seat-6']
+ ];
+ for(const [id,operation,jobId] of specs)put(ctrl,'ledger/'+id+'.json',{
+  payloadSha:'a'.repeat(64),report:{schema:'ZGMINI_PC_RESULT_V1',requestId:id,
+   operation,jobId,seat:6,status:'PASS',code:'LOCAL_PASS',firstFail:null,
+   protectedStateUnchanged:true,actualExecutionSha:sha}
+ });
+ const living=new Set([supervisorPid,watchdogPid,12580,16268,...children.map(x=>x.pid)]);
+ const filesystem={
+  lstatSync(p){if(!docs.has(p))throw Object.assign(Error('missing'),{code:'ENOENT'});
+   return {isFile:()=>true,isSymbolicLink:()=>false,size:Buffer.byteLength(docs.get(p))};},
+  readFileSync:p=>docs.get(p)
+ };
+ const audit=(args={})=>inspectControllerOperatingAuditReadonly({
+  filesystem,now:()=>clock,pidAlive:n=>living.has(n),controlRoot:ctrl,watchdogRoot:wd,...args});
+ const good=audit();
+ assert.equal(good.status,'PASS');
+ assert.equal(good.standbyPairReady,true);
+ assert.equal(good.supervisorVerified,true);
+ assert.equal(good.localPostcheckLedgerVerified,true);
+ assert.equal(good.localRunnerSmokeLedgerVerified,true);
+ assert.equal(good.operationalWrites,0);
+ assert.equal(good.providerCalls,0);
+ assert.equal(good.d1Writes,0);
+ assert.doesNotMatch(JSON.stringify(good),/SENSITIVE|payloadSha|555f957/);
+ const changed=(root,p,replacement)=>{
+  const k=path.join(root,p),old=docs.get(k);
+  docs.set(k,JSON.stringify({...JSON.parse(old),...replacement}));
+  assert.equal(audit().status,'STATE_UNKNOWN',p);
+  docs.set(k,old);
+ };
+ changed(wd,'STATUS.json',{standbyReadyCount:1});
+ changed(wd,'STATUS.json',{secondStandbyRole:'STARTING'});
+ changed(wd,'STATUS.json',{secondStandbyPid:12580});
+ changed(wd,'STATUS.json',{secondStandbyPid:watchdogPid});
+ changed(wd,'STATUS.json',{at:'2026-11-27T19:40:00.000Z'});
+ changed(wd,'receiver/owner.json',{pid:99999});
+ changed(ctrl,'SUPERVISOR_STATUS.json',{sourceSha:'b'.repeat(40)});
+ changed(ctrl,'SUPERVISOR_STATUS.json',{children:children.slice(0,5)});
+ const [id]=specs[0],ledger=path.join(ctrl,'ledger',id+'.json');
+ const old=docs.get(ledger);
+ docs.set(ledger,JSON.stringify({...JSON.parse(old),report:{...JSON.parse(old).report,protectedStateUnchanged:false}}));
+ assert.equal(audit().localPostcheckLedgerVerified,false);
+ assert.equal(audit().status,'STATE_UNKNOWN');
+ docs.set(ledger,old);
+ living.delete(16268);
+ assert.equal(audit().standbyPairReady,false);
+ living.add(16268);
+ const missing=docs.get(path.join(wd,'receiver','owner.json'));
+ docs.delete(path.join(wd,'receiver','owner.json'));
+ assert.equal(audit().status,'STATE_UNKNOWN');
+ docs.set(path.join(wd,'receiver','owner.json'),missing);
+ assert.equal(audit().status,'PASS');
 });
