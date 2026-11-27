@@ -46,8 +46,11 @@
         name === 'cscript.exe' || name === 'wscript.exe';
       // Exact Core entrypoints are retained, irrespective of C: junction vs E:.
       // A generic 'zgmini pc-writer' command belongs to many independent jobs.
-      var isCore = command.indexOf('local-cycle.mjs') !== -1 ||
-        command.indexOf('run-local.mjs') !== -1;
+      // Only known Core launchers may name a Core entrypoint. Other processes
+      // (editors, diagnostics) can mention these filenames without running it.
+      var isCore = relevantName &&
+        (command.indexOf('local-cycle.mjs') !== -1 ||
+         command.indexOf('run-local.mjs') !== -1);
       var record = {pid:pid, parent:parentPid, missing:missing,
         relevant:relevantName, core:isCore};
       records.push(record);
