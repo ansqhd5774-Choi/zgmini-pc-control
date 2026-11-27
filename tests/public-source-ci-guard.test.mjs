@@ -14,6 +14,8 @@ import '../sidecar-b/w06-v2-to-v3-pin-only.test.mjs';
 import '../sidecar-b/operating-probe.test.mjs';
 // Public W06 independent Windows preimage path is READONLY, never an install.
 import '../sidecar-b/public-v3-independent-preimage-readonly.test.mjs';
+// Public B new operator remains disabled until separately approved exact effect.
+import '../sidecar-b/public-v3-independent-owner-b-once.test.mjs';
 
 const repo='ansqhd5774-Choi/zgmini-pc-control', id=1442936296;
 const owner='ansqhd5774-Choi', ownerId=327938088;
