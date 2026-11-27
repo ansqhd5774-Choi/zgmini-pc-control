@@ -993,21 +993,31 @@ export function createMaintenanceAgent({
     };
     const gitRaw=(revision,relative)=>{
       if(!sha40(revision)||
-        ![...runtime,...extra,
-          'approvals/maintenance-handoffs/'+revision+'.json'].includes(relative))
+        ![...runtime,...extra].includes(relative))
         throw coded('ORPHAN_SIX_B_GIT_SCOPE_DENIED');
       return execFileSync('git',['show',revision+':'+relative],
         {cwd:checkout,windowsHide:true,timeout:10000,maxBuffer:2000000});
     };
-    function provenance(){
+    async function provenance(){
       verifyInstalledSource();
       const m=JSON.parse(pinned(path.join(root,'MAINTENANCE_INSTALL.json')).toString('utf8'));
       if(m?.schema!=='ZGMINI_PC_MAINTENANCE_INSTALL_V1'||
         !sha40(m.sourceSha)||!sha64(m.startupSha256)||
         !m.files||!same(Object.keys(m.files).sort(),[...runtime].sort()))
         throw coded('ORPHAN_SIX_B_INSTALLED_SEVEN_CAS_DENIED');
-      const a=JSON.parse(gitRaw(m.sourceSha,
-        'approvals/maintenance-handoffs/'+m.sourceSha+'.json').toString('utf8'));
+      // Historic approval records are committed AFTER the source revision.
+      // Read the canonical approved record at main; never invent it in the
+      // earlier source SHA or fall back to a mutable unverified local file.
+      const approvalPath='approvals/maintenance-handoffs/'+m.sourceSha+'.json';
+      const response=await ghApi('contents/'+approvalPath+'?ref=main');
+      if(response?.type!=='file'||response.path!==approvalPath||
+        response.encoding!=='base64'||typeof response.content!=='string'||
+        response.content.length>32768)
+        throw coded('ORPHAN_SIX_B_NINE_SOURCE_PINS_DENIED');
+      const encoded=response.content.replace(/\s/g,'');
+      if(!/^[A-Za-z0-9+/]*={0,2}$/.test(encoded))
+        throw coded('ORPHAN_SIX_B_NINE_SOURCE_PINS_DENIED');
+      const a=JSON.parse(Buffer.from(encoded,'base64').toString('utf8'));
       if(a?.targetSha!==m.sourceSha||a.approved!==true||
         a.transition!=='SEVEN_TO_SEVEN'||!a.files||
         !same(Object.keys(a.files).sort(),[...runtime,...extra].sort()))
@@ -1036,7 +1046,7 @@ export function createMaintenanceAgent({
       'ORPHAN_SIX_B_CANONICAL_GET_FAILED');
     return Object.freeze({
       attestCurrentMaintainerSource:async()=>{
-        provenance();
+        await provenance();
         return {origin:'PRIVATE_INDEPENDENT_B_MAINTAINER',
           verifiedNinePinnedMaintainerFiles:true,
           currentMaintainerSourceUnchangedVerified:true};
@@ -1083,7 +1093,7 @@ export function createMaintenanceAgent({
         throw coded('ORPHAN_SIX_B_COMMENTS_INCOMPLETE');
       },
       getInstalledReadback:async()=>{
-        const m=provenance(),ci=installedControllerBPolicy(m);
+        const m=await provenance(),ci=installedControllerBPolicy(m);
         if(ci?.workflowId!==430972394||
           ci.workflowBlobSha!=='27e48ecde81bdf6f15cccffcffd9b3e70482a5f3')
           throw coded('ORPHAN_SIX_B_HELD_POLICY_DRIFT');
