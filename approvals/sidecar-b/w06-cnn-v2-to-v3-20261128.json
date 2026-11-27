@@ -1,0 +1,19 @@
+{
+  "schema": "ZGMINI_CNN_SIDECAR_ONEFILE_B_V3",
+  "status": "APPROVED_B",
+  "requestId": "8ad02254-fdf6-4eb7-86bb-bce3bd44d2ec",
+  "target": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\archive-run.mjs",
+  "beforeSha256": "eb3c43bf8fba6ea4e51f3e84b77f9ec13000db9d9e38077ffd914950d7080b6b",
+  "afterSha256": "894411dea16462c4ee305f7ec80102d81662063f5f76c8a8384f04977e860ac3",
+  "approvedContentSha256": "894411dea16462c4ee305f7ec80102d81662063f5f76c8a8384f04977e860ac3",
+  "approvedSourceSha": "42ab63b28e0c2617486a7b7dba550101960e5cf7",
+  "installedHead": "c8ed53a3991212dd1778742cda8a86ac133e0796",
+  "installedConfigSource": "c8ed53a3991212dd1778742cda8a86ac133e0796",
+  "taskDefinitionSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+  "wrapperSha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskChanges": false,
+  "runCount": 1
+}
