@@ -151,8 +151,8 @@ test('duplicate stop intent, early postcheck, missing or wrong exit cannot advan
   readback(1,input.seats[0]),input).status,'BLOCKED');
  const pending=transition(initial,'DURABLE_STOP_INTENT',intent(1),input);
  assert.equal(pending.phase,'STOP_INTENT_RECORDED');
- assert.equal(transition(pending,'DURABLE_STOP_INTENT',intent(1),input).status,'BLOCKED');
- assert.equal(transition(pending,'FINAL_WATCHDOG_READBACK',after(),input).status,'BLOCKED');
+ assert.equal(transition(pending,'DURABLE_STOP_INTENT',intent(1),input).status,'RECOVERY_REQUIRED');
+ assert.equal(transition(pending,'FINAL_WATCHDOG_READBACK',after(),input).status,'RECOVERY_REQUIRED');
  for(const proof of [
   readback(2,input.seats[0]),
   readback(1,input.seats[0],{pinnedPid:99999}),
@@ -162,8 +162,9 @@ test('duplicate stop intent, early postcheck, missing or wrong exit cannot advan
   readback(1,input.seats[0],{otherFiveOrRemainingSeatsUnchangedVerified:false}),
   readback(1,input.seats[0],{watchdogFenceUninterruptedVerified:false})
  ]){
-  assert.equal(transition(pending,'PRIVATE_SEAT_EXIT_READBACK',proof,input).status,
-   'BLOCKED');
+  const outcome=transition(pending,'PRIVATE_SEAT_EXIT_READBACK',proof,input);
+  assert.equal(outcome.status,'RECOVERY_REQUIRED');
+  assert.equal(outcome.nextAction,'RECONCILE_DURABLE_ORIGINAL_JOURNAL_NO_SIGNAL_RETRY');
  }
 });
 test('fresh per-phase proof is needed, even when original preimage is historical',()=>{
@@ -190,9 +191,9 @@ test('original B pins cannot drift after an intent, even with matching current c
  edited.preimage.heartbeatRawSha256=h('e');
  edited.approval.heartbeatRawSha256=h('e');
  assert.equal(transition(waiting,'PRIVATE_SEAT_EXIT_READBACK',
-  readback(1,edited.seats[0]),edited).status,'BLOCKED');
+  readback(1,edited.seats[0]),edited).status,'RECOVERY_REQUIRED');
  const spoofed={...waiting,stoppedCount:6,nextSeat:7,intentCount:1};
- assert.equal(transition(spoofed,'FINAL_WATCHDOG_READBACK',after(),input).status,'BLOCKED');
+ assert.equal(transition(spoofed,'FINAL_WATCHDOG_READBACK',after(),input).status,'RECOVERY_REQUIRED');
 });
 test('final sequence refuses missing fresh heartbeat, R6 or both Standby slots',()=>{
  const input=sample();let j=initialOrphanGracefulSixSourceJournal(preflight(input));
@@ -210,7 +211,8 @@ test('final sequence refuses missing fresh heartbeat, R6 or both Standby slots',
   after({smokeJobPassVerified:false})
  ]){
   const r=transition(j,'FINAL_WATCHDOG_READBACK',evidence,input);
-  assert.equal(r.status,'BLOCKED');
+  assert.equal(r.status,'RECOVERY_REQUIRED');
+  assert.equal(r.nextAction,'RECONCILE_DURABLE_ORIGINAL_JOURNAL_NO_SIGNAL_RETRY');
   assert.equal(r.operationalWrites,0);
  }
 });
