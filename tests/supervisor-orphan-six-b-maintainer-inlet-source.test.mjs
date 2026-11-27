@@ -2,6 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {nextRuntimeFiles} from '../tools/handoff-maintenance.mjs';
+import {digestOrphanSevenInstalledRuntimeFiles,
+ inspectOrphanInstalledSevenCasReadOnly}
+ from '../tools/supervisor-orphan-six-installed-seven-cas-readonly.mjs';
 import {ORPHAN_SIX_B_FIXED_EFFECT,ORPHAN_SIX_B_SCOPE}
  from '../tools/supervisor-orphan-six-b-admission.mjs';
 import {parseOrphanSixBFlatRequest,inspectOrphanSixBMaintainerInletSource}
@@ -154,4 +160,92 @@ test('future B inlet module is source-only: no built-in process or filesystem ef
   '../tools/supervisor-orphan-six-b-maintainer-inlet-source.mjs',import.meta.url),'utf8');
  assert.doesNotMatch(src,/from ['"]node:(?:child_process|fs|net|http|https)['"]/);
  assert.doesNotMatch(src,/\b(?:execFile|spawnSync|taskkill|GenerateConsoleCtrlEvent)\s*\(/);
+});
+
+function temporarySevenFileMaintainer(t){
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'orphan-seven-cas-readonly-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ fs.mkdirSync(path.join(root,'tools'),{recursive:true});
+ const files={};
+ for(const rel of nextRuntimeFiles){
+  const bytes=Buffer.from('TEMP_ORPHAN_CAS_FIXTURE_'+rel+'\n','utf8');
+  fs.writeFileSync(path.join(root,rel),bytes);
+  files[rel]=sha(bytes);
+ }
+ const manifest={schema:'ZGMINI_PC_MAINTENANCE_INSTALL_V1',
+  sourceSha:'b'.repeat(40),startupSha256:'c'.repeat(64),files};
+ const raw=Buffer.from(JSON.stringify(manifest)+'\n');
+ fs.writeFileSync(path.join(root,'MAINTENANCE_INSTALL.json'),raw);
+ const pins={
+  root,expectedInstalledManifestRawSha256:sha(raw),
+  expectedMaintainerSourceSha:manifest.sourceSha,
+  expectedSevenRuntimeFilesSha256:digestOrphanSevenInstalledRuntimeFiles(files)
+ };
+ return {root,pins,files,manifest,raw};
+}
+test('read-only exact installed seven-file CAS verifies bytes but grants zero private Windows authority',t=>{
+ const f=temporarySevenFileMaintainer(t);
+ const got=inspectOrphanInstalledSevenCasReadOnly(f.pins);
+ assert.equal(got.status,'CANDIDATE_ONLY');
+ assert.equal(got.installedRuntimeVerified,true);
+ assert.equal(got.installedMaintainerSha,f.manifest.sourceSha);
+ assert.equal(got.installedManifestRawSha256,sha(f.raw));
+ assert.equal(got.sevenRuntimeFilesSha256,f.pins.expectedSevenRuntimeFilesSha256);
+ assert.notEqual(got.sevenRuntimeFilesSha256,got.installedManifestRawSha256);
+ for(const flag of ['verifiedNinePinnedMaintainerFiles','receiverAncestryVerified',
+  'controllerBPolicyUnchangedVerified','effectAuthorized','runnerStopAuthorized'])
+  assert.equal(got[flag],false,flag);
+ assert.equal(got.operationalWrites,0);
+ assert.equal(got.origin,'SOURCE_ONLY_LOCAL_CAS_READ');
+});
+test('independent installed manifest raw SHA and seven-runtime tuple digest must BOTH agree',t=>{
+ const f=temporarySevenFileMaintainer(t);
+ let result=inspectOrphanInstalledSevenCasReadOnly({
+  ...f.pins,expectedInstalledManifestRawSha256:'a'.repeat(64)});
+ assert.equal(result.code,'ORPHAN_SIX_INSTALLED_MANIFEST_RAW_CAS_MISMATCH');
+ result=inspectOrphanInstalledSevenCasReadOnly({
+  ...f.pins,expectedSevenRuntimeFilesSha256:'a'.repeat(64)});
+ assert.equal(result.code,'ORPHAN_SIX_INSTALLED_FILES_PIN_MISMATCH');
+ result=inspectOrphanInstalledSevenCasReadOnly({
+  ...f.pins,expectedMaintainerSourceSha:'a'.repeat(40)});
+ assert.equal(result.code,'ORPHAN_SIX_INSTALLED_MAINTAINER_SHA_MISMATCH');
+});
+test('tampered installed runtime source is denied even if approval manifest has valid original bytes',t=>{
+ const f=temporarySevenFileMaintainer(t);
+ fs.appendFileSync(path.join(f.root,nextRuntimeFiles[2]),'UNAPPROVED_DRIFT\n');
+ const result=inspectOrphanInstalledSevenCasReadOnly(f.pins);
+ assert.equal(result.status,'BLOCKED');
+ assert.equal(result.code,'ORPHAN_SIX_INSTALLED_FILE_BYTES_MISMATCH');
+ assert.equal(result.effectAuthorized,false);
+ assert.equal(result.operationalWrites,0);
+});
+test('unknown or omitted seventh module cannot be accepted as six-file maintainer',t=>{
+ const f=temporarySevenFileMaintainer(t);
+ const six={...f.files};delete six[nextRuntimeFiles[6]];
+ const extra={...f.files,'tools/unapproved.mjs':'f'.repeat(64)};
+ for(const files of [six,extra]){
+  assert.throws(()=>digestOrphanSevenInstalledRuntimeFiles(files),
+   /ORPHAN_SIX_SEVEN_FILE_SET_INVALID/);
+ }
+ fs.rmSync(path.join(f.root,nextRuntimeFiles[6]));
+ const result=inspectOrphanInstalledSevenCasReadOnly(f.pins);
+ assert.equal(result.status,'BLOCKED');
+ assert.equal(result.code,'ORPHAN_SIX_INSTALLED_CAS_READBACK_UNKNOWN');
+});
+test('shared hard-linked file and opaque IO failures do not produce CAS attestation',t=>{
+ const f=temporarySevenFileMaintainer(t);
+ const file=path.join(f.root,nextRuntimeFiles[3]);
+ fs.linkSync(file,path.join(f.root,'tools','other-hardlink.fixture'));
+ const result=inspectOrphanInstalledSevenCasReadOnly(f.pins);
+ assert.equal(result.status,'BLOCKED');
+ assert.equal(result.code,'ORPHAN_SIX_INSTALLED_CAS_READBACK_UNKNOWN');
+ assert.equal(result.operationalWrites,0);
+ assert.doesNotMatch(JSON.stringify(result),/other-hardlink|TEMP_ORPHAN_CAS_FIXTURE|\/tools\//);
+});
+test('seven-file read-only module has no OS signal, process kill or persistent write operation',()=>{
+ const source=fs.readFileSync(new URL(
+  '../tools/supervisor-orphan-six-installed-seven-cas-readonly.mjs',import.meta.url),'utf8');
+ assert.doesNotMatch(source,/from ['"]node:(?:child_process|net|http|https)['"]/);
+ assert.doesNotMatch(source,/\b(?:execFile|spawn|taskkill|writeFileSync|renameSync|unlinkSync)\s*\(/);
+ assert.doesNotMatch(source,/PRIVATE_INDEPENDENT_B_MAINTAINER'.*origin/);
 });
