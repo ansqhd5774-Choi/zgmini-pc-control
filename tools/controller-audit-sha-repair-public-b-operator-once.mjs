@@ -18,7 +18,7 @@ const MAINT='E:/ZGmini/automation/pc-maintenance';
 const TARGET='f03febc06f32a553676622ecf049e7dd90e2b7d5';
 const INSTALLED='cde1dd372210e4658ae348cb9e2577967cb11634';
 const APPROVAL_MERGE=null; // Must be pinned after separate owner approval.
-const SOURCE_PR=null; // Pin the distinct reviewed operator-source PR after approval merge.
+const SOURCE_PR=4305; // Distinct reviewed operator-source PR, not B-effect approval PR #4303.
 const GH='C:/Program Files/GitHub CLI/gh.exe';
 const PATHS=Object.freeze([
  'controller/operations.mjs'
