@@ -486,3 +486,12 @@
 - [#4079](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4079), [#4075](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4075), [#4061](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4061): 각 agent-handoff 진단은 `VERIFIED_CANDIDATE_ONLY` 또는 `INSUFFICIENT_EVIDENCE`이며 원본 PC 작업 완료·타 대화 수신·운영 적용 증거가 없음. 원본 #4078/#4068/#4055의 미해결 결과와 연결 유지하고 인계 자동 종결하지 않음.
 - [#3947](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3947), [#4069](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4069): Supervisor/Runner 별도 회복 readback은 존재하나 원래 S6 `RECOVERY_REQUIRED`의 Watchdog promotion·backlog reconciliation 성공은 미입증. Open.
 - 이 배치 신규 종료/병합 0; 독립 운영 효과/재실행 0. 단순 과거 성공, 후속 소스 CI, stage 또는 요약 bot 댓글만으로 원본 실패 단회 요청을 완료로 바꾸지 않는다.
+
+
+## 2026-11-28 최신 정정 — #4276 소스 병합 확인 및 Open 범위 재판정
+
+- 이전 2026-11-28 기록의 **#4276 Draft/미병합 및 Public checkout ancestry 차단은 당시 관측**이다. 현재 원본 PR 댓글 [#7227708327](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4276#issuecomment-7227708327)과 GitHub commit compare를 대조한 결과, PR #4276은 원본 HEAD `d4e7b7130a558a380ae0be80bc8a20fc8031a86f`가 merge commit `da52580380885ea6c4ba3d68757b79cbe848ac0b`로 **main 병합 완료**. Public checkout `4d3fe664a90f2e8c3dea885559b1ec263df66a24` → main 비교는 `ahead 46 / behind 0`로 조상 조건 충족. 해당 이전 차단 항목을 현재 미해결로 반복 보고하지 않는다.
+- **남은 단계는 별개:** 승인·설치 V2 Windows 정책 및 실제 7파일/설치 SHA·baseline CAS·lease·백업/복구, 단일 B 효과와 workflow ID/blob 연결, 실제 Public B 발행/수신 JSON/TXT readback은 **미완료**. 소스 병합과 운영 적용 성공을 혼동하지 않는다.
+- 현재 GitHub `is:issue is:open` 검색 반환 24건, `is:pr is:open` 검색 반환 2건: [#4229](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4229) orphan-six 회복 Draft HOLD, [#4152](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4152) Controller B 정책 Draft HOLD. 두 후보는 현재 보류 지시/운영 조건을 해제하지 않고 Open 유지.
+- 기존 최근 운영 단회 #4270/#4164/#4159/#4156/#4140/#4135/#4131/#4122/#4117/#4110/#4082/#4078/#4069/#4068/#4055/#3947/#3767은 앞 절의 정확한 개별 완료조건을 충족하지 않아 임의 종료하지 않았다. #4079/#4075/#4061 인계 기록과 #2427/#2426/#1743/#68 장기 원장도 목적상 Open 유지.
+- 이번 배치 신규 Issue close **0건**, PR merge **0건**(기존 #4276 병합은 다른 담당자가 앞서 완료), 운영 파일 변경 **0건**. 기존 직접 종료 누적 207건 기록 보존. 후속은 새로운 원본 결과가 생긴 각 문제에서 필요한 정확 한 범위만 갱신한다.
