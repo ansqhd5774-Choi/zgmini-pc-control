@@ -45,7 +45,7 @@ function sample(){
  };
 }
 function fixture(t,{denyApproval=false,failBeforeSignalAt=null,
- failAfterSignalAt=null,breakExitAt=null}={}){
+ firstIdentityDriftAt=null,failAfterSignalAt=null,breakExitAt=null}={}){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-orphan-b-fixture-'));
  fs.mkdirSync(path.join(root,'requests'));
  const requestId='pc-'+randomUUID(),manifestRawSha256=d('d');
@@ -76,7 +76,9 @@ function fixture(t,{denyApproval=false,failBeforeSignalAt=null,
     watchdogFenceUninterruptedVerified:true,
     nextSeatIdentityStillLiveVerified:!gone.has(seat),
     remainingOriginalSeatsUnchangedVerified:true,
-    oldInstancePid:pin.pid,oldInstanceBirth:pin.startedAtUtc,
+    oldInstancePid:seat===firstIdentityDriftAt&&!afterIntentReadbackSha256?
+      pin.pid+1000:pin.pid,
+    oldInstanceBirth:pin.startedAtUtc,
     oldInstancePathSha256:pin.canonicalPathSha256};
   },
   async sendPrivateGracefulSignal({seat,proposalId,expectedIntentReadbackSha256}){
@@ -145,6 +147,19 @@ test('private approval denied means no signal and no journal creation',async t=>
  assert.equal(f.journal.read(),null);
  assert.deepEqual(f.sent,[]);
 });
+test('changed first original-seat PID blocks before any durable stop intent',async t=>{
+ const f=fixture(t,{firstIdentityDriftAt:1}),r=await f.run();
+ assert.equal(r.status,'BLOCKED');
+ assert.equal(r.code,'ORPHAN_SIX_PRESIGNAL_IDENTITY_CHANGED');
+ assert.equal(r.attemptedSignalCount,0);
+ assert.deepEqual(f.sent,[]);
+ const record=f.journal.read().record;
+ assert.equal(record.phase,'RECOVERY_REQUIRED');
+ assert.equal(record.intentCount,0);
+ assert.equal(record.stoppedCount,0);
+ assert.equal(f.events.some(e=>e.includes('after-intent')),false);
+});
+
 test('after durable intent, presignal failure preserves lock and forbids replay',async t=>{
  const f=fixture(t,{failBeforeSignalAt:1}),r=await f.run();
  assert.equal(r.status,'RECOVERY_REQUIRED');
