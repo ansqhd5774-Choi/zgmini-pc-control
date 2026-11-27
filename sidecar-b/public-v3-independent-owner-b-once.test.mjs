@@ -216,7 +216,7 @@ test('reviewed immutable merge bytes are compared before any local preflight eva
  const dynamic=s.indexOf("await import('./public-v3-independent-preimage-readonly.mjs')");
  assert.ok(review>0&&closure>review&&ancestry>closure&&dynamic>ancestry);
  assert.match(s,/reviewed\.equals\(current\)/);
- assert.match(s,/sha\(readLocal\(relative\)\)===sha\(reviewed\)/);
+ assert.match(s,/sha\(local\)===sha\(reviewed\)/);
  assert.match(s,/verifyReviewedSourceClosure\(reviewedSourceMerge\)/);
  assert.match(s,/W06_PUBLIC_B_OPERATOR_REVIEWED_MERGE_REQUIRED/);
 });
