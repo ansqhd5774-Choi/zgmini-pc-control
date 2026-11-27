@@ -278,6 +278,18 @@ export async function submitExistingControllerApprovalFromCi({targetSha,approval
   if(publicPolicy.targetSha!==targetSha||
      publicPolicy.manifestSha256!==approvalSha256)
    fail('MAINTENANCE_CI_PUBLIC_EFFECT_SCOPE_MISMATCH');
+  // An installed one-effect grant does not authorize arbitrary GitHub CI
+  // workers. Independently pin the *running* publisher workflow ID and its
+  // immutable reviewed source blob before accepting even an Issue POST.
+  if(typeof ports.readPublisherWorkflowIdentity!=='function')
+   fail('MAINTENANCE_CI_PUBLIC_PUBLISHER_IDENTITY_UNVERIFIED');
+  let active;
+  try{active=await ports.readPublisherWorkflowIdentity();}
+  catch{fail('MAINTENANCE_CI_PUBLIC_PUBLISHER_IDENTITY_UNVERIFIED');}
+  if(!Number.isSafeInteger(active?.workflowId)||
+     active.workflowId!==publicPolicy.workflowId||
+     active.workflowBlobSha!==publicPolicy.workflowBlobSha)
+   fail('MAINTENANCE_CI_PUBLIC_PUBLISHER_IDENTITY_MISMATCH');
  }
  const bytes=await ports.readManifest(targetSha);
  if(!Buffer.isBuffer(bytes)||digest(bytes)!==approvalSha256)fail('MAINTENANCE_CI_MANIFEST_PIN_MISMATCH');
