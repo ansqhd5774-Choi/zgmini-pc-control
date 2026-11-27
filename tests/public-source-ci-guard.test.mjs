@@ -18,6 +18,7 @@ import '../sidecar-b/public-v3-independent-preimage-readonly.test.mjs';
 import '../sidecar-b/public-v3-independent-owner-b-once.test.mjs';
 // Exact approved Controller audit two-file B source-only regression.
 import './controller-audit-public-b-operator-once.test.mjs';
+import './controller-audit-lineage-public-b-operator-once.test.mjs';
 
 const repo='ansqhd5774-Choi/zgmini-pc-control', id=1442936296;
 const owner='ansqhd5774-Choi', ownerId=327938088;
