@@ -48,6 +48,8 @@ on:
       - 'tests/pc-job-late-label-intake.test.mjs'
       - 'controller/supervisor.mjs'
       - 'controller/standby.mjs'
+      - 'controller/orphan-no-spawn-monitor-contract.mjs'
+      - 'tests/supervisor-orphan-no-spawn-monitor.test.mjs'
       - 'controller/orphan-no-spawn-heartbeat-actor.mjs'
       - 'tests/supervisor-orphan-no-spawn-heartbeat-actor.test.mjs'
       - 'tests/supervisor-orphan-owner-watchdog-crosscheck.test.mjs'

@@ -226,3 +226,48 @@ test('ongoing Controller work is not mistaken for an unrelated lease after estab
   assert.equal(assessNoSpawnMonitorSnapshot(q).status,'BLOCKED','renewal '+i);
  }
 });
+
+test('initial independent B keeps controller-install lease until first heartbeat; renewal cannot',()=>{
+ const x=good();
+ x.installation={
+  ...x.installation,
+  installLeaseHeld:true,
+  installLeaseProofSource:'PRIVATE_INDEPENDENT_MAINTAINER_SAME_HOST',
+  installLeaseOwnerMatchesMaintainerVerified:true,
+  installLeaseRequestMatchesApprovalVerified:true,
+  installLeaseNonceContinuousVerified:true,
+  watchdogRecoveryCriticalSectionExcludedVerified:true
+ };
+ const initial=assessNoSpawnMonitorSnapshot(x);
+ assert.equal(initial.status,'CANDIDATE_ONLY');
+ assert.equal(initial.heartbeatWriteAuthorized,false);
+ assert.equal(initial.leaseMutationAuthorized,false);
+ assert.equal(initial.effectAuthorized,false);
+ // A lease held across a later heartbeat tick is not silently renewed.
+ const renewal=assessNoSpawnMonitorSnapshot({
+  ...x,monitorPhase:'ESTABLISHED_MONITOR_RENEWAL'
+ });
+ assert.equal(renewal.status,'BLOCKED');
+ assert.equal(renewal.code,'NO_SPAWN_MONITOR_RESOURCE_OR_ROSTER_UNVERIFIED');
+ // No public Issue boolean or partial maintainer evidence can replace the
+ // independent private proof of both installation ownership and Watchdog fence.
+ const changed=[
+  a=>{a.installation.installLeaseProofSource='GITHUB_ISSUE_BODY';},
+  a=>{a.installation.installLeaseOwnerMatchesMaintainerVerified=false;},
+  a=>{a.installation.installLeaseRequestMatchesApprovalVerified=false;},
+  a=>{a.installation.installLeaseNonceContinuousVerified=false;},
+  a=>{a.installation.watchdogRecoveryCriticalSectionExcludedVerified=false;},
+  a=>{a.monitorPhase='UNKNOWN';}
+ ];
+ for(let i=0;i<changed.length;i++){
+  const q=structuredClone(x);changed[i](q);
+  const result=assessNoSpawnMonitorSnapshot(q);
+  assert.equal(result.status,'BLOCKED','fenced cutover gate '+i);
+  assert.equal(result.operationalWrites,0);
+ }
+ // Existing no-install-lease observation stays a source-only candidate,
+ // not proof that an operating transition without a fence is safe.
+ const noLease=good();
+ assert.equal(assessNoSpawnMonitorSnapshot(noLease).status,'CANDIDATE_ONLY');
+ assert.equal(assessNoSpawnMonitorSnapshot(noLease).effectAuthorized,false);
+});

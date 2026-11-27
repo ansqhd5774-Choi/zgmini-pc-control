@@ -95,8 +95,22 @@ export function assessNoSpawnMonitorSnapshot({
   ongoingJobs?.noInstallRecoveryOrExternalLeaseVerified===true&&
   ongoingJobs?.jobOwnerNonceContinuityVerified===true&&
   ongoingJobs?.activeWorkerCount===activeControllerWorkers;
+ // An independent B must hold the existing controller-install lease
+ // through initial Owner + heartbeat readback. Requiring its absence here
+ // would force premature release before the first no-spawn heartbeat.
+ // This exception is source-only: a public flag cannot prove an in-flight
+ // Watchdog recovery is excluded, and CANDIDATE_ONLY grants no OS effect.
+ // The future private B must establish a real same-host critical-section
+ // barrier rather than rely on the Watchdog's lease-exists check alone.
+ const fencedInitialBLease=monitorPhase==='INITIAL_OWNER_ADOPTION'&&
+  installation?.installLeaseHeld===true&&
+  installation?.installLeaseProofSource==='PRIVATE_INDEPENDENT_MAINTAINER_SAME_HOST'&&
+  installation?.installLeaseOwnerMatchesMaintainerVerified===true&&
+  installation?.installLeaseRequestMatchesApprovalVerified===true&&
+  installation?.installLeaseNonceContinuousVerified===true&&
+  installation?.watchdogRecoveryCriticalSectionExcludedVerified===true;
  if((relatedLeases!==0&&!verifiedJobLeaseRenewal)||
-    installation?.installLeaseHeld!==false||
+    (installation?.installLeaseHeld!==false&&!fencedInitialBLease)||
     installation?.workflowState!=='active'||
     gitHubRoster?.fixedSixOnline!==true)
   return deny('NO_SPAWN_MONITOR_RESOURCE_OR_ROSTER_UNVERIFIED');
