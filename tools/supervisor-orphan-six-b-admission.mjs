@@ -57,8 +57,9 @@ export function validateOrphanSixBRequest(request,{actor=null,repo=REPO}={}){
  return Object.freeze({...request});
 }
 // The canonical approved raw bytes must be committed to main and tied to the
-// independently authenticated PR identity. Neither JSON fields nor a valid
-// Issue can self-approve a B effect. The result remains CANDIDATE_ONLY.
+// independently authenticated merged source PR and exact user-authored B
+// effect comment. Neither an Issue body nor a self-merged PR approves B.
+// The result remains CANDIDATE_ONLY with all execution rights false.
 export function validateOrphanSixBManifest(request,bytes,{
  actor=null,repo=REPO,approvalPr=null
 }={}){
@@ -96,7 +97,7 @@ export function validateOrphanSixBManifest(request,bytes,{
     approvalPr.state!=='closed'||approvalPr.merged!==true||
     approvalPr.headSha!==ap.reviewedSourceSha||
     approvalPr.baseRepo!==REPO||
-    approvalPr.reviewedByOwner!==true)
+    approvalPr.ownerExactEffectApproved!==true)
   fail('ORPHAN_SIX_B_APPROVAL_PR_IDENTITY_UNVERIFIED');
  // Do not expose private pins. Return only the raw approval identifier.
  return candidate('ORPHAN_SIX_B_EXACT_APPROVAL_SOURCE_CANDIDATE',{
