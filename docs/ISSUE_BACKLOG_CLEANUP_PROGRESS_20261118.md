@@ -460,3 +460,16 @@
 - [#4156](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4156): 과거 Supervisor/Watchdog 회복 증거와 별도로 Public B 설치 및 추가 read-only 감사의 실제 결과는 미확인. 기능 종단 완료로 종료하지 않는다.
 - [#4276](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4276): Public B 소스 Draft/미병합 및 고정 checkout `4d3fe664...`의 `main` 조상 조건 불충족. PR 본문에 #4283/#4287 사용자 승인 및 main 병합 정정 기록 있음. 이슈 담당자가 실행 SHA를 임의 재핀하거나 운영 B 발행·Windows 설치를 수행하지 않는다. 해당 소스 담당자의 정규 pin/검증 후 별도 인증·설치가 필요하다.
 - 이번 회차 신규 Issue Close 0, PR merge 0, PC 요청·실행 0. 이전 207건 누적 직접 종료 실적은 과거 원장 기록이며 이번 회차 실적에 가산하지 않는다. 전체 Open/Closed 현행 총수는 이 제한 조회만으로 산정하지 않는다.
+
+
+## 2026-11-28 후속 배치 — 최근 운영 Open 6건 원본 판정
+
+- 본 배치는 진행 원장의 직전 2026-11-28 기록 후 별도의 원본 Issue + 전 페이지 댓글 재조회에 의한 상태 판정. `main`·운영 Runtime·결과 증거를 새로 생성하지 않았음.
+- [#4159](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4159): Run 45908087228 결과 JSON/TXT 2/2 확인 댓글이 있으나 `STATE_UNKNOWN/STANDBY_WMI_EXECUTABLE_PATH_UNVERIFIED`. 현재 Controller 프로세스 출처 미확인 범위를 남김. **OPEN 유지**.
+- [#4140](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4140): Run 45902843072 결과쌍 확인 댓글 존재, `STATE_UNKNOWN/WATCHDOG_R6_NATURAL_RESTART_PENDING`. 읽기 완료와 Watchdog 정상 완료 구분. **OPEN 유지**.
+- [#4110](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4110): Run 45898382780 `STATE_UNKNOWN/R6_D1_QUERY_FAILED`, result `d1StoredAt=null`, `matchedToLocal=false`. D1 결과가 실제 정상인 것으로 닫지 않음. **OPEN 유지**.
+- [#4082](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4082): CNN 기능의 후속 V2/V3 source 후보·CI·UI 증거는 많지만 신규 B 실제 설치/동일 관측 종단 `0/1`. 관련 #4270 후속과 결과 분리. **OPEN 유지**.
+- [#4078](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4078): 승인된 read-only #4105에서 원본 요청이 S6 pause window 내 접수, `replayLedgerStatus=NOT_RECORDED`, `executionEstablished=false`; 원본 Workflow Run 및 결과 없음. **OPEN 유지**, 중복 replay 금지.
+- [#3767](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3767): 과거 `STANDBY_WMI_EXECUTABLE_PATH_UNVERIFIED`와 이후 R5 소스/설치/READY 증거가 각각 확정됐으나 원래 독립 probe나 실제 S6 승격 검증 아님. 대표 추적 **OPEN 유지**.
+- 이번 검토 대상 6/6 현재 Open; 완료/종료 조건을 충족하는 신규 단회 요청 **0건**. 신규 Close 0, PR merge 0, PC 재실행 0. 제한 검색으로 저장소 전체 Open 총수 확정하지 않음. 종료 누적 실적 207건은 기존 역사 기록 그대로.
+- 다음: 새로 종료 가능한 후보는 `is:open`만 일괄 검색해 추정하지 말고 원본 requestId별 실제 결과쌍/Run/원장에 기반하여 확인. 위 운영 미해결은 원담당의 실제 수정/인증 이후 재판정.
