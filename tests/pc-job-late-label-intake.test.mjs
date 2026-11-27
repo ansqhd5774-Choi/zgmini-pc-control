@@ -263,3 +263,22 @@ test('public A logs redact raw Worker payload while private path stays unchanged
  });
  assert.match(entry,/publicJobLogEnvelope\(result\.report,admitted\.visibility==='PRIVATE'\)/);
 });
+
+
+test('public A Issue comment heading uses the same projected bytes as JSON/TXT',()=>{
+ const uploader=fs.readFileSync(new URL('../controller/upload.mjs',import.meta.url),'utf8');
+ assert.match(uploader,/const publishedReport=JSON\.parse\(json\)/);
+ assert.match(uploader,/const transfer=publishedReport\.reportTransfer/);
+ assert.match(uploader,/\*\*\$\{publishedReport\.status\} — \$\{publishedReport\.code\}\*\*/);
+ assert.doesNotMatch(uploader,/\*\*\$\{report\.status\} — \$\{report\.code\}\*\*/);
+ // A locally held raw code must never influence the public title.
+ const secret='DO_NOT_PUBLISH_TEST_SECRET';
+ const raw={schema:'ZGMINI_PC_RESULT_V1',jobId:'run-150-1-seat-2',
+   status:'PASS',code:secret,private:{token:secret}};
+ const safe=publicPcReportProjection(raw);
+ const transmittedJson=JSON.stringify(safe);
+ const publishedReport=JSON.parse(transmittedJson);
+ const headline=`**${publishedReport.status} — ${publishedReport.code}**`;
+ assert.equal(headline,'**PASS — PUBLIC_RESULT_CODE_REDACTED**');
+ assert.doesNotMatch(headline,/DO_NOT_PUBLISH_TEST_SECRET/);
+});
