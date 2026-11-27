@@ -1,0 +1,27 @@
+{
+  "schema": "ZGMINI_CONTROLLER_SELECTIVE_PIN_V1",
+  "installedSha": "3c7d4cfefacf072fd35cb19706b352c64c5e4fd2",
+  "targetSha": "555f95708984580cd7d5a0fd05a80b718e867710",
+  "sourceMainSha": "9b12c27a341fe3f982e93a631497bdf23547d371",
+  "targetBranch": "codex/public-a-controller-postcheck-selective-20261128",
+  "customPaths": [],
+  "allowFiles": [
+    {
+      "path": "controller/common.mjs",
+      "sha256": "9e940a92c0f3ac332ba4d8a5d52b4bac0d647340bdb30863e2628b5b70d27083"
+    },
+    {
+      "path": "controller/entry.mjs",
+      "sha256": "1874aa1b0b9c6ce109a15737a608a711b81aecb7e3bdcc475032be8b54c1dca7"
+    },
+    {
+      "path": "controller/preimage-manifest-stager.mjs",
+      "sha256": "806950791803cfc9a1fb387dfdbc4b74757304c48df20e90a2d9b76d52c8cf10"
+    },
+    {
+      "path": "controller/upload.mjs",
+      "sha256": "a0a6065c7f2fd8f816e6b0a9efd9e7aba14e990bd0336aadc6b0be74baaefe8e"
+    }
+  ],
+  "approvalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4260"
+}
