@@ -46,6 +46,8 @@ on:
       - 'controller/preimage-manifest-stager.mjs'
       - '.github/workflows/pc-job.yml'
       - 'tests/pc-job-late-label-intake.test.mjs'
+      - 'tests/public-a-controller-selective-source.test.mjs'
+      - 'drafts/controller-public-a-selective-candidate-20261128.json'
       - 'controller/supervisor.mjs'
       - 'controller/standby.mjs'
       - 'controller/orphan-no-spawn-monitor-contract.mjs'
@@ -313,6 +315,7 @@ jobs:
           node --test --test-concurrency=1 tests/public-pc-job-candidate.test.mjs
           node --test --test-concurrency=1 tests/controller-entry-import-receipt.test.mjs
           node --test --test-concurrency=1 tests/pc-job-late-label-intake.test.mjs
+          node --test --test-concurrency=1 tests/public-a-controller-selective-source.test.mjs
           node --test --test-concurrency=1 tests/maintenance-agent.test.mjs
           node --test --test-concurrency=1 tests/ci-controller-b-policy-only-proposal.test.mjs
           node --test --test-concurrency=1 tests/supervisor-orphan-six-b-receiver-source.test.mjs
