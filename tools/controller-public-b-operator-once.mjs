@@ -8,12 +8,7 @@ import os from 'node:os';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
-import {prepareControllerUpdateRequest,validateUpdateRequest,
- validateControllerSelectivePin,manifestFingerprint,INSTALLABLE_FILES} from './maintenance-contract.mjs';
-import {verifyRecoveryOperator,prevalidationInventory,makePorts,
- validatePublicOwnerBExactScope} from './update.mjs';
-import {applyApprovedUpdate} from './maintenance-apply.mjs';
-import {acquireMaintenanceLock,maintenanceLockStatus} from './maintenance-lock.mjs';
+// No local static imports: origin/CAS checks MUST precede module evaluation.
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const CHECKOUT='E:/ZGmini/projects/zgmini-pc-control';
@@ -30,7 +25,7 @@ const PATHS=Object.freeze([
 const SOURCE=Object.freeze([
  'tools/controller-public-b-operator-once.mjs','tools/update.mjs',
  'tools/maintenance-contract.mjs','tools/maintenance-apply.mjs',
- 'tools/maintenance-lock.mjs'
+ 'tools/maintenance-lock.mjs','tools/source-bundle-register.mjs'
 ]);
 const claimPath=path.join(MAINT,'operator-public-b-'+TARGET+'.json');
 const sha=b=>createHash('sha256').update(b).digest('hex');
@@ -64,13 +59,57 @@ export function classifyPublicBPreflight(input){
  if(input?.previousAttempt!==false)return 'PUBLIC_B_PREVIOUS_ATTEMPT_RECONCILE';
  return 'PUBLIC_B_OPERATOR_PREFLIGHT_READY_ONLY';
 }
-function sourceAndOwner(){
+// Verify every statically imported local module, including transitive imports,
+// before evaluating ANY local module. Tests inject trusted bytes with no PC I/O.
+export function verifyOperatorSourceClosure(readLocal,readTrusted){
+ const sources={};
+ for(const rel of SOURCE){
+  const local=readLocal(rel),trusted=readTrusted(rel);
+  need(Buffer.isBuffer(local)&&Buffer.isBuffer(trusted)&&
+   sha(local)===sha(trusted),'PUBLIC_B_OPERATOR_SOURCE_CAS_FAILED');
+  sources[rel]=local.toString('utf8');
+ }
+ const expected=new Set(SOURCE);
+ for(const [rel,code] of Object.entries(sources)){
+  const specifiers=code.matchAll(/\\b(?:from\\s+|import\\s+)(['"])([^'"]+)\\1/g);
+  for(const item of specifiers){
+   const spec=item[2];
+   if(spec.startsWith('node:'))continue;
+   need(spec.startsWith('./')||spec.startsWith('../'),
+    'PUBLIC_B_OPERATOR_IMPORT_NOT_PINNED');
+   const resolved=path.posix.normalize(path.posix.join(path.posix.dirname(rel),spec));
+   need(expected.has(resolved),'PUBLIC_B_OPERATOR_IMPORT_NOT_PINNED');
+  }
+ }
+ return true;
+}
+export async function withPublicBInstallLease(lock,run){
+ let safe=false;
+ try{
+  const result=await run();
+  safe=(result?.status==='PASS'&&result.actualInstalledSha===TARGET&&
+    result.postcheck?.protectedStateUnchanged===true&&
+    result.postcheck?.runnerSetVerified===true&&
+    result.postcheck?.postSourceVerified===true)||
+   (result?.status==='BLOCKED'&&result.actualInstalledSha===INSTALLED&&
+    result.workflowEnabled===true)||
+   (result?.status==='ROLLED_BACK'&&result.actualInstalledSha===INSTALLED&&
+    result.workflowEnabled===true&&result.protectedStateUnchanged===true);
+  return result;
+ }finally{
+  // Throws in persist(), switch, rollback, postcheck or the final claim
+  // writer may have an unknown effect: hold the owned lease, never release it.
+  if(safe)lock.release();
+  else lock.holdForRecovery();
+ }
+}
+async function sourceAndOwner(){
  need(process.platform==='win32'&&os.hostname().toUpperCase()==='PC'&&
   !process.env.GITHUB_ACTIONS&&!process.env.RUNNER_NAME&&!process.env.GITHUB_RUN_ID,
   'PUBLIC_B_INDEPENDENT_WINDOWS_REQUIRED');
- // The preinstalled WMI checker rejects Runner/Worker ancestry and must
- // reach the same-user interactive Explorer chain with an unprivileged token.
- verifyRecoveryOperator();
+ need(path.resolve(fileURLToPath(import.meta.url)).toLowerCase()===
+  path.resolve(CHECKOUT,SOURCE[0]).toLowerCase(),
+  'PUBLIC_B_OPERATOR_ENTRY_PATH_DRIFT');
  const user=api('user'),repo=api('repos/'+REPO);
  need(user?.login==='ansqhd5774-Choi'&&user?.id===327938088&&
   repo?.id===1442936296&&repo?.owner?.id===327938088&&
@@ -82,14 +121,22 @@ function sourceAndOwner(){
  const chain=api('repos/'+REPO+'/compare/'+APPROVAL_MERGE+'...main');
  need(chain?.behind_by===0&&chain?.merge_base_commit?.sha===APPROVAL_MERGE,
   'PUBLIC_B_APPROVAL_NOT_ON_MAIN');
- for(const rel of SOURCE){
+ verifyOperatorSourceClosure(rel=>{
   const local=path.join(CHECKOUT,rel);
-  need(isRegular(local)&&sha(fs.readFileSync(local))===sha(readMain(rel)),
-   'PUBLIC_B_OPERATOR_SOURCE_CAS_FAILED');
- }
- return true;
+  need(isRegular(local)&&fs.realpathSync(local).toLowerCase()===
+    path.resolve(local).toLowerCase(),'PUBLIC_B_OPERATOR_SOURCE_CAS_FAILED');
+  return fs.readFileSync(local);
+ },readMain);
+ // All local static imports are now verified against authenticated main bytes.
+ const [contract,updater,apply,lock]=await Promise.all([
+  import('./maintenance-contract.mjs'),import('./update.mjs'),
+  import('./maintenance-apply.mjs'),import('./maintenance-lock.mjs')]);
+ // Preinstalled checker rejects Runner/Worker ancestry and requires an
+ // independent same-user Explorer chain before any operational request.
+ updater.verifyRecoveryOperator();
+ return {...contract,...updater,...apply,...lock};
 }
-function approvedManifest(){
+function approvedManifest(deps){
  const manifestPath='approvals/controller-updates/'+TARGET+'.json';
  const bytes=readMain(manifestPath),manifest=JSON.parse(bytes.toString('utf8'));
  const pin=JSON.parse(readMain('approvals/controller-selective-targets/'+TARGET+'.json').toString('utf8'));
@@ -100,16 +147,16 @@ function approvedManifest(){
   manifest.approval?.grade==='B'&&manifest.postOperation==='core-status'&&
   pin.targetSha===TARGET&&pin.installedSha===INSTALLED,
   'PUBLIC_B_APPROVAL_SCOPE_INVALID');
- need(manifest.checks?.manifestSha256===manifestFingerprint(manifest.allowFiles).sha256,
+ need(manifest.checks?.manifestSha256===deps.manifestFingerprint(manifest.allowFiles).sha256,
   'PUBLIC_B_APPROVED_FILE_FINGERPRINT_MISMATCH');
- validateControllerSelectivePin(manifest,pin);
+ deps.validateControllerSelectivePin(manifest,pin);
  return {bytes,manifest};
 }
-function installedCas(){
+function installedCas(deps){
  const hostPath=path.join(CONTROL,'host.json');
  need(isRegular(hostPath),'PUBLIC_B_HOST_MANIFEST_UNVERIFIED');
  const host=JSON.parse(fs.readFileSync(hostPath,'utf8'));
- need(host.controllerSourceSha===INSTALLED&&prevalidationInventory(host)!==null,
+ need(host.controllerSourceSha===INSTALLED&&deps.prevalidationInventory(host)!==null,
   'PUBLIC_B_INSTALLED_CONTROLLER_NOT_PINNED');
  for(const [rel,digest] of Object.entries(host.controllerFiles)){
   need(/^(?:controller\/[a-z0-9-]+\.mjs|config\/operations\.json)$/.test(rel),
@@ -118,21 +165,21 @@ function installedCas(){
   need(isRegular(filename)&&sha(fs.readFileSync(filename))===digest,
    'PUBLIC_B_INSTALLED_FILE_CAS_MISMATCH');
  }
- need(INSTALLABLE_FILES.every(rel=>typeof host.controllerFiles[rel]==='string'),
+ need(deps.INSTALLABLE_FILES.every(rel=>typeof host.controllerFiles[rel]==='string'),
   'PUBLIC_B_INSTALLED_FILES_INCOMPLETE');
  return true;
 }
-function preflight(){
- sourceAndOwner();
- const approved=approvedManifest();
- installedCas();
- const lease=maintenanceLockStatus(MAINT,'controller-install');
+async function preflight(){
+ const deps=await sourceAndOwner();
+ const approved=approvedManifest(deps);
+ installedCas(deps);
+ const lease=deps.maintenanceLockStatus(MAINT,'controller-install');
  need(lease?.held===false,'PUBLIC_B_INSTALL_LEASE_NOT_FREE');
  need(!fs.existsSync(claimPath),'PUBLIC_B_PREVIOUS_ATTEMPT_RECONCILE');
  const data={actor:'ansqhd5774-Choi',manifest:approved.manifest,
   issue:{operation:'controller-update',controlRepository:REPO,targetControllerSha:TARGET}};
- validatePublicOwnerBExactScope(data);
- return approved;
+ deps.validatePublicOwnerBExactScope(data);
+ return {approved,deps};
 }
 function durableClaim(data){
  // The unique claim is never deleted. Failed or unknown execution is reconciled
@@ -152,7 +199,10 @@ function record(data){
 export async function main(args=process.argv.slice(2)){
  need(args.length===1&&['inspect','apply'].includes(args[0]),
   'PUBLIC_B_OPERATOR_ARGS_INVALID');
- const approved=preflight();
+ const {approved,deps}=await preflight();
+ const {prepareControllerUpdateRequest,validateUpdateRequest,
+  validatePublicOwnerBExactScope,makePorts,acquireMaintenanceLock,
+  applyApprovedUpdate}=deps;
  if(args[0]==='inspect')return {status:'PASS',code:'PUBLIC_B_OPERATOR_PREFLIGHT_READY_ONLY',
   targetSha:TARGET,operationalWrites:0,issueCreated:false,installed:false};
  // Only explicit interactive 'apply', after source, Owner, WMI, approved bytes,
@@ -179,17 +229,13 @@ export async function main(args=process.argv.slice(2)){
   const {request:job,ports}=makePorts(data,number,{publicOwnerBOperator:true});
   await ports.capturePrevalidationBaseline();
   const lock=acquireMaintenanceLock(MAINT,'controller-install');
-  let hold=false;
-  try{
+  return await withPublicBInstallLease(lock,async()=>{
    const result=await applyApprovedUpdate(job,ports);
-   hold=result.status==='RECOVERY_REQUIRED';
-   if(hold)lock.holdForRecovery();
    record({schema:'ZGMINI_PUBLIC_B_OPERATOR_ONCE_V1',targetSha:TARGET,
     requestId:job.requestId,issueNumber:number,phase:'FINAL_RESULT',
     status:result.status,code:result.code,actualInstalledSha:result.actualInstalledSha??null});
-   return {status:result.status,code:result.code,requestId:job.requestId,
-    issueNumber:number,actualInstalledSha:result.actualInstalledSha??null};
-  }finally{if(!hold)lock.release();}
+   return {...result,requestId:job.requestId,issueNumber:number};
+  });
  }catch(error){
   // A GitHub POST or updater outcome may already have taken effect. No retry.
   return {status:'STATE_UNKNOWN',code:'PUBLIC_B_OPERATOR_RECONCILE_NO_RETRY',
