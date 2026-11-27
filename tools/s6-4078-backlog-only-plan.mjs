@@ -65,3 +65,52 @@ export function inspectS64078BacklogOnly(e){
   next:'SEPARATE_APPROVED_OWNER_BACKLOG_ONLY_EFFECT_REQUIRED'
  };
 }
+
+/**
+ * Source-only, double-read CAS evidence adapter. Reads are supplied by the
+ * independent operator; this function performs no filesystem or network IO.
+ * Its result is NEVER an authorization to post a replay or alter the ledger.
+ */
+export function inspectS64078PinnedReadback(e){
+ const refusal=code=>blocked(code);
+ const pin=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
+ const raw=x=>typeof x==='string'&&x.length>0&&x.length<=262144;
+ const local=e?.localReadback;
+ if(!local||!raw(local.journalBefore)||!raw(local.journalAfter)||
+   !raw(local.backlogBefore)||!raw(local.backlogAfter)||
+   !pin(local.journalSha256)||!pin(local.backlogSha256))
+  return refusal('S6_LOCAL_READBACK_INCOMPLETE');
+ if(local.journalBefore!==local.journalAfter||
+   local.backlogBefore!==local.backlogAfter||
+   sha(local.journalBefore)!==local.journalSha256||
+   sha(local.backlogBefore)!==local.backlogSha256)
+  return refusal('S6_LOCAL_READBACK_CAS_DRIFT');
+ let journal,backlog;
+ try{
+  journal=JSON.parse(local.journalBefore);
+  backlog=JSON.parse(local.backlogBefore);
+ }catch{return refusal('S6_LOCAL_READBACK_JSON_INVALID');}
+ const remote=e?.githubReadback;
+ if(remote?.originalIssueNumber!==FIXED.originalIssue||
+   remote.originalRequestId!==FIXED.originalRequestId||
+   remote.searchComplete!==true||
+   !Array.isArray(remote.pcJobRuns)||!Array.isArray(remote.resultPairs)||
+   !Array.isArray(remote.replayIssues))
+  return refusal('BACKLOG_4078_GITHUB_READBACK_INCOMPLETE');
+ if(remote.pcJobRuns.length||remote.resultPairs.length||remote.replayIssues.length)
+  return refusal('BACKLOG_4078_PRIOR_EFFECT_PRESENT');
+ // A double read proves equality of the supplied bytes, not authority of the
+ // process supplying them. The original independent Owner/lease proof remains
+ // mandatory and is not inferred from the hashes alone.
+ const result=inspectS64078BacklogOnly({
+  ...e,journal,backlog,
+  backlogBytesCasVerified:true,s6JournalBytesCasVerified:true,
+  existingPcJobRuns:0,existingResultPairs:0,existingReplayIssues:0,
+  resultSearchComplete:true
+ });
+ return result.status==='SOURCE_PREFLIGHT_ELIGIBLE'?{
+  ...result,code:'S6_4078_PINNED_READBACK_SOURCE_ONLY',
+  journalSha256:local.journalSha256,backlogSha256:local.backlogSha256,
+  mutationAuthorized:false,operationalWrites:0
+ }:result;
+}
