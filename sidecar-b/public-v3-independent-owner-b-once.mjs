@@ -19,11 +19,11 @@ const APPROVAL='approvals/sidecar-b/w06-cnn-v2-to-v3-20261128.json';
 // Keep the gate disabled until owner independently approves the exact
 // one-file effect (candidate SHA, current CAS, backup/rollback, zero D1/DB/Task
 // changes) and a separate reviewed PR pins that approval's merge commit.
-const APPROVAL_PR=0;
-const APPROVAL_MERGE=null;
+const APPROVAL_PR=4289;
+const APPROVAL_MERGE='1c0e8b2e3b032548548b42df535dc060a40ff64c';
 // Executable bytes must come from this reviewed source PR's immutable merge.
 // A later unrelated main update must never silently replace approved code.
-const REVIEWED_SOURCE_PR=4288;
+const REVIEWED_SOURCE_PR=0;
 const FIXED={
  schema:'ZGMINI_CNN_SIDECAR_ONEFILE_B_V3',
  target:'E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\archive-run.mjs',
@@ -309,7 +309,7 @@ export async function main(args=process.argv.slice(2)) {
   current?.status==='DEFERRED'&&
   current.code==='W06_V3_NATURAL_CORE_ACTIVE'),
   'W06_PUBLIC_B_CURRENT_PREIMAGE_STOP');
- const manifest=verifyFixedOwnerApproval(); // intentionally never passes yet
+ const manifest=verifyFixedOwnerApproval();
  const verifiedCandidate=candidate();
  const {validateManifest,verifyCandidateBytes,applyOneFile,TARGET,sha256}=
   await import('./contract.mjs');
