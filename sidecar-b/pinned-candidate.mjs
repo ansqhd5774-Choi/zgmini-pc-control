@@ -3,9 +3,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {validateManifest,verifyCandidateBytes,SUCCESSOR_SCHEMA} from './contract.mjs';
+import {validateManifest,verifyCandidateBytes,SUCCESSOR_SCHEMA,NEXT_SUCCESSOR_SCHEMA} from './contract.mjs';
 export const APPROVED_CANDIDATE='sidecar-b/approved/archive-run.mjs';
 export const SUCCESSOR_CANDIDATE='sidecar-b/approved/archive-run-w06-v2.mjs';
+// Reviewed source-only V3 candidate must be committed at this exact path.
+export const NEXT_SUCCESSOR_CANDIDATE='sidecar-b/approved/archive-run-w06-v3.mjs';
 const fail=c=>{throw Object.assign(Error(c),{code:c});};
 const need=(ok,c)=>{if(!ok)fail(c);};
 const gitBins=['C:\\Program Files\\Git\\cmd\\git.exe',
@@ -20,7 +22,8 @@ const git=(root,args)=>{
 };
 export function readPinnedSidecarCandidate({candidateRoot,manifest,runGit=git}){
  validateManifest(manifest);
- const fixedCandidate=manifest.schema===SUCCESSOR_SCHEMA?SUCCESSOR_CANDIDATE:APPROVED_CANDIDATE;
+ const fixedCandidate=manifest.schema===NEXT_SUCCESSOR_SCHEMA?NEXT_SUCCESSOR_CANDIDATE:
+  manifest.schema===SUCCESSOR_SCHEMA?SUCCESSOR_CANDIDATE:APPROVED_CANDIDATE;
  need(process.platform==='win32'&&
   typeof candidateRoot==='string'&&path.win32.isAbsolute(candidateRoot),
   'SIDECAR_B_CANDIDATE_ROOT_STOP');
