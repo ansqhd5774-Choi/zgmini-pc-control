@@ -29,10 +29,11 @@ export function inspectS64078BacklogOnly(e){
    typeof original.body!=='string'||sha(original.body)!==FIXED.originalBodySha256)
   return blocked('BACKLOG_4078_ORIGINAL_CAS_FAILED');
  const journal=e?.journal;
- if(journal?.requestId!==FIXED.s6RequestId||
+ if(journal?.schema!=='ZGMINI_S6_ONCE_JOURNAL_V1'||
+   journal?.requestId!==FIXED.s6RequestId||
    journal?.phase!=='RECOVERY_REQUIRED'||
    journal?.failedAt!=='WATCHDOG_RELEASE_OUTCOME_UNVERIFIED'||
-   journal?.failedCode!=='S6_PORT_PROMOTION_UNVERIFIED')
+   journal?.code!=='S6_PORT_PROMOTION_UNVERIFIED')
   return blocked('S6_JOURNAL_PHASE_DRIFT');
  const backlog=e?.backlog;
  if(backlog?.schema!=='ZGMINI_PC_BACKLOG_V1'||
