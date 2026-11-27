@@ -99,7 +99,7 @@ jobs:
         if: github.event.repository.private == false
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: 62249e557c63f9b641b22cdd2213a71a88470d6e
+          ref: 25c300b8a13da5b269b05c76039d077710c66287
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
