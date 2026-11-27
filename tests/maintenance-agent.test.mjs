@@ -64,16 +64,22 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
   verifyInstalledSource=()=>{},statusFaults={},preexistingLedger=null,
   extraIssueSummaries=[],extraIssueDetails=[],progressError=null,
   s6RawManifest=null,s6Status=null,s6ApplyResult=null,s6ApplyError=null,
-  s6ApplyRaw=null,publicMetadataPatch={}}={}){
+  s6ApplyRaw=null,publicMetadataPatch={},requestPatch={},
+  publicCiProof=null,installedCiPolicy=null}={}){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),"zgmini-maintainer-agent-test-"));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const leaseRoot=path.join(root,"leases");fs.mkdirSync(leaseRoot);
   const example=sampleRequest();
   const manifest={...example.manifest,...manifestPatch};
   const rawManifest=Buffer.from(JSON.stringify(manifest));
-  const request={...example.issue,approvalManifestSha256:digest(rawManifest)};
+  const request={...example.issue,approvalManifestSha256:digest(rawManifest),...requestPatch};
   const issue={number:72,title,state:"OPEN",body:JSON.stringify(request),
     author:{login:actor},labels:labels.map(name=>({name})),comments:[],...issuePatch};
+  if(installedCiPolicy){
+    const installed=typeof installedCiPolicy==='function'?
+      installedCiPolicy(issue,rawManifest):installedCiPolicy;
+    fs.writeFileSync(path.join(root,'MAINTENANCE_INSTALL.json'),JSON.stringify(installed));
+  }
   const calls=[],remote=new Map(),stats={applies:0,statusQueries:0,comments:0,
     manifestReads:0,uploadWrites:0,uploadReads:0,issueViews:0};
   const applied=applyResult??{status:"SUCCEEDED",code:"UPDATE_COMMITTED",lastPass:"UPDATE_COMMITTED",
@@ -97,6 +103,20 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
         return {stdout:JSON.stringify(extraIssueDetails.find(row=>row.number===number)??issue)};
       }
       if(args[0]==="api"){
+        if(publicCiProof&&args[1]===`repos/${REPO}/issues/${issue.number}`){
+          return {stdout:JSON.stringify({...publicCiProof.actual,number:issue.number,
+            body:issue.body})};
+        }
+        if(publicCiProof&&args[1].startsWith(`repos/${REPO}/actions/jobs/`)
+          &&args[1].endsWith('/logs')){
+          const jobId=Number(args[1].match(/\\/jobs\\/(\\d+)\\/logs$/)?.[1]);
+          return {stdout:publicCiProof.readJobLogs(jobId,issue)};
+        }
+        if(publicCiProof&&(args[1].startsWith(`repos/${REPO}/actions/runs/`)
+          ||args[1].startsWith(`repos/${REPO}/contents/.github/workflows/`))){
+          const response=await publicCiProof.getJson(args[1].slice(`repos/${REPO}/`.length));
+          return {stdout:JSON.stringify(response)};
+        }
         if(args[1]==="repos/"+REPO)
           return {stdout:JSON.stringify({id:1442936296,full_name:REPO,
             owner:{id:327938088,login:ACTOR},private:false,...publicMetadataPatch})};
@@ -200,7 +220,7 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
       assert.deepEqual(packaged.manifest,manifest);
       assert.deepEqual(Buffer.from(packaged.manifestRawBase64,"base64"),rawManifest);
       assert.equal(packaged.issueNumber,issue.number);
-      assert.equal(packaged.actor,ACTOR);
+      assert.equal(packaged.actor,actor);
       if(applyError)throw applyError;
       return {stdout:JSON.stringify(applied)};
     }
