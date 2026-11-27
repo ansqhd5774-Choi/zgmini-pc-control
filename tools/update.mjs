@@ -26,6 +26,7 @@ validateControllerConfigTransition,controllerAdmissionForPurpose,
  verifiedRunningPostcheckFailure,classifyMaintenancePostcheckLink,
  selectMaintenancePostcheckRun,classifyMaintenancePostcheckWorkflowRegistration,
  summarizeMaintenancePostcheckLocalPointer,
+ summarizeMaintenancePublicPostcheckLedger,
  R6_HOST_CANDIDATE_SHA256,validateR54BIssueEnvelope,
  validateR54BManifestRequest,R54_B_ISSUE_TITLE,R54_B_OPERATION,
  R54_B_SOURCE_FILES,SOURCE_BUNDLE_OPERATION,SOURCE_BUNDLE_ISSUE_TITLE,
@@ -1583,10 +1584,12 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
      const protectedStateUnchanged=JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore);
      const runnerState=apiRunners();
      const runnerSetVerified=dedicatedPcRunnerRows(runnerState,{requireOnline:true})!==null;
-     const postSourceVerified=result.requestedSourceSha===manifest.postSourceSha&&
+     let postSourceVerified=result.requestedSourceSha===manifest.postSourceSha&&
        result.sourceRepository==='ansqhd5774-Choi/zgmini'&&
        result.sourceBranch===manifest.postSourceBranch&&
        result.controlSourceSha===manifest.targetSha;
+     const publicSafeReceipt=result.code==='PUBLIC_RESULT_CODE_REDACTED';
+     let publicLocalAttested=false;
      // The bot-reported payload is a different event from verified execution.
      // Preserve the observed status/source comparison without retroactive PASS,
      // and retain any already correlated Run/Job identity.
@@ -1604,18 +1607,45 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
        const matched=jobs.filter(j=>j.id===linked.jobId&&j.run_id===selected.id);
        const seat=Number(matched.length===1?
         matched[0].runner_name?.match(/^zgmini-pc-0([1-6])$/)?.[1]:null);
-       const proof=summarizeMaintenancePostcheckLocalPointer({
-        pointer:{issueNumber:postIssueNumber,report:result},
-        requestId:issue.requestId,issueNumber:postIssueNumber,
-        runId:linked.runId,attempt:selected.run_attempt,seat,
-        operation:manifest.postOperation,sourceBranch:manifest.postSourceBranch,
-        sourceSha:manifest.postSourceSha,controllerSha:manifest.targetSha});
-       if(proof.status==='LOCAL_RESULT_MATCHED'){
-        reportedRunJobLinked=true;
-        reportedRunId=linked.runId;reportedJobId=linked.jobId;
+       if(matched.length===1&&matched[0].name==='public-approved-a'&&publicSafeReceipt){
+        // The public bot report contains no source provenance or private
+        // Worker code. Bind it to this exact Job, seat and immutable
+        // installed-host ledger. The temporary pointer may have been removed
+        // by the uploader after safe remote readback; the ledger persists.
+        const ledgerPath=path.join(controlRoot,'ledger',issue.requestId+'-postcheck.json');
+        const stat=fs.lstatSync(ledgerPath);
+        need(stat.isFile()&&!stat.isSymbolicLink()&&stat.nlink===1&&
+         stat.size>0&&stat.size<=131072,'POSTCHECK_LOCAL_LEDGER_UNSAFE');
+        const localLedger=json(ledgerPath);
+        const proof=summarizeMaintenancePublicPostcheckLedger({
+         publicReport:result,ledger:localLedger,issueBody:liveIssue.body,
+         requestId:issue.requestId,issueNumber:postIssueNumber,
+         runId:linked.runId,attempt:selected.run_attempt,seat,
+         operation:manifest.postOperation,sourceBranch:manifest.postSourceBranch,
+         sourceSha:manifest.postSourceSha,controllerSha:manifest.targetSha
+        });
+        if(proof.status==='LOCAL_RESULT_MATCHED'){
+         postSourceVerified=true;publicLocalAttested=true;
+         reportedRunJobLinked=true;
+         reportedRunId=linked.runId;reportedJobId=linked.jobId;
+        }
+       }else if(!publicSafeReceipt){
+        const proof=summarizeMaintenancePostcheckLocalPointer({
+         pointer:{issueNumber:postIssueNumber,report:result},
+         requestId:issue.requestId,issueNumber:postIssueNumber,
+         runId:linked.runId,attempt:selected.run_attempt,seat,
+         operation:manifest.postOperation,sourceBranch:manifest.postSourceBranch,
+         sourceSha:manifest.postSourceSha,controllerSha:manifest.targetSha});
+        if(proof.status==='LOCAL_RESULT_MATCHED'){
+         reportedRunJobLinked=true;
+         reportedRunId=linked.runId;reportedJobId=linked.jobId;
+        }
        }
       }
      }catch{/* Missing diagnostic evidence does not turn postcheck into FAIL. */}
+     // Never classify a redacted public bot comment as a valid B postcheck
+     // without the same-host durable full-result provenance.
+     if(publicSafeReceipt&&!publicLocalAttested)continue;
      const current=json(ledgerFile);
      writeJson(ledgerFile,{...current,postcheckLink:{
       ...(current.postcheckLink??{}),
@@ -1652,7 +1682,8 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
       // Only an exactly correlated Run/attempt/PC seat can select a local
       // pointer. A missing/partial or redirected file is never treated as PASS.
       if(['ENTRY_REJECT','UPLOAD_MISSING'].includes(link.state)&&selected){
-       const matched=jobs?.filter(j=>j.run_id===selected.id&&j.name==='approved-pc-job')??[];
+       const matched=jobs?.filter(j=>j.run_id===selected.id&&j.id===link.jobId&&
+        ['approved-pc-job','public-approved-a'].includes(j.name))??[];
        const seatNumber=matched.length===1?
         Number(matched[0].runner_name?.match(/^zgmini-pc-0([1-6])$/)?.[1]):null;
        const attempt=selected.run_attempt;
