@@ -148,8 +148,11 @@ export function createNoSpawnHeartbeatActor({
   if(timer)return result('MONITORING','NO_SPAWN_ACTOR_ALREADY_MONITORING');
   const first=await tick();
   if(first.status==='MONITORING'&&!terminal&&!timer){
+   // This is the standalone orphan monitor's liveness handle. An unref'ed
+   // interval would let Node exit after a successful first heartbeat even
+   // though the six original Runner.Listeners are still alive. stop()/halt()
+   // own its release. This source candidate does not install or start it.
    timer=setInterval(()=>{void tick();},15000);
-   timer.unref?.();
   }
   return first;
  }
