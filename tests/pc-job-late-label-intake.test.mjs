@@ -261,5 +261,5 @@ test('public A logs redact raw Worker payload while private path stays unchanged
  assert.deepEqual(publicJobLogEnvelope(null,false),{
   status:'BLOCKED',code:'PUBLIC_LOCAL_RESULT_REDACTED'
  });
- assert.match(entry,/publicJobLogEnvelope\(result\.report,admitted\.visibility==='PRIVATE'\)/);
+ assert.match(entry,/publicJobLogEnvelope\(result\.report,event\?\.repository\?\.private\)/);
 });
