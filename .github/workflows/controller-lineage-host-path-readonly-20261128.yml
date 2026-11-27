@@ -83,6 +83,67 @@ jobs:
               }
             }
           }
+          # Read-only protected checkout preflight. Do NOT fetch, reset, merge, or modify the shared checkout.
+          Write-Output 'FF_PROTECTION_SCHEMA=ZGMINI_CHECKOUT_PROTECTION_READONLY_V1'
+          Write-Output 'CHECKOUT_SYNC_ATTEMPTED=FALSE'
+          Write-Output 'SHARED_CHECKOUT_WRITE_COORDINATION=UNVERIFIED'
+          $env:GIT_OPTIONAL_LOCKS = '0'
+          $env:GIT_TERMINAL_PROMPT = '0'
+          if ($checkoutPresent) {
+            $git = Get-Command git.exe -ErrorAction SilentlyContinue
+            if ($null -eq $git) {
+              Write-Output 'FF_STATIC_PREFLIGHT=GIT_UNAVAILABLE'
+            } else {
+              $root = & $git.Source -C $checkout rev-parse --show-toplevel 2>$null | Select-Object -First 1
+              $rootOk = $LASTEXITCODE -eq 0 -and $null -ne $root -and
+                ([IO.Path]::GetFullPath([string]$root).TrimEnd('\') -ieq [IO.Path]::GetFullPath($checkout).TrimEnd('\'))
+              $branch = & $git.Source -C $checkout symbolic-ref --quiet --short HEAD 2>$null | Select-Object -First 1
+              $branchOk = $LASTEXITCODE -eq 0 -and $branch -ceq 'main'
+              $origin = & $git.Source -C $checkout remote get-url origin 2>$null | Select-Object -First 1
+              $originOk = $LASTEXITCODE -eq 0 -and [string]$origin -cmatch
+                '^(?:https://github\.com/|git@github\.com:|ssh://git@github\.com/)ansqhd5774-Choi/zgmini-pc-control(?:\.git)?/?
+            Write-Output 'DIAG_RESULT=OPERATOR_FILE_MISSING'
+            exit 2
+          }
+          if (-not $nodePresent) {
+            Write-Output 'DIAG_RESULT=NODE_RUNTIME_MISSING'
+            exit 3
+          }
+          Write-Output 'DIAG_RESULT=OPERATOR_FILE_PRESENT_ONLY'
+
+              $dirty = @(& $git.Source -C $checkout -c core.fsmonitor=false -c core.untrackedCache=false status --porcelain=v1 --untracked-files=all 2>$null | Where-Object { $_ -ne '' })
+              $statusOk = $LASTEXITCODE -eq 0
+              $clean = $statusOk -and $dirty.Count -eq 0
+              $remoteSha = $null
+              if ($originOk) {
+                $remoteLine = & $git.Source -C $checkout ls-remote --heads origin main 2>$null | Select-Object -First 1
+                if ($LASTEXITCODE -eq 0 -and $remoteLine -match '^([a-f0-9]{40})\s+refs/heads/main
+            Write-Output 'DIAG_RESULT=OPERATOR_FILE_MISSING'
+            exit 2
+          }
+          if (-not $nodePresent) {
+            Write-Output 'DIAG_RESULT=NODE_RUNTIME_MISSING'
+            exit 3
+          }
+          Write-Output 'DIAG_RESULT=OPERATOR_FILE_PRESENT_ONLY'
+) {
+                  $remoteSha = $Matches[1]
+                }
+              }
+              $remoteReadable = $null -ne $remoteSha
+              Write-Output "CHECKOUT_ROOT_EXACT=$rootOk"
+              Write-Output "CHECKOUT_BRANCH_MAIN=$branchOk"
+              Write-Output "CHECKOUT_STATUS_READABLE=$statusOk"
+              Write-Output "CHECKOUT_CLEAN=$clean"
+              Write-Output "CHECKOUT_REMOTE_TRUSTED=$originOk"
+              Write-Output "REMOTE_MAIN_READABLE=$remoteReadable"
+              if ($remoteReadable) { Write-Output "REMOTE_MAIN_SHA=$remoteSha" }
+              $staticPass = $rootOk -and $branchOk -and $clean -and $originOk -and $remoteReadable
+              Write-Output "FF_STATIC_PREFLIGHT=$staticPass"
+            }
+          } else {
+            Write-Output 'FF_STATIC_PREFLIGHT=CHECKOUT_MISSING'
+          }
           if (-not $operatorPresent) {
             Write-Output 'DIAG_RESULT=OPERATOR_FILE_MISSING'
             exit 2
