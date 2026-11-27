@@ -20,7 +20,7 @@ const OLD='3c7d4cfefacf072fd35cb19706b352c64c5e4fd2';
 const TARGET='555f95708984580cd7d5a0fd05a80b718e867710';
 const MANIFEST_SHA='e36ab64432b5c4e8891140fdec5d226de77f1821fe73f0d11a836a0fc14a8939';
 const APPROVAL_MERGE='ac0e806a929bcab05b72115edd5d673b172839f3';
-const RECOVERY_PR=4264; // exact reviewed/merged origin, not an operator argument
+const RECOVERY_PR=4265; // exact reviewed/merged origin, not an operator argument
 const LOCAL='tools/controller-public-b-recover-4263.mjs';
 const ledgerPath=path.join(ROOT,'ledger',REQUEST+'.json');
 const backlogPath=path.join(ROOT,'backlog',REQUEST+'.json');
@@ -116,7 +116,19 @@ async function attestedModules(merge){
     'B4263_UNPINNED_DYNAMIC_IMPORT');
   }
  }
- return await import('./update.mjs');
+ // validateControllerSelectivePin is imported by update.mjs for internal use
+ // but is not re-exported. Import it from its authoritative contract module
+ // only AFTER all dependency bytes above have been pinned to the review merge.
+ const update=await import('./update.mjs');
+ const contract=await import('./maintenance-contract.mjs');
+ return assemble4263Contracts(update,contract);
+}
+export function assemble4263Contracts(update,contract){
+ need(typeof update?.prevalidationInventory==='function'&&
+  typeof update?.verifyPublicOwnerBWindows==='function'&&
+  typeof contract?.validateControllerSelectivePin==='function',
+  'B4263_CONTRACT_EXPORT_MISSING');
+ return {...update,validateControllerSelectivePin:contract.validateControllerSelectivePin};
 }
 function verifyLedger(ledger,issue){
  let body=null;try{body=JSON.parse(issue.body);}catch{}
