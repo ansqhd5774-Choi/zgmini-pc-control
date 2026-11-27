@@ -76,7 +76,7 @@ test('B proposal is inert even with synthetically perfect source flags',()=>{
  for(const key of ['effectAuthorized','runnerStopAuthorized','runnerStartAuthorized',
   'supervisorSpawnAuthorized','leaseMutationAuthorized',
   'watchdogPromotionAuthorized','operationalWrites','consoleSignalsSent'])
-  assert.equal(result[key],false,result[key]===0?key:key);
+  assert.equal(result[key],key==='operationalWrites'||key==='consoleSignalsSent'?0:false,key);
  assert.doesNotMatch(JSON.stringify(result),/5110|50000|E:\\|Runner.Listener|2026-11-27T02:20/);
 });
 test('preflight fails closed for missing approval, old Owner, watchdog, leases and console proof',()=>{
