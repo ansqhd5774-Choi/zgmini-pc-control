@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {executeJob} from '../controller/engine.mjs';
+import {attestOwnerPcJobEvent} from '../controller/common.mjs';
 import {stagePreimageManifest} from '../controller/preimage-manifest-stager.mjs';
 
 const wf=fs.readFileSync(new URL('../.github/workflows/pc-job.yml',import.meta.url),'utf8');
@@ -12,15 +13,21 @@ const entry=fs.readFileSync(new URL('../controller/entry.mjs',import.meta.url),'
 const stager=fs.readFileSync(new URL('../controller/preimage-manifest-stager.mjs',import.meta.url),'utf8');
 const engine=fs.readFileSync(new URL('../controller/engine.mjs',import.meta.url),'utf8');
 
-const policy={sourceRepository:'ansqhd5774-Choi/zgmini',operations:{'core-runtime-source-readonly':{grade:'A'}}};
+const policy={controlRepository:'ansqhd5774-Choi/zgmini-pc-control',sourceRepository:'ansqhd5774-Choi/zgmini',operations:{'core-runtime-source-readonly':{grade:'A'}}};
 const request={schema:'ZGMINI_PC_JOB_V1',requestId:'pc-late-label-source-fixture-01',chatId:'pc-label-fixture',
  operation:'core-runtime-source-readonly',sourceRepository:'ansqhd5774-Choi/zgmini',
  sourceBranch:'main',sourceSha:'a'.repeat(40)};
 const env={GITHUB_REPOSITORY:'ansqhd5774-Choi/zgmini-pc-control',
- GITHUB_ACTOR:'ansqhd5774-Choi',GITHUB_EVENT_NAME:'issues'};
+ GITHUB_ACTOR:'ansqhd5774-Choi',GITHUB_EVENT_NAME:'issues',
+ GITHUB_REF:'refs/heads/main',GITHUB_RUN_ATTEMPT:'1',
+ GITHUB_WORKFLOW_REF:'ansqhd5774-Choi/zgmini-pc-control/.github/workflows/pc-job.yml@refs/heads/main'};
+const sender={id:327938088,login:'ansqhd5774-Choi'};
 const event=(action='labeled',label='pc-job',issueOwner='ansqhd5774-Choi')=>({
- action,label:{name:label},repository:{private:true},
- issue:{user:{login:issueOwner},labels:[{name:'pc-job'}],body:JSON.stringify(request)}
+ action,label:{name:label},sender,
+ repository:{id:1442936296,full_name:'ansqhd5774-Choi/zgmini-pc-control',
+  private:false,owner:sender},
+ issue:{number:4231,title:'pc-job',user:{id:327938088,login:issueOwner},
+  labels:[{name:'pc-job'}],body:JSON.stringify(request)}
 });
 
 test('workflow accepts exactly owner opened or pc-job labeled and retains pinned Windows entry',()=>{
@@ -32,6 +39,15 @@ test('workflow accepts exactly owner opened or pc-job labeled and retains pinned
  assert.match(wf,/Late-label entry is opt-in only after matching fixed Controller/);
  assert.match(wf,/contains\(github\.event\.issue\.labels\.\*\.name, 'pc-job'\)/);
  assert.match(wf,/github\.actor == 'ansqhd5774-Choi'/);
+ assert.match(wf,/github\.event\.repository\.id == 1442936296/);
+ assert.match(wf,/github\.event\.repository\.owner\.id == 327938088/);
+ assert.match(wf,/github\.actor_id == 327938088/);
+ assert.match(wf,/github\.event\.sender\.id == 327938088/);
+ assert.match(wf,/github\.event\.issue\.title == 'pc-job'/);
+ assert.match(wf,/github\.event\.issue\.pull_request == null/);
+ assert.match(wf,/github\.workflow_ref == 'ansqhd5774-Choi\/zgmini-pc-control\/\.github\/workflows\/pc-job\.yml@refs\/heads\/main'/);
+ assert.doesNotMatch(wf,/github\.event\.repository\.private == true/);
+ assert.doesNotMatch(wf,/pull_request:|pull_request_target:|actions\/checkout/);
  assert.match(wf,/cancel-in-progress: false/);
  assert.match(wf,/E:\\ZGmini\\runtime\\node\.exe/);
  assert.match(wf,/controller\\entry\.mjs/);
@@ -51,14 +67,15 @@ test('labeled workflow admission is independently gated from opened single-run e
  assert.match(jobExpression,/github\.actor == 'ansqhd5774-Choi'/);
 });
 
-test('installed Controller entry and scope stager require exact label and issue owner',()=>{
- assert.match(entry,/event\.action==='opened'/);
- assert.match(entry,/event\.action==='labeled'&&event\.label\?\.name==='pc-job'/);
- assert.match(entry,/event\.issue\?\.user\?\.login==='ansqhd5774-Choi'/);
- assert.match(entry,/EVENT_NOT_ALLOWED/);
- assert.match(stager,/event\?\.action==='opened'/);
- assert.match(stager,/event\?\.action==='labeled'&&event\?\.label\?\.name==='pc-job'/);
- assert.match(stager,/event\?\.issue\?\.user\?\.login!=='ansqhd5774-Choi'/);
+test('installed Controller and preimage stager share exact immutable owner Issue origin',()=>{
+ const common=fs.readFileSync(new URL('../controller/common.mjs',import.meta.url),'utf8');
+ assert.match(entry,/attestOwnerPcJobEvent\(event,process\.env,policy\)/);
+ assert.match(entry,/PUBLIC_A_ONLY_POLICY_UNVERIFIED/);
+ assert.match(stager,/attestOwnerPcJobEvent\(event,env,policy\)/);
+ assert.match(common,/event\.action==='opened'/);
+ assert.match(common,/event\.action==='labeled'&&event\.label\?\.name==='pc-job'/);
+ assert.match(common,/event\.issue\.user\.id===ownerId/);
+ assert.match(common,/!event\.issue\.pull_request/);
  // Existing requestId ledger means repeated original labels cannot execute
  // the fixed A operation twice; concurrency remains serialized per Issue.
  assert.match(engine,/DUPLICATE_REUSED_NO_EXECUTION/);
@@ -139,8 +156,53 @@ test('late-label intake rejects unrelated labels, foreign owner, foreign actor, 
   {env:{...env,GITHUB_ACTOR:'another-user'},event:event()},
   {env,event:{...event(),issue:{...event().issue,labels:[]}}},
   {env,event:event('edited')},
-  {env,event:{...event(),repository:{private:false}}},
+  {env,event:{...event(),repository:{...event().repository,id:9999}}},
  ];
  for(const testCase of invalid)
   await assert.rejects(stagePreimageManifest({...testCase,policy}),{code:'PREIMAGE_STAGE_EVENT_STOP'});
+});
+
+test('public pc-job accepts only fixed owner Issue origin and rejects untrusted variants',()=>{
+ const good=event('opened');
+ const admission=attestOwnerPcJobEvent(good,env,policy);
+ assert.equal(admission.visibility,'PUBLIC');
+ assert.equal(admission.ownerVerified,true);
+ assert.equal(admission.prCodeAllowed,false);
+ assert.equal(attestOwnerPcJobEvent({...good,repository:{...good.repository,private:true}},env,policy).visibility,'PRIVATE');
+ const invalid=[
+  [{...good,repository:{...good.repository,id:123}},env],
+  [{...good,repository:{...good.repository,full_name:'other/repo'}},env],
+  [{...good,repository:{...good.repository,owner:{...sender,id:99}}},env],
+  [{...good,repository:{...good.repository,private:'false'}},env],
+  [{...good,sender:{...sender,id:99}},env],
+  [{...good,sender:{...sender,login:'attacker'}},env],
+  [{...good,issue:{...good.issue,user:{...sender,id:99}}},env],
+  [{...good,issue:{...good.issue,user:{...sender,login:'attacker'}}},env],
+  [{...good,issue:{...good.issue,pull_request:{url:'pr'}}},env],
+  [{...good,issue:{...good.issue,title:'fake-job'}},env],
+  [{...good,issue:{...good.issue,labels:[]}},env],
+  [{...good,issue:{...good.issue,number:-1}},env],
+  [{...good,action:'edited'},env],
+  [{...good,action:'labeled',label:{name:'other'}},env],
+  [good,{...env,GITHUB_EVENT_NAME:'pull_request'}],
+  [good,{...env,GITHUB_EVENT_NAME:'pull_request_target'}],
+  [good,{...env,GITHUB_WORKFLOW_REF:env.GITHUB_WORKFLOW_REF.replace('main','attacker')}],
+  [good,{...env,GITHUB_REF:'refs/pull/1/merge'}],
+  [good,{...env,GITHUB_RUN_ATTEMPT:'2'}],
+  [good,{...env,GITHUB_ACTOR:'attacker'}],
+  [good,{...env,GITHUB_REPOSITORY:'attacker/control'}],
+ ];
+ for(const [candidate,environment] of invalid)
+  assert.throws(()=>attestOwnerPcJobEvent(candidate,environment,policy),
+    /CONTROL_(REPOSITORY|WORKFLOW|OWNER|ISSUE|EVENT)/);
+});
+test('public pc-job preserves fixed A-grade source+report boundary',()=>{
+ assert.match(entry,/policy\.operations\[raw\.operation\]\?\.grade==='A'/);
+ assert.match(entry,/policy\.mutationsEnabled===false/);
+ assert.match(entry,/policy\.maxAutomaticRetries===0/);
+ assert.match(entry,/assertSupervisorOwner\(root,host\)/);
+ assert.match(entry,/digest\(fs\.readFileSync\(path\.join\(root,rel\)\)\)===sha/);
+ assert.doesNotMatch(wf,/pull_request:\s*\n|pull_request_target:/);
+ assert.match(wf,/controller\\\\entry\.mjs/);
+ assert.match(wf,/controller\\\\upload\.mjs/);
 });
