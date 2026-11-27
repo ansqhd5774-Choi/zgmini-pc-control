@@ -55,10 +55,13 @@ function reviewedMerge(raw,prNum,sourceSha,reviewReadback){
  const accepted=reviews.filter(r=>r?.user?.login===owner&&
   r.commit_id===sourceSha&&r.state==='APPROVED'&&
   validDate(r.submitted_at)&&Date.parse(r.submitted_at)<=Date.parse(raw.merged_at));
- return accepted.length>0&&
-  !reviews.some(r=>r?.user?.login===owner&&r.commit_id===sourceSha&&
+ if(accepted.length===0)return false;
+ // API readback may not be in submitted_at order. A later exact-head
+ // approval supersedes an earlier dismissal; ties fail closed.
+ const latestApprovedAt=Math.max(...accepted.map(r=>Date.parse(r.submitted_at)));
+ return !reviews.some(r=>r?.user?.login===owner&&r.commit_id===sourceSha&&
    r.state==='DISMISSED'&&validDate(r.submitted_at)&&
-   Date.parse(r.submitted_at)>=Date.parse(accepted.at(-1).submitted_at));
+   Date.parse(r.submitted_at)>=latestApprovedAt);
 }
 /**
  * Dependency callbacks are READ-only ports exposed by a separately
