@@ -513,8 +513,640 @@ async function inspectOrphanSixBMaintainerInletSource({
 }
 return Object.freeze({inspectOrphanSixBMaintainerInletSource,parseOrphanSixBFlatRequest});
 })();
+const orphanSixStatic_graceful=(()=>{
+// Source-only six-seat graceful-stop plan for orphan Controller recovery.
+// This module cannot stop/start a Runner, claim a lease, publish a heartbeat,
+// run the Watchdog, authenticate an Issue, or install itself.
+// A separately approved independent Windows B maintainer must eventually
+// authenticate the raw approval bytes and perform every protected effect.
+const {createHash}=crypto;
+
+const ORPHAN_GRACEFUL_SIX_SCOPE='SEPARATELY_APPROVED_ORPHAN_GRACEFUL_SIX_B';
+const ORPHAN_GRACEFUL_SIX_SCHEMA='ZGMINI_ORPHAN_GRACEFUL_SIX_SOURCE_V1';
+const sha64=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
+const sha40=x=>typeof x==='string'&&/^[a-f0-9]{40}$/.test(x);
+const pid=x=>Number.isSafeInteger(x)&&x>0;
+const time=x=>typeof x==='string'&&Number.isFinite(Date.parse(x))&&
+ /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z$/.test(x);
+const hash=x=>createHash('sha256').update(x).digest('hex');
+const zero=Object.freeze({
+ schema:ORPHAN_GRACEFUL_SIX_SCHEMA,
+ effectAuthorized:false,runnerStopAuthorized:false,
+ runnerStartAuthorized:false,supervisorSpawnAuthorized:false,
+ leaseMutationAuthorized:false,watchdogPromotionAuthorized:false,
+ operationalWrites:0,consoleSignalsSent:0,providerCalls:0,d1Writes:0
+});
+const deny=code=>Object.freeze({...zero,status:'BLOCKED',code,
+ verifiedSeatCount:0,proposalId:null,phase:'NOT_PREPARED'});
+const ok=(code,patch={})=>Object.freeze({...zero,status:'CANDIDATE_ONLY',code,
+ ...patch});
+
+function privateIdentity(p){
+ return [p.seat,p.pid,p.startedAtUtc,p.canonicalPathSha256];
+}
+function strongPrivatePreflight(snapshot,now,{pinnedHistorical=false}={}){
+ const s=snapshot;
+ if(!s||s.schema!=='ZGMINI_ORPHAN_SIX_PRIVATE_B_SNAPSHOT_V1'||
+    !Number.isFinite(now)||!time(s.observedAtUtc)||
+    Date.parse(s.observedAtUtc)>now||
+    (!pinnedHistorical&&now-Date.parse(s.observedAtUtc)>5000))
+  return {code:'ORPHAN_GRACEFUL_OBSERVATION_STALE'};
+ if(!sha40(s.installed?.controllerSourceSha)||
+    s.installed?.controllerFilesVerified!==true||
+    !sha64(s.preimage?.ownerRawSha256)||
+    !sha64(s.preimage?.heartbeatRawSha256)||
+    !sha64(s.preimage?.hostRawSha256))
+  return {code:'ORPHAN_GRACEFUL_INSTALLED_OR_CAS_UNKNOWN'};
+ const a=s.approval;
+ // These are model inputs, not authorizations; a real independent B must
+ // authenticate the bytes/actor/origin and obtain a one-use effect claim.
+ if(a?.scope!==ORPHAN_GRACEFUL_SIX_SCOPE||
+    a?.source!=='PRIVATE_B_MANIFEST_BYTES_ALREADY_ATTESTED'||
+    a?.approved!==true||!sha64(a.manifestRawSha256)||
+    a?.ownerRawSha256!==s.preimage.ownerRawSha256||
+    a?.heartbeatRawSha256!==s.preimage.heartbeatRawSha256||
+    a?.hostRawSha256!==s.preimage.hostRawSha256||
+    a?.controllerSourceSha!==s.installed.controllerSourceSha)
+  return {code:'ORPHAN_GRACEFUL_B_APPROVAL_CAS_UNKNOWN'};
+ if(s.oldOwner?.deadVerified!==true||
+    s.oldOwner?.sameBootVerified!==true||
+    s.oldOwner?.sixOriginalListenerIdentitiesVerified!==true||
+    !pid(s.oldOwner.pid)||!time(s.oldOwner.lastHeartbeatAt)||
+    Date.parse(s.oldOwner.lastHeartbeatAt)>Date.parse(s.observedAtUtc))
+  return {code:'ORPHAN_GRACEFUL_OLD_OWNER_UNVERIFIED'};
+ const op=s.operator,wd=s.watchdog,r=s.resources;
+ if(op?.source!=='PRIVATE_INDEPENDENT_WINDOWS_B'||
+    op?.notRunnerDescendantVerified!==true||
+    op?.oneUseEffectClaimVerified!==true||
+    op?.originalMaintenanceLeaseOwnedVerified!==true||
+    op?.watchdogRecoverySectionExcludedVerified!==true||
+    wd?.ownerIdentityVerified!==true||
+    wd?.sourceVerified!==true||
+    wd?.noPromotionPendingVerified!==true||
+    wd?.blockedOnOldLiveRunnerVerified!==true)
+  return {code:'ORPHAN_GRACEFUL_MAINTAINER_OR_WATCHDOG_FENCE_UNVERIFIED'};
+ if(r?.intakePauseAcknowledged!==true||
+    r?.drainCompleteVerified!==true||
+    r?.completeLiveLeaseEnumerationVerified!==true||
+    r?.relatedControllerLeaseCount!==0||
+    r?.activeControllerWorkerCount!==0||
+    r?.otherMaintenanceWritesAbsentVerified!==true||
+    r?.noUncertainExecutionOutcomeVerified!==true)
+  return {code:'ORPHAN_GRACEFUL_DRAIN_OR_RESOURCE_UNVERIFIED'};
+ if(!Array.isArray(s.seats)||s.seats.length!==6||
+    !Array.isArray(s.originalHeartbeatChildren)||
+    s.originalHeartbeatChildren.length!==6)
+  return {code:'ORPHAN_GRACEFUL_SIX_SEAT_SET_INVALID'};
+ const seenSeats=new Set(),seenPids=new Set(),seenBirths=new Set();
+ const original=new Map();
+ for(const h of s.originalHeartbeatChildren){
+  if(!Number.isInteger(h?.seat)||h.seat<1||h.seat>6||
+     !pid(h.pid)||original.has(h.seat))
+   return {code:'ORPHAN_GRACEFUL_HEARTBEAT_SEAT_INVALID'};
+  original.set(h.seat,h.pid);
+ }
+ const ordered=[...s.seats].sort((a,b)=>a.seat-b.seat);
+ for(const p of ordered){
+  if(!Number.isInteger(p?.seat)||p.seat<1||p.seat>6||
+     seenSeats.has(p.seat)||!pid(p.pid)||seenPids.has(p.pid)||
+     !time(p.startedAtUtc)||Date.parse(p.startedAtUtc)>=Date.parse(s.oldOwner.lastHeartbeatAt)||
+     !sha64(p.canonicalPathSha256)||
+     p.consoleAttached!==true||p.consoleMemberCount!==1||
+     p.workerPresent!==false||p.alive!==true||
+     original.get(p.seat)!==p.pid)
+   return {code:'ORPHAN_GRACEFUL_LISTENER_IDENTITY_OR_CONSOLE_UNVERIFIED'};
+  seenSeats.add(p.seat);seenPids.add(p.pid);
+  seenBirths.add(p.startedAtUtc+':'+p.pid);
+ }
+ if(seenSeats.size!==6||seenPids.size!==6||seenBirths.size!==6)
+  return {code:'ORPHAN_GRACEFUL_SIX_UNIQUE_IDENTITIES_UNVERIFIED'};
+ // Only the synthetic/source-only proposal identity is returned. Raw PID,
+ // birth time, path and nonce MUST NOT appear in logs or GitHub results.
+ const opaque=hash(JSON.stringify([
+  a.manifestRawSha256,s.preimage.ownerRawSha256,
+  s.preimage.heartbeatRawSha256,s.preimage.hostRawSha256,
+  s.installed.controllerSourceSha,
+  ...ordered.map(privateIdentity)
+ ]));
+ return {ordered,opaque,code:null};
+}
+
+// Structural review only; flags from an Issue cannot mint OS effect authority.
+// The real B must atomically re-attest immediately before EACH seat signal,
+// preserve a phase journal and recheck all active jobs/Watchdog changes.
+function assessOrphanGracefulSixPreflight(snapshot,{now=Date.now()}={}){
+ const p=strongPrivatePreflight(snapshot,now);
+ if(p.code)return deny(p.code);
+ return ok('ORPHAN_GRACEFUL_SIX_PINNED_SOURCE_PROPOSAL',{
+  phase:'PREPARED',verifiedSeatCount:6,proposalId:p.opaque,
+  nextSeat:1,nextAction:'INDEPENDENT_APPROVED_B_DURABLE_INTENT_REQUIRED'
+ });
+}
+const STAGES=new Set(['PREPARED','STOP_INTENT_RECORDED',
+  'SEAT_EXIT_VERIFIED','WAITING_WATCHDOG','RECOVERY_REQUIRED','SOURCE_FINAL_CANDIDATE']);
+const events=new Set(['DURABLE_STOP_INTENT','PRIVATE_SEAT_EXIT_READBACK',
+  'FINAL_WATCHDOG_READBACK']);
+function failJournal(prior,code){
+ // Once an intent has been recorded, any uncertainty is a PARTIAL EFFECT,
+ // not a harmless prevalidation BLOCKED. Preserve the original journal on
+ // the independent B host; never send the same signal a second time.
+ const maybePartial=prior?.status==='CANDIDATE_ONLY'&&
+  Number.isInteger(prior.intentCount)&&prior.intentCount>0;
+ if(!maybePartial)return deny(code);
+ return Object.freeze({...zero,status:'RECOVERY_REQUIRED',code,
+  phase:'RECOVERY_REQUIRED',proposalId:null,
+  stoppedCount:Number.isInteger(prior.stoppedCount)?prior.stoppedCount:null,
+  intentCount:prior.intentCount,
+  nextAction:'RECONCILE_DURABLE_ORIGINAL_JOURNAL_NO_SIGNAL_RETRY'});
+}
+
+// Pure journal reducer: never emits OS signals, even when its test inputs
+// claim approval. An unknown/partial transition fails closed; it can never
+// auto-resend a stop signal or release a maintenance lease.
+function advanceOrphanGracefulSixSourceJournal({
+ prior,event,proof,snapshot,now=Date.now()
+}={}){
+ // Snapshot is the immutable B-pinned ORIGINAL six-seat preimage, not a
+ // claim that all six still live after some have already exited. Each event
+ // instead needs a separate fresh private same-host readback below.
+ const p=strongPrivatePreflight(snapshot,now,{pinnedHistorical:true});
+ if(p.code)return failJournal(prior,p.code);
+ if(!time(proof?.observedAtUtc)||Date.parse(proof.observedAtUtc)>now||
+    now-Date.parse(proof.observedAtUtc)>5000)
+  return Object.freeze({...zero,status:'RECOVERY_REQUIRED',
+   code:'ORPHAN_GRACEFUL_FRESH_PRIVATE_READBACK_MISSING',
+   phase:'RECOVERY_REQUIRED',stoppedCount:prior?.stoppedCount??0,
+   intentCount:prior?.intentCount??0,
+   nextAction:'RECONCILE_DURABLE_ORIGINAL_JOURNAL_NO_SIGNAL_RETRY'});
+ if(!prior||prior.schema!==ORPHAN_GRACEFUL_SIX_SCHEMA||
+    !STAGES.has(prior.phase)||prior.status!=='CANDIDATE_ONLY'||
+    prior.proposalId!==p.opaque||
+    prior.verifiedSeatCount!==6||
+    !Number.isInteger(prior.stoppedCount)||prior.stoppedCount<0||
+    prior.stoppedCount>6||!Number.isInteger(prior.intentCount)||
+    prior.intentCount<0||prior.intentCount>6||
+    !Number.isInteger(prior.nextSeat)||prior.nextSeat<1||prior.nextSeat>7||
+    prior.stoppedCount>prior.intentCount||
+    prior.intentCount-prior.stoppedCount>1||
+    prior.nextSeat!==prior.stoppedCount+1)
+  return failJournal(prior,'ORPHAN_GRACEFUL_JOURNAL_CAS_UNVERIFIED');
+ if(!events.has(event))return failJournal(prior,'ORPHAN_GRACEFUL_EVENT_UNKNOWN');
+ const fixed={phase:prior.phase,proposalId:prior.proposalId,
+  verifiedSeatCount:6,stoppedCount:prior.stoppedCount,
+  intentCount:prior.intentCount,nextSeat:prior.nextSeat};
+ // Neither action is executable. The approved B must persist/read back this
+ // intent BEFORE it may send its one and only OS control signal.
+ if(event==='DURABLE_STOP_INTENT'){
+  if(prior.phase!=='PREPARED'&&prior.phase!=='SEAT_EXIT_VERIFIED')
+   return failJournal(prior,'ORPHAN_GRACEFUL_UNEXPECTED_INTENT_PHASE');
+  if(prior.stoppedCount===6||prior.intentCount!==prior.stoppedCount||
+     proof?.source!=='PRIVATE_B_JOURNAL_EXACT_CAS_READBACK'||
+     proof?.nextSeat!==prior.nextSeat||proof?.durableIntentReadback!==true||
+     proof?.sameOneUseClaimVerified!==true||
+     proof?.nextSeatIdentityStillLiveVerified!==true||
+     proof?.watchdogFenceUninterruptedVerified!==true)
+   return failJournal(prior,'ORPHAN_GRACEFUL_INTENT_CAS_UNVERIFIED');
+  return ok('ORPHAN_GRACEFUL_SIGNAL_INTENT_RECORDED_SOURCE_ONLY',{
+   ...fixed,phase:'STOP_INTENT_RECORDED',intentCount:prior.intentCount+1,
+   nextAction:'INDEPENDENT_APPROVED_B_MAY_REATTEST_BEFORE_SIGNAL'
+  });
+ }
+ if(event==='PRIVATE_SEAT_EXIT_READBACK'){
+  if(prior.phase!=='STOP_INTENT_RECORDED'||
+     prior.intentCount!==prior.stoppedCount+1||
+     proof?.source!=='PRIVATE_SAME_HOST_B_WMI_DOUBLE_READ'||
+     proof?.seat!==prior.nextSeat||
+     proof?.pinnedPid===undefined||proof.pinnedPid!==p.ordered[prior.stoppedCount].pid||
+     proof?.pinnedBirth!==p.ordered[prior.stoppedCount].startedAtUtc||
+     proof?.pinnedPathSha256!==p.ordered[prior.stoppedCount].canonicalPathSha256||
+     proof?.oldInstanceExitedVerified!==true||
+     proof?.unknownOrDuplicateListenerAbsentVerified!==true||
+     proof?.watchdogFenceUninterruptedVerified!==true||
+     proof?.operatorClaimUninterruptedVerified!==true||
+     proof?.otherFiveOrRemainingSeatsUnchangedVerified!==true)
+   return failJournal(prior,'ORPHAN_GRACEFUL_SEAT_EXIT_READBACK_UNVERIFIED');
+  const stoppedCount=prior.stoppedCount+1;
+  return ok('ORPHAN_GRACEFUL_SEAT_EXIT_SOURCE_ONLY',{
+   ...fixed,stoppedCount,nextSeat:stoppedCount+1,
+   phase:stoppedCount===6?'WAITING_WATCHDOG':'SEAT_EXIT_VERIFIED',
+   nextAction:stoppedCount===6?
+    'INDEPENDENT_B_RELEASE_FENCE_AND_VERIFY_WATCHDOG':
+    'INDEPENDENT_APPROVED_B_DURABLE_INTENT_REQUIRED'
+  });
+ }
+ if(prior.phase!=='WAITING_WATCHDOG'||prior.stoppedCount!==6||
+    prior.intentCount!==6||
+    proof?.source!=='PRIVATE_SAME_HOST_B_WATCHDOG_AND_RUNNER_READBACK'||
+    proof?.oldSixAbsentVerified!==true||
+    proof?.newSupervisorOwnerVerified!==true||
+    proof?.freshHeartbeatVerified!==true||
+    proof?.sixNewRunnerSeatsVerified!==true||
+    proof?.watchdogR6HealthyVerified!==true||
+    proof?.standbyTwoReadyVerified!==true||
+    proof?.smokeJobPassVerified!==true)
+  return failJournal(prior,'ORPHAN_GRACEFUL_POSTRECOVERY_READBACK_UNVERIFIED');
+ return ok('ORPHAN_GRACEFUL_SOURCE_SEQUENCE_VERIFIED_ONLY',{
+  ...fixed,phase:'SOURCE_FINAL_CANDIDATE',stoppedCount:6,nextSeat:7,
+  nextAction:'INDEPENDENT_RUNTIME_RECEIPT_REQUIRED'
+ });
+}
+function initialOrphanGracefulSixSourceJournal(candidate){
+ if(candidate?.status!=='CANDIDATE_ONLY'||
+    candidate?.code!=='ORPHAN_GRACEFUL_SIX_PINNED_SOURCE_PROPOSAL'||
+    !sha64(candidate.proposalId))
+  return deny('ORPHAN_GRACEFUL_INITIAL_CANDIDATE_INVALID');
+ return ok('ORPHAN_GRACEFUL_INITIAL_SOURCE_JOURNAL',{
+  phase:'PREPARED',proposalId:candidate.proposalId,
+  verifiedSeatCount:6,stoppedCount:0,intentCount:0,nextSeat:1,
+  nextAction:'INDEPENDENT_APPROVED_B_DURABLE_INTENT_REQUIRED'
+ });
+}
+return Object.freeze({ORPHAN_GRACEFUL_SIX_SCOPE,ORPHAN_GRACEFUL_SIX_SCHEMA,assessOrphanGracefulSixPreflight,advanceOrphanGracefulSixSourceJournal,initialOrphanGracefulSixSourceJournal});
+})();
+const orphanSixStatic_journal=(()=>{
+// Existing maintainer-root request ledger adapter for the orphan-six B session.
+// It is NOT a CLI or standalone installer. Only a trusted independent maintainer
+// holding the existing controller-install lock may create/change this journal.
+// No Runner, watchdog, heartbeat or other PC operation is performed here.
+
+
+const {createHash,randomUUID}=crypto;
+
+const SCHEMA='ZGMINI_ORPHAN_GRACEFUL_SIX_JOURNAL_V1';
+const sha256=b=>createHash('sha256').update(b).digest('hex');
+const sha64=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
+const reqId=x=>typeof x==='string'&&/^pc-[a-f0-9-]{36}$/.test(x);
+const fail=x=>{throw Object.assign(new Error(x),{code:x});};
+const allowedStatus=new Set(['CANDIDATE_ONLY','RECOVERY_REQUIRED']);
+const allowedPhase=new Set(['PREPARED','STOP_INTENT_RECORDED',
+ 'SEAT_EXIT_VERIFIED','WAITING_WATCHDOG','RECOVERY_REQUIRED','SOURCE_FINAL_CANDIDATE']);
+const fields=['schema','requestId','manifestRawSha256','proposalId','status','phase',
+ 'intentCount','stoppedCount','nextSeat','code'];
+function exactRecord(x,requestId,manifestRawSha256){
+ if(!x||typeof x!=='object'||Array.isArray(x)||
+    Object.keys(x).sort().join(',')!==fields.slice().sort().join(',')||
+    x.schema!==SCHEMA||x.requestId!==requestId||
+    x.manifestRawSha256!==manifestRawSha256||
+    !sha64(x.proposalId)||!allowedStatus.has(x.status)||
+    !allowedPhase.has(x.phase)||
+    !Number.isInteger(x.intentCount)||x.intentCount<0||x.intentCount>6||
+    !Number.isInteger(x.stoppedCount)||x.stoppedCount<0||
+    x.stoppedCount>6||x.stoppedCount>x.intentCount||
+    x.intentCount-x.stoppedCount>1||
+    !Number.isInteger(x.nextSeat)||x.nextSeat<1||x.nextSeat>7||
+    x.nextSeat!==x.stoppedCount+1||
+    typeof x.code!=='string'||!/^[A-Z][A-Z0-9_]{2,79}$/.test(x.code))
+   fail('ORPHAN_SIX_JOURNAL_RECORD_INVALID');
+ if(x.status==='RECOVERY_REQUIRED'&&x.phase!=='RECOVERY_REQUIRED')
+  fail('ORPHAN_SIX_JOURNAL_RECOVERY_PHASE_INVALID');
+ if(x.status==='CANDIDATE_ONLY'&&x.phase==='RECOVERY_REQUIRED')
+  fail('ORPHAN_SIX_JOURNAL_RECOVERY_PHASE_INVALID');
+ return x;
+}
+function readRegular(file){
+ const st=fs.lstatSync(file);
+ if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1||
+    st.size<10||st.size>8192)fail('ORPHAN_SIX_JOURNAL_FILE_INVALID');
+ const bytes=fs.readFileSync(file);
+ const after=fs.lstatSync(file);
+ if(after.ino!==st.ino||after.size!==st.size||after.mtimeMs!==st.mtimeMs||
+    bytes.length!==st.size)fail('ORPHAN_SIX_JOURNAL_CHANGED_DURING_READ');
+ return bytes;
+}
+function writeNew(file,bytes){
+ const fd=fs.openSync(file,'wx',0o600);
+ try{fs.writeFileSync(fd,bytes);fs.fsyncSync(fd);}
+ finally{fs.closeSync(fd);}
+}
+// Existing maintenance-agent uses the same controller-install atomic lock.
+// Its release()/holdForRecovery() belong to the caller, never this adapter.
+function createOrphanSixMaintenanceJournal({
+ root,requestId,manifestRawSha256,lease
+}={}){
+ if(!path.isAbsolute(root??'')||!reqId(requestId)||!sha64(manifestRawSha256)||
+    !lease?.owner||lease.owner.pid!==process.pid||
+    typeof lease.owner.nonce!=='string'||lease.owner.nonce.length<16)
+  fail('ORPHAN_SIX_JOURNAL_CONTEXT_DENIED');
+ const requestedRoot=path.resolve(root);
+ const rootStat=fs.lstatSync(requestedRoot);
+ const requests=path.join(requestedRoot,'requests');
+ const dirStat=fs.lstatSync(requests);
+ if(!rootStat.isDirectory()||rootStat.isSymbolicLink()||
+    !dirStat.isDirectory()||dirStat.isSymbolicLink())
+  fail('ORPHAN_SIX_JOURNAL_ROOT_INVALID');
+ const file=path.join(requests,'orphan-six-'+sha256(requestId)+'.json');
+ const ownerFile=path.join(requestedRoot,'leases','controller-install','owner.json');
+ function verifyLease(){
+  let actual;
+  try{actual=JSON.parse(readRegular(ownerFile).toString('utf8'));}
+  catch{fail('ORPHAN_SIX_INSTALL_LEASE_UNVERIFIED');}
+  if(actual?.pid!==process.pid||
+     actual?.nonce!==lease.owner.nonce||
+     actual?.bootAt!==lease.owner.bootAt)
+    fail('ORPHAN_SIX_INSTALL_LEASE_UNVERIFIED');
+ }
+ function read(){
+  try{
+   const bytes=readRegular(file);
+   let record;
+   try{record=JSON.parse(bytes.toString('utf8'));}
+   catch{fail('ORPHAN_SIX_JOURNAL_JSON_INVALID');}
+   exactRecord(record,requestId,manifestRawSha256);
+   return Object.freeze({record,sha256:sha256(bytes)});
+  }catch(e){if(e?.code==='ENOENT')return null;throw e;}
+ }
+ function commit(record,expectedSha256=null){
+  verifyLease();
+  exactRecord(record,requestId,manifestRawSha256);
+  const bytes=Buffer.from(JSON.stringify(record)+'\n','utf8');
+  if(bytes.length>8192)fail('ORPHAN_SIX_JOURNAL_SIZE_INVALID');
+  const nextSha=sha256(bytes);
+  if(expectedSha256===null){
+   if(read()!==null)fail('ORPHAN_SIX_JOURNAL_ALREADY_CLAIMED');
+   try{writeNew(file,bytes);}
+   catch(e){if(e?.code==='EEXIST')fail('ORPHAN_SIX_JOURNAL_ALREADY_CLAIMED');throw e;}
+  }else{
+   if(!sha64(expectedSha256))fail('ORPHAN_SIX_JOURNAL_EXPECTED_SHA_INVALID');
+   const before=read();
+   if(!before||before.sha256!==expectedSha256)
+    fail('ORPHAN_SIX_JOURNAL_CAS_MISMATCH');
+   // CAS is serialized by the independently owned controller-install lease.
+   // Recheck both lease and bytes immediately before atomic replace.
+   const tmp=path.join(requests,'.orphan-six-'+randomUUID()+'.tmp');
+   let renamed=false;
+   try{
+    writeNew(tmp,bytes);
+    verifyLease();
+    if(read()?.sha256!==expectedSha256)
+     fail('ORPHAN_SIX_JOURNAL_CAS_MISMATCH');
+    fs.renameSync(tmp,file);
+    renamed=true;
+   }finally{if(!renamed)try{fs.unlinkSync(tmp);}catch{/* leave evidence */}}
+  }
+  const observed=read();
+  if(observed?.sha256!==nextSha)fail('ORPHAN_SIX_JOURNAL_READBACK_UNKNOWN');
+  verifyLease();
+  return Object.freeze({status:'EXACT_CAS_READBACK_VERIFIED',
+   previousSha256:expectedSha256,readbackSha256:nextSha,
+   phase:record.phase,code:record.code});
+ }
+ return Object.freeze({read,commit});
+}
+return Object.freeze({createOrphanSixMaintenanceJournal});
+})();
+const orphanSixStatic_coordinator=(()=>{
+// One-shot orphan-six coordinator for the existing independent B maintainer.
+// No CLI, PC request route, listener PID arguments, Windows signal API, or
+// automatic recovery/retry. The installed B receiver (not this module) must
+// authenticate the approved Issue/manifest, construct PRIVATE same-host ports,
+// acquire the existing controller-install lease, and pin its installed source.
+// A test-created port is NOT an authorization to change the operating PC.
+const {assessOrphanGracefulSixPreflight,initialOrphanGracefulSixSourceJournal,advanceOrphanGracefulSixSourceJournal}=orphanSixStatic_graceful;
+
+const SCHEMA='ZGMINI_ORPHAN_GRACEFUL_SIX_JOURNAL_V1';
+const SCOPE='SEPARATELY_APPROVED_ORPHAN_GRACEFUL_SIX_B';
+const reqId=x=>typeof x==='string'&&/^pc-[a-f0-9-]{36}$/.test(x);
+const sha64=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
+const fail=x=>{throw Object.assign(new Error(x),{code:x});};
+const code=x=>typeof x==='string'&&/^[A-Z][A-Z0-9_]{2,79}$/.test(x)?
+ x:'ORPHAN_SIX_EXECUTION_OUTCOME_UNKNOWN';
+const reported=(status,reason,extra={})=>Object.freeze({
+ schema:'ZGMINI_ORPHAN_GRACEFUL_SIX_EXECUTION_V1',
+ status,code:reason,operationalRecoveryVerified:false,
+ runnerStarts:0,automaticRetries:0,providerCalls:0,d1Writes:0,
+ ...extra
+});
+const essential=['verifyExactApproval','verifyFreshOwnerEffectDecision',
+ 'readPrivateSnapshot','attestPreSignal',
+ 'attestSeatExit','sendPrivateGracefulSignal','verifyFinalOldSixAbsent',
+ 'releaseFenceForWatchdog','holdForRecovery'];
+function stateRecord(source,requestId,digest){
+ return {
+  schema:SCHEMA,requestId,manifestRawSha256:digest,proposalId:source.proposalId,
+  status:source.status,phase:source.phase,
+  intentCount:source.intentCount,stoppedCount:source.stoppedCount,
+  nextSeat:source.nextSeat,code:source.code
+ };
+}
+function checkReceipt(receipt,expectedPhase){
+ if(receipt?.status!=='EXACT_CAS_READBACK_VERIFIED'||
+    receipt?.phase!==expectedPhase||!sha64(receipt.readbackSha256))
+  fail('ORPHAN_SIX_DURABLE_CAS_READBACK_UNVERIFIED');
+}
+function verifyPresignal(p,seat,proposalId,instant){
+ if(p?.source!=='PRIVATE_SAME_HOST_B_PRESIGNAL_DOUBLE_READ'||
+    p?.seat!==seat||p?.proposalId!==proposalId||
+    p?.operatorClaimUninterruptedVerified!==true||
+    p?.watchdogFenceUninterruptedVerified!==true||
+    p?.nextSeatIdentityStillLiveVerified!==true||
+    p?.remainingOriginalSeatsUnchangedVerified!==true||
+    // No worker, related lease, unknown in-flight work or intake changes
+    // may arise AFTER the initial snapshot. A seat-by-seat OS signal must
+    // fail closed whenever the live job drain is no longer provable.
+    p?.intakeDrainStillVerified!==true||
+    p?.zeroActiveWorkersStillVerified!==true||
+    p?.activeControllerWorkerCount!==0||
+    p?.completeRelatedLeaseEnumerationStillVerified!==true||
+    p?.relatedControllerLeaseCount!==0||
+    p?.noUncertainWorkOutcomeStillVerified!==true||
+    typeof p?.observedAtUtc!=='string'||
+    !Number.isFinite(Date.parse(p.observedAtUtc))||
+    Date.parse(p.observedAtUtc)>instant||
+    instant-Date.parse(p.observedAtUtc)>5000)
+  fail('ORPHAN_SIX_PRESIGNAL_LIVE_BOUNDARY_UNVERIFIED');
+}
+function sourceStep(prior,event,proof,snapshot,now){
+ const out=advanceOrphanGracefulSixSourceJournal({
+  prior,event,proof,snapshot,now
+ });
+ if(out.status!=='CANDIDATE_ONLY')fail(code(out.code));
+ return out;
+}
+// The function is invoked only in an already-authenticated maintainer context,
+// not from a user Issue, a generic pc-job, or a GitHub Action. It still fails
+// closed if any port, one-use claim or original raw CAS evidence is missing.
+async function runOrphanSixGracefulB({
+ requestId,approvalManifestSha256,lease,journal,port,
+ now=()=>Date.now()
+}={}){
+ if(!reqId(requestId)||!sha64(approvalManifestSha256)||
+    !lease?.owner||lease.owner.pid!==process.pid||
+    typeof lease.owner.nonce!=='string'||lease.owner.nonce.length<16||
+    !journal||typeof journal.read!=='function'||
+    typeof journal.commit!=='function'||!port||
+    essential.some(k=>typeof port[k]!=='function')||
+    typeof now!=='function')
+  return reported('BLOCKED','ORPHAN_SIX_MAINTAINER_BINDINGS_MISSING');
+ let last=null, lastHash=null, snapshot=null;
+ let attemptedSignalCount=0;
+ try{
+  // A prior attempt, including PREPARED, is NEVER an invitation to
+  // automatically replay any seat signal. Human-controlled reconciliation
+  // must inspect the real journal + controller-install lock.
+  const previous=journal.read();
+  if(previous!==null)
+   return reported('RECOVERY_REQUIRED','ORPHAN_SIX_EXISTING_JOURNAL_RECONCILE_FIRST',
+    {attemptedSignalCount:0,nextAction:'READ_ORIGINAL_JOURNAL_NO_REPLAY'});
+  const approved=await port.verifyExactApproval({requestId,approvalManifestSha256,
+   scope:SCOPE,leaseOwner:lease.owner});
+  if(approved?.state!=='PRIVATE_SAME_HOST_B_ORIGIN_AND_APPROVAL_VERIFIED'||
+     approved?.manifestRawSha256!==approvalManifestSha256||
+     approved?.oneUseEffectClaimVerified!==true||
+     approved?.independentInstalledMaintainerVerified!==true)
+   fail('ORPHAN_SIX_ORIGIN_OR_APPROVAL_UNVERIFIED');
+  snapshot=await port.readPrivateSnapshot({requestId,approvalManifestSha256});
+  if(snapshot?.approval?.manifestRawSha256!==approvalManifestSha256)
+   fail('ORPHAN_SIX_PRIVATE_APPROVAL_PREIMAGE_CHANGED');
+  const proposal=assessOrphanGracefulSixPreflight(snapshot,{now:now()});
+  if(proposal.status!=='CANDIDATE_ONLY')
+   fail(code(proposal.code));
+  last=initialOrphanGracefulSixSourceJournal(proposal);
+  if(last.status!=='CANDIDATE_ONLY')fail(code(last.code));
+  let receipt=journal.commit(stateRecord(last,requestId,approvalManifestSha256),null);
+  checkReceipt(receipt,last.phase);
+  lastHash=receipt.readbackSha256;
+  // Stop each pre-pinned seat exactly once. Never forward a PID/path from an
+  // Issue or accept fresh PIDs into the one-use proposal.
+  for(let seat=1;seat<=6;seat++){
+   const originalPin=snapshot.seats.find(x=>x.seat===seat);
+   if(!originalPin)fail('ORPHAN_SIX_PIN_MISSING');
+   const first=await port.attestPreSignal({seat,proposalId:proposal.proposalId});
+   verifyPresignal(first,seat,proposal.proposalId,now());
+   // Reject an already changed instance BEFORE recording an irreversible
+   // stop intent. Repeat this identity check after the durable CAS below.
+   if(first.oldInstancePid!==originalPin.pid||
+      first.oldInstanceBirth!==originalPin.startedAtUtc||
+      first.oldInstancePathSha256!==originalPin.canonicalPathSha256)
+    fail('ORPHAN_SIX_PRESIGNAL_IDENTITY_CHANGED');
+   // Prepare a candidate; only the following actual journal.commit/readback
+   // makes it a DURABLE intent. No signal can precede that verified commit.
+   const proposed=sourceStep(last,'DURABLE_STOP_INTENT',{
+    ...first,source:'PRIVATE_B_JOURNAL_EXACT_CAS_READBACK',
+    nextSeat:seat,durableIntentReadback:true,
+    sameOneUseClaimVerified:true},snapshot,now());
+   receipt=journal.commit(stateRecord(proposed,requestId,approvalManifestSha256),lastHash);
+   checkReceipt(receipt,'STOP_INTENT_RECORDED');
+   lastHash=receipt.readbackSha256;
+   last=proposed;
+   // Check exact SAME old seat and exclusive Watchdog fence AGAIN after
+   // durable intent and immediately before any irreversible console event.
+   const lastProof=await port.attestPreSignal({seat,
+    proposalId:proposal.proposalId,afterIntentReadbackSha256:lastHash});
+   verifyPresignal(lastProof,seat,proposal.proposalId,now());
+   if(lastProof.oldInstancePid!==originalPin.pid||
+      lastProof.oldInstanceBirth!==originalPin.startedAtUtc||
+      lastProof.oldInstancePathSha256!==originalPin.canonicalPathSha256)
+    fail('ORPHAN_SIX_PRESIGNAL_IDENTITY_CHANGED');
+   // A source-only CANDIDATE is never a durable effect authorization.
+   // The installed independent maintainer must re-read canonical OWNER
+   // APPROVE/REVOKE (complete pages, unedited, exact SHA) for EVERY seat,
+   // including after prior signals. A stale/cached/unknown readback blocks.
+   const decision=await port.verifyFreshOwnerEffectDecision({
+    seat,proposalId:proposal.proposalId,requestId,
+    approvalManifestSha256,afterIntentReadbackSha256:lastHash
+   });
+   const checkedAt=Date.parse(decision?.observedAtUtc);
+   const instant=now();
+   if(decision?.source!=='PRIVATE_B_FRESH_CANONICAL_OWNER_EFFECT_DECISION'||
+      decision?.status!=='CURRENT_OWNER_APPROVE_VERIFIED'||
+      decision?.seat!==seat||decision?.proposalId!==proposal.proposalId||
+      decision?.requestId!==requestId||
+      decision?.manifestRawSha256!==approvalManifestSha256||
+      decision?.intentReadbackSha256!==lastHash||
+      decision?.completeCanonicalCommentsReadbackVerified!==true||
+      decision?.latestOwnerDecisionApprovedUnrevokedVerified!==true||
+      decision?.unchangedOwnerCommentVerified!==true||
+      decision?.watchdogFenceUninterruptedVerified!==true||
+      !Number.isFinite(checkedAt)||!Number.isFinite(instant)||
+      checkedAt>instant||instant-checkedAt>5000)
+    fail('ORPHAN_SIX_FRESH_OWNER_EFFECT_APPROVAL_UNVERIFIED');
+   // Canonical owner approval recheck may take several seconds. Re-read
+   // same-host Worker/lease/intake and the exact old seat AFTER that network
+   // decision. A former zero-worker snapshot is never an effect-time gate.
+   const finalProof=await port.attestPreSignal({seat,
+    proposalId:proposal.proposalId,afterIntentReadbackSha256:lastHash,
+    afterFreshOwnerDecision:true});
+   verifyPresignal(finalProof,seat,proposal.proposalId,now());
+   if(finalProof.afterFreshOwnerDecisionDoubleReadVerified!==true||
+      Date.parse(finalProof.observedAtUtc)<checkedAt||
+      finalProof.oldInstancePid!==originalPin.pid||
+      finalProof.oldInstanceBirth!==originalPin.startedAtUtc||
+      finalProof.oldInstancePathSha256!==originalPin.canonicalPathSha256)
+    fail('ORPHAN_SIX_FINAL_LIVE_DRAIN_OR_IDENTITY_CHANGED');
+   // The one-use private B adapter still must repeat these exact checks
+   // at the Windows console effect boundary; this coordinator proof is not
+   // an authorization to signal an installed Runner.
+   // RETURNING "SENT" does not prove exit or Runner graceful handling.
+   attemptedSignalCount++;
+   const signal=await port.sendPrivateGracefulSignal({
+    seat,proposalId:proposal.proposalId,expectedIntentReadbackSha256:lastHash
+   });
+   if(signal?.status!=='PRIVATE_SINGLE_CONSOLE_SIGNAL_SUBMITTED'||
+      signal?.seat!==seat||
+      signal?.watchdogFenceUninterruptedVerified!==true)
+    fail('ORPHAN_SIX_SIGNAL_DELIVERY_OUTCOME_UNKNOWN');
+   const exit=await port.attestSeatExit({seat,proposalId:proposal.proposalId});
+   // Original snapshot is intentionally historical; only THIS current
+   // double-read may prove the old birth/path is gone while others persist.
+   const exited=sourceStep(last,'PRIVATE_SEAT_EXIT_READBACK',exit,snapshot,now());
+   receipt=journal.commit(stateRecord(exited,requestId,approvalManifestSha256),lastHash);
+   checkReceipt(receipt,exited.phase);
+   lastHash=receipt.readbackSha256;
+   last=exited;
+  }
+  if(last.phase!=='WAITING_WATCHDOG'||last.stoppedCount!==6)
+   fail('ORPHAN_SIX_ALL_SEATS_NOT_VERIFIED_EXITED');
+  const allGone=await port.verifyFinalOldSixAbsent({proposalId:proposal.proposalId,
+   expectedJournalSha256:lastHash});
+  if(allGone?.status!=='PRIVATE_SIX_OLD_INSTANCES_ABSENT'||
+     allGone?.watchdogFenceUninterruptedVerified!==true||
+     allGone?.intakeDrainStillVerified!==true)
+   fail('ORPHAN_SIX_OLD_SIX_ABSENCE_UNVERIFIED');
+  // WATCHDOG must be allowed to promote after the final 6 exits. The
+  // independent maintainer is responsible for exact lock release and lease
+  // readback, then separately re-observes Supervisor/R6/standby/smoke.
+  // Never return PASS here: Watchdog and 2 standby READY remain unproven.
+  const handoff=await port.releaseFenceForWatchdog({
+   proposalId:proposal.proposalId,expectedJournalSha256:lastHash,
+   allSixOriginalExitedVerified:true
+  });
+  if(handoff?.status!=='MAINTAINER_FENCE_RELEASE_READBACK_VERIFIED')
+   fail('ORPHAN_SIX_WATCHDOG_FENCE_RELEASE_UNVERIFIED');
+  return reported('POSTCHECK_PENDING','ORPHAN_SIX_WAITING_R6_RUNTIME_READBACK',{
+   attemptedSignalCount,verifiedExitedSeatCount:6,
+   nextAction:'READ_FRESH_WATCHDOG_R6_TWO_STANDBY_AND_RUNNER_SMOKE'});
+ }catch(error){
+  const reason=code(error?.code);
+  const uncertain=last?.intentCount>0||attemptedSignalCount>0;
+  if(last){
+   try{
+    const current=journal.read();
+    if(current?.sha256===lastHash){
+     const marker={
+      ...current.record,status:'RECOVERY_REQUIRED',phase:'RECOVERY_REQUIRED',
+      code:'ORPHAN_SIX_RUNTIME_RECONCILIATION_REQUIRED'
+     };
+     const saved=journal.commit(marker,lastHash);
+     checkReceipt(saved,'RECOVERY_REQUIRED');
+    }
+   }catch{/* leave original verified intent/lock intact; no replay */}
+  }
+  if(uncertain){
+   try{await port.holdForRecovery({requestId,reason});}catch{/* fail closed */}
+  }
+  return reported(uncertain?'RECOVERY_REQUIRED':'BLOCKED',reason,{
+   attemptedSignalCount,
+   nextAction:uncertain?'RECONCILE_ORIGINAL_JOURNAL_AND_LEASE_NO_SIGNAL_REPLAY':
+    'REVALIDATE_PRIVATE_B_APPROVAL_NO_OPERATION'
+  });
+ }
+}
+return Object.freeze({runOrphanSixGracefulB});
+})();
 export const inspectOrphanSixPackagedInletSource=orphanSixStatic_inlet.inspectOrphanSixBMaintainerInletSource;
 export const parseOrphanSixPackagedRequest=orphanSixStatic_inlet.parseOrphanSixBFlatRequest;
+export const runOrphanSixPackagedCoordinatorSource=orphanSixStatic_coordinator.runOrphanSixGracefulB;
+export const createOrphanSixPackagedJournalSource=orphanSixStatic_journal.createOrphanSixMaintenanceJournal;
 // END GENERATED ORPHAN SIX SOURCE INLET
 
 const CONTROL_REPOSITORY="ansqhd5774-Choi/zgmini-pc-control";
