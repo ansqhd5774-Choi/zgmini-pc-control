@@ -208,6 +208,8 @@ on:
       - 'tools/r181-protected-b-entry.mjs'
       - 'tools/r181-protected-b-report.mjs'
       - 'tools/update.mjs'
+      - 'tools/controller-public-b-operator-once.mjs'
+      - 'tests/controller-public-b-operator-once.test.mjs'
       - 'tools/runner-watchdog.mjs'
       - 'tests/runner-watchdog.test.mjs'
       - 'watchdog-b/**'
@@ -320,6 +322,9 @@ jobs:
           node --test --test-concurrency=1 tests/pc-job-late-label-intake.test.mjs
           node --test --test-concurrency=1 tests/public-a-controller-selective-source.test.mjs
           node --test --test-concurrency=1 tests/maintenance-agent.test.mjs
+          node --check tools/update.mjs
+          node --check tools/controller-public-b-operator-once.mjs
+          node --test --test-concurrency=1 tests/controller-public-b-operator-once.test.mjs
           node --test --test-concurrency=1 tests/maintenance-postcheck-link.test.mjs
           node --test --test-concurrency=1 tests/automation-status.test.mjs
           node --test --test-concurrency=1 tests/ci-controller-b-policy-only-proposal.test.mjs
