@@ -1032,3 +1032,21 @@
 
 **종료: 실제 무인 A/Writer B/Controller B 종단 0/3 (0%). 비운영 Source CI/병합은 별개 완료.**
 
+
+## 40. 서른여섯 번째 실행 기록 — Public B 소스 통합 및 R3 잔여 실행 지시 반영 (2026-11-28 KST)
+
+### 승인·소스 변경·검증 사실
+
+- 사용자 임시 승인 위임 범위: [#4276 댓글 #7227666796](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4276#issuecomment-7227666796). 기존 #4283/#4287 효과별 승인은 실제 원본 확인 후 재사용하고, 이를 Windows 설치 인증·포괄 신규 B 승인으로 확대하지 않는다.
+- [PR #4276](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4276) 정확 HEAD `d4e7b7130a558a380ae0be80bc8a20fc8031a86f` → **일반 merge commit** `da52580380885ea6c4ba3d68757b79cbe848ac0b`로 `main` 통합 완료. 기존 소스 PR CI [#46063748322](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/46063748322) GitHub hosted `public-source-only=success`, `source-only=skipped`.
+- 병합 직후 Public 고정 checkout `4d3fe664a90f2e8c3dea885559b1ec263df66a24` ↔ `main@da525803...` compare **ahead=46/behind=0, merge base=checkout SHA**로 기존 main 조상 인증 실패가 해결됨. 당시 Workflow blob `887cd36ee5ad438e634897f937b1a7c8958962e1`. 현재 실행 직전 main·정책 readback은 별도 필요.
+- 병합 후 [Controller B Submission Run #46065042920](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/46065042920) = completed/skipped; `submit-controller-b`, `observe-public-source` 모두 SKIPPED. 이는 실제 신규 B 운영 발행/설치 PASS가 아님. Windows 독립 정책·7파일 SHA·설치 CAS·lease·backup/restore·실제 단회 Issue/JSON/TXT는 **미확인**.
+- 이 내용의 GitHub 실행 기록은 [#4276 댓글 #7227708327](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4276#issuecomment-7227708327).
+
+### 사용자 지시 R3 실행계획
+
+- [R3 잔여 작업 실행 지시](CI_AUTO_APPROVAL_REMAINING_WORK_DIRECTIVE_R3_20261128.md)를 전용 관리 브랜치에 등록. 기존 P0~P6의 완료 계약과 제1~39절 원장은 변경·삭제하지 않는다.
+- **P0** 본 기록 및 R3 지시 원격 반영 → **P1** #4283/#4287 승인·병합/현행 독립 Windows V2 설치 정책·실제 CAS 확인 → **P2** 신규 승인 미소진 Controller B 효과 한 건만 정규 CI 발행/수신·결과 검증 → 독립 **P3 A / P4 Writer B** 무인 종단 실행 → **P5** 중복/오류 회귀 → **P6** 실제 3유형 종료 판정.
+- 전용 관리 브랜치는 최신 `main`과 diverged이므로 통째로 main에 병합하지 않음. 코드 수정은 당시 최신 main 기반 최소 작업 브랜치로 처리. 과거 R6/정책 보류는 최신 정확 효과·승인·복구 증거를 비교해 판단하며, 임의로 해제 또는 무관한 기능 전역 중단으로 확대하지 않음.
+
+**현 시점 운영 종단: 신규 무인 A/Controller B/Writer B 0/3 확인.** R3 계획 기록은 실제 운영 설치·실행 증명이 아니다.
