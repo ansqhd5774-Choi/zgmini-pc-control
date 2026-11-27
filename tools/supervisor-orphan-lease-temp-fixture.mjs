@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {createHash} from 'node:crypto';
+import {createHash,randomUUID} from 'node:crypto';
 const hash=x=>createHash('sha256').update(x).digest('hex');
 const sha64=x=>typeof x==='string'&&/^[0-9a-f]{64}$/.test(x);
 const oneUse=x=>typeof x==='string'&&/^[a-z][a-z0-9-]{7,63}$/.test(x);
@@ -52,7 +52,8 @@ export function swapOrphanLeaseInTemp({
  newPidAlive,filesystem=fs,tempRoot=os.tmpdir(),
  injectFailure=null
 }={}){
- let base,claimDir,backupDir,stagedDir,leaseDir,journal;
+ let base,claimDir,backupDir,stagedDir,leaseDir,journal,control,ownerFile,hostFile,heartbeatFile,old,oldBytes;
+ let phaseWritten=false,recordPhase=null;
  try{base=assertIsolatedOrphanRoot(root,{filesystem,tempRoot});}
  catch{return denial('BLOCKED','ORPHAN_TEMP_SCOPE_DENIED');}
  if(!oneUse(requestId)||!sha64(expected?.ownerSha256)||
@@ -70,12 +71,11 @@ export function swapOrphanLeaseInTemp({
     privateAttestation.watchdogFenced!==true||
     privateAttestation.independentOperatorVerified!==true)
   return denial('BLOCKED','ORPHAN_TEMP_PRIVATE_PROOF_MISSING');
- const control=path.join(base,'pc-control');
+ control=path.join(base,'pc-control');
  leaseDir=path.join(control,'leases','supervisor');
- const ownerFile=path.join(leaseDir,'owner.json'),
-  hostFile=path.join(control,'host.json'),
-  heartbeatFile=path.join(control,'SUPERVISOR_STATUS.json');
- let oldBytes;
+ ownerFile=path.join(leaseDir,'owner.json');
+ hostFile=path.join(control,'host.json');
+ heartbeatFile=path.join(control,'SUPERVISOR_STATUS.json');
  try{
   oldBytes=readExact(filesystem,ownerFile,8192);
   const hostBytes=readExact(filesystem,hostFile,65536),
@@ -84,7 +84,10 @@ export function swapOrphanLeaseInTemp({
      hash(hostBytes)!==expected.hostSha256||
      hash(heartbeatBytes)!==expected.heartbeatSha256)
    return denial('BLOCKED','ORPHAN_TEMP_CAS_PREIMAGE_CHANGED');
-  const old=JSON.parse(oldBytes.toString('utf8'));
+  old=JSON.parse(oldBytes.toString('utf8'));
+  if(filesystem.readdirSync(leaseDir).length!==1||
+     filesystem.readdirSync(leaseDir)[0]!=='owner.json')
+   return denial('BLOCKED','ORPHAN_TEMP_LEASE_SHAPE_UNVERIFIED');
   if(!validPid(old.pid)||old.pid===newOwner.pid||
      old.nonce!==newOwner.nonce||
      !Number.isFinite(old.bootAt)||
@@ -101,45 +104,91 @@ export function swapOrphanLeaseInTemp({
   try{filesystem.mkdirSync(claimDir);}
   catch(e){if(e?.code==='EEXIST')return denial('BLOCKED','ORPHAN_TEMP_CLAIM_REUSED_NO_RETRY');
    throw e;}
-  // Durable one-use claim must precede any old lease rename.
+  // Durable immutable phase witnesses + latest journal. A crash between
+  // writing a phase witness and updating journal is NOT safe to retry:
+  // reconciliation must examine both files and the current lease bytes.
   journal=path.join(claimDir,'journal.json');
-  filesystem.writeFileSync(journal,JSON.stringify({
-   schema:'ZGMINI_ORPHAN_TEMP_CLAIM_V1',requestId,
-   phase:'PREPARED',ownerSha256:expected.ownerSha256})+'\n',{flag:'wx'});
+  recordPhase=phase=>{
+   const bytes=Buffer.from(JSON.stringify({
+    schema:'ZGMINI_ORPHAN_TEMP_CLAIM_V1',requestId,phase,
+    ownerSha256:expected.ownerSha256})+'\n');
+   const persist=file=>{
+    const fd=filesystem.openSync(file,'wx');
+    try{filesystem.writeFileSync(fd,bytes);filesystem.fsyncSync(fd);}
+    finally{filesystem.closeSync(fd);}
+   };
+   persist(path.join(claimDir,'phase-'+phase+'.json'));
+   const tempJournal=path.join(claimDir,'journal-'+randomUUID()+'.tmp');
+   persist(tempJournal);
+   filesystem.renameSync(tempJournal,journal);
+   phaseWritten=true;
+  };
+  recordPhase('PREPARED');
   backupDir=path.join(claimDir,'old-supervisor');
   stagedDir=path.join(claimDir,'new-supervisor');
   filesystem.mkdirSync(stagedDir);
-  filesystem.writeFileSync(path.join(stagedDir,'owner.json'),
-   JSON.stringify(newOwner)+'\n',{flag:'wx'});
+  const newBytes=Buffer.from(JSON.stringify(newOwner)+'\n');
+  filesystem.writeFileSync(path.join(stagedDir,'owner.json'),newBytes,{flag:'wx'});
   if(injectFailure==='BEFORE_RENAME')return denial('BLOCKED','ORPHAN_TEMP_PRE_RENAME_FENCED');
-  // Repeat all three exact CAS comparisons immediately before the effect.
+  // Check every input and the process/lease exclusion conditions once more
+  // at the effect boundary, not only at receipt creation.
   if(hash(readExact(filesystem,ownerFile,8192))!==expected.ownerSha256||
      hash(readExact(filesystem,hostFile,65536))!==expected.hostSha256||
-     hash(readExact(filesystem,heartbeatFile,16384))!==expected.heartbeatSha256)
-   return denial('BLOCKED','ORPHAN_TEMP_SECOND_CAS_CHANGED');
+     hash(readExact(filesystem,heartbeatFile,16384))!==expected.heartbeatSha256||
+     filesystem.readdirSync(path.join(control,'leases')).join(',')!=='supervisor'||
+     oldPidAlive(old.pid)!==false||newPidAlive(newOwner.pid)!==true)
+   return denial('BLOCKED','ORPHAN_TEMP_SECOND_CAS_OR_LIVENESS_CHANGED');
+  recordPhase('OLD_ARCHIVE_PENDING');
   filesystem.renameSync(leaseDir,backupDir);
+  recordPhase('OLD_ARCHIVED');
   if(injectFailure==='AFTER_OLD_RENAMED')
    throw Error('ORPHAN_TEMP_INJECTED_AFTER_OLD_RENAMED');
+  recordPhase('NEW_OWNER_PENDING');
   filesystem.renameSync(stagedDir,leaseDir);
+  recordPhase('NEW_OWNER_CLAIMED');
   if(injectFailure==='AFTER_NEW_RENAMED')
    throw Error('ORPHAN_TEMP_INJECTED_AFTER_NEW_RENAMED');
   const after=readExact(filesystem,path.join(leaseDir,'owner.json'),8192);
-  if(!Buffer.isBuffer(after)||JSON.parse(after.toString('utf8')).pid!==newOwner.pid)
+  if(hash(after)!==hash(newBytes)||JSON.parse(after.toString('utf8')).pid!==newOwner.pid)
    throw Error('ORPHAN_TEMP_NEW_OWNER_READBACK_FAILED');
+  recordPhase('POSTCHECK_PASS');
   return denial('ISOLATED_SWAPPED','ORPHAN_TEMP_LEASE_CAS_SWAP_SIMULATED');
  }catch{
-  // Never overwrite a possibly claimed lease or restart any process.
-  // Restore only the provably unchanged OLD dir when the target is absent.
-  if(backupDir&&leaseDir&&oldBytes){
+  // Treat all unknown effects as RECOVERY_REQUIRED. Only restore the OLD
+  // directory when the new lease is absent AND exact old owner, host and
+  // heartbeat bytes, no other leases and current PID liveness are unchanged.
+  // Never overwrite a possibly claimed lease, even on a synthetic failure.
+  if(backupDir&&leaseDir&&oldBytes&&claimDir&&phaseWritten){
    try{
-    if(!filesystem.existsSync(leaseDir)&&filesystem.existsSync(backupDir)&&
-       hash(readExact(filesystem,path.join(backupDir,'owner.json'),8192))===
-       hash(oldBytes)){
-      filesystem.renameSync(backupDir,leaseDir);
+    const noNewClaim=!filesystem.existsSync(leaseDir);
+    const oldExact=filesystem.existsSync(backupDir)&&
+     hash(readExact(filesystem,path.join(backupDir,'owner.json'),8192))===
+     hash(oldBytes);
+    const sourceExact=hash(readExact(filesystem,hostFile,65536))===
+     expected.hostSha256;
+    const heartbeatExact=hash(readExact(filesystem,heartbeatFile,16384))===
+     expected.heartbeatSha256;
+    const noExtraLease=filesystem.readdirSync(path.join(control,'leases')).length===0;
+    const pidStable=oldPidAlive(old.pid)===false&&newPidAlive(newOwner.pid)===true;
+    if(noNewClaim&&oldExact&&sourceExact&&heartbeatExact&&noExtraLease&&pidStable&&
+       privateAttestation.watchdogFenced===true&&
+       privateAttestation.workerCount===0){
+     // Keep the current journal as well as the immutable phase witness.
+     // If this phase cannot be written, do not perform the rollback rename.
+     recordPhase('OLD_RESTORE_PENDING');
+     filesystem.renameSync(backupDir,leaseDir);
+     // The restored old owner is now exact and no new owner is claimed.
+     if(hash(readExact(filesystem,path.join(leaseDir,'owner.json'),8192))===
+        hash(oldBytes)){
+      recordPhase('OLD_RESTORED');
       return denial('ISOLATED_ROLLED_BACK','ORPHAN_TEMP_OLD_ONLY_RESTORED');
+     }
     }
-   }catch{/* Keep all evidence for separate reconciliation. */}
+   }catch{/* Keep all exact original evidence for separate reconciliation. */}
   }
+  // Never mask the original uncertainty if even the phase update fails.
+  try{if(phaseWritten&&recordPhase)recordPhase('RECOVERY_REQUIRED');}catch{}
   return denial('RECOVERY_REQUIRED','ORPHAN_TEMP_OUTCOME_UNVERIFIED_NO_RETRY');
+
  }
 }

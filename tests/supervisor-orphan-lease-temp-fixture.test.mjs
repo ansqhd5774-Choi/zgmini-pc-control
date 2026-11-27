@@ -166,3 +166,121 @@ test('isolated implementation does not run shell, kill process or modify externa
  assert.match(src,/sourceOnlyFixture:true/);
  assert.match(src,/operatingEffectAuthorized:false/);
 });
+
+
+test('immutable phase witnesses and latest journal distinguish successful handoff from initial PREPARED',()=>{
+ const fx=fixture();try{
+  const result=swapOrphanLeaseInTemp(request(fx));
+  assert.equal(result.status,'ISOLATED_SWAPPED');
+  const claim=path.join(fx.root,'orphan-claim-orphan-temp-proof-20261127-once');
+  const phases=['PREPARED','OLD_ARCHIVE_PENDING','OLD_ARCHIVED',
+   'NEW_OWNER_PENDING','NEW_OWNER_CLAIMED','POSTCHECK_PASS'];
+  for(const phase of phases){
+   const record=JSON.parse(fs.readFileSync(path.join(claim,'phase-'+phase+'.json'),'utf8'));
+   assert.equal(record.phase,phase);
+   assert.equal(record.ownerSha256,fx.expected.ownerSha256);
+   assert.doesNotMatch(JSON.stringify(record),/11111111-2222|9000|4242/);
+  }
+  assert.equal(JSON.parse(fs.readFileSync(path.join(claim,'journal.json'),'utf8')).phase,
+   'POSTCHECK_PASS');
+  assert.equal(fs.readdirSync(claim).filter(x=>x.startsWith('phase-')).length,6);
+ }finally{fx.cleanup();}
+});
+
+test('rollback after old archive is journaled and never reuses its durable claim',()=>{
+ const fx=fixture();try{
+  const result=swapOrphanLeaseInTemp({...request(fx),
+   injectFailure:'AFTER_OLD_RENAMED'});
+  assert.equal(result.status,'ISOLATED_ROLLED_BACK');
+  const claim=path.join(fx.root,'orphan-claim-orphan-temp-proof-20261127-once');
+  for(const phase of ['OLD_ARCHIVED','OLD_RESTORE_PENDING','OLD_RESTORED'])
+   assert.equal(JSON.parse(fs.readFileSync(
+    path.join(claim,'phase-'+phase+'.json'),'utf8')).phase,phase);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(claim,'journal.json'),'utf8')).phase,
+   'OLD_RESTORED');
+  assert.equal(readOwner(fx),fx.oldBytes);
+  assert.equal(swapOrphanLeaseInTemp(request(fx)).code,
+   'ORPHAN_TEMP_CLAIM_REUSED_NO_RETRY');
+ }finally{fx.cleanup();}
+});
+
+test('after old archive any host or heartbeat CAS change prevents rollback',()=>{
+ for(const target of ['host.json','SUPERVISOR_STATUS.json']){
+  const fx=fixture();try{
+   let drifted=false;
+   const filesystem=Object.create(fs);
+   filesystem.renameSync=(src,dst)=>{
+    fs.renameSync(src,dst);
+    if(path.basename(dst)==='old-supervisor'){
+     fs.writeFileSync(path.join(fx.control,target),
+      JSON.stringify({simulated:'DRIFT'})+'\n');
+     drifted=true;
+    }
+   };
+   const before=fs.readFileSync(path.join(fx.control,target),'utf8');
+   const result=swapOrphanLeaseInTemp({...request(fx),filesystem,
+    injectFailure:'AFTER_OLD_RENAMED'});
+   assert.equal(drifted,true);
+   assert.equal(result.status,'RECOVERY_REQUIRED',target);
+   assert.notEqual(fs.readFileSync(path.join(fx.control,target),'utf8'),before);
+   assert.equal(fs.existsSync(fx.lease),false);
+   const claim=path.join(fx.root,'orphan-claim-orphan-temp-proof-20261127-once');
+   assert.equal(fs.readFileSync(path.join(claim,'old-supervisor','owner.json'),'utf8'),
+    fx.oldBytes);
+   assert.equal(JSON.parse(fs.readFileSync(path.join(claim,'journal.json'),'utf8')).phase,
+    'RECOVERY_REQUIRED');
+  }finally{fx.cleanup();}
+ }
+});
+
+test('new unrelated lease after old archive blocks rollback, leaves original evidence',()=>{
+ const fx=fixture();try{
+  const filesystem=Object.create(fs);
+  filesystem.renameSync=(src,dst)=>{
+   fs.renameSync(src,dst);
+   if(path.basename(dst)==='old-supervisor')
+    fs.mkdirSync(path.join(fx.control,'leases','request-racing'));
+  };
+  const result=swapOrphanLeaseInTemp({...request(fx),filesystem,
+   injectFailure:'AFTER_OLD_RENAMED'});
+  assert.equal(result.status,'RECOVERY_REQUIRED');
+  assert.equal(fs.existsSync(fx.lease),false);
+  assert.equal(fs.readFileSync(path.join(fx.root,
+   'orphan-claim-orphan-temp-proof-20261127-once','old-supervisor',
+   'owner.json'),'utf8'),fx.oldBytes);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(fx.root,
+   'orphan-claim-orphan-temp-proof-20261127-once','journal.json'),'utf8')).phase,
+   'RECOVERY_REQUIRED');
+ }finally{fx.cleanup();}
+});
+
+test('old Owner identity and live new Owner must still match directly before handoff',()=>{
+ for(const key of ['old','new']){
+  const fx=fixture();try{
+   let count=0;
+   const q=request(fx);
+   q.oldPidAlive=()=>key==='old'&&++count>=2?true:false;
+   q.newPidAlive=()=>key==='new'&&++count>=2?false:true;
+   const result=swapOrphanLeaseInTemp(q);
+   assert.equal(result.status,'BLOCKED');
+   assert.equal(result.code,'ORPHAN_TEMP_SECOND_CAS_OR_LIVENESS_CHANGED');
+   assert.equal(readOwner(fx),fx.oldBytes);
+   const claim=path.join(fx.root,'orphan-claim-orphan-temp-proof-20261127-once');
+   assert.equal(JSON.parse(fs.readFileSync(path.join(claim,'journal.json'),'utf8')).phase,
+    'PREPARED');
+  }finally{fx.cleanup();}
+ }
+});
+
+test('after new owner claim unknown phase never automatically restores old owner',()=>{
+ const fx=fixture();try{
+  const result=swapOrphanLeaseInTemp({...request(fx),
+   injectFailure:'AFTER_NEW_RENAMED'});
+  assert.equal(result.status,'RECOVERY_REQUIRED');
+  const claim=path.join(fx.root,'orphan-claim-orphan-temp-proof-20261127-once');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(claim,'journal.json'),'utf8')).phase,
+   'RECOVERY_REQUIRED');
+  assert.equal(JSON.parse(readOwner(fx)).pid,9000);
+  assert.equal(fs.existsSync(path.join(claim,'old-supervisor','owner.json')),true);
+ }finally{fx.cleanup();}
+});
