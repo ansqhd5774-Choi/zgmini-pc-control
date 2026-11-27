@@ -261,7 +261,13 @@ test('public A logs redact raw Worker payload while private path stays unchanged
  assert.deepEqual(publicJobLogEnvelope(null,false),{
   status:'BLOCKED',code:'PUBLIC_LOCAL_RESULT_REDACTED'
  });
- assert.match(entry,/publicJobLogEnvelope\(result\.report,admitted\.visibility==='PRIVATE'\)/);
+ // Both transports are safe only after the installed entry checks the Owner
+ // Issue/Workflow identity. Never accept raw stringify or an unchecked flag.
+ const byVerifiedVisibility=/publicJobLogEnvelope\(result\.report,admitted\.visibility==='PRIVATE'\)/.test(entry);
+ const bySignedEvent=/publicJobLogEnvelope\(result\.report,event\?\.repository\?\.private\)/.test(entry);
+ assert.ok(byVerifiedVisibility||bySignedEvent,'source must redact Public Actions logs');
+ assert.match(entry,/const admitted=attestOwnerPcJobEvent\(event,process\.env,policy\)/);
+ assert.doesNotMatch(entry,/console\.log\(JSON\.stringify\(result\.report\)\)/);
 });
 
 
