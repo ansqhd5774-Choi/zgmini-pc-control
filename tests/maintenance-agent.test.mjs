@@ -220,7 +220,7 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
       assert.deepEqual(packaged.manifest,manifest);
       assert.deepEqual(Buffer.from(packaged.manifestRawBase64,"base64"),rawManifest);
       assert.equal(packaged.issueNumber,issue.number);
-      assert.equal(packaged.actor,actor);
+      assert.equal(packaged.actor,publicCiProof?CI_CONTROLLER_ACTOR:actor);
       if(applyError)throw applyError;
       return {stdout:JSON.stringify(applied)};
     }
@@ -1303,7 +1303,7 @@ function publicBAuthFixture(){
 
 test('Public receiver poll performs exact installed V2 CI proof, one isolated apply and no retry',async t=>{
  const p=publicBAuthFixture();
- const f=fixture(t,{privateRepo:false,actor:CI_CONTROLLER_ACTOR,
+ const f=fixture(t,{privateRepo:false,actor:'app/github-actions',
   requestPatch:{chatId:'chat-ci-765-1'},
   manifestPatch:{controllerOnlyInstall:true,selectiveSource:{
     schema:'ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1',
