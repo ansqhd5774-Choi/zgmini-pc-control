@@ -9,6 +9,7 @@ const stamp=x=>typeof x==='string'&&
  Number.isFinite(Date.parse(x))&&new Date(x).toISOString()===x.slice(0,23)+'Z';
 const goodPid=x=>Number.isSafeInteger(x)&&x>0&&x<=0x7fffffff;
 const sha=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
+const privateSources=new WeakMap();
 const denied=code=>Object.freeze({schema:'ZGMINI_ORPHAN_SIX_BREAK_V1',
  status:'BLOCKED',code,signalSubmitted:false,exitVerified:false,
  operationalRecoveryVerified:false});
@@ -35,25 +36,30 @@ export function prepareOrphanSixFixedConsoleBreak({
   .replace('__BIRTH__',startedAtUtc)
   .replace('__KIND__',mode)
   .replace('__TEMP_EXE__',mode==='TEMP'?testExe.replaceAll("'","''"):'');
- // Never serialize source.script: contains sensitive exact original PID/birth.
- return Object.freeze({status:'PRIVATE_SOURCE_READY',code:'ORPHAN_SIX_BREAK_SOURCE_PINNED',
-  seat,pid,startedAtUtc,mode,script:ps});
+ // The public token contains neither PID, birth nor runnable PowerShell.
+ // JSON copying or forging the token cannot reach the private source.
+ const token=Object.freeze({status:'PRIVATE_SOURCE_READY',
+  code:'ORPHAN_SIX_BREAK_SOURCE_PINNED',seat});
+ privateSources.set(token,Object.freeze({seat,pid,startedAtUtc,mode,script:ps}));
+ return token;
 }
 export async function submitOrphanSixCtrlBreakOnce({
  source,exactIntent,preSignal,
  run=spawnSync,platform=process.platform,
  root=process.env.SystemRoot
-}={}){
- if(source?.status!=='PRIVATE_SOURCE_READY'||!goodPid(source.pid)||
-    !stamp(source.startedAtUtc)||!sha(exactIntent?.rawSha256)||
+}= {}){
+ const pin=privateSources.get(source);
+ if(source?.status!=='PRIVATE_SOURCE_READY'||!pin||
+    !goodPid(pin.pid)||!stamp(pin.startedAtUtc)||
+    !sha(exactIntent?.rawSha256)||
     exactIntent?.status!=='EXACT_CAS_READBACK_VERIFIED'||
     exactIntent?.phase!=='STOP_INTENT_RECORDED'||
-    exactIntent?.seat!==source.seat||
+    exactIntent?.seat!==pin.seat||
     exactIntent?.source!=='PRIVATE_B_DURABLE_STOP_INTENT'||
     preSignal?.source!=='PRIVATE_SAME_HOST_B_PRESIGNAL_DOUBLE_READ'||
-    preSignal?.seat!==source.seat||
-    preSignal?.oldInstancePid!==source.pid||
-    preSignal?.oldInstanceBirth!==source.startedAtUtc||
+    preSignal?.seat!==pin.seat||
+    preSignal?.oldInstancePid!==pin.pid||
+    preSignal?.oldInstanceBirth!==pin.startedAtUtc||
     preSignal?.maintenanceLeaseOwnedVerified!==true||
     preSignal?.oneUseClaimUninterruptedVerified!==true||
     preSignal?.watchdogFenceUninterruptedVerified!==true||
@@ -70,15 +76,15 @@ export async function submitOrphanSixCtrlBreakOnce({
  // Live Runner effects are disabled until the installed B receiver can
  // attest exact one-use approval and current operating CAS. Do not let
  // booleans supplied by callers authorize a Runner.Listener signal.
- if(source.mode==='RUNNER')
+ if(pin.mode==='RUNNER')
   return denied('ORPHAN_SIX_BREAK_INSTALLED_B_AUTHORITY_UNAVAILABLE');
- if(source.mode==='TEMP'&&String(os.hostname()).toUpperCase()!=='DESKTOP-N62L0NG')
+ if(pin.mode==='TEMP'&&String(os.hostname()).toUpperCase()!=='DESKTOP-N62L0NG')
   return denied('ORPHAN_SIX_BREAK_TEMP_ISOLATED_HOST_REQUIRED');
  let result;
  try{
   result=await run(path.win32.join(root,'System32',
    'WindowsPowerShell','v1.0','powershell.exe'),
-   ['-NoLogo','-NoProfile','-NonInteractive','-Command',source.script],
+   ['-NoLogo','-NoProfile','-NonInteractive','-Command',pin.script],
    {shell:false,windowsHide:true,timeout:18000,
     encoding:'utf8',maxBuffer:16384});
  }catch{return uncertain('ORPHAN_SIX_BREAK_OUTCOME_UNKNOWN');}
