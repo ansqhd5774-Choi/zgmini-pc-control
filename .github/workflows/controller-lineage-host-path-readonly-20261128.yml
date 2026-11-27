@@ -1,0 +1,94 @@
+# One-off diagnostic for the exact MODULE_NOT_FOUND observed on the owner PC.
+# Read-only on the existing PC Runner; this is NOT the independent B operator.
+name: ZGMINI Controller Lineage Host Path Readonly
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - '.github/workflows/controller-lineage-host-path-readonly-20261128.yml'
+permissions:
+  contents: read
+jobs:
+  operator-file-readonly:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.repository.full_name == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == false &&
+      github.event.repository.owner.id == 327938088 &&
+      github.event.pull_request.user.id == 327938088 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.base.ref == 'main' &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 4
+    steps:
+      - name: Read-only checkout, runtime and Controller source evidence
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Write-Output 'DIAG_SCHEMA=ZGMINI_CONTROLLER_LINEAGE_HOST_PATH_READONLY_V1'
+          Write-Output 'EXECUTION_EFFECT=READONLY'
+          Write-Output 'B_APPLY_ATTEMPTED=FALSE'
+          $isPc = [Environment]::MachineName.ToUpperInvariant() -eq 'PC'
+          Write-Output "HOST_IS_PC=$isPc"
+          if (-not $isPc) {
+            Write-Output 'DIAG_RESULT=WRONG_HOST'
+            exit 12
+          }
+          $checkout = 'E:\ZGmini\projects\zgmini-pc-control'
+          $op = Join-Path $checkout 'tools\controller-lineage-public-b-operator-once.mjs'
+          $node = 'E:\ZGmini\runtime\node.exe'
+          $hostPath = 'E:\ZGmini\automation\pc-control\host.json'
+          $checkoutPresent = Test-Path -LiteralPath $checkout -PathType Container
+          $operatorPresent = Test-Path -LiteralPath $op -PathType Leaf
+          $nodePresent = Test-Path -LiteralPath $node -PathType Leaf
+          $hostManifestPresent = Test-Path -LiteralPath $hostPath -PathType Leaf
+          Write-Output "CHECKOUT_PRESENT=$checkoutPresent"
+          Write-Output "OPERATOR_PRESENT=$operatorPresent"
+          Write-Output "NODE_PRESENT=$nodePresent"
+          Write-Output "HOST_MANIFEST_PRESENT=$hostManifestPresent"
+          if ($operatorPresent) {
+            $digest = (Get-FileHash -LiteralPath $op -Algorithm SHA256).Hash.ToLowerInvariant()
+            Write-Output "OPERATOR_SHA256=$digest"
+          } else {
+            Write-Output 'OPERATOR_SHA256=NOT_PRESENT'
+          }
+          if ($hostManifestPresent) {
+            try {
+              $record = Get-Content -LiteralPath $hostPath -Raw | ConvertFrom-Json
+              if ($record.controllerSourceSha -eq 'cde1dd372210e4658ae348cb9e2577967cb11634') {
+                Write-Output 'HOST_SOURCE_STATE=EXISTING_CDE1DD'
+              } elseif ($record.controllerSourceSha -eq 'd3764580fdb08ecddd5f9b1064051eec30f90492') {
+                Write-Output 'HOST_SOURCE_STATE=NEW_D376'
+              } else {
+                Write-Output 'HOST_SOURCE_STATE=OTHER_OR_UNVERIFIED'
+              }
+            } catch {
+              Write-Output 'HOST_SOURCE_STATE=UNREADABLE'
+            }
+          }
+          if ($checkoutPresent) {
+            $git = Get-Command git.exe -ErrorAction SilentlyContinue
+            if ($null -eq $git) {
+              Write-Output 'CHECKOUT_HEAD=GIT_UNAVAILABLE'
+            } else {
+              $head = & $git.Source -C $checkout rev-parse HEAD 2>$null | Select-Object -First 1
+              if ($LASTEXITCODE -eq 0 -and $head -match '^[a-f0-9]{40}$') {
+                Write-Output "CHECKOUT_HEAD=$head"
+                $expected = '0c60109f03b41fae4cd81a26d04733a02e23bb4e'
+                $same = $head -eq $expected
+                Write-Output "CHECKOUT_MATCHES_REVIEWED_SOURCE_MERGE=$same"
+              } else {
+                Write-Output 'CHECKOUT_HEAD=NOT_A_GIT_WORKTREE'
+              }
+            }
+          }
+          if (-not $operatorPresent) {
+            Write-Output 'DIAG_RESULT=OPERATOR_FILE_MISSING'
+            exit 2
+          }
+          if (-not $nodePresent) {
+            Write-Output 'DIAG_RESULT=NODE_RUNTIME_MISSING'
+            exit 3
+          }
+          Write-Output 'DIAG_RESULT=OPERATOR_FILE_PRESENT_ONLY'
