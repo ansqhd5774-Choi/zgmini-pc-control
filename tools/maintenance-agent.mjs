@@ -1134,14 +1134,14 @@ export function createMaintenanceAgent({
     const result=await receiveOrphanSixBApprovalSource({
       issue,readOriginalOneUseClaim,
       getMainManifest:async (rel,ref)=>{
-        if(ref!=='main'||!/^approvals\\/controller-orphan-six\\/[a-f0-9]{64}\\.json$/.test(rel))
+        if(ref!=='main'||!/^approvals\/controller-orphan-six\/[a-f0-9]{64}\.json$/.test(rel))
           throw coded('ORPHAN_SIX_B_APPROVAL_PATH_INVALID');
         const data=await githubJson(['api',`repos/${repo}/contents/${rel}?ref=main`],
           'ORPHAN_SIX_B_APPROVAL_READ_FAILED');
         if(data?.type!=='file'||data.encoding!=='base64'||
            typeof data.content!=='string'||data.content.length>32768)
           throw coded('ORPHAN_SIX_B_APPROVAL_RESPONSE_INVALID');
-        const raw64=data.content.replace(/\\s/g,'');
+        const raw64=data.content.replace(/\s/g,'');
         if(!/^[A-Za-z0-9+/]*={0,2}$/.test(raw64))
           throw coded('ORPHAN_SIX_B_APPROVAL_ENCODING_INVALID');
         return Buffer.from(raw64,'base64'); // receiver checks exact byte hash.
