@@ -10,7 +10,8 @@ import {
 import {assessNoSpawnMonitorSnapshot} from
  '../controller/orphan-no-spawn-monitor-contract.mjs';
 
-const nonce='11111111-2222-4333-8444-555555555555';
+// Mixed-case-capable synthetic UUID: digits-only UUIDs cannot test case drift.
+const nonce='a1111111-b222-4333-8444-55555555c555';
 const baseTime=Date.parse('2026-11-27T00:10:00Z');
 const json=o=>Buffer.from(JSON.stringify(o)+'\n');
 const sha=x=>createHash('sha256').update(x).digest('hex');
@@ -100,6 +101,7 @@ test('wrong, malformed or absent inherited nonce fail without publishing bytes',
 });
 
 test('nonce comparison is byte-exact like installed assertSupervisorOwner',()=>{
+ assert.notEqual(nonce,nonce.toUpperCase(),'fixture must exercise ASCII case drift');
  const same=request();
  assert.equal(assess(same).status,'OBSERVED');
 
