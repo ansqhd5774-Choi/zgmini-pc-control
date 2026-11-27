@@ -352,6 +352,38 @@ test('Public publisher mock can submit exactly one preapproved B effect with ins
  assert.equal(f.posts,1);
 });
 
+test('Public publisher accepts only exact V2-approved operations config and controller module pair',async()=>{
+ const {f,installed}=publicBPublisherFixture();
+ const approved=JSON.parse(f.bytes);
+ const files=[
+  {path:'config/operations.json',sha256:'1'.repeat(64)},
+  {path:'controller/operations.mjs',sha256:'c'.repeat(64)}
+ ];
+ approved.allowFiles=files;
+ approved.selectiveSource.customPaths=files.map(x=>x.path);
+ approved.checks.manifestSha256=manifestFingerprint(files).sha256;
+ f.bytes=Buffer.from(JSON.stringify(approved));
+ f.input.approvalSha256=createHash('sha256').update(f.bytes).digest('hex');
+ installed.ciControllerBPolicy.manifestSha256=f.input.approvalSha256;
+ f.ports.readIndependentInstalledCiPolicy=async()=>installed;
+ const result=await submitExistingControllerApprovalFromCi(f.input,f.ports);
+ assert.equal(result.status,'REQUEST_READBACK_VERIFIED');
+ assert.equal(f.posts,1);assert.equal(f.saved.phase,'READBACK_VERIFIED');
+ assert.equal((await submitExistingControllerApprovalFromCi({...f.input,runId:999},f.ports)).status,
+  'EXISTING_REQUEST_REUSED');
+ assert.equal(f.posts,1);
+ // A different config filename is never allowed even under a valid one-effect policy.
+ const denied=publicBPublisherFixture(),invalid=JSON.parse(denied.f.bytes);
+ invalid.allowFiles=[{path:'config/secrets.json',sha256:'1'.repeat(64)}];
+ denied.f.bytes=Buffer.from(JSON.stringify(invalid));
+ denied.f.input.approvalSha256=createHash('sha256').update(denied.f.bytes).digest('hex');
+ denied.installed.ciControllerBPolicy.manifestSha256=denied.f.input.approvalSha256;
+ denied.f.ports.readIndependentInstalledCiPolicy=async()=>denied.installed;
+ await assert.rejects(()=>submitExistingControllerApprovalFromCi(denied.f.input,denied.f.ports),
+  /UPDATE_FILE_PATH_NOT_ALLOWED/);
+ assert.equal(denied.f.posts,0);assert.equal(denied.f.saved,null);
+});
+
 test('Public CI publisher never posts for unverified local policy, changed approval or repo',async()=>{
  const cases=[
   {name:'no V2 grant',mutate:v=>{delete v.ciControllerBPolicy;},code:'PUBLIC_POLICY_UNVERIFIED'},
