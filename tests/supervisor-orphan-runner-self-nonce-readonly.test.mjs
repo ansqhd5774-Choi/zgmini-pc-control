@@ -10,7 +10,8 @@ import {
 import {assessNoSpawnMonitorSnapshot} from
  '../controller/orphan-no-spawn-monitor-contract.mjs';
 
-const nonce='11111111-2222-4333-8444-555555555555';
+// Mixed-case-capable synthetic UUID: digits-only UUIDs cannot test case drift.
+const nonce='a1111111-b222-4333-8444-55555555c555';
 const baseTime=Date.parse('2026-11-27T00:10:00Z');
 const json=o=>Buffer.from(JSON.stringify(o)+'\n');
 const sha=x=>createHash('sha256').update(x).digest('hex');
@@ -99,9 +100,27 @@ test('wrong, malformed or absent inherited nonce fail without publishing bytes',
  }
 });
 
-test('nonce comparison is case-insensitive for a well-formed UUID only',()=>{
- const r=request();r.env.ZGMINI_SUPERVISOR_NONCE=nonce.toUpperCase();
- assert.equal(assess(r).status,'OBSERVED');
+test('nonce comparison is byte-exact like installed assertSupervisorOwner',()=>{
+ assert.notEqual(nonce,nonce.toUpperCase(),'fixture must exercise ASCII case drift');
+ const same=request();
+ assert.equal(assess(same).status,'OBSERVED');
+
+ // The real installed guard uses === on nonce strings, not normalized UUID
+ // bytes. Accepting these would falsely certify an A job that stays BLOCKED.
+ const upperEnv=request();
+ upperEnv.env.ZGMINI_SUPERVISOR_NONCE=nonce.toUpperCase();
+ assert.equal(assess(upperEnv).code,'RUNNER_SELF_PROCESS_NONCE_MISMATCH');
+
+ const upperOwner=request();
+ upperOwner.ownerBytes=json({...owner,nonce:nonce.toUpperCase()});
+ upperOwner.expected.ownerSha256=sha(upperOwner.ownerBytes);
+ assert.equal(assess(upperOwner).code,'RUNNER_SELF_PROCESS_NONCE_MISMATCH');
+
+ const bothUpper=request();
+ bothUpper.env.ZGMINI_SUPERVISOR_NONCE=nonce.toUpperCase();
+ bothUpper.ownerBytes=json({...owner,nonce:nonce.toUpperCase()});
+ bothUpper.expected.ownerSha256=sha(bothUpper.ownerBytes);
+ assert.equal(assess(bothUpper).status,'OBSERVED');
 });
 
 test('wrong host/source/owner/heartbeat raw preimage is rejected before nonce',()=>{
