@@ -185,3 +185,44 @@ test('monitor is pure, cannot mutate Supervisor lease or spawn any Runner',()=>{
   'runnerStopAuthorized:false','leaseMutationAuthorized:false',
   'watchdogPromotionAuthorized:false'])assert.ok(source.includes(token));
 });
+
+
+test('ongoing Controller work is not mistaken for an unrelated lease after established adoption',()=>{
+ const x=good();
+ x.monitorPhase='ESTABLISHED_MONITOR_RENEWAL';
+ x.relatedLeases=2;
+ x.ongoingJobs={
+  source:'PRIVATE_SAME_HOST_CONTROLLER_JOB_LEASES',
+  observedRelatedLeaseCount:2,
+  allRelatedLeasesAccountedFor:true,
+  allBoundToOriginalSixSeatsVerified:true,
+  workerProcessLineageVerified:true,
+  noInstallRecoveryOrExternalLeaseVerified:true,
+  jobOwnerNonceContinuityVerified:true,
+  activeWorkerCount:1
+ };
+ const renewed=assessNoSpawnMonitorSnapshot(x);
+ assert.equal(renewed.status,'CANDIDATE_ONLY');
+ assert.equal(renewed.effectAuthorized,false);
+ assert.equal(renewed.heartbeatWriteAuthorized,false);
+ const initial={...x,monitorPhase:'INITIAL_OWNER_ADOPTION'};
+ assert.equal(assessNoSpawnMonitorSnapshot(initial).status,'BLOCKED');
+ const cases=[
+  a=>{a.ongoingJobs.source='GITHUB_ISSUE_BODY';},
+  a=>{a.ongoingJobs.observedRelatedLeaseCount=1;},
+  a=>{a.ongoingJobs.allRelatedLeasesAccountedFor=false;},
+  a=>{a.ongoingJobs.allBoundToOriginalSixSeatsVerified=false;},
+  a=>{a.ongoingJobs.workerProcessLineageVerified=false;},
+  a=>{a.ongoingJobs.noInstallRecoveryOrExternalLeaseVerified=false;},
+  a=>{a.ongoingJobs.jobOwnerNonceContinuityVerified=false;},
+  a=>{a.ongoingJobs.activeWorkerCount=0;},
+  a=>{a.relatedLeases=19;},
+  a=>{a.installation.installLeaseHeld=true;},
+  a=>{a.liveWmi.rows[0].pid=9999;},
+  a=>{a.monitorPhase='UNKNOWN_PHASE';}
+ ];
+ for(let i=0;i<cases.length;i++){
+  const q=structuredClone(x);cases[i](q);
+  assert.equal(assessNoSpawnMonitorSnapshot(q).status,'BLOCKED','renewal '+i);
+ }
+});
