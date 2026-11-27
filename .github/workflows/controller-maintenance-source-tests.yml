@@ -271,6 +271,10 @@ on:
       - 'inflation-census-api-b/contract.test.mjs'
       - 'inflation-census-api-b/coordinator.test.mjs'
       - 'inflation-census-api-b/report.test.mjs'
+      - 'tools/public-source-ci-guard.mjs'
+      - 'tests/public-source-ci-guard.test.mjs'
+      - 'tools/public-pc-job-candidate.mjs'
+      - 'tests/public-pc-job-candidate.test.mjs'
       - '.github/workflows/controller-maintenance-source-tests.yml'
 permissions:
   contents: read
@@ -278,6 +282,36 @@ concurrency:
   group: zgmini-controller-maintenance-source-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 jobs:
+  # Public repository CI executes ONLY source checks on an ephemeral GitHub-hosted runner.
+  # This job never queues the existing operating or isolated self-hosted Windows seats.
+  public-source-only:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == false &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login == 'ansqhd5774-Choi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 0 # historical approved Git blob SHA pins
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify exact public source-only event origin
+        run: |
+          node --check tools/public-source-ci-guard.mjs
+          node tools/public-source-ci-guard.mjs
+      - name: Verify public source/runner isolation and deferred B approval
+        run: |
+          node --test --test-concurrency=1 tests/public-source-ci-guard.test.mjs
+          node --test --test-concurrency=1 tests/public-pc-job-candidate.test.mjs
+          node --test --test-concurrency=1 tests/ci-controller-b-policy-only-proposal.test.mjs
   source-only:
     if: >-
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
