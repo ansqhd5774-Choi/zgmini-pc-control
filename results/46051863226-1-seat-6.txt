@@ -1,0 +1,9 @@
+schema=ZGMINI_PC_RESULT_V1
+jobId=run-46051863226-1-seat-6
+requestId=pc-update-3f1c0413-37dd-4b44-900e-75c709d492ff-postcheck
+operation=core-status
+seat=6
+status=PASS
+code=PUBLIC_RESULT_CODE_REDACTED
+actualExecutionSha=555f95708984580cd7d5a0fd05a80b718e867710
+reportTransfer={"status":"SUMMARY_ONLY","code":"PUBLIC_REPOSITORY_REDACTED"}
