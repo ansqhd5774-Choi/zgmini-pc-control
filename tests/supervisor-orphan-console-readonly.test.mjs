@@ -71,6 +71,8 @@ test('orphan console: Windows probe is a fixed observational P/Invoke, no signal
  assert.match(command.exe,/powershell\.exe$/i);
  assert.deepEqual(command.args.slice(0,3),['-NoLogo','-NoProfile','-NonInteractive']);
  assert.match(command.args[4],/GetConsoleProcessList/);
+ assert.ok(command.args[4].includes(String.raw`Runner\.Listener\.exe`),
+  'exact literal Runner.Listener executable suffix');
  assert.match(command.args[4],/AttachConsole/);
  assert.match(command.args[4],/FreeConsole/);
  for(const prohibited of ['GenerateConsoleCtrlEvent','Stop-Process',
