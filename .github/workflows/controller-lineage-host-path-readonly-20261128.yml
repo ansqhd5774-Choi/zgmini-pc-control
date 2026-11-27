@@ -72,11 +72,13 @@ jobs:
             if ($null -eq $git) {
               Write-Output 'CHECKOUT_HEAD=GIT_UNAVAILABLE'
             } else {
-              $head = & $git.Source -C $checkout rev-parse HEAD 2>$null | Select-Object -First 1
-              if ($LASTEXITCODE -eq 0 -and $head -match '^[a-f0-9]{40}$') {
-                Write-Output "CHECKOUT_HEAD=$head"
+              $headRecords = @(& $git.Source -C $checkout rev-parse HEAD 2>$null)
+              $headExit = $LASTEXITCODE
+              $headMatches = @($headRecords | Where-Object { $_ -match '^[a-f0-9]{40}$' } | Select-Object -First 1)
+              if ($headExit -eq 0 -and $headMatches.Count -eq 1) {
+                Write-Output "CHECKOUT_HEAD=$($headMatches[0])"
                 $expected = '0c60109f03b41fae4cd81a26d04733a02e23bb4e'
-                $same = $head -eq $expected
+                $same = $headMatches[0] -eq $expected
                 Write-Output "CHECKOUT_MATCHES_REVIEWED_SOURCE_MERGE=$same"
               } else {
                 Write-Output 'CHECKOUT_HEAD=NOT_A_GIT_WORKTREE'
@@ -166,7 +168,7 @@ jobs:
                 $rootEqualDirect = [IO.Path]::GetFullPath([string]$rootCheckLines[0]).TrimEnd('\') -ieq [IO.Path]::GetFullPath($checkout).TrimEnd('\')
               }
               $prefixCheck = @(& $git.Source -C $checkout rev-parse --show-prefix 2>$null)
-              $gitAtRoot = $LASTEXITCODE -eq 0 -and $prefixCheck.Count -eq 0
+              $gitAtRoot = $LASTEXITCODE -eq 0 -and ($prefixCheck.Count -eq 0 -or ($prefixCheck.Count -eq 1 -and [string]::IsNullOrWhiteSpace([string]$prefixCheck[0])))
               $originCanonical = $originKind -eq 'HTTPS' -and $originHostGithub -and $originRepoExact -and -not $originHasUserInfo
               $remoteMainLines = @()
               $remoteMainVerified = $false
@@ -181,8 +183,13 @@ jobs:
               Write-Output "ORIGIN_CANONICAL=$originCanonical"
               Write-Output "REMOTE_MAIN_DIRECT_VERIFIED=$remoteMainVerified"
               if ($remoteMainVerified) { Write-Output "REMOTE_MAIN_DIRECT_SHA=$($remoteMatch[0].Split()[0])" }
-              $verifiedStatic = $headDirectVerified -and $refKindDirect -eq 'MAIN' -and $clean -and $gitAtRoot -and $originCanonical -and $remoteMainVerified
+              $verifiedStatic = $headDirectVerified -and $refKindDirect -eq 'MAIN' -and $clean -and $rootEqualDirect -and $originCanonical -and $remoteMainVerified
               Write-Output "FF_VERIFIED_STATIC_PREFLIGHT=$verifiedStatic"
+              $rootOk = $rootEqualDirect
+              $branchOk = $refKindDirect -eq 'MAIN'
+              $originOk = $originCanonical
+              $remoteReadable = $remoteMainVerified
+              if ($remoteReadable) { $remoteSha = $remoteMatch[0].Split()[0] }
               Write-Output 'FF_ACTUAL_SAFE_TO_WRITE=UNVERIFIED_SHARED_COORDINATION'
 
 
