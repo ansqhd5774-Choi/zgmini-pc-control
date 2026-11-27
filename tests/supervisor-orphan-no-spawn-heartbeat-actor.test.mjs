@@ -6,6 +6,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {spawn} from 'node:child_process';
 import {createNoSpawnHeartbeatActor} from '../controller/orphan-no-spawn-heartbeat-actor.mjs';
+import {assessNoSpawnMonitorSnapshot} from '../controller/orphan-no-spawn-monitor-contract.mjs';
 import {createIsolatedOrphanStatusWriter} from '../tools/supervisor-orphan-status-temp-writer.mjs';
 
 const t=Date.parse('2026-11-26T23:45:12Z');
@@ -14,7 +15,7 @@ const seats=()=>Array.from({length:6},(_,i)=>({
  seat:i+1,pid:5100+i,startedAtUtc:'2026-11-26T22:57:00Z',
  canonicalPathSha256:String.fromCharCode(97+i).repeat(64)
 }));
-const sample=()=>({
+const sample=(installLeaseHeld=true)=>({
  observedAt:'2026-11-26T23:45:10Z',
  preimage:{controllerSourceSha:'a'.repeat(40),ownerRecordSha256:hex('a'),
   hostManifestSha256:hex('b'),heartbeatSha256:hex('c'),stableAtRead:true},
@@ -42,7 +43,12 @@ const sample=()=>({
   uninterruptedRecoveryLeaseVerified:true},
  gitHubRoster:{fixedSixOnline:true},
  installation:{independentMaintainerVerified:true,controllerSourceUnchanged:true,
-  installLeaseHeld:false,workflowState:'active'},
+  installLeaseHeld,workflowState:'active',
+  installLeaseProofSource:'PRIVATE_INDEPENDENT_MAINTAINER_SAME_HOST',
+  installLeaseOwnerMatchesMaintainerVerified:true,
+  installLeaseRequestMatchesApprovalVerified:true,
+  installLeaseNonceContinuousVerified:true,
+  watchdogRecoveryCriticalSectionExcludedVerified:true},
  relatedLeases:0,activeControllerWorkers:0
 });
 const clone=x=>structuredClone(x);
@@ -114,7 +120,7 @@ test('a second prewrite probe detecting PID reuse, birth or path changes never w
 test('after a good tick no change to any pinned Listener or Owner can be rebased',async()=>{
  let writes=0,mutated=false;
  const a=actor(async()=>{
-  const x=sample();if(mutated){
+  const x=sample(!mutated);if(mutated){
    x.controllerSeatPins[1].pid=7101;
    x.liveWmi.rows[1].pid=7101;
   }return x;
@@ -192,7 +198,7 @@ test('Windows TEMP exact-file atomic CAS permits real three-tick rotating readba
   const oldSha=hash(initial);
   let clock=t,commits=0;
   const sampleOnDisk=()=>{
-   const x=sample();
+   const x=sample(commits===0);
    // The approved first heartbeat is immutable even as the *current*
    // status-file bytes are replaced by this Actor's own fresh heartbeat.
    x.preimage.heartbeatSha256=oldSha;
@@ -241,7 +247,7 @@ test('no-spawn Actor has no OS process, lease or filesystem mutation primitives'
 test('established actor continues verified heartbeat during a legitimate Controller job lease',async()=>{
  let active=false,writes=[];
  const a=actor(async()=>{
-  const x=sample();
+  const x=sample(!active);
   if(active){
    x.relatedLeases=2;x.activeControllerWorkers=1;
    x.ongoingJobs={
@@ -269,7 +275,7 @@ test('established actor continues verified heartbeat during a legitimate Control
 test('unattributed job leases after initial adoption stop further heartbeat',async()=>{
  let active=false,writes=0;
  const a=actor(async()=>{
-  const x=sample();
+  const x=sample(!active);
   if(active){x.relatedLeases=2;x.activeControllerWorkers=1;}
   return x;
  },async()=>{writes++;return true;});
@@ -283,7 +289,7 @@ test('unattributed job leases after initial adoption stop further heartbeat',asy
 
 test('rolling SHA verifies three consecutive self-authored heartbeats without reapproving historical bytes',async()=>{
  let current=hex('c'),writes=[],reads=0;
- const fixed=async()=>{reads++;return {...sample(),heartbeatRawObservation:{
+ const fixed=async()=>{reads++;return {...sample(writes.length===0),heartbeatRawObservation:{
   source:'PRIVATE_FIXED_STATUS_FILE_RAW_BYTES',sha256:current
  }};};
  const a=createNoSpawnHeartbeatActor({
@@ -320,7 +326,7 @@ test('external status-file tamper after a verified write stops subsequent heartb
  let current=hex('c'),writes=0;
  const a=createNoSpawnHeartbeatActor({
   now:()=>t,
-  attest:async()=>({...sample(),heartbeatRawObservation:{
+  attest:async()=>({...sample(writes===0),heartbeatRawObservation:{
    source:'PRIVATE_FIXED_STATUS_FILE_RAW_BYTES',sha256:current
   }}),
   writeStatus:async packet=>{
@@ -531,4 +537,29 @@ test('first no-spawn heartbeat can precede release of pinned maintenance lease; 
  assert.equal(renewed,1);
  assert.equal((await b.tick()).status,'FAIL_CLOSED');
  b.stop();
+});
+
+test('unfenced read-only six-seat candidate cannot publish first heartbeat',async()=>{
+ // Snapshot remains nonauthoritative: the Actor must hold the approved B
+ // controller-install lease through the first heartbeat readback.
+ assert.equal(assessNoSpawnMonitorSnapshot({...sample(false),now:t}).status,'CANDIDATE_ONLY');
+ const denied=[
+  x=>{x.installation.installLeaseHeld=false;},
+  x=>{x.installation.installLeaseProofSource='GITHUB_ISSUE_BODY';},
+  x=>{x.installation.installLeaseOwnerMatchesMaintainerVerified=false;},
+  x=>{x.installation.installLeaseRequestMatchesApprovalVerified=false;},
+  x=>{x.installation.installLeaseNonceContinuousVerified=false;},
+  x=>{x.installation.watchdogRecoveryCriticalSectionExcludedVerified=false;}
+ ];
+ for(let i=0;i<denied.length;i++){
+  let writes=0;
+  const a=actor(async()=>{const x=sample();denied[i](x);return x;},
+   async()=>{writes++;return true;});
+  const out=await a.tick();
+  assert.equal(out.status,'FAIL_CLOSED','first heartbeat fence '+i);
+  assert.equal(out.operatingRecoveryVerified,false);
+  assert.equal(writes,0);
+  assert.equal((await a.tick()).status,'FAIL_CLOSED');
+  a.stop();
+ }
 });

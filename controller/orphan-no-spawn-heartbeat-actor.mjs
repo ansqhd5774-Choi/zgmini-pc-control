@@ -3,7 +3,7 @@
 // Only a separately approved independent Windows maintainer may provide a
 // trusted, same-host live attestor and an exact fixed-path heartbeat writer.
 // It cannot acquire/mutate leases, start/stop Runners or read old nonces.
-import {assessNoSpawnMonitorSnapshot} from './orphan-no-spawn-monitor-contract.mjs';
+import {assessNoSpawnMonitorSnapshot,hasFencedInitialBLeaseCandidate} from './orphan-no-spawn-monitor-contract.mjs';
 import {createHash} from 'node:crypto';
 
 const result=(status,code)=>Object.freeze({
@@ -83,6 +83,13 @@ export function createNoSpawnHeartbeatActor({
      assessed.exactSeatIdentityCount!==6||
      !validPid(sample?.newOwner?.pid)||sample.newOwner.pid!==process.pid)
    throw Error('NO_SPAWN_ACTOR_LIVE_ATTESTATION_REJECTED');
+  // The monitor's read-only CANDIDATE_ONLY may describe six continuous
+  // Listeners even without a maintenance lock. Never turn that observation
+  // into the FIRST heartbeat unless the approved independent B is still
+  // holding its original controller-install lease through readback.
+  // A same-host private attestor is required; flags are NOT B authority.
+  if(baseline===null&&!hasFencedInitialBLeaseCandidate(sample?.installation))
+   throw Error('NO_SPAWN_ACTOR_INITIAL_MAINTENANCE_FENCE_UNVERIFIED');
   // Only the independent fixed-file private reader may supply this proof.
   // The initial expected bytes are the exact approved historical heartbeat.
   // All subsequent reads must match OUR last verified atomic CAS write,
