@@ -160,7 +160,7 @@ test('late-run source is inert until existing Controller B receiver pin is separ
  const publisher=readFileSync(new URL('../ci-approval/completed-run-intake.mjs',import.meta.url),'utf8');
  assert.match(y,/vars\.ZGMINI_CI_CONTROLLER_B_ENABLED == 'true'/);
  assert.match(y,/vars\.ZGMINI_CI_CONTROLLER_B_POLICY != ''/);
- assert.match(y,/ref: 62249e557c63f9b641b22cdd2213a71a88470d6e/);
+ assert.match(y,/ref: cfe57f3d720219613c87eff21338de0d35edbf6b/);
  assert.match(publisher,/return publishLateOwnerMergedControllerApproval\(event,opts\)/);
  assert.doesNotMatch(y,/workflow_dispatch:|schedule:/);
 });
@@ -287,7 +287,7 @@ test('submission workflow is activation-gated, source-event driven and pinned to
  assert.match(y,/name: Record Controller B request receipt/);
  // Only an exact reviewed source commit may be checked out by this B publisher.
  // Activation requires an independently installed exact workflow policy pin.
- assert.match(y,/ref: 62249e557c63f9b641b22cdd2213a71a88470d6e\s+persist-credentials: false/);
+ assert.match(y,/ref: cfe57f3d720219613c87eff21338de0d35edbf6b\s+persist-credentials: false/);
  assert.match(y,/run: node ci-approval\/completed-run-intake\.mjs --publish-existing/);
  assert.match(y,/cancel-in-progress: false/);
  assert.match(y,/github\.event\.workflow_run\.conclusion == 'success'/);
@@ -307,6 +307,8 @@ test('separate Public B activation flag never authorizes uninstalled effect or b
  assert.match(pub,/github\.event\.repository\.private == true/);
  assert.match(pub,/github\.event\.repository\.private == false/);
  assert.match(pub,/vars\.ZGMINI_CI_CONTROLLER_B_PUBLIC_EFFECT_APPROVED == 'true'/);
+ assert.match(y,/name: Checkout existing Private B source pin\s+if: github\.event\.repository\.private == true\s+uses: actions\/checkout@[a-f0-9]{40}\s+with:\s+ref: cfe57f3d720219613c87eff21338de0d35edbf6b/);
+ assert.match(y,/name: Checkout separately approved Public B candidate source pin\s+if: github\.event\.repository\.private == false\s+uses: actions\/checkout@[a-f0-9]{40}\s+with:\s+ref: 62249e557c63f9b641b22cdd2213a71a88470d6e/);
  assert.match(pub,/github\.event\.workflow_run\.workflow_id == 416355595/);
  assert.match(pub,/github\.event\.workflow_run\.event == 'pull_request'/);
  assert.match(pub,/github\.event\.workflow_run\.head_repository\.id == 1442936296/);
