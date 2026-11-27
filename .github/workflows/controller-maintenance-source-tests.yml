@@ -64,6 +64,7 @@ on:
       - 'tools/supervisor-orphan-six-b-receiver-source.mjs'
       - 'tests/supervisor-orphan-six-b-receiver-source.test.mjs'
       - 'tools/supervisor-orphan-six-b-maintainer-inlet-source.mjs'
+      - 'tools/supervisor-orphan-six-b-flat-request.mjs'
       - 'tests/supervisor-orphan-six-b-maintainer-inlet-source.test.mjs'
       - 'tools/supervisor-orphan-six-graceful-b-coordinator.mjs'
       - 'tests/supervisor-orphan-six-graceful-b-coordinator.test.mjs'
