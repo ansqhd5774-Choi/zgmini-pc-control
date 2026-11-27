@@ -2,6 +2,8 @@
 import './supervisor-orphan-runner-self-nonce-readonly.test.mjs';
 // Fixed Windows-only orphan WMI birth/path evidence remains private and read-only.
 import './supervisor-orphan-private-wmi.test.mjs';
+// Windows console cohort observation never emits a control signal or grants stop rights.
+import './supervisor-orphan-console-readonly.test.mjs';
 // Fixed TEMP-only exact status CAS writer regression; never touches operating root.
 import './supervisor-orphan-status-temp-writer.test.mjs';
 // Cross-module readback boundary: Watchdog HEALTHY is not old six-listener B admission.
