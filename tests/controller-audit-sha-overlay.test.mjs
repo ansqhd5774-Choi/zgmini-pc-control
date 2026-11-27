@@ -43,3 +43,26 @@ test('historical SHA is fixed while current supervisor SHA stays independently p
  assert.equal(updated.includes('report.status===\'PASS\''),true);
  assert.equal(original.includes('supervisor?.sourceSha===host?.controllerSourceSha'),true);
 });
+
+test('draft one-file B manifest and selective pin preserve installed CAS and exact effect',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const {manifestFingerprint,validateControllerSelectivePin}=await import('../tools/maintenance-contract.mjs');
+ const m=JSON.parse(readFileSync('approvals/controller-updates/'+TARGET+'.json','utf8'));
+ const pin=JSON.parse(readFileSync('approvals/controller-selective-targets/'+TARGET+'.json','utf8'));
+ assert.equal(m.schema,'ZGMINI_PC_UPDATE_V1');
+ assert.equal(m.installedSha,BASE);
+ assert.equal(m.targetSha,TARGET);
+ assert.equal(m.controllerOnlyInstall,true);
+ assert.deepEqual(m.allowFiles,[{path:PATH,sha256:AFTER}]);
+ assert.equal(m.checks.manifestSha256,manifestFingerprint(m.allowFiles).sha256);
+ assert.deepEqual(m.backup,{strategy:'VERSIONED_SNAPSHOT',rollback:{kind:'RESTORE_INSTALLED_SHA',sha:BASE}});
+ assert.equal(m.approval.ref,'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4303');
+ assert.equal(m.selectiveSource.branch,'codex/issues-lifecycle-manager-20261118-72-audit-sha-overlay');
+ assert.deepEqual(m.selectiveSource.customPaths,[PATH]);
+ assert.equal(validateControllerSelectivePin(m,pin),true);
+ assert.equal(pin.approvalRef,m.approval.ref);
+ assert.equal(pin.allowFiles.length,1);
+ assert.throws(()=>validateControllerSelectivePin({...m,targetSha:'a'.repeat(40)},pin),/SELECTIVE_PIN_MISMATCH/);
+ assert.throws(()=>validateControllerSelectivePin({...m,allowFiles:[...m.allowFiles,
+  {path:'controller/common.mjs',sha256:'a'.repeat(64)}]},pin),/SELECTIVE_PIN_MISMATCH/);
+});
