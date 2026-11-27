@@ -3774,7 +3774,7 @@ test('orphan self-nonce A TXT projection never serializes nonce/Owner PID/path/s
  const out=toText({
   schema:'ZGMINI_PC_PROCESS_INVENTORY_RESULT_V1',
   role:'operating',runnerName:'zgmini-pc-02',
-  runId:'45999999999',attempt:1,host:'PC',
+  runId:'45912345000',attempt:1,host:'PC',
   status:'PASS',code:'RUNNER_SELF_NONCE_EQUALS_ORIGINAL_OWNER_ONLY',
   observedAtUtc:'2026-11-27T01:08:00Z',
   orphanSelfNonce:{
