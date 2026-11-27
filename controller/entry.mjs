@@ -1,4 +1,4 @@
-import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';import {need,writeJson,errorCode,digest,validateRequest,assertSupervisorOwner,attestOwnerPcJobEvent} from './common.mjs';
+import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';import {need,writeJson,errorCode,digest,validateRequest,assertSupervisorOwner,attestOwnerPcJobEvent,publicJobLogEnvelope} from './common.mjs';
 const controller=path.dirname(fileURLToPath(import.meta.url)),root=path.dirname(controller);
 let policy,event,importFailureStage='EVENT_OR_REQUEST_VALIDATION';
 const seat=Number(process.env.RUNNER_NAME?.match(/^zgmini-pc-0([1-6])$/)?.[1]);const runId=process.env.GITHUB_RUN_ID,attempt=Number(process.env.GITHUB_RUN_ATTEMPT||1);
@@ -69,7 +69,7 @@ try{
  importFailureStage='ENGINE_IMPORT';
  const {executeJob}=await import('./engine.mjs');
  const result=await executeJob(raw,{root,policy,host,seat,runId,attempt,approvedPreimageScope});
- writeJson(pointer,{...result,issueNumber:event.issue.number});console.log(JSON.stringify(result.report));process.exitCode=result.report.status==='FAIL'?1:0;
+ writeJson(pointer,{...result,issueNumber:event.issue.number});console.log(JSON.stringify(publicJobLogEnvelope(result.report,admitted.visibility==='PRIVATE')));process.exitCode=result.report.status==='FAIL'?1:0;
 }catch(error){
  const missingModule=error?.code==='ERR_MODULE_NOT_FOUND'||error?.code==='MODULE_NOT_FOUND';
  const code=missingModule?'CONTROLLER_IMPORT_MISSING':errorCode(error);
