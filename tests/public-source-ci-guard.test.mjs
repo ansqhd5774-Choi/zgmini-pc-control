@@ -4,6 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {assessPublicSourceCi,runPublicSourceCiGuard} from '../tools/public-source-ci-guard.mjs';
+// Reuse immutable Public source CI; no workflow byte change or Windows B dispatch.
+import '../sidecar-b/w06-v2-to-v3-pin-only.test.mjs';
 
 const repo='ansqhd5774-Choi/zgmini-pc-control', id=1442936296;
 const owner='ansqhd5774-Choi', ownerId=327938088;
