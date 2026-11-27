@@ -34,9 +34,14 @@ test('post-S6 Owner-directed policy-only V2 admits exact CAS and changes no exec
  requireSevenToSevenContract(existingFiles,candidate.files);
  for(const rel of source){
   assert.equal(candidate.files[rel],previous.files[rel],'no executable SHA drift: '+rel);
-  assert.equal(createHash('sha256').update(
-   fs.readFileSync(new URL('../'+rel,import.meta.url))).digest('hex'),
-   candidate.files[rel],'checkout bytes must match approved target: '+rel);
+  // Compare both immutable historical revisions, never the moving PR checkout.
+  // A future separately reviewed receiver update must not rewrite old pins.
+  for(const manifest of [previous,candidate]){
+   const bytes=execFileSync('git',['show',manifest.targetSha+':'+rel],
+    {cwd:new URL('../',import.meta.url),maxBuffer:4*1024*1024});
+   assert.equal(createHash('sha256').update(bytes).digest('hex'),
+    manifest.files[rel],'pinned historical bytes: '+manifest.targetSha+':'+rel);
+  }
  }
  const syntheticOldPolicy={...candidate.ciControllerBPolicy,
   workflowBlobSha:'b568bbc5de05b2d6fff75419b88322b3e2de020c'};
