@@ -48,6 +48,8 @@ on:
       - 'tests/pc-job-late-label-intake.test.mjs'
       - 'controller/supervisor.mjs'
       - 'controller/standby.mjs'
+      - 'controller/orphan-no-spawn-heartbeat-actor.mjs'
+      - 'tests/supervisor-orphan-no-spawn-heartbeat-actor.test.mjs'
       - 'tests/controller-standby.test.mjs'
       - 'tools/supervisor-orphan-lease-temp-fixture.mjs'
       - 'tests/supervisor-orphan-lease-temp-fixture.test.mjs'
