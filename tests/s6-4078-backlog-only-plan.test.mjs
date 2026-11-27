@@ -96,3 +96,14 @@ for(const [name,edit,code] of [
   assert.equal(r.mutationAuthorized,false);assert.equal(r.operationalWrites,0);
  });
 }
+
+test('malformed issue labels fail closed without an exception',()=>{
+ for(const labels of [{name:'pc-job'},'pc-job',42,[null],[{}]]){
+  const e=fixture();e.originalIssue.labels=labels;
+  const result=inspect(e);
+  assert.equal(result.status,'BLOCKED');
+  assert.equal(result.code,'BACKLOG_4078_ORIGINAL_CAS_FAILED');
+  assert.equal(result.mutationAuthorized,false);
+  assert.equal(result.operationalWrites,0);
+ }
+});
