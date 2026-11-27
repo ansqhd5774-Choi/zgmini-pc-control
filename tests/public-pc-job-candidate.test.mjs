@@ -45,6 +45,22 @@ test('owner public issue becomes a read-only candidate and never a PC authorizat
   assert.equal(JSON.stringify(r).includes(s.event.issue.body),false);
 });
 
+test('official issues opened webhook may omit redundant top-level number without weakening Issue identity',()=>{
+ const sample=good();
+ delete sample.event.number;
+ const result=assessPublicPcJobCandidate(sample);
+ assert.equal(result.status,'CANDIDATE_ONLY');
+ assert.equal(result.issueNumber,4230);
+ assert.equal(result.executionAuthorized,false);
+ assert.equal(result.selfHostedAuthorized,false);
+ const mismatch=good();mismatch.event.number=4231;
+ deny(mismatch,'PUBLIC_PC_JOB_ISSUE_IDENTITY_DENIED');
+ const missing=good();delete missing.event.issue.number;
+ deny(missing,'PUBLIC_PC_JOB_ISSUE_IDENTITY_DENIED');
+ const invalid=good();delete invalid.event.number;invalid.event.issue.number=-1;
+ deny(invalid,'PUBLIC_PC_JOB_ISSUE_IDENTITY_DENIED');
+});
+
 test('repository visibility, owner id, name or issuer cannot bypass gate',()=>{
   for(const p of [
     s=>{s.event.repository.private=true;},
