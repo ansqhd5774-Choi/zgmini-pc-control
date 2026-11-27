@@ -1,3 +1,5 @@
+// Same Runner-job environment nonce comparison is read-only and not listener lineage proof.
+import './supervisor-orphan-runner-self-nonce-readonly.test.mjs';
 // Fixed Windows-only orphan WMI birth/path evidence remains private and read-only.
 import './supervisor-orphan-private-wmi.test.mjs';
 // Fixed TEMP-only exact status CAS writer regression; never touches operating root.
