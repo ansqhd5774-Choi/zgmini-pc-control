@@ -152,3 +152,43 @@ test('already installed R3 after-image is classified without authorizing origina
  assert.equal(project({...raw,configSource:'c'.repeat(40)}).status,'STATE_UNKNOWN');
  assert.equal(project({...raw,targetSha256:'f'.repeat(64)}).status,'STATE_UNKNOWN');
 });
+
+
+test('installed V2 is a bounded exact V3 preimage pin, never an approval',async()=>{
+ const {projectSidecarBManifestPreimageReadonly:project}=await import('./operating-probe.mjs');
+ const {V2_AFTER}=await import('./contract.mjs');
+ const raw={head:'c8ed53a3991212dd1778742cda8a86ac133e0796',
+  configSource:'c8ed53a3991212dd1778742cda8a86ac133e0796',
+  taskDefinitionSha256:'dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028',
+  wrapperSha256:'9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c',
+  targetSha256:V2_AFTER,
+  localCommandLine:'NOT_ALLOWED',secret:'NOT_ALLOWED'};
+ const out=project(raw);
+ assert.equal(out.schema,'ZGMINI_CNN_SIDECAR_B_PREIMAGE_PINS_V1');
+ assert.equal(out.status,'PASS');
+ assert.equal(out.code,'CNN_B_V3_PREIMAGE_PINS_COLLECTED');
+ assert.equal(out.beforeSha256,V2_AFTER);
+ assert.equal(out.head,raw.head);
+ assert.equal(out.configSource,raw.configSource);
+ assert.equal(out.taskDefinitionSha256,raw.taskDefinitionSha256);
+ assert.equal(out.wrapperSha256,raw.wrapperSha256);
+ assert.equal(out.operationalWrites,0);
+ assert.equal(out.providerCalls,0);
+ assert.equal(out.d1Writes,0);
+ assert.equal(Object.keys(out).sort().join(','),'beforeSha256,code,configSource,d1Writes,head,operationalWrites,providerCalls,schema,status,taskDefinitionSha256,wrapperSha256');
+ assert.doesNotMatch(JSON.stringify(out),/NOT_ALLOWED|localCommandLine|secret|APPROVED_B/);
+ for(const delta of [
+  {head:'f'.repeat(40)},
+  {configSource:'f'.repeat(40)},
+  {taskDefinitionSha256:'f'.repeat(63)},
+  {wrapperSha256:null},
+  {targetSha256:'f'.repeat(64)}
+ ]){
+  const blocked=project({...raw,...delta});
+  assert.equal(blocked.status,'STATE_UNKNOWN');
+  assert.equal(blocked.beforeSha256,null);
+  assert.equal(blocked.taskDefinitionSha256,null);
+ }
+ const nextAfter='894411dea16462c4ee305f7ec80102d81662063f5f76c8a8384f04977e860ac3';
+ assert.equal(project({...raw,targetSha256:nextAfter}).status,'STATE_UNKNOWN');
+});
