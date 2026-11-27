@@ -149,7 +149,7 @@ export function inspectPrivateOrphanWmiReadonly({
   "[pscustomobject]@{pid=[int]$p.ProcessId;name=[string]$p.Name;executablePath=[string]$p.ExecutablePath;sessionId=$session;serviceAncestor=$serviceAncestor;serviceObservationAvailable=$true;startedAtUtc=$started}",
   "})",
   "[pscustomobject]@{rows=$rows}|ConvertTo-Json -Compress -Depth 4"
- ].join(';');
+ ].join('\n');
  let raw;
  try{raw=run(powershell,['-NoLogo','-NoProfile','-NonInteractive',
   '-Command',script],{windowsHide:true,timeout:15000,maxBuffer:131072,
