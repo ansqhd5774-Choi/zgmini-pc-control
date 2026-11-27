@@ -473,3 +473,16 @@
 - [#3767](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3767): 과거 `STANDBY_WMI_EXECUTABLE_PATH_UNVERIFIED`와 이후 R5 소스/설치/READY 증거가 각각 확정됐으나 원래 독립 probe나 실제 S6 승격 검증 아님. 대표 추적 **OPEN 유지**.
 - 이번 검토 대상 6/6 현재 Open; 완료/종료 조건을 충족하는 신규 단회 요청 **0건**. 신규 Close 0, PR merge 0, PC 재실행 0. 제한 검색으로 저장소 전체 Open 총수 확정하지 않음. 종료 누적 실적 207건은 기존 역사 기록 그대로.
 - 다음: 새로 종료 가능한 후보는 `is:open`만 일괄 검색해 추정하지 말고 원본 requestId별 실제 결과쌍/Run/원장에 기반하여 확인. 위 운영 미해결은 원담당의 실제 수정/인증 이후 재판정.
+
+
+## 2026-11-28 단회 실행·인계 후속 판정 — Writer/Watchdog/Backlog
+
+- 원본 Issue와 댓글 전체를 기준으로 최신 생성 이슈의 유일한 검증용 [PR #4286](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4286)은 이미 `closed`; 재종료하지 않는다. 동일 소스 [#4285](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4285)는 이전 병합 증거를 재사용한다.
+- [#4135](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4135): Writer B 결과쌍 2/2, `WRITER_B_PREFLIGHT_STOP/WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED`, 167/167 ACTIVE/READY 0. 설치 자체는 하지 않았으므로 Open.
+- [#4131](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4131): Watchdog B Run 45901271597 `STAGED/WATCHDOG_B_APPROVED_SOURCE_STAGED_AWAITING_NATURAL_RESTART`; 두 파일 staged와 실제 R6 활성화 구별. Open.
+- [#4122](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4122): Watchdog 원본 B `BLOCKED/WATCHDOG_B_APPROVED_CONTROLLER_SHA_DRIFT`, writes 0. 후속 다른 승인 대상과 원본 효과 혼합 금지. Open.
+- [#4055](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4055): Writer B `WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP`; 승인 4파일 후보와 두 개 실제 import closure 경로 불일치. Open.
+- [#4068](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4068): 뒤이은 Writer B `WRITER_B_CORE_NATURAL_DRAIN_TIMEOUT_STOP`; #4055와 원인 다른 소진 요청. Open.
+- [#4079](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4079), [#4075](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4075), [#4061](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4061): 각 agent-handoff 진단은 `VERIFIED_CANDIDATE_ONLY` 또는 `INSUFFICIENT_EVIDENCE`이며 원본 PC 작업 완료·타 대화 수신·운영 적용 증거가 없음. 원본 #4078/#4068/#4055의 미해결 결과와 연결 유지하고 인계 자동 종결하지 않음.
+- [#3947](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3947), [#4069](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4069): Supervisor/Runner 별도 회복 readback은 존재하나 원래 S6 `RECOVERY_REQUIRED`의 Watchdog promotion·backlog reconciliation 성공은 미입증. Open.
+- 이 배치 신규 종료/병합 0; 독립 운영 효과/재실행 0. 단순 과거 성공, 후속 소스 CI, stage 또는 요약 bot 댓글만으로 원본 실패 단회 요청을 완료로 바꾸지 않는다.
