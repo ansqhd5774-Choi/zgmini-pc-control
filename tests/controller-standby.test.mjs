@@ -6,6 +6,8 @@ import './supervisor-orphan-private-wmi.test.mjs';
 import './supervisor-orphan-console-readonly.test.mjs';
 // Actual console control signals are confined to disposable isolated Windows TEMP children.
 import './supervisor-orphan-console-signal-windows-isolation.test.mjs';
+// Synthetic TEMP-only real Windows native break path; live Runner signals refused.
+import './supervisor-orphan-six-windows-ctrlbreak-port.test.mjs';
 // Source-only one-use B transition model: no real Runner signal, Owner write or lease mutation.
 import './supervisor-orphan-six-graceful-source.test.mjs';
 // Uses TEMP-only existing maintenance-lock and no operating B receiver invocation.
