@@ -58,6 +58,82 @@ import {inspectBeaMfgArchiveReadonly} from './earnings-bea-mfg-archive-readonly.
 import {inspectBeaUnitArchiveReadonly} from './earnings-bea-unit-archive-readonly.mjs';
 import {inspectBeaNipaCaptureReadonly} from './earnings-bea-nipa-capture-readonly.mjs';
 import {runW05ServiceStoredReadonly} from './w05-wpsfd42-service-readonly.mjs';
+// Fixed Public A candidate: read-only, bounded, no dynamic paths or private output.
+// A source PR or Workflow success does NOT install or authorize this operation.
+export function inspectControllerOperatingAuditReadonly({
+ filesystem=fs,now=Date.now,pidAlive=pid=>{
+  try{process.kill(pid,0);return true;}catch{return null;}
+ },controlRoot='E:/ZGmini/automation/pc-control',
+ watchdogRoot='E:/ZGmini/automation/pc-watchdog'
+}={}){
+ const safeRead=(file,maxBytes=131072)=>{
+  try{
+   const st=filesystem.lstatSync(file);
+   if(!st.isFile()||st.isSymbolicLink()||st.size<2||st.size>maxBytes)return null;
+   const obj=JSON.parse(filesystem.readFileSync(file,'utf8'));
+   return obj&&typeof obj==='object'&&!Array.isArray(obj)?obj:null;
+  }catch{return null;}
+ };
+ const pid=n=>Number.isSafeInteger(n)&&n>0?n:null;
+ const iso=s=>typeof s==='string'&&/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(s)&&
+  Number.isFinite(Date.parse(s))&&new Date(Date.parse(s)).toISOString()===s?Date.parse(s):null;
+ const fresh=(s,limit)=>{
+  const at=iso(s),clock=now();
+  return at!==null&&Number.isFinite(clock)&&clock>=at&&clock-at<limit;
+ };
+ const alive=n=>pid(n)!==null&&pidAlive(n)===true;
+ const wd=safeRead(path.join(watchdogRoot,'STATUS.json'),16384);
+ const wdOwner=safeRead(path.join(watchdogRoot,'receiver','owner.json'),4096);
+ const supervisor=safeRead(path.join(controlRoot,'SUPERVISOR_STATUS.json'),32768);
+ const supOwner=safeRead(path.join(controlRoot,'leases','supervisor','owner.json'),4096);
+ const host=safeRead(path.join(controlRoot,'host.json'),32768);
+ const wdHealthy=wd?.state==='HEALTHY'&&fresh(wd?.at,60000)&&
+  pid(wd?.pid)!==null&&wd.pid===wdOwner?.pid&&alive(wd.pid);
+ const first=pid(wd?.standbyPid),second=pid(wd?.secondStandbyPid);
+ const pairReady=wdHealthy&&wd.standbyRole==='READY'&&
+  wd.secondStandbyRole==='READY'&&wd.standbyReadyCount===2&&
+  first!==null&&second!==null&&first!==second&&
+  first!==wd.pid&&second!==wd.pid&&alive(first)&&alive(second);
+ const children=supervisor?.children;
+ const supervisorReady=fresh(supervisor?.at,45000)&&
+  typeof supOwner?.nonce==='string'&&supOwner.nonce.length>0&&
+  pid(supervisor?.pid)!==null&&supervisor.pid===supOwner.pid&&
+  alive(supervisor.pid)&&supervisor?.sourceSha===host?.controllerSourceSha&&
+  /^[a-f0-9]{40}$/.test(host?.controllerSourceSha??'')&&
+  supervisor.mode==='LISTENING'&&Array.isArray(children)&&children.length===6&&
+  Array.from({length:6},(_,i)=>i+1).every(seat=>{
+   const same=children.filter(c=>c?.seat===seat);
+   return same.length===1&&same[0].alive===true&&alive(same[0].pid);
+  })&&wd?.supervisorPid===supervisor.pid&&iso(wd?.heartbeatAt)!==null&&
+  Math.abs(Date.parse(wd.heartbeatAt)-Date.parse(supervisor.at))<45000;
+ const targets=[
+  ['postcheck','pc-update-3f1c0413-37dd-4b44-900e-75c709d492ff-postcheck',
+   'core-status','run-46051863226-1-seat-6'],
+  ['smoke','pc-stage5-4263-recovery-smoke-20261128-01',
+   'runner-smoke','run-46052065337-1-seat-6']
+ ];
+ const original={};
+ for(const [key,requestId,operation,jobId] of targets){
+  const ledger=safeRead(path.join(controlRoot,'ledger',requestId+'.json'));
+  const report=ledger?.report;
+  original[key]=Boolean(/^[a-f0-9]{64}$/.test(ledger?.payloadSha??'')&&
+   report?.schema==='ZGMINI_PC_RESULT_V1'&&report.requestId===requestId&&
+   report.operation===operation&&report.jobId===jobId&&report.seat===6&&
+   report.status==='PASS'&&report.firstFail===null&&
+   report.protectedStateUnchanged===true&&report.reused!==true&&
+   /^[A-Z0-9_]{1,96}$/.test(report.code??'')&&
+   report.actualExecutionSha===host?.controllerSourceSha);
+ }
+ const complete=pairReady&&supervisorReady&&original.postcheck&&original.smoke;
+ return {status:complete?'PASS':'STATE_UNKNOWN',
+  code:complete?'OPERATING_AUDIT_READONLY_VERIFIED':'OPERATING_AUDIT_EVIDENCE_INCOMPLETE',
+  evidenceScope:'FIXED_LOCAL_SNAPSHOT_NO_PUBLIC_RAW_LEDGER',
+  watchdogReady:wdHealthy,standbyPairReady:pairReady,
+  supervisorVerified:supervisorReady,
+  localPostcheckLedgerVerified:original.postcheck,
+  localRunnerSmokeLedgerVerified:original.smoke,
+  operationalWrites:0,providerCalls:0,d1Writes:0,sqliteOpened:false};
+}
 const activeTasks=['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea'];
 // Fixed, non-sensitive stage values for diagnosing a confirmed core-status Worker timeout.
 // No raw checkpoint contents, machine paths, PIDs, or task XML leave the job workspace.
@@ -230,6 +306,7 @@ export function readCore(dataRoot,{queryTask,retiredTaskEvidence=nativeRetiredIr
 export function nativeTaskXml(task){return execFileSync(path.join(process.env.SystemRoot||'C:/Windows','System32','schtasks.exe'),['/Query','/TN',task,'/XML'],{windowsHide:true,timeout:12000,maxBuffer:262144});}
 export async function runOperation(request,context){
  const {workspace,dataRoot,policy,host,queryTask=nativeTaskXml,retiredTaskEvidence=nativeRetiredIranEvidence}=context;
+ if(request.operation==='controller-operating-audit-readonly')return inspectControllerOperatingAuditReadonly();
  if(request.operation==='runner-smoke')return {status:'PASS',code:'RUNNER_COMMAND_EXECUTED',seat:context.seat,resource:{totalMiB:Math.floor(os.totalmem()/1048576),freeMiB:Math.floor(os.freemem()/1048576)},execution: 'CMD_TO_PINNED_NODE',providerCalls:0,d1Writes:0};
  if(request.operation==='core-status'){
   // Only the fixed engine's missing pre-snapshot activates this scope. The
