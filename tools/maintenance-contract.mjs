@@ -1075,7 +1075,8 @@ export function validateConfirmedPostcheckFailure({original,manifest,approval,is
     run.conclusion!=='failure'||run.display_title!==title||
     job?.id!==spec.jobId||job.run_id!==spec.runId||
     job.status!=='completed'||job.conclusion!=='failure'||
-    job.runner_name!==spec.runnerName||job.name!=='approved-pc-job')return false;
+    job.runner_name!==spec.runnerName||
+    !['approved-pc-job','public-approved-a'].includes(job.name))return false;
  const steps=job.steps?.filter(x=>x.name===POSTCHECK_STEP);
  return Array.isArray(steps)&&steps.length===1&&
     steps[0].status==='completed'&&steps[0].conclusion==='failure';
