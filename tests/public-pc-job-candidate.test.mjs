@@ -131,7 +131,7 @@ test('event file reader is bounded and denies invalid input without network or w
 });
 
 test('existing private operational job stays gated; public job cannot grant permissions',()=>{
- const yaml=fs.readFileSync(new URL('../.github/workflows/pc-job.yml',import.meta.url),'utf8');
+ const yaml=fs.readFileSync(new URL('../.github/workflows/pc-job.yml',import.meta.url),'utf8').replace(/\r\n/g,'\n');
  const op=yaml.split('  approved-pc-job:\n')[1]?.split('\n  public-readonly-intake:')[0];
  const pub=yaml.split('  public-readonly-intake:\n')[1];
  assert.ok(op);assert.ok(pub);

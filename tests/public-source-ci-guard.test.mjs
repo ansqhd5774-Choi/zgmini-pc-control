@@ -84,3 +84,18 @@ test('fixed source-CI gate rejects malformed and missing event files',t=>{
  fs.writeFileSync(file,JSON.stringify(s.event));
  assert.equal(runPublicSourceCiGuard({...s.env,GITHUB_EVENT_PATH:file}).status,'PASS');
 });
+
+test('GitHub-hosted public source CI fails closed on each Node step for Windows and Linux',()=>{
+ const workflow=fs.readFileSync(new URL('../.github/workflows/controller-maintenance-source-tests.yml',import.meta.url),'utf8').replace(/\r\n/g,'\n');
+ const section=workflow.split('  public-source-only:\n')[1]?.split('\n  source-only:')[0];
+ assert.ok(section,'expected existing source-only job');
+ assert.match(section,/os: \[ubuntu-latest, windows-latest\]/);
+ assert.match(section,/runs-on: \$\{\{ matrix\.os \}\}/);
+ // Windows defaults to pwsh and can swallow prior child process exit status.
+ // Both independent steps must use bash -e instead.
+ assert.equal((section.match(/shell: bash/g)||[]).length,2);
+ assert.equal((section.match(/set -euo pipefail/g)||[]).length,2);
+ assert.match(section,/permissions:\n\s+contents: read/);
+ assert.match(section,/persist-credentials: false/);
+ assert.doesNotMatch(section,/runs-on: \[self-hosted/);
+});

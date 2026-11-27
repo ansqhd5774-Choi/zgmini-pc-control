@@ -290,8 +290,13 @@ jobs:
       github.event.repository.private == false &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.user.login == 'ansqhd5774-Choi'
-    runs-on: ubuntu-latest
-    timeout-minutes: 4
+    # Both jobs use ephemeral GitHub-hosted runners; no self-hosted PC seat.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
     permissions:
       contents: read
     steps:
@@ -304,11 +309,15 @@ jobs:
         with:
           node-version: '22'
       - name: Verify exact public source-only event origin
+        shell: bash
         run: |
+          set -euo pipefail
           node --check tools/public-source-ci-guard.mjs
           node tools/public-source-ci-guard.mjs
       - name: Verify public source/runner isolation and deferred B approval
+        shell: bash
         run: |
+          set -euo pipefail
           node --test --test-concurrency=1 tests/public-source-ci-guard.test.mjs
           node --test --test-concurrency=1 tests/public-pc-job-candidate.test.mjs
           node --test --test-concurrency=1 tests/controller-entry-import-receipt.test.mjs

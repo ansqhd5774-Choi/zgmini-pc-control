@@ -8,7 +8,8 @@ import {executeJob} from '../controller/engine.mjs';
 import {attestOwnerPcJobEvent,publicPcReportProjection,publicJobLogEnvelope} from '../controller/common.mjs';
 import {stagePreimageManifest} from '../controller/preimage-manifest-stager.mjs';
 
-const wf=fs.readFileSync(new URL('../.github/workflows/pc-job.yml',import.meta.url),'utf8');
+// Keep the same source contract on LF/CRLF checkout (Windows Git autocrlf).
+const wf=fs.readFileSync(new URL('../.github/workflows/pc-job.yml',import.meta.url),'utf8').replace(/\r\n/g,'\n');
 const entry=fs.readFileSync(new URL('../controller/entry.mjs',import.meta.url),'utf8');
 const publicA=wf.split('  public-approved-a:\n')[1]?.split('\n  # Public issue observation')[0];
 const stager=fs.readFileSync(new URL('../controller/preimage-manifest-stager.mjs',import.meta.url),'utf8');
