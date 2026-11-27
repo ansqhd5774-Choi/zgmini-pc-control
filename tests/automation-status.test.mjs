@@ -4,6 +4,7 @@ import path from 'node:path';
 import './controller-operating-audit-selective.test.mjs';
 import './controller-operating-audit-b-manifest.test.mjs';
 import './controller-audit-public-b-operator-once.test.mjs';
+import './controller-audit-lineage-approval.test.mjs';
 import {summarizeAutomation,dedicatedPcRunnersOnline,classifyRunnerQueryError,scopedRunnerRosterCliOptions,safeRuntimeSignals,operatingPcRunnerEvidence,inspectWatchdogReadOnly,summarizeSupervisorReadOnly,summarizeRequestedRecoveryEvidence,summarizeRequestProgress} from '../tools/automation-status.mjs';
 import {inspectControllerOperatingAuditReadonly} from '../controller/operations.mjs';
 const healthy=()=>({installLock:{held:false},actualControllerSha:'a'.repeat(40),
