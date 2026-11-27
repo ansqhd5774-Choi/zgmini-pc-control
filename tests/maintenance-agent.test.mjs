@@ -1974,3 +1974,7 @@ test('Public B requires exact pinned request, origin and run receipt',async()=>{
  const swapped=await verifyControllerBIdentity({...f.proof,issueNumber:43});
  assert.equal(swapped.code,'CI_RECEIPT_ISSUE_OR_BYTES_MISMATCH');
 });
+
+// Public GitHub-hosted source-only CI runs the fixed Writer B COM probe
+// in Node vm with injected fixtures; no Windows API/PC action is invoked.
+import '../r17-writer-b/r17-b-windows-probe.test.mjs';
