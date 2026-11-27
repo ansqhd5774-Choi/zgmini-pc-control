@@ -170,7 +170,10 @@ test('public-capable PC job has no raw stdout or unprojected Issue headline',()=
  // Direct stringify of the full Worker report exposes private runtime
  // inventory to GitHub Actions logs if the public A path is enabled.
  assert.doesNotMatch(entry,/console\.log\(JSON\.stringify\(result\.report\)\)/);
- assert.match(entry,/publicJobLogEnvelope\(result\.report,event\?\.repository\?\.private\)/);
+ const privateEventLog=/publicJobLogEnvelope\(result\.report,event\?\.repository\?\.private\)/.test(entry);
+ const attestedLog=/publicJobLogEnvelope\(result\.report,admitted\.visibility==='PRIVATE'\)/.test(entry);
+ assert.ok(privateEventLog||attestedLog,'only a verified visibility may choose raw private logs');
+ if(attestedLog)assert.match(entry,/const admitted=attestOwnerPcJobEvent\(event,process\.env,policy\)/);
  // The public report projection has to govern the comment title too.
  assert.doesNotMatch(upload,/\*\*\$\{report\.status\} — \$\{report\.code\}\*\*/);
  assert.match(upload,/\*\*\$\{publishedReport\.status\} — \$\{publishedReport\.code\}\*\*/);
@@ -178,4 +181,23 @@ test('public-capable PC job has no raw stdout or unprojected Issue headline',()=
  // This is not authorization to remove Private execution checks here.
  const op=job.split('  approved-pc-job:')[1]?.split('  public-readonly-intake:')[0];
  assert.match(op??'',/github\.event\.repository\.private == true/);
+ // The Public A candidate has a separate, stricter workflow/actor boundary.
+ // Existing Private-only job must never be reused as a generic Public bridge.
+ if(job.includes('  public-approved-a:')){
+   const a=job.split('  public-approved-a:')[1]?.split('  public-readonly-intake:')[0];
+   assert.ok(a,'expected separate public A job');
+   for(const guard of [
+     /github\.event\.repository\.private == false/,
+     /github\.event\.repository\.id == 1442936296/,
+     /github\.event\.repository\.owner\.id == 327938088/,
+     /github\.actor_id == 327938088/,
+     /github\.event\.sender\.id == 327938088/,
+     /github\.event\.issue\.user\.id == 327938088/,
+     /github\.ref == 'refs\/heads\/main'/,
+     /github\.workflow_ref == 'ansqhd5774-Choi\/zgmini-pc-control\/\.github\/workflows\/pc-job\.yml@refs\/heads\/main'/,
+     /github\.run_attempt == 1/,
+     /runs-on: \[self-hosted, Windows, X64, zgmini-pc-control\]/
+   ])assert.match(a,guard);
+   assert.doesNotMatch(a,/uses: actions\/checkout|workflow_dispatch|repository_dispatch/);
+ }
 });
