@@ -4,6 +4,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {test} from "node:test";
+import {execFileSync} from "node:child_process";
+import {requireHandoffApproval,handoffFilePlan,nextRuntimeFiles} from "../tools/handoff-maintenance.mjs";
 
 import {createMaintenanceAgent,failedUpdaterResult,normalizedResult,attachApprovedNativeBReceipt,parseS6NonzeroRecoveryReport} from "../tools/maintenance-agent.mjs";
 import {prepareMaintenanceIssue} from '../tools/maintenance-request.mjs';
@@ -1131,4 +1133,39 @@ test('ordinary B result never gains CI-native permission from updater stdout',as
  assert.equal(output.status,'SUCCEEDED');
  assert.equal(output.ciNativeEffect,undefined);
  assert.equal(output.ciNativePolicySha256,undefined);
+});
+
+
+test('public maintainer one-file handoff pins exact immutable source and leaves all B effects held',()=>{
+ const target='feaf0a380890663d8881881bea63587576188c76';
+ const previous=JSON.parse(fs.readFileSync(new URL(
+  '../approvals/maintenance-handoffs/b08f3a482e9bb39523f47675ae06bc6e02e01d2d.json',import.meta.url),'utf8'));
+ const approved=JSON.parse(fs.readFileSync(new URL(
+  '../approvals/maintenance-handoffs/'+target+'.json',import.meta.url),'utf8'));
+ assert.equal(previous.targetSha,'b08f3a482e9bb39523f47675ae06bc6e02e01d2d');
+ assert.equal(approved.installedSha,previous.targetSha);
+ assert.equal(approved.targetSha,target);
+ assert.equal(approved.schema,'ZGMINI_MAINTENANCE_HANDOFF_V2');
+ assert.equal(approved.transition,'SEVEN_TO_SEVEN');
+ assert.equal(approved.scope,'COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE');
+ assert.equal(requireHandoffApproval(approved,target,previous.targetSha),'SEVEN_TO_SEVEN');
+ assert.throws(()=>requireHandoffApproval({...approved,approved:false},target,previous.targetSha),
+  /HANDOFF_APPROVAL_REQUIRED/);
+ assert.equal(Object.hasOwn(approved,'ciControllerBPolicy'),false);
+ const source=[...nextRuntimeFiles,'tools/bootstrap-maintenance.mjs','tools/handoff-maintenance.mjs'];
+ assert.deepEqual(Object.keys(approved.files).sort(),source.sort());
+ const installedFiles=Object.fromEntries(nextRuntimeFiles.map(p=>[p,previous.files[p]]));
+ assert.deepEqual(handoffFilePlan('SEVEN_TO_SEVEN',installedFiles,approved.files).writes,
+  ['tools/maintenance-agent.mjs']);
+ assert.deepEqual(approved.runtimeChangedFiles,['tools/maintenance-agent.mjs']);
+ assert.equal(approved.files['tools/maintenance-agent.mjs'],
+  '7c3f6318b07844aaba68cc6f24d5bc82a45d4cde9bd5291cd3e9948778c945c2');
+ for(const rel of source){
+  const bytes=execFileSync('git',['show',target+':'+rel],
+   {cwd:new URL('../',import.meta.url),maxBuffer:5_000_000});
+  assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),
+   approved.files[rel], 'approved immutable source: '+rel);
+  if(rel!=='tools/maintenance-agent.mjs')
+   assert.equal(approved.files[rel],previous.files[rel], 'unrelated file preserved: '+rel);
+ }
 });
