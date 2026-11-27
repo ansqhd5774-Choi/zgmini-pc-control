@@ -259,6 +259,7 @@ on:
       - 'tests/writer-install-preimage-readonly.test.mjs'
       - 'tests/engine.test.mjs'
       - 'tests/maintenance-agent.test.mjs'
+      - 'tests/maintenance-postcheck-link.test.mjs'
       - 'tests/maintenance-installed-recovery-request.test.mjs'
       - 'tests/maintenance-lock.test.mjs'
       - 'tests/source-bundle-register.test.mjs'
@@ -317,6 +318,7 @@ jobs:
           node --test --test-concurrency=1 tests/pc-job-late-label-intake.test.mjs
           node --test --test-concurrency=1 tests/public-a-controller-selective-source.test.mjs
           node --test --test-concurrency=1 tests/maintenance-agent.test.mjs
+          node --test --test-concurrency=1 tests/maintenance-postcheck-link.test.mjs
           node --test --test-concurrency=1 tests/ci-controller-b-policy-only-proposal.test.mjs
           node --test --test-concurrency=1 tests/supervisor-orphan-six-b-receiver-source.test.mjs
   source-only:
