@@ -1276,7 +1276,7 @@ function publicBAuthFixture(){
    throw Error('unexpected GitHub API route');
   },
   readJobLogs:async id=>id===888?
-   '2026-11-28T00:00:00Z '+controllerBReceiptMarker(42,requestBytes)+'\\n':''
+   '2026-11-28T00:00:00Z '+controllerBReceiptMarker(42,requestBytes)+'\n':''
  };
  return {installed,policy,run,job,actual,request,proof};
 }
