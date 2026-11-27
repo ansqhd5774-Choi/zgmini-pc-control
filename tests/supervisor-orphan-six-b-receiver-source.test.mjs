@@ -295,9 +295,11 @@ test('fresh decision blocks changed raw manifest or merged PR, never allows OS a
  pr.pr.head.sha='a'.repeat(40);
  assert.equal((await freshSeat(pr)).code,'ORPHAN_SIX_FRESH_DECISION_MERGED_PR_UNVERIFIED');
  const invalid=sample();
+ const originalRequestId=invalid.issueBody.requestId;
  invalid.issueBody.requestId='pc-12345678-1234-4234-9234-ffffffffffff';
  invalid.issue.body=JSON.stringify(invalid.issueBody);
- assert.equal((await freshSeat(invalid)).code,'ORPHAN_SIX_FRESH_DECISION_REQUEST_PIN_CHANGED');
+ assert.equal((await freshSeat(invalid,1,{expectedRequestId:originalRequestId})).code,
+  'ORPHAN_SIX_FRESH_DECISION_REQUEST_PIN_CHANGED');
 });
 test('fresh decision refuses missing seat/journal/proposal pins before any canonical reads',async()=>{
  const f=sample();
