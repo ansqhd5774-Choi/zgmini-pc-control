@@ -46,7 +46,7 @@ function sample(){
 }
 function fixture(t,{denyApproval=false,failBeforeSignalAt=null,
  firstIdentityDriftAt=null,failAfterSignalAt=null,breakExitAt=null,
- revokeBeforeSeat=null,approvalReadbackUnknownAt=null}={}){
+ revokeBeforeSeat=null,approvalReadbackUnknownAt=null,drainFailure=null}={}){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-orphan-b-fixture-'));
  fs.mkdirSync(path.join(root,'requests'));
  const requestId='pc-'+randomUUID(),manifestRawSha256=d('d');
@@ -55,6 +55,7 @@ function fixture(t,{denyApproval=false,failBeforeSignalAt=null,
   root,requestId,manifestRawSha256,lease
  });
  const original=sample(),sent=[],events=[],gone=new Set();
+ const preSignalReads=new Map();
  const port={
   async verifyExactApproval({requestId:id,approvalManifestSha256:sha,scope}){
    events.push('approval');
@@ -86,17 +87,31 @@ function fixture(t,{denyApproval=false,failBeforeSignalAt=null,
     watchdogFenceUninterruptedVerified:true};
   },
   async readPrivateSnapshot(){events.push('snapshot');return original;},
-  async attestPreSignal({seat,proposalId,afterIntentReadbackSha256}){
-   events.push('presignal-'+seat+(afterIntentReadbackSha256?'-after-intent':''));
+  async attestPreSignal({seat,proposalId,afterIntentReadbackSha256,
+   afterFreshOwnerDecision=false}){
+   const read=(preSignalReads.get(seat)??0)+1;
+   preSignalReads.set(seat,read);
+   events.push('presignal-'+seat+
+    (afterFreshOwnerDecision?'-after-owner-decision':
+     afterIntentReadbackSha256?'-after-intent':'-before-intent'));
    if(seat===failBeforeSignalAt&&afterIntentReadbackSha256)
     throw Object.assign(Error('fixture'),{code:'ORPHAN_SIX_TEST_PRESIGNAL_FAILED'});
    const pin=original.seats[seat-1];
+   const missing=drainFailure?.seat===seat&&drainFailure?.read===read;
+   const failKind=missing?drainFailure.kind:null;
    return {source:'PRIVATE_SAME_HOST_B_PRESIGNAL_DOUBLE_READ',
     seat,proposalId,observedAtUtc:new Date().toISOString(),
     operatorClaimUninterruptedVerified:true,
     watchdogFenceUninterruptedVerified:true,
     nextSeatIdentityStillLiveVerified:!gone.has(seat),
     remainingOriginalSeatsUnchangedVerified:true,
+    intakeDrainStillVerified:failKind!=='intake',
+    zeroActiveWorkersStillVerified:failKind!=='worker',
+    activeControllerWorkerCount:failKind==='worker'?1:0,
+    completeRelatedLeaseEnumerationStillVerified:failKind!=='enumeration',
+    relatedControllerLeaseCount:failKind==='lease'?1:0,
+    noUncertainWorkOutcomeStillVerified:failKind!=='uncertain',
+    afterFreshOwnerDecisionDoubleReadVerified:afterFreshOwnerDecision,
     oldInstancePid:seat===firstIdentityDriftAt&&!afterIntentReadbackSha256?
       pin.pid+1000:pin.pid,
     oldInstanceBirth:pin.startedAtUtc,
@@ -150,6 +165,9 @@ test('six-seat synthetic B executes fixed one-use sequence and returns POSTCHECK
  assert.equal(r.verifiedExitedSeatCount,6);
  assert.equal(r.attemptedSignalCount,6);
  assert.deepEqual(f.sent,[1,2,3,4,5,6]);
+ for(let seat=1;seat<=6;seat++)
+  assert.equal(f.events.filter(x=>x==='presignal-'+seat+
+   '-after-owner-decision').length,1);
  assert.deepEqual(f.events.slice(-2),['all-absent','release-fence']);
  const j=f.journal.read().record;
  assert.equal(j.phase,'WAITING_WATCHDOG');
@@ -160,6 +178,56 @@ test('six-seat synthetic B executes fixed one-use sequence and returns POSTCHECK
  assert.equal(again.status,'RECOVERY_REQUIRED');
  assert.equal(again.attemptedSignalCount,0);
  assert.deepEqual(f.sent,[1,2,3,4,5,6]);
+});
+test('live Worker, lease, intake and unknown-work drift block BEFORE any signal',async t=>{
+ for(const kind of ['worker','lease','intake','enumeration','uncertain']){
+  for(const read of [1,2,3]){
+   const f=fixture(t,{drainFailure:{seat:1,read,kind}});
+   const r=await f.run();
+   assert.equal(r.status,read===1?'BLOCKED':'RECOVERY_REQUIRED',
+    kind+'/'+read);
+   assert.equal(r.code,'ORPHAN_SIX_PRESIGNAL_LIVE_BOUNDARY_UNVERIFIED',
+    kind+'/'+read);
+   assert.deepEqual(f.sent,[],kind+'/'+read);
+   assert.equal(r.attemptedSignalCount,0);
+   assert.equal(f.events.includes('signal-1'),false);
+   assert.equal(f.events.includes('release-fence'),false);
+   const journal=f.journal.read()?.record;
+   assert.equal(journal?.phase,'RECOVERY_REQUIRED');
+   assert.equal(journal.intentCount,read===1?0:1);
+   assert.equal((await f.run()).attemptedSignalCount,0);
+  }
+ }
+});
+test('Worker or lease admission between seat one and two never signals seat two',async t=>{
+ for(const kind of ['worker','lease','intake']){
+  const f=fixture(t,{drainFailure:{seat:2,read:3,kind}});
+  const r=await f.run();
+  assert.equal(r.status,'RECOVERY_REQUIRED');
+  assert.equal(r.attemptedSignalCount,1);
+  assert.deepEqual(f.sent,[1],kind);
+  assert.equal(f.events.includes('signal-2'),false);
+  assert.equal(f.events.includes('release-fence'),false);
+  assert.equal(f.journal.read().record.intentCount,2);
+  assert.equal(f.journal.read().record.stoppedCount,1);
+  assert.equal((await f.run()).attemptedSignalCount,0);
+ }
+});
+test('final post-approval proof identity and freshness cannot be recycled',async t=>{
+ const f=fixture(t);
+ const base=f.port.attestPreSignal;
+ f.port.attestPreSignal=async x=>{
+  const proof=await base(x);
+  if(x.seat===1&&x.afterFreshOwnerDecision===true)
+   return {...proof,afterFreshOwnerDecisionDoubleReadVerified:false};
+  return proof;
+ };
+ const r=await f.run();
+ assert.equal(r.code,'ORPHAN_SIX_FINAL_LIVE_DRAIN_OR_IDENTITY_CHANGED');
+ assert.equal(r.status,'RECOVERY_REQUIRED');
+ assert.equal(r.attemptedSignalCount,0);
+ assert.deepEqual(f.sent,[]);
+ assert.equal(f.journal.read().record.phase,'RECOVERY_REQUIRED');
 });
 test('private approval denied means no signal and no journal creation',async t=>{
  const f=fixture(t,{denyApproval:true}),r=await f.run();
