@@ -28,6 +28,23 @@ const observed=m=>({target:TARGET,regularFile:true,realPathMatches:true,
  taskDefinitionSha256:m.taskDefinitionSha256,wrapperSha256:m.wrapperSha256,
  active:false,leaseOwned:true,sharedInstallLockOwned:true,sourceApproved:true});
 const stop=(fn,code)=>assert.throws(fn,e=>e.code===code);
+const draft=JSON.parse(fs.readFileSync(new URL('../drafts/w06-cnn-sidecar-v3-pin-20261128.json',import.meta.url),'utf8'));
+test('exact V3 draft is byte-complete but explicitly not executable B approval',()=>{
+ assert.equal(draft.schema,NEXT_SUCCESSOR_SCHEMA);
+ assert.equal(draft.status,'DRAFT_UNAPPROVED');
+ assert.equal(draft.beforeSha256,V2_AFTER);
+ assert.equal(draft.afterSha256,sha256(after));
+ assert.equal(draft.approvedContentSha256,sha256(after));
+ assert.equal(draft.approvedSourceSha,'42ab63b28e0c2617486a7b7dba550101960e5cf7');
+ assert.equal(draft.installedHead,nextSource);
+ assert.equal(draft.installedConfigSource,nextSource);
+ assert.equal(draft.runCount,1);
+ stop(()=>validateManifest(draft),'SIDECAR_B_SCOPE_STOP');
+ const projected={...draft,status:'APPROVED_B'};
+ assert.equal(validateManifest(projected),projected);
+ assert.equal(verifyCandidateBytes(projected,after),after);
+});
+
 
 test('V3 requires full installed V2 preimage and only new source pin',()=>{
  const m=manifest();
