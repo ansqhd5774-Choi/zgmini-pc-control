@@ -8,7 +8,7 @@ import {execFileSync} from "node:child_process";
 import {requireHandoffApproval,handoffFilePlan,nextRuntimeFiles} from "../tools/handoff-maintenance.mjs";
 
 import {createMaintenanceAgent,failedUpdaterResult,normalizedResult,attachApprovedNativeBReceipt,parseS6NonzeroRecoveryReport} from "../tools/maintenance-agent.mjs";
-import {prepareMaintenanceIssue} from '../tools/maintenance-request.mjs';
+import {prepareMaintenanceIssue,submitExistingControllerApprovalFromCi} from '../tools/maintenance-request.mjs';
 
 test('pre-install child rejection retains exact safe code and current installed SHA',()=>{
  const r=failedUpdaterResult({requestId:'fixture',targetControllerSha:'b'.repeat(40)},
@@ -1247,6 +1247,81 @@ test('public postcheck receiver handoff is exactly two source files with origina
  assert.match(handoffSource,/requireNoUnfinishedHandoff/);
 });
 
+
+
+test('Public B publisher on hosted source CI is default-denied until exact installed policy',async()=>{
+ const m=sampleRequest().manifest;
+ m.controllerOnlyInstall=true;
+ m.selectiveSource={schema:'ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1',
+  branch:'codex/publisher-scope-evidence',mainSha:'f'.repeat(40),customPaths:[]};
+ const bytes=Buffer.from(JSON.stringify(m));
+ const input={targetSha:TARGET,approvalSha256:digest(bytes),runId:765,attempt:1};
+ const repo={id:1442936296,full_name:REPO,private:false,
+  owner:{id:327938088,login:ACTOR,type:'User'}};
+ let reads=0,posts=0;
+ const ports={readRepository:async()=>repo,
+  readManifest:async()=>{reads++;return bytes;},
+  createIssue:async()=>{posts++;throw Error('UNAUTHORIZED_POST');}};
+ await assert.rejects(()=>submitExistingControllerApprovalFromCi(input,ports),
+  /MAINTENANCE_CI_PUBLIC_POLICY_NOT_INSTALLED/);
+ assert.equal(reads,0);assert.equal(posts,0);
+ const installed=()=>({schema:'ZGMINI_PC_MAINTENANCE_INSTALL_V1',
+  sourceSha:'c'.repeat(40),startupSha256:'d'.repeat(64),
+  files:Object.fromEntries(['a','b','c','d','e','f','g'].map(x=>
+   ['tools/'+x+'.mjs','e'.repeat(64)])),
+  ciControllerBPolicy:{schema:'ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V2',
+   enabled:true,workflowId:430972394,
+   workflowBlobSha:'f'.repeat(40),
+   workflowPath:'.github/workflows/ci-approval-controller-b.yml',
+   repositoryVisibility:'public',installedSha:INSTALLED,
+   targetSha:TARGET,manifestSha256:digest(bytes)}});
+ ports.readIndependentInstalledCiPolicy=async()=>({
+  ...installed(),ciControllerBPolicy:{...installed().ciControllerBPolicy,
+   manifestSha256:'0'.repeat(64)}});
+ await assert.rejects(()=>submitExistingControllerApprovalFromCi(input,ports),
+  /MAINTENANCE_CI_PUBLIC_EFFECT_SCOPE_MISMATCH/);
+ assert.equal(reads,0);assert.equal(posts,0);
+ ports.readIndependentInstalledCiPolicy=async()=>installed();
+ const own={id:327938088,login:ACTOR,type:'User'};
+ const pr={number:28,merged:true,merged_by:own,merge_commit_sha:'a'.repeat(40),
+  base:{ref:'main',repo:{full_name:REPO}},
+  head:{sha:'f'.repeat(40),repo:{full_name:REPO}}};
+ const run={id:22,workflow_id:416355595,
+  path:'.github/workflows/controller-maintenance-source-tests.yml',
+  event:'pull_request',status:'completed',conclusion:'success',
+  repository:{id:1442936296,full_name:REPO},head_repository:{id:1442936296},
+  head_sha:pr.head.sha};
+ let saved=null,actual=null;
+ Object.assign(ports,{
+  readMergedManifest:async()=>bytes,
+  readApprovalPr:async()=>pr,listRuns:async()=>({workflow_runs:[run]}),
+  readRun:async()=>run,loadReceipt:async()=>saved,
+  findPriorRequests:async()=>[],
+  saveReceipt:async(_effect,receipt,{exclusive=false}={})=>{
+   if(exclusive&&saved)throw Error('DUPLICATE_RECEIPT');
+   saved=structuredClone(receipt);
+  },
+  createIssue:async envelope=>{
+   posts++;
+   assert.equal(saved.phase,'CREATING');
+   actual={number:42,state:'open',
+    user:{login:CI_CONTROLLER_ACTOR,id:41898282,type:'Bot'},
+    title:envelope.title,body:envelope.body,
+    labels:envelope.labels.map(name=>({name}))};
+   return {number:42};
+  },
+  readIssue:async()=>actual
+ });
+ const done=await submitExistingControllerApprovalFromCi(input,ports);
+ assert.equal(done.status,'REQUEST_READBACK_VERIFIED');
+ assert.equal(saved.phase,'READBACK_VERIFIED');
+ assert.match(done.receiptMarker,/^ZGMINI_CI_CONTROLLER_B_RECEIPT=42:[a-f0-9]{64}$/);
+ assert.equal(posts,1);assert.ok(reads>=1);
+ const reused=await submitExistingControllerApprovalFromCi({...input,runId:777},ports);
+ assert.equal(reused.status,'EXISTING_REQUEST_REUSED');
+ assert.equal(reused.receiptMarker,undefined);
+ assert.equal(posts,1);
+});
 
 test('Public B stays blocked without an independently installed V2 grant, including bot spoof',async t=>{
  const f=fixture(t,{privateRepo:false,actor:CI_CONTROLLER_ACTOR});
