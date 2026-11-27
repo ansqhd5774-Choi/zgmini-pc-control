@@ -66,7 +66,7 @@ test('lineage source closure requires identical trusted bytes and rejects unlist
  assert.match(text,/const TARGET='d3764580fdb08ecddd5f9b1064051eec30f90492'/);
  assert.match(text,/const INSTALLED='cde1dd372210e4658ae348cb9e2577967cb11634'/);
  assert.match(text,/manifest\.checks\?\.status==='PASS'/);
- assert.match(text,/APPROVAL_MERGE='PENDING_PR_4302_APPROVAL_MERGE'/);
+ assert.match(text,/APPROVAL_MERGE='b7b7eb92802d0e974ee3ad9a2d2689e37ae41bb4'/);
 });
 test('unknown outcome preserves leased recovery exclusivity',async()=>{
  const lock=()=>({releases:0,holds:0,release(){this.releases++;},
