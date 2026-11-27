@@ -322,7 +322,7 @@ test('installed Public A Controller must pass immutable host gate before old PC 
  }
  assert.ok(script.includes("h.controllerSourceSha!=='"+target+"'"));
  const baseHost={controllerSourceSha:target,controllerFiles:digests};
- const guard=({host=baseHost,fileMap=files,symlink=null,missing=null}={})=>{
+ const guard=({host=baseHost,fileMap=files,symlink=null,missing=null,hostSymlink=false}={})=>{
   const proc={exitCode:0,exit(code){this.exitCode=code;throw Error('EXPECTED_EXIT');}};
   const fakeFs={
    readFileSync(path){
@@ -335,6 +335,8 @@ test('installed Public A Controller must pass immutable host gate before old PC 
     return fileMap[rel];
    },
    lstatSync(path){
+    if(path==='E:/ZGmini/automation/pc-control/host.json')
+     return {isFile:()=>true,isSymbolicLink:()=>hostSymlink};
     const prefix='E:/ZGmini/automation/pc-control/';
     const rel=path.slice(prefix.length);
     if(rel===missing)throw Error('MISSING_FILE');
@@ -361,6 +363,7 @@ test('installed Public A Controller must pass immutable host gate before old PC 
  }
  assert.equal(guard({host:{controllerSourceSha:target}}),2,'truncated host fails');
  assert.equal(guard({host:null}),2,'missing host fails');
+ assert.equal(guard({hostSymlink:true}),2,'symlink host manifest fails');
  const scope=publicA.slice(publicA.indexOf('    steps:\n'));
  const stage=scope.slice(scope.indexOf('      - name: Stage approved'),scope.indexOf('      - name: Execute fixed'));
  const execute=scope.slice(scope.indexOf('      - name: Execute fixed'),scope.indexOf('      - name: Upload sanitized'));
