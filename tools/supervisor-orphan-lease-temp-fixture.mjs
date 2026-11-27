@@ -53,7 +53,7 @@ export function swapOrphanLeaseInTemp({
  injectFailure=null
 }={}){
  let base,claimDir,backupDir,stagedDir,leaseDir,journal,control,ownerFile,hostFile,heartbeatFile,old,oldBytes;
- let phaseWritten=false;
+ let phaseWritten=false,recordPhase=null;
  try{base=assertIsolatedOrphanRoot(root,{filesystem,tempRoot});}
  catch{return denial('BLOCKED','ORPHAN_TEMP_SCOPE_DENIED');}
  if(!oneUse(requestId)||!sha64(expected?.ownerSha256)||
@@ -108,7 +108,7 @@ export function swapOrphanLeaseInTemp({
   // writing a phase witness and updating journal is NOT safe to retry:
   // reconciliation must examine both files and the current lease bytes.
   journal=path.join(claimDir,'journal.json');
-  const recordPhase=phase=>{
+  recordPhase=phase=>{
    const bytes=Buffer.from(JSON.stringify({
     schema:'ZGMINI_ORPHAN_TEMP_CLAIM_V1',requestId,phase,
     ownerSha256:expected.ownerSha256})+'\n');
@@ -173,31 +173,21 @@ export function swapOrphanLeaseInTemp({
     if(noNewClaim&&oldExact&&sourceExact&&heartbeatExact&&noExtraLease&&pidStable&&
        privateAttestation.watchdogFenced===true&&
        privateAttestation.workerCount===0){
-     // Phase records are append-only. Failure to record rollback pending
-     // stops the rename rather than silently mutating a lease.
-     const bytes=Buffer.from(JSON.stringify({
-      schema:'ZGMINI_ORPHAN_TEMP_CLAIM_V1',requestId,
-      phase:'OLD_RESTORE_PENDING',ownerSha256:expected.ownerSha256})+'\n');
-     const pending=path.join(claimDir,'phase-OLD_RESTORE_PENDING.json');
-     const fd=filesystem.openSync(pending,'wx');
-     try{filesystem.writeFileSync(fd,bytes);filesystem.fsyncSync(fd);}
-     finally{filesystem.closeSync(fd);}
+     // Keep the current journal as well as the immutable phase witness.
+     // If this phase cannot be written, do not perform the rollback rename.
+     recordPhase('OLD_RESTORE_PENDING');
      filesystem.renameSync(backupDir,leaseDir);
      // The restored old owner is now exact and no new owner is claimed.
      if(hash(readExact(filesystem,path.join(leaseDir,'owner.json'),8192))===
         hash(oldBytes)){
-      const complete=path.join(claimDir,'phase-OLD_RESTORED.json');
-      const done=Buffer.from(JSON.stringify({
-       schema:'ZGMINI_ORPHAN_TEMP_CLAIM_V1',requestId,
-       phase:'OLD_RESTORED',ownerSha256:expected.ownerSha256})+'\n');
-      const f=filesystem.openSync(complete,'wx');
-      try{filesystem.writeFileSync(f,done);filesystem.fsyncSync(f);}
-      finally{filesystem.closeSync(f);}
+      recordPhase('OLD_RESTORED');
       return denial('ISOLATED_ROLLED_BACK','ORPHAN_TEMP_OLD_ONLY_RESTORED');
      }
     }
    }catch{/* Keep all exact original evidence for separate reconciliation. */}
   }
+  // Never mask the original uncertainty if even the phase update fails.
+  try{if(phaseWritten&&recordPhase)recordPhase('RECOVERY_REQUIRED');}catch{}
   return denial('RECOVERY_REQUIRED','ORPHAN_TEMP_OUTCOME_UNVERIFIED_NO_RETRY');
 
  }
