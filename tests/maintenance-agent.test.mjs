@@ -1269,7 +1269,7 @@ function publicBAuthFixture(){
   issueNumber:42,requestBytes,runId:765,attempt:1,policy,
   getJson:async route=>{
    if(route==='actions/runs/765/attempts/1')return run;
-   if(route==='contents/'+path+'?ref='+run.head_sha')return {type:'file',
+   if(route==='contents/'+path+'?ref='+run.head_sha)return {type:'file',
     path,sha:blob,encoding:'base64',content:workflow.toString('base64')};
    if(route==='actions/runs/765/attempts/1/jobs?per_page=100')
     return {total_count:1,jobs:[job]};
