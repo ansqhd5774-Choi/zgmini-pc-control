@@ -94,11 +94,21 @@ test('hosted source CI never operates exact #4263 recovery on Windows',async()=>
  await assert.rejects(recover4263Main(['inspect']),/B4263_INDEPENDENT_WINDOWS_REQUIRED/);
  await assert.rejects(recover4263Main(['recover']),/B4263_INDEPENDENT_WINDOWS_REQUIRED/);
 });
-test('public maintenance receiver denial remains intact',()=>{
+test('Public B receiver is denied by default and requires installed exact V2 CI scope',()=>{
  const agent=fs.readFileSync(new URL('../tools/maintenance-agent.mjs',import.meta.url),'utf8');
- assert.match(agent,/if\(await repositoryAllowed\(\)==='PUBLIC'\)/);
+ const contract=fs.readFileSync(new URL('../tools/maintenance-contract.mjs',import.meta.url),'utf8');
+ assert.match(agent,/const repositoryVisibility=await repositoryAllowed\(\)/);
+ assert.match(agent,/if\(repositoryVisibility==='PUBLIC'&&!publicCandidate\)/);
+ assert.match(agent,/if\(repositoryVisibility==='PUBLIC'&&ciPolicy\?\.repositoryVisibility!=='public'\)/);
  assert.match(agent,/PUBLIC_B_EFFECT_SEPARATE_AUTH_REQUIRED/);
  assert.match(agent,/operationalWrites:0,effectAuthorized:false/);
+ assert.match(agent,/verifyInstalledSource\(\)/);
+ assert.match(agent,/installedControllerBPolicy\(JSON\.parse\(fs\.readFileSync/);
+ assert.match(agent,/authenticateControllerBIssue\(actual,\{policy:ciPolicy/);
+ assert.match(agent,/exactManifest\.installedSha!==ciPolicy\.installedSha/);
+ assert.match(contract,/ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V2/);
+ assert.match(contract,/request\.targetControllerSha!==policy\.targetSha/);
+ assert.match(contract,/request\.approvalManifestSha256!==policy\.manifestSha256/);
 });
 
 test('full local static import closure is pinned before module evaluation',()=>{
