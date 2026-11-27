@@ -31,7 +31,9 @@ export function assessPublicPcJobCandidate({event,env}={}) {
      issue?.user?.id!==OWNER_ID||issue.user.login!==OWNER||
      issue.title!=='pc-job'||issue.state!=='open'||
      !Number.isSafeInteger(issue.number)||issue.number<=0||
-     event.number!==issue.number||issue.pull_request||
+     // GitHub 'issues' webhook identifies the Issue in issue.number;
+     // some valid payloads do not carry a redundant top-level number.
+     (Object.hasOwn(event,'number')&&event.number!==issue.number)||issue.pull_request||
      !Array.isArray(issue.labels)||!issue.labels.some(l=>l?.name==='pc-job'))
     return blocked('PUBLIC_PC_JOB_ISSUE_IDENTITY_DENIED');
   if(event.action!=='opened'&&
