@@ -1316,6 +1316,8 @@ test('Public receiver poll performs exact installed V2 CI proof, one isolated ap
  });
  const observed=await f.agent.pollOnce();
  const successful=observed.find(x=>x.status==='SUCCEEDED');
+ assert.equal(observed[0]?.status,'SUCCEEDED',
+   'authenticated Public B effect cannot be mislabeled source-only');
  assert.equal(successful?.code,'UPDATE_COMMITTED',JSON.stringify(observed));
  assert.equal(f.stats.applies,1);
  assert.equal(f.stats.manifestReads,1);
@@ -1341,6 +1343,25 @@ test('Public receiver rejects spoofed CI issue despite pinned V2 grant without a
  assert.equal(observed.find(x=>x.status==='BLOCKED')?.code,
    'CI_PUBLIC_EFFECT_SCOPE_MISMATCH',JSON.stringify(observed));
  assert.equal(f.stats.applies,0);assert.equal(f.stats.manifestReads,0);
+ assert.equal(f.agent.loadLedger(f.request.requestId),null);
+});
+
+test('Public GitHub CLI app alias alone cannot spoof REST Bot admission',async t=>{
+ const p=publicBAuthFixture();
+ const f=fixture(t,{privateRepo:false,actor:'app/github-actions',
+  requestPatch:{chatId:'chat-ci-765-1'},
+  installedCiPolicy:(_issue,raw)=>({...p.installed,ciControllerBPolicy:{
+    ...p.installed.ciControllerBPolicy,manifestSha256:digest(raw)}}),
+  publicCiProof:{actual:{...p.actual,user:{...p.actual.user,id:1}},
+    getJson:p.proof.getJson,
+    readJobLogs:(id,issue)=>id===p.job.id?
+      '2026-11-28T00:00:00Z '+controllerBReceiptMarker(issue.number,Buffer.from(issue.body))+'\n':''}
+ });
+ const observed=await f.agent.pollOnce();
+ assert.equal(observed.find(x=>x.status==='BLOCKED')?.code,
+   'CI_ISSUE_ORIGIN_DENIED',JSON.stringify(observed));
+ assert.equal(f.stats.applies,0);
+ assert.equal(f.stats.manifestReads,0);
  assert.equal(f.agent.loadLedger(f.request.requestId),null);
 });
 
