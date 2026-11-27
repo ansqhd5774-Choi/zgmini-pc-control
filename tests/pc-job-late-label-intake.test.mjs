@@ -4,6 +4,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import {runInNewContext} from 'node:vm';
+import {execFileSync,spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import {executeJob} from '../controller/engine.mjs';
 import {attestOwnerPcJobEvent,publicPcReportProjection,publicJobLogEnvelope} from '../controller/common.mjs';
 import {stagePreimageManifest} from '../controller/preimage-manifest-stager.mjs';
@@ -32,29 +35,42 @@ const event=(action='labeled',label='pc-job',issueOwner='ansqhd5774-Choi')=>({
   labels:[{name:'pc-job'}],body:JSON.stringify(request)}
 });
 
-test('Public-safe Controller source remains non-dispatching until the existing workflow is separately approved',()=>{
+test('workflow accepts exactly owner opened or pc-job labeled and retains pinned Windows entry',()=>{
  assert.match(wf,/types: \[opened, labeled\]/);
- assert.match(wf,/github\.event\.repository\.private == true/);
- assert.equal(publicA,undefined,'no public-approved-a self-hosted dispatch before installed Controller CAS');
- assert.match(wf,/runs-on: \[self-hosted, Windows, X64, zgmini-pc-control\]/);
- assert.match(wf,/github\.actor == 'ansqhd5774-Choi'/);
  assert.match(wf,/github\.event\.issue\.user\.login == 'ansqhd5774-Choi'/);
+ assert.match(wf,/github\.event\.action == 'opened'/);
+ assert.match(wf,/github\.event\.action == 'labeled' &&\s*github\.event\.label\.name == 'pc-job' &&\s*vars\.ZGMINI_PC_JOB_LATE_LABEL_ENABLED == 'true'/);
+ assert.match(wf,/github\.event\.action == 'opened' \|\|/);
+ assert.match(wf,/Late-label entry remains opt-in; duplicate claims are not replayed./);
  assert.match(wf,/contains\(github\.event\.issue\.labels\.\*\.name, 'pc-job'\)/);
+ assert.match(wf,/github\.actor == 'ansqhd5774-Choi'/);
+ assert.match(wf,/github\.event\.repository\.id == 1442936296/);
+ assert.match(wf,/github\.event\.repository\.owner\.id == 327938088/);
+ assert.match(wf,/github\.actor_id == 327938088/);
+ assert.match(wf,/github\.event\.sender\.id == 327938088/);
+ assert.match(wf,/github\.event\.issue\.title == 'pc-job'/);
+ assert.match(wf,/github\.event\.issue\.pull_request == null/);
+ assert.match(wf,/github\.workflow_ref == 'ansqhd5774-Choi\/zgmini-pc-control\/\.github\/workflows\/pc-job\.yml@refs\/heads\/main'/);
+ assert.match(wf,/github\.event\.repository\.private == true/);
+ assert.match(publicA,/github\.event\.repository\.private == false/);
+ assert.doesNotMatch(wf.split('\njobs:')[0],/pull_request:|pull_request_target:|schedule:/);
+ assert.doesNotMatch(publicA,/pull_request:|pull_request_target:|actions\/checkout/);
  assert.match(wf,/cancel-in-progress: false/);
+ assert.match(wf,/E:\\ZGmini\\runtime\\node\.exe/);
  assert.match(wf,/controller\\entry\.mjs/);
  assert.match(wf,/controller\\upload\.mjs/);
- assert.doesNotMatch(wf,/pull_request:\s*\n|pull_request_target:|workflow_dispatch:|repository_dispatch:/);
+ assert.doesNotMatch(wf,/workflow_dispatch:|repository_dispatch:|schedule:/);
 });
 
-test('old private labeled path stays opt-in and cannot activate Public execution',()=>{
- const privateJob=wf.split('  approved-pc-job:\n')[1]?.split('\n  public-readonly-intake:')[0];
- assert.ok(privateJob,'fixed existing private-only self-hosted job');
- assert.match(privateJob,/github\.event\.repository\.private == true/);
- assert.match(privateJob,/github\.event\.action == 'opened' \|\|/);
- assert.match(privateJob,/github\.event\.action == 'labeled'/);
- assert.match(privateJob,/vars\.ZGMINI_PC_JOB_LATE_LABEL_ENABLED == 'true'/);
- assert.match(privateJob,/github\.actor == 'ansqhd5774-Choi'/);
- assert.doesNotMatch(privateJob,/github\.event\.repository\.private == false/);
+test('labeled workflow admission is independently gated from opened single-run entry',()=>{
+ const jobExpression=publicA.split('    if: >-\n')[1]?.split('\n    # Public visibility')[0];
+ assert.ok(jobExpression,'expected fixed self-hosted job admission');
+ assert.match(jobExpression,/github\.event\.action == 'opened' \|\|/);
+ assert.match(jobExpression,/github\.event\.action == 'labeled'/);
+ assert.match(jobExpression,/vars\.ZGMINI_PC_JOB_LATE_LABEL_ENABLED == 'true'/);
+ assert.doesNotMatch(jobExpression,/vars\.ZGMINI_PC_JOB_LATE_LABEL_ENABLED == 'false'/);
+ assert.match(jobExpression,/github\.event\.issue\.user\.login == 'ansqhd5774-Choi'/);
+ assert.match(jobExpression,/github\.actor == 'ansqhd5774-Choi'/);
 });
 
 test('installed Controller and preimage stager share exact immutable owner Issue origin',()=>{
@@ -269,4 +285,115 @@ test('public A Issue comment heading uses the same projected bytes as JSON/TXT',
  const headline=`**${publishedReport.status} — ${publishedReport.code}**`;
  assert.equal(headline,'**PASS — PUBLIC_RESULT_CODE_REDACTED**');
  assert.doesNotMatch(headline,/DO_NOT_PUBLISH_TEST_SECRET/);
+});
+
+
+test('installed Public A Controller must pass immutable host gate before old PC entry and upload',()=>{
+ const target='20d5bbbf305531dca9bf5b74744df83daf37cf17';
+ const base='e11ba38a9f03da083b07258a961ee0855c4d3ae9';
+ const root=fileURLToPath(new URL('../',import.meta.url));
+ assert.ok(publicA,'fixed Public A job candidate must exist on this Draft branch');
+ const gate=publicA.match(/- name: Verify pinned installed Public A Controller before all host actions\n\s+id: installed_controller\n\s+run: >-\n\s+"E:\\ZGmini\\runtime\\node\.exe" -e "([^"\n]+)"/);
+ assert.ok(gate,'one fixed installed-file preflight must precede every host action');
+ const script=gate[1];
+ assert.doesNotMatch(script,/fetch\(|https?:|process\.env|spawn|execFile|writeFile|unlink|rename/);
+ assert.match(script,/h\.controllerSourceSha!==/);
+ assert.match(script,/lstatSync/);
+ assert.match(script,/createHash\('sha256'\)/);
+ assert.match(script,/process\.exit\(2\)/);
+ assert.match(script,/catch\{process\.exitCode=2\}/);
+ const privateHead=wf.slice(0,wf.indexOf('  public-approved-a:'));
+ const original=execFileSync('git',['show',base+':.github/workflows/pc-job.yml'],
+  {cwd:root,encoding:'utf8',maxBuffer:1_000_000}).replace(/\r\n/g,'\n');
+ assert.equal(privateHead,original.slice(0,original.indexOf('  public-approved-a:')),
+  'legacy Private job and owner admission must remain byte-identical');
+ const publicTail=wf.slice(wf.indexOf('  # Public issue observation'));
+ assert.equal(publicTail,original.slice(original.indexOf('  # Public issue observation')),
+  'GitHub-hosted Public source observation must remain byte-identical');
+ const exactPaths=[
+  'controller/common.mjs','controller/entry.mjs',
+  'controller/preimage-manifest-stager.mjs','controller/upload.mjs'];
+ const files=Object.fromEntries(exactPaths.map(rel=>[
+  rel,execFileSync('git',['show',target+':'+rel],{cwd:root,maxBuffer:1_000_000})]));
+ const digests=Object.fromEntries(Object.entries(files).map(([rel,bytes])=>[
+  rel,createHash('sha256').update(bytes).digest('hex')]));
+ for(const [rel,expected] of Object.entries(digests)){
+  assert.ok(script.includes("'"+rel+"':'"+expected+"'"),'literal exact target SHA256 '+rel);
+ }
+ assert.ok(script.includes("h.controllerSourceSha!=='"+target+"'"));
+ const baseHost={controllerSourceSha:target,controllerFiles:digests};
+ const guard=({host=baseHost,fileMap=files,symlink=null,missing=null,hostSymlink=false}={})=>{
+  const proc={exitCode:0,exit(code){this.exitCode=code;throw Error('EXPECTED_EXIT');}};
+  const fakeFs={
+   readFileSync(path){
+    if(path==='E:/ZGmini/automation/pc-control/host.json')
+     return JSON.stringify(host);
+    const prefix='E:/ZGmini/automation/pc-control/';
+    if(!path.startsWith(prefix))throw Error('WRONG_PATH');
+    const rel=path.slice(prefix.length);
+    if(rel===missing||!(rel in fileMap))throw Error('MISSING_FILE');
+    return fileMap[rel];
+   },
+   lstatSync(path){
+    if(path==='E:/ZGmini/automation/pc-control/host.json')
+     return {isFile:()=>true,isSymbolicLink:()=>hostSymlink};
+    const prefix='E:/ZGmini/automation/pc-control/';
+    const rel=path.slice(prefix.length);
+    if(rel===missing)throw Error('MISSING_FILE');
+    return {isFile:()=>true,isSymbolicLink:()=>rel===symlink};
+   }
+  };
+  runInNewContext(script,{require(name){
+   if(name==='node:fs')return fakeFs;
+   if(name==='node:crypto')return {createHash};
+   throw Error('UNPINNED_IMPORT');
+  },process:proc},{timeout:2000});
+  return proc.exitCode;
+ };
+ assert.equal(guard(),0,'exact approved installed target may proceed');
+ assert.equal(guard({host:{...baseHost,controllerSourceSha:'3c7d4cfefacf072fd35cb19706b352c64c5e4fd2'}}),2,
+  'old installed Controller must not execute');
+ for(const rel of exactPaths){
+  assert.equal(guard({host:{...baseHost,controllerFiles:{...digests,[rel]:'0'.repeat(64)}}}),2,
+   'forged host manifest hash fails: '+rel);
+  assert.equal(guard({fileMap:{...files,[rel]:Buffer.from('changed')}}),2,
+   'changed installed bytes fail: '+rel);
+  assert.equal(guard({symlink:rel}),2,'symlink install file fails: '+rel);
+  assert.equal(guard({missing:rel}),2,'missing file fails: '+rel);
+ }
+ assert.equal(guard({host:{controllerSourceSha:target}}),2,'truncated host fails');
+ assert.equal(guard({host:null}),2,'missing host fails');
+ assert.equal(guard({hostSymlink:true}),2,'symlink host manifest fails');
+ const scope=publicA.slice(publicA.indexOf('    steps:\n'));
+ const stage=scope.slice(scope.indexOf('      - name: Stage approved'),scope.indexOf('      - name: Execute fixed'));
+ const execute=scope.slice(scope.indexOf('      - name: Execute fixed'),scope.indexOf('      - name: Upload sanitized'));
+ const upload=scope.slice(scope.indexOf('      - name: Upload sanitized'));
+ assert.match(stage,/if: steps\.installed_controller\.outcome == 'success' && contains/);
+ assert.match(execute,/if: steps\.installed_controller\.outcome == 'success'/);
+ assert.match(upload,/if: always\(\) && steps\.installed_controller\.outcome == 'success'/);
+ assert.ok(scope.indexOf('id: installed_controller')<scope.indexOf('Stage approved'));
+ assert.ok(scope.indexOf('Stage approved')<scope.indexOf('Execute fixed'));
+ assert.ok(scope.indexOf('Execute fixed')<scope.indexOf('Upload sanitized'));
+});
+
+
+test('Windows CMD interprets immutable Public A gate with fail-closed missing-host result and no output',{
+ skip:process.platform!=='win32'
+},()=>{
+ const gate=publicA.match(/id: installed_controller\n\s+run: >-\n\s+"E:\\ZGmini\\runtime\\node\.exe" -e "([^"\n]+)"/);
+ assert.ok(gate);
+ // GitHub Actions cmd shell writes the run block to a temporary .cmd file;
+ // running cmd /s /c on a nested quoted command is not equivalent.
+ const temp=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-public-a-shell-'));
+ try{
+  const cmdFile=path.join(temp,'gate.cmd');
+  fs.writeFileSync(cmdFile,'@echo off\r\n"'+process.execPath+
+   '" -e "'+gate[1]+'"\r\nexit /b %ERRORLEVEL%\r\n');
+  const result=spawnSync('cmd.exe',['/d','/c',cmdFile],{
+   encoding:'utf8',windowsHide:true,timeout:10000,maxBuffer:16384});
+  assert.equal(result.error,undefined);
+  assert.equal(result.status,2,'missing on-host manifest never permits Public action');
+  assert.equal(result.stdout,'','Windows CMD guard must not reveal private data');
+  assert.equal(result.stderr,'','Windows CMD guard failure must not echo local file paths');
+ }finally{fs.rmSync(temp,{force:true,recursive:true});}
 });
