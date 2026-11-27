@@ -135,11 +135,15 @@ test('real updater persists exact Issue link through coordinator failure phase',
 test('workflow late-label branch stays opt-in and matches source entry contract',()=>{
  const workflow=fs.readFileSync(fileURLToPath(new URL('../.github/workflows/pc-job.yml',import.meta.url)),'utf8');
  const entry=fs.readFileSync(fileURLToPath(new URL('../controller/entry.mjs',import.meta.url)),'utf8');
+ const common=fs.readFileSync(fileURLToPath(new URL('../controller/common.mjs',import.meta.url)),'utf8');
  assert.match(workflow,/types: \[opened, labeled\]/);
  assert.match(workflow,/vars\.ZGMINI_PC_JOB_LATE_LABEL_ENABLED == 'true'/);
- assert.match(entry,/event\.action==='opened'/);
- assert.match(entry,/event\.action==='labeled'/);
- assert.match(entry,/event\.label\?\.name==='pc-job'/);
+ // Since Public owner identity was centralized in attestOwnerPcJobEvent,
+ // verify the active entry calls the shared authorization, not stale inline text.
+ assert.match(entry,/attestOwnerPcJobEvent\(event,process\.env,policy\)/);
+ assert.match(common,/event\.action==='opened'/);
+ assert.match(common,/event\.action==='labeled'&&event\.label\?\.name==='pc-job'/);
+ assert.match(common,/event\.issue\.user\.id===ownerId/);
 });
 
 test('existing local pointer is correlated to exact postcheck run, source and Controller',()=>{
