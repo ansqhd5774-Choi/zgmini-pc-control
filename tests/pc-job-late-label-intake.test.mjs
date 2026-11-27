@@ -65,7 +65,7 @@ test('workflow accepts exactly owner opened or pc-job labeled and retains pinned
 test('Public maintenance postcheck requires exact original owner requestId/title and A allowlist',()=>{
  const id='pc-update-11111111-1111-4111-8111-111111111111';
  const title='PC Update '+id+' postcheck';
- const p={...request(),requestId:id+'-postcheck',operation:'core-status'};
+ const p={...request,requestId:id+'-postcheck',operation:'core-status'};
  const origin=event('opened');origin.issue.title=title;origin.issue.body=JSON.stringify(p);
  assert.equal(attestOwnerPcJobEvent(origin,env,policy).visibility,'PUBLIC');
  const common=fs.readFileSync(new URL('../controller/common.mjs',import.meta.url),'utf8');
