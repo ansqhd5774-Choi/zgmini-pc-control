@@ -1850,7 +1850,7 @@ test('Public receiver accepts exact approved operations config plus Controller m
    ...p.installed.ciControllerBPolicy,manifestSha256:digest(raw)}}),
   publicCiProof:{actual:p.actual,getJson:p.proof.getJson,
    readJobLogs:(id,issue)=>id===p.job.id?
-    '2026-11-28T00:00:00Z '+controllerBReceiptMarker(issue.number,Buffer.from(issue.body))+'\\n':''}
+    '2026-11-28T00:00:00Z '+controllerBReceiptMarker(issue.number,Buffer.from(issue.body))+'\n':''}
  });
  const observed=await f.agent.pollOnce();
  assert.equal(observed.find(x=>x.status==='SUCCEEDED')?.code,'UPDATE_COMMITTED',JSON.stringify(observed));
