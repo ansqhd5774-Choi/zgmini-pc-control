@@ -5,7 +5,7 @@ import {TARGET,NEXT_SUCCESSOR_SCHEMA,SCHEMA,SUCCESSOR_SCHEMA,R3_AFTER,V2_AFTER,
  sha256,validateManifest,verifyCandidateBytes,verifyObservation,applyOneFile} from './contract.mjs';
 
 const V2_SOURCE='393cee0da46515ff056543173fcd1253a858b3d7';
-const nextSource='a'.repeat(40);
+const nextSource='c8ed53a3991212dd1778742cda8a86ac133e0796';
 const old=fs.readFileSync(new URL('./approved/archive-run-w06-v2.mjs',import.meta.url));
 const oldPin=`const APPROVED='${V2_SOURCE}';`;
 const nextPin=`const APPROVED='${nextSource}';`;
