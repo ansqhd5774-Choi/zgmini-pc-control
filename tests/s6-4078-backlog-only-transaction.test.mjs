@@ -15,7 +15,8 @@ const s6Body=JSON.stringify({schema:'ZGMINI_PC_MAINTENANCE_REQUEST_V1',
  targetControllerSha:'3c7d4cfefacf072fd35cb19706b352c64c5e4fd2',
  approvalManifestSha256:'1fceeba061f7f8731811220b27cac245bd91d44e87d68935cd8475117f094141'});
 function evidence(){
- const journal=JSON.stringify({requestId:FIXED.s6RequestId,phase:'RECOVERY_REQUIRED',
+ const journal=JSON.stringify({schema:'ZGMINI_S6_ONCE_JOURNAL_V1',
+  requestId:FIXED.s6RequestId,phase:'RECOVERY_REQUIRED',
   failedAt:'WATCHDOG_RELEASE_OUTCOME_UNVERIFIED',code:'S6_PORT_PROMOTION_UNVERIFIED'});
  const backlog=JSON.stringify({schema:'ZGMINI_PC_BACKLOG_V1',requestId:FIXED.s6RequestId,
   windows:[{pausedAt:'2026-11-26T19:12:00Z',resumedAt:'2026-11-26T19:16:00Z'}],replays:{}});
