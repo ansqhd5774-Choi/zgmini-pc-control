@@ -66,7 +66,7 @@ $ErrorActionPreference='Stop'
 $raw=@(Get-CimInstance -ClassName Win32_Process -Filter "Name='Runner.Listener.exe'" -ErrorAction Stop)
 $items=@()
 foreach($p in $raw){
- $m=[regex]::Match([string]$p.ExecutablePath,'(?i)^E:\\ZGmini\\automation\\pc-control\\runners\\(0[1-6])\\(?:bin\\)?Runner\\.Listener\\.exe$')
+ $m=[regex]::Match([string]$p.ExecutablePath,'(?i)^E:\\ZGmini\\automation\\pc-control\\runners\\(0[1-6])\\(?:bin\\)?Runner\.Listener\.exe$')
  if($m.Success){
   $items+= [pscustomobject]@{seat=[int]$m.Groups[1].Value;pid=[int]$p.ProcessId;birth=([datetime]$p.CreationDate).ToUniversalTime().ToString('o')}
  }
