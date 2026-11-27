@@ -18,8 +18,6 @@ import {validateMaintenanceRequest,validateUpdateRequest,
   S6_ONCE_ISSUE_TITLE,S6_ONCE_OPERATION,
   validateS6OnceIssueEnvelope,validateS6OnceBManifest} from "./maintenance-contract.mjs";
 import {acquireMaintenanceLock} from "./maintenance-lock.mjs";
-import {ORPHAN_SIX_B_TITLE} from "./supervisor-orphan-six-b-admission.mjs";
-import {receiveOrphanSixBApprovalSource} from "./supervisor-orphan-six-b-receiver-source.mjs";
 
 const CONTROL_REPOSITORY="ansqhd5774-Choi/zgmini-pc-control";
 const ISSUE_TITLE="pc-controller-update";
@@ -438,10 +436,6 @@ export function createMaintenanceAgent({
   leaseRoot=FIXED_LEASE_ROOT,leaseAttempts=120,leaseWaitMs=500,
   updateScript=path.join(path.dirname(fileURLToPath(import.meta.url)),"update.mjs"),
   verifyInstalledSource=()=>{},verifyRecoverySource=verifyInstalledRecoveryLocalSource,
-  // Only an independently authenticated installed B integration may replace
-  // this default. The existing seven-file maintainer cannot attest the new
-  // orphan-six private installed CAS and must remain read-only/fail-closed.
-  orphanSixInstalledReadback=async()=>{throw coded('ORPHAN_SIX_B_PRIVATE_INSTALLED_CAS_NOT_WIRED');},
   installedShaFromStatus=result=>result?.actualControllerSha,
   ghTimeoutMs=20_000,updateTimeoutMs=0,
   now=()=>new Date().toISOString(),
@@ -451,8 +445,7 @@ export function createMaintenanceAgent({
     ||typeof updateScript!=="string"||!path.isAbsolute(updateScript)
     ||typeof leaseRoot!=="string"||!path.isAbsolute(leaseRoot)
     ||!Number.isInteger(leaseAttempts)||leaseAttempts<1||leaseAttempts>120
-    ||!Number.isInteger(leaseWaitMs)||leaseWaitMs<0||leaseWaitMs>500
-    ||typeof orphanSixInstalledReadback!=='function'){
+    ||!Number.isInteger(leaseWaitMs)||leaseWaitMs<0||leaseWaitMs>500){
     throw coded("MAINTENANCE_AGENT_CONFIG_INVALID");
   }
   const requestsDir=path.join(root,"requests"),approvedDir=path.join(root,"approved");
@@ -1101,102 +1094,7 @@ export function createMaintenanceAgent({
       s6ExecutionStatus:result.s6ExecutionStatus??null,
       reportUploadStatus:stored.reportUploadStatus};
   }
-  async function processOrphanSixBSourceIssue(issue){
-    if(!issueIsTrusted(issue,{allowedActors,title:ORPHAN_SIX_B_TITLE,label}))
-      return {status:'IGNORED',issueNumber:issue?.number};
-    // This inlet checks canonical GitHub approval evidence only. It does not
-    // claim an effect, write an approval package, signal a Runner or call apply.
-    // Reuse the existing strict seven-key raw JSON parser to reject duplicate
-    // security-sensitive keys before the source receiver calls JSON.parse.
-    try{
-      if(typeof issue.body!=='string'||Buffer.byteLength(issue.body)>MAX_BODY_BYTES)
-        throw coded('ORPHAN_SIX_B_ISSUE_BODY_INVALID');
-      parseIssueBody(issue.body);
-    }catch{
-      return {status:'BLOCKED',code:'ORPHAN_SIX_B_ISSUE_BODY_INVALID',
-        issueNumber:issue.number,executionStarted:false,
-        runnerStopAuthorized:false,operationalWrites:0};
-    }
-    // Re-attest the installed maintainer source at actual reception; startup
-    // verification cannot cover subsequent on-disk drift.
-    try{verifyInstalledSource();}
-    catch{return {status:'BLOCKED',
-      code:'ORPHAN_SIX_B_RECEIVER_INSTALLED_SOURCE_UNVERIFIED',
-      issueNumber:issue.number,executionStarted:false,
-      runnerStopAuthorized:false,operationalWrites:0};}
-    const readOriginalOneUseClaim=async requestId=>{
-      if(!/^pc-[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(requestId))
-        throw coded('ORPHAN_SIX_B_CLAIM_ID_INVALID');
-      const file=path.join(requestsDir,'orphan-six-'+sha256(requestId)+'.json');
-      let st;
-      try{st=fs.lstatSync(file);}catch(error){
-        if(error?.code==='ENOENT')return null;
-        throw coded('ORPHAN_SIX_B_CLAIM_READ_UNVERIFIED');
-      }
-      if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1||
-         st.size<10||st.size>8192)
-        throw coded('ORPHAN_SIX_B_CLAIM_READ_UNVERIFIED');
-      const bytes=fs.readFileSync(file);
-      const after=fs.lstatSync(file);
-      if(after.ino!==st.ino||after.size!==st.size||
-         after.mtimeMs!==st.mtimeMs||bytes.length!==st.size)
-        throw coded('ORPHAN_SIX_B_CLAIM_READ_UNVERIFIED');
-      let entry;try{entry=JSON.parse(bytes.toString('utf8'));}catch{
-        throw coded('ORPHAN_SIX_B_CLAIM_READ_UNVERIFIED');
-      }
-      if(entry?.schema!=='ZGMINI_ORPHAN_GRACEFUL_SIX_JOURNAL_V1'||
-         entry.requestId!==requestId)
-        throw coded('ORPHAN_SIX_B_CLAIM_READ_UNVERIFIED');
-      return entry; // Any prior intent, including UNKNOWN, blocks resubmission.
-    };
-    const result=await receiveOrphanSixBApprovalSource({
-      issue,readOriginalOneUseClaim,
-      getMainManifest:async (rel,ref)=>{
-        if(ref!=='main'||!/^approvals\/controller-orphan-six\/[a-f0-9]{64}\.json$/.test(rel))
-          throw coded('ORPHAN_SIX_B_APPROVAL_PATH_INVALID');
-        const data=await githubJson(['api',`repos/${repo}/contents/${rel}?ref=main`],
-          'ORPHAN_SIX_B_APPROVAL_READ_FAILED');
-        if(data?.type!=='file'||data.encoding!=='base64'||
-           typeof data.content!=='string'||data.content.length>32768)
-          throw coded('ORPHAN_SIX_B_APPROVAL_RESPONSE_INVALID');
-        const raw64=data.content.replace(/\s/g,'');
-        if(!/^[A-Za-z0-9+/]*={0,2}$/.test(raw64))
-          throw coded('ORPHAN_SIX_B_APPROVAL_ENCODING_INVALID');
-        return Buffer.from(raw64,'base64'); // receiver checks exact byte hash.
-      },
-      getPullRequest:async number=>{
-        if(!Number.isSafeInteger(number)||number<=0)
-          throw coded('ORPHAN_SIX_B_PR_NUMBER_INVALID');
-        return githubJson(['api',`repos/${repo}/pulls/${number}`],
-          'ORPHAN_SIX_B_PR_READ_FAILED');
-      },
-      getOwnerEffectComments:async number=>{
-        if(!Number.isSafeInteger(number)||number!==issue.number)
-          throw coded('ORPHAN_SIX_B_COMMENT_ISSUE_MISMATCH');
-        // gh api --paginate follows the canonical Link header. --slurp
-        // returns all pages; never silently treat a single page as complete.
-        const pages=await githubJson(['api',
-          `repos/${repo}/issues/${number}/comments?per_page=100`,
-          '--paginate','--slurp'],'ORPHAN_SIX_B_COMMENTS_READ_FAILED');
-        if(!Array.isArray(pages)||pages.length<1||pages.length>11||
-           pages.some(p=>!Array.isArray(p)||p.length>100))
-          throw coded('ORPHAN_SIX_B_COMMENT_PAGES_UNVERIFIED');
-        const items=pages.flat();
-        if(items.length>1000)throw coded('ORPHAN_SIX_B_COMMENTS_LIMIT_UNVERIFIED');
-        return {source:'GITHUB_CANONICAL_ISSUE_COMMENTS_API',
-          complete:true,issueNumber:number,items};
-      },
-      getInstalledReadback:async()=>orphanSixInstalledReadback()
-    });
-    return {status:result.status,code:result.code,
-      requestId:result.requestId??null,issueNumber:issue.number,
-      approvalSourceVerified:result.approvalSourceVerified===true,
-      executionStarted:false,effectAuthorized:false,
-      runnerStopAuthorized:false,operationalWrites:0,automaticRetries:0};
-  }
   async function processIssue(issue){
-    if(issue?.title===ORPHAN_SIX_B_TITLE)
-      return processOrphanSixBSourceIssue(issue);
     if(issue?.title===S6_ONCE_ISSUE_TITLE)return processS6OnceIssue(issue);
     if(issue?.title===INSTALLED_RECOVERY_ISSUE_TITLE)
       return processInstalledRecoveryIssue(issue);
@@ -1403,8 +1301,7 @@ export function createMaintenanceAgent({
       // Summary filtering avoids unnecessary reads; processIssue still verifies
       // the full Issue actor, label, request body and approval before applying.
       if(![ISSUE_TITLE,R6_HOST_ISSUE_TITLE,R54_B_ISSUE_TITLE,SOURCE_BUNDLE_ISSUE_TITLE,
-        INSTALLED_RECOVERY_ISSUE_TITLE,S6_ONCE_ISSUE_TITLE,
-        ORPHAN_SIX_B_TITLE].includes(entry?.title))continue;
+        INSTALLED_RECOVERY_ISSUE_TITLE,S6_ONCE_ISSUE_TITLE].includes(entry?.title))continue;
       seen.add(number);
       const cached=settledIssueCache.get(number);
       const updatedAt=entry?.updatedAt;
