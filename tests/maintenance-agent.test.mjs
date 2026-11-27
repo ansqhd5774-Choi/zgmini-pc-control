@@ -9,7 +9,7 @@ import {requireHandoffApproval,handoffFilePlan,nextRuntimeFiles} from "../tools/
 
 import {createMaintenanceAgent,failedUpdaterResult,normalizedResult,attachApprovedNativeBReceipt,parseS6NonzeroRecoveryReport} from "../tools/maintenance-agent.mjs";
 import {prepareMaintenanceIssue,submitExistingControllerApprovalFromCi} from '../tools/maintenance-request.mjs';
-import {readIndependentlyInstalledControllerBPublisherPolicy,readAuthenticatedControllerBPublisherWorkflow} from '../ci-approval/completed-run-intake.mjs';
+import {readIndependentlyInstalledControllerBPublisherPolicy,readAuthenticatedControllerBPublisherWorkflow,observeCompletedRun,observePublishedControllerApprovals,observeLateOwnerMergedControllerApproval,publishExistingControllerApprovals,publishLateOwnerMergedControllerApproval} from '../ci-approval/completed-run-intake.mjs';
 
 test('pre-install child rejection retains exact safe code and current installed SHA',()=>{
  const r=failedUpdaterResult({requestId:'fixture',targetControllerSha:'b'.repeat(40)},
@@ -1383,6 +1383,97 @@ test('Public B publisher on hosted source CI is default-denied until exact insta
  assert.equal(reused.status,'EXISTING_REQUEST_REUSED');
  assert.equal(reused.receiptMarker,undefined);
  assert.equal(posts,1);
+});
+
+
+test('Public source event stays Private-only by default but is observable with verified caller scope',async()=>{
+ const repo={id:1442936296,full_name:REPO,private:false};
+ const run={id:45623579994,run_attempt:1,workflow_id:416355595,
+  path:'.github/workflows/controller-maintenance-source-tests.yml',
+  event:'pull_request',repository:repo,head_repository:repo,
+  head_sha:'a'.repeat(40),status:'completed',conclusion:'success'};
+ const event={action:'completed',repository:repo,workflow_run:run};
+ let reads=0;
+ const getRun=async()=>{reads++;return structuredClone(run);};
+ const blocked=await observeCompletedRun(event,{getRun});
+ assert.equal(blocked.state,'IGNORED');assert.equal(reads,0);
+ const seen=await observeCompletedRun(event,{getRun,allowPublic:true});
+ assert.equal(seen.state,'CI_COMPLETION_OBSERVED_ONLY');
+ assert.equal(seen.headSha,run.head_sha);assert.equal(seen.canPublish,false);
+ assert.equal(seen.canExecute,false);assert.equal(reads,1);
+ for(const drift of [
+  e=>e.workflow_run.head_repository.id=123,
+  e=>e.workflow_run.repository.private=true,
+  e=>e.repository.private=true,
+  e=>e.workflow_run.conclusion='failure',
+  e=>e.workflow_run.workflow_id=1
+ ]){
+  const e=structuredClone(event);drift(e);reads=0;
+  const denied=await observeCompletedRun(e,{getRun,allowPublic:true});
+  assert.equal(denied.state,'IGNORED');assert.equal(reads,0);
+ }
+ const late=await observeLateOwnerMergedControllerApproval(event,{
+  getJson:async route=>route==='actions/runs/'+run.id?run:
+   route==='commits/'+run.head_sha+'/pulls?per_page=100'?[]:
+   assert.fail('unexpected API route'),allowPublic:true});
+ assert.equal(late.state,'IGNORED');
+ assert.equal(late.canPublish,false);
+ const lateBlocked=await observeLateOwnerMergedControllerApproval(event,{
+  getJson:()=>assert.fail('default Private does not read a Public event')});
+ assert.equal(lateBlocked.state,'IGNORED');
+});
+
+test('Public approval main event reaches read-only intake only under explicit verified scope',async()=>{
+ const repo={id:1442936296,full_name:REPO,private:false};
+ const before='a'.repeat(40),after='b'.repeat(40);
+ const event={repository:repo,ref:'refs/heads/main',deleted:false,
+  forced:false,before,after};
+ let reads=0;
+ const getJson=async route=>{
+  reads++;
+  assert.equal(route,'compare/'+before+'...'+after);
+  return {status:'ahead',behind_by:0,base_commit:{sha:before},
+   merge_base_commit:{sha:before},files:[]};
+ };
+ assert.equal((await observePublishedControllerApprovals(event,{getJson})).state,'IGNORED');
+ assert.equal(reads,0);
+ const observed=await observePublishedControllerApprovals(event,{getJson,allowPublic:true});
+ assert.equal(observed.state,'IGNORED','unrelated changes do not issue approval');
+ assert.equal(observed.reason,'NO_CONTROLLER_APPROVAL_CHANGE');
+ assert.equal(reads,1);assert.equal(observed.canExecute,false);
+ const pushed=await publishExistingControllerApprovals(event,{
+  getJson,allowPublic:true,runId:123,attempt:1,
+  ports:{createIssue:()=>assert.fail('unrelated source cannot POST')},
+  emitReceipt:()=>assert.fail('unrelated source cannot issue receipt')});
+ assert.equal(pushed.state,'IGNORED');
+ assert.equal(reads,2);
+ const wrong={...event,repository:{...repo,id:1}};
+ assert.equal((await observePublishedControllerApprovals(wrong,{
+  getJson:()=>assert.fail('foreign repo cannot read'),allowPublic:true})).state,'IGNORED');
+});
+
+test('Public run cannot use legacy Private-only publisher flag or unverified output as authority',async()=>{
+ const repo={id:1442936296,full_name:REPO,private:false};
+ const run={id:765,run_attempt:1,workflow_id:416355595,
+  path:'.github/workflows/controller-maintenance-source-tests.yml',
+  event:'pull_request',repository:repo,head_repository:repo,
+  head_sha:'a'.repeat(40),status:'completed',conclusion:'success'};
+ const event={action:'completed',repository:repo,workflow_run:run};
+ const blocked=await publishLateOwnerMergedControllerApproval(event,{
+  getJson:()=>assert.fail('unverified Public must not read'),
+  ports:{createIssue:()=>assert.fail('unverified Public must not post')},
+  runId:765,attempt:1,emitReceipt:()=>assert.fail('no receipt')});
+ assert.equal(blocked.state,'IGNORED');
+ assert.deepEqual(blocked.results,[]);
+ const allowed=await publishLateOwnerMergedControllerApproval(event,{
+  allowPublic:true,
+  getJson:async route=>route==='actions/runs/'+run.id?run:
+   route==='commits/'+run.head_sha+'/pulls?per_page=100'?[]:
+   assert.fail('unexpected read'),
+  ports:{createIssue:()=>assert.fail('no approval PR, no post')},
+  runId:765,attempt:1,emitReceipt:()=>assert.fail('no receipt')});
+ assert.equal(allowed.state,'IGNORED');
+ assert.deepEqual(allowed.results,[]);
 });
 
 test('Public running publisher workflow attestation binds authenticated immutable GitHub API bytes',async()=>{
