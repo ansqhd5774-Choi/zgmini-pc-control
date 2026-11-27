@@ -2034,3 +2034,7 @@ test('S6 #4078 transaction denies any unbound operating effect on public CI',asy
  assert.equal(result.operationalSuccess,false);
  assert.equal(result.replayIssueNumber,null);
 });
+
+// Run the dedicated source-only replay transaction suite on the existing
+// immutable public maintenance workflow without modifying workflow bytes.
+import './s6-4078-backlog-only-transaction.test.mjs';
