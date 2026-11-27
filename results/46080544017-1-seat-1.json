@@ -1,0 +1,14 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-46080544017-1-seat-1",
+  "requestId": "pc-6b4df91a-0e76-4ad1-ae43-57fd213893c0",
+  "operation": "shared-resource-release-readonly",
+  "seat": 1,
+  "status": "PASS",
+  "code": "PUBLIC_RESULT_CODE_REDACTED",
+  "actualExecutionSha": "d3764580fdb08ecddd5f9b1064051eec30f90492",
+  "reportTransfer": {
+    "status": "SUMMARY_ONLY",
+    "code": "PUBLIC_REPOSITORY_REDACTED"
+  }
+}
