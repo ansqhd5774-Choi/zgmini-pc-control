@@ -5,6 +5,7 @@ import {validatePublicOwnerBExactScope} from '../tools/update.mjs';
 import {classifyPublicBPreflight,main,verifyOperatorSourceClosure,
  withPublicBInstallLease} from '../tools/controller-public-b-operator-once.mjs';
 import {validateControllerSelectivePin,manifestFingerprint} from '../tools/maintenance-contract.mjs';
+import {classify4263Evidence,main as recover4263Main} from '../tools/controller-public-b-recover-4263.mjs';
 
 const target='555f95708984580cd7d5a0fd05a80b718e867710';
 const installed='3c7d4cfefacf072fd35cb19706b352c64c5e4fd2';
@@ -49,6 +50,39 @@ test('source-only Linux CI cannot create a Public B Issue or execute operator',a
  if(process.platform==='win32')return;
  await assert.rejects(main(['inspect']),/PUBLIC_B_INDEPENDENT_WINDOWS_REQUIRED/);
  await assert.rejects(main(['apply']),/PUBLIC_B_INDEPENDENT_WINDOWS_REQUIRED/);
+});
+test('interrupted #4263 stays within original exact-source one-shot scope',()=>{
+ const ready={originalLedger:true,ownerDead:true,leaseExact:true,
+  installedTarget:true,supervisorHealthy:true,sixIdle:true,
+  workflowPaused:true,backupProtected:true,backlogOriginal:true,
+  claimAbsent:true};
+ assert.equal(classify4263Evidence(ready),'B4263_RECOVERY_PREFLIGHT_ONLY');
+ for(const key of Object.keys(ready)){
+  assert.notEqual(classify4263Evidence({...ready,[key]:false}),
+   'B4263_RECOVERY_PREFLIGHT_ONLY',key);
+ }
+ assert.notEqual(classify4263Evidence({}),'B4263_RECOVERY_PREFLIGHT_ONLY');
+ const src=fs.readFileSync(new URL('../tools/controller-public-b-recover-4263.mjs',import.meta.url),'utf8');
+ assert.match(src,/const RECOVERY_PR=4264;/);
+ assert.match(src,/const ISSUE=4263;/);
+ assert.match(src,/const REQUEST='pc-update-3f1c0413-37dd-4b44-900e-75c709d492ff';/);
+ assert.match(src,/originalLedgerSha256:hash\(pre\.ledgerRaw\)/);
+ assert.match(src,/record\('WORKFLOW_ENABLE_ATTEMPTED'\)/);
+ assert.match(src,/await ports\.resumeIntake\(\)/);
+ assert.match(src,/await ports\.reconcileBacklog\(request\)/);
+ assert.match(src,/const post=await ports\.postcheck\(request\)/);
+ assert.match(src,/fs\.renameSync\(leaseDir,leaseArchived\)/);
+ assert.doesNotMatch(src,/\bports\.(?:switchVersion|stopOwnSupervisor|restore|reconnect)\s*\(/);
+ assert.match(src,/fs\.readFileSync\(leaseOwner\)\.equals\(pre\.ownerRaw\)/);
+ assert.match(src,/B4263_OUTCOME_RECONCILE_NO_RETRY/);
+ const upd=fs.readFileSync(new URL('../tools/update.mjs',import.meta.url),'utf8');
+ assert.match(upd,/prepareInterruptedPublicBSwitch:async\(\)=>\{/);
+ assert.match(upd,/publicOwnerBOperator&&issueNumber===4263/);
+});
+test('hosted source CI never operates exact #4263 recovery on Windows',async()=>{
+ if(process.platform==='win32')return;
+ await assert.rejects(recover4263Main(['inspect']),/B4263_INDEPENDENT_WINDOWS_REQUIRED/);
+ await assert.rejects(recover4263Main(['recover']),/B4263_INDEPENDENT_WINDOWS_REQUIRED/);
 });
 test('public maintenance receiver denial remains intact',()=>{
  const agent=fs.readFileSync(new URL('../tools/maintenance-agent.mjs',import.meta.url),'utf8');

@@ -1348,6 +1348,40 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,public
   // an otherwise proven no-effect failure retain an install-wide recovery
   // lease. Still require live original supervisor identity, pinned file bytes,
   // unchanged Core protection and a freshly read active intake workflow.
+  // Exact #4263 continuation only: bind the existing maintenance
+  // postcheck ports to the immutable protection baseline after SWITCHED.
+  // Never stage, stop, switch, or acquire a second install lease.
+  prepareInterruptedPublicBSwitch:async()=>{
+   need(publicOwnerBOperator&&issueNumber===4263&&
+    issue.requestId==='pc-update-3f1c0413-37dd-4b44-900e-75c709d492ff'&&
+    manifest.targetSha==='555f95708984580cd7d5a0fd05a80b718e867710',
+    'PUBLIC_B_RECOVERY_EXACT_REQUEST_ONLY');
+   const {host,installedSha}=installedManifest(),current=readOwner();
+   verifyPublicOwnerBWindows(packageData,issueNumber,current.owner.pid);
+   need(installedSha===manifest.targetSha&&
+    current.status.sourceSha===manifest.targetSha&&
+    prevalidationInventory(host)!==null,'PUBLIC_B_RECOVERY_TARGET_NOT_SERVING');
+   const snapshot=json(path.join(snapshotRoot,'host.json'));
+   need(snapshot.controllerSourceSha===manifest.installedSha&&
+    Object.entries(snapshot.controllerFiles??{}).every(([rel,d])=>
+     sha256(fs.readFileSync(path.join(snapshotRoot,rel)))===d),
+    'PUBLIC_B_RECOVERY_ORIGINAL_SNAPSHOT_UNVERIFIED');
+   const before=json(path.join(backupRoot,'PROTECTED_BEFORE.json'));
+   need(recoveryProtectedSnapshotStillPinned(before,protectedSnapshot()),
+    'PUBLIC_B_RECOVERY_PROTECTION_DRIFT');
+   const backlog=json(backlogFile);
+   need(backlog.requestId===issue.requestId&&
+    backlogPauseWindows(backlog).length===1&&
+    backlogPauseWindows(backlog)[0].resumedAt===null&&
+    Object.keys(backlog.replays??{}).length===0,
+    'PUBLIC_B_RECOVERY_BACKLOG_NOT_ORIGINAL');
+   need(github('actions/workflows/pc-job.yml').state==='disabled_manually',
+    'PUBLIC_B_RECOVERY_WORKFLOW_NOT_PAUSED');
+   protectedBefore=before;
+   oldOwner=current;
+   return {controllerSha:installedSha,supervisorPid:current.owner.pid,
+    supervisorNonce:current.owner.nonce,protectedStateUnchanged:true};
+  },
   verifyPrevalidationUntouched:async({installedSha})=>{
    if(!prevalidationBaseline||prevalidationBaseline.installedSha!==installedSha)return false;
    const current=installedManifest(),{owner,status}=readOwner();
