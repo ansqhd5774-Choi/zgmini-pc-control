@@ -92,7 +92,9 @@ export function publicPcReportProjection(report){
  const safe=(value,pattern)=>typeof value==='string'&&pattern.test(value)?value:null;
  const status=['PASS','FAIL','BLOCKED','STATE_UNKNOWN'].includes(report.status)?
   report.status:'BLOCKED';
- const code=safe(report.code,/^[A-Z][A-Z0-9_]{2,100}$/)??'PUBLIC_RESULT_CODE_REDACTED';
+ // A syntactically safe uppercase code can still encode a secret.
+ // Public callers receive only status; full diagnostic code stays on PC.
+ const code='PUBLIC_RESULT_CODE_REDACTED';
  return Object.freeze({
   schema:'ZGMINI_PC_RESULT_V1',jobId:report.jobId,
   requestId:safe(report.requestId,/^[a-z0-9][a-z0-9-]{7,79}$/),
