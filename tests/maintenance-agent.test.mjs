@@ -22,7 +22,9 @@ test('unknown stage never claims untouched install and never copies arbitrary st
  const exact=failedUpdaterResult({requestId:'fixture'},{stdout:JSON.stringify({status:'AUTOMATION_BLOCKED',code:'SUPERVISOR_NOT_HEALTHY'})},{ledger:null,installLock:{held:false}});
  assert.equal(exact.status,'UNKNOWN');assert.equal(exact.code,'SUPERVISOR_NOT_HEALTHY');
 });
-import {manifestFingerprint,validateUpdateRequest,R54_B_SOURCE_FILES,R54_B_OPERATION,R54_B_ISSUE_TITLE} from "../tools/maintenance-contract.mjs";
+import {manifestFingerprint,validateUpdateRequest,R54_B_SOURCE_FILES,R54_B_OPERATION,R54_B_ISSUE_TITLE,
+  installedControllerBPolicy,verifyControllerBIdentity,authenticateControllerBIssue,
+  controllerBReceiptMarker,CI_CONTROLLER_ACTOR} from "../tools/maintenance-contract.mjs";
 
 const REPO="ansqhd5774-Choi/zgmini-pc-control";
 const ACTOR="ansqhd5774-Choi";
@@ -1223,4 +1225,130 @@ test('public postcheck receiver handoff is exactly two source files with origina
  assert.match(handoffSource,/HANDOFF_OPERATOR_WINDOWS_REQUIRED/);
  assert.match(handoffSource,/HANDOFF_MAIN_REQUIRED/);
  assert.match(handoffSource,/requireNoUnfinishedHandoff/);
+});
+
+
+test('Public B stays blocked without an independently installed V2 grant, including bot spoof',async t=>{
+ const f=fixture(t,{privateRepo:false,actor:CI_CONTROLLER_ACTOR});
+ const result=await f.agent.processIssue(f.issue);
+ assert.equal(result.status,'BLOCKED');
+ assert.equal(result.code,'PUBLIC_B_EFFECT_SEPARATE_AUTH_REQUIRED');
+ assert.equal(result.effectAuthorized,false);
+ assert.equal(result.operationalWrites,0);
+ assert.equal(f.stats.applies,0);assert.equal(f.stats.manifestReads,0);
+ assert.equal(f.agent.loadLedger(REQUEST_ID),null);
+});
+
+function publicBAuthFixture(){
+ const path='.github/workflows/ci-approval-controller-b.yml';
+ const workflow=Buffer.from('reviewed Public B source workflow fixture\\n');
+ const blob=crypto.createHash('sha1').update(Buffer.from('blob '+workflow.length))
+  .update(Buffer.from([0])).update(workflow).digest('hex');
+ const manifest=sampleRequest(),request={...manifest.issue,chatId:'chat-ci-765-1'};
+ const requestBytes=Buffer.from(JSON.stringify(request));
+ const installed={schema:'ZGMINI_PC_MAINTENANCE_INSTALL_V1',
+  sourceSha:'c'.repeat(40),startupSha256:'d'.repeat(64),
+  files:Object.fromEntries(['a','b','c','d','e','f','g'].map(x=>['tools/'+x+'.mjs','e'.repeat(64)])),
+  ciControllerBPolicy:{schema:'ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V2',
+    enabled:true,workflowId:123456,workflowBlobSha:blob,workflowPath:path,
+    repositoryVisibility:'public',installedSha:INSTALLED,targetSha:TARGET,
+    manifestSha256:request.approvalManifestSha256}};
+ const policy=installedControllerBPolicy(installed);
+ const run={id:765,run_attempt:1,workflow_id:123456,path,
+  repository:{id:1442936296,full_name:REPO,private:false},
+  head_repository:{id:1442936296,full_name:REPO,private:false},
+  head_branch:'main',head_sha:'b'.repeat(40),event:'workflow_run',
+  status:'completed',conclusion:'success'};
+ const job={id:888,run_id:765,run_attempt:1,head_sha:run.head_sha,
+  name:'submit-controller-b',status:'completed',conclusion:'success',
+  steps:[{name:'Record Controller B request receipt',status:'completed',conclusion:'success'}]};
+ const actual={number:42,title:'pc-controller-update',state:'open',
+  user:{id:41898282,type:'Bot',login:CI_CONTROLLER_ACTOR},
+  labels:[{name:'pc-maintenance'}],body:requestBytes.toString('utf8')};
+ const proof={
+  issueNumber:42,requestBytes,runId:765,attempt:1,policy,
+  getJson:async route=>{
+   if(route==='actions/runs/765/attempts/1')return run;
+   if(route==='contents/'+path+'?ref='+run.head_sha')return {type:'file',
+    path,sha:blob,encoding:'base64',content:workflow.toString('base64')};
+   if(route==='actions/runs/765/attempts/1/jobs?per_page=100')
+    return {total_count:1,jobs:[job]};
+   throw Error('unexpected GitHub API route');
+  },
+  readJobLogs:async id=>id===888?
+   '2026-11-28T00:00:00Z '+controllerBReceiptMarker(42,requestBytes)+'\\n':''
+ };
+ return {installed,policy,run,job,actual,request,proof};
+}
+
+test('independent installed V2 exact public effect authenticates only original CI workload',async()=>{
+ const f=publicBAuthFixture();
+ assert.deepEqual(Object.keys(f.policy).sort(),
+  ['workflowId','workflowBlobSha','repositoryVisibility','installedSha',
+   'targetSha','manifestSha256'].sort());
+ assert.equal(Object.isFrozen(f.policy),true);
+ const proof=await verifyControllerBIdentity(f.proof);
+ assert.equal(proof.state,'CI_WORKLOAD_IDENTITY_VERIFIED_ONLY');
+ assert.equal(proof.issueNumber,42);
+ assert.equal(proof.canPublish,false);assert.equal(proof.canExecute,false);
+ const admission=await authenticateControllerBIssue(f.actual,{policy:f.policy,
+  getJson:f.proof.getJson,readJobLogs:f.proof.readJobLogs});
+ assert.equal(admission.state,'CI_WORKLOAD_IDENTITY_VERIFIED_ONLY');
+ assert.ok(admission.authorization);
+ assert.equal(admission.canExecute,false);
+ assert.equal((await authenticateControllerBIssue(f.actual,{policy:null,
+  getJson:f.proof.getJson,readJobLogs:f.proof.readJobLogs})).state,'DISABLED');
+});
+
+test('public B installed scope rejects extra fields, malformed pins and implicit visibility',()=>{
+ const f=publicBAuthFixture();
+ const mutate=[
+  x=>x.ciControllerBPolicy.targetSha='f'.repeat(40),
+  x=>x.ciControllerBPolicy.targetSha=x.ciControllerBPolicy.installedSha,
+  x=>x.ciControllerBPolicy.manifestSha256='incorrect',
+  x=>x.ciControllerBPolicy.repositoryVisibility='private',
+  x=>x.ciControllerBPolicy.workflowBlobSha='invalid',
+  x=>x.ciControllerBPolicy.enabled=false,
+  x=>x.ciControllerBPolicy.extra='allow',
+  x=>x.ciControllerBPolicy.workflowPath='not-reviewed.yml',
+  x=>x.sourceSha='invalid',
+  x=>x.files={}
+ ];
+ for(const patch of mutate){
+  const v=structuredClone(f.installed);patch(v);
+  if(v.ciControllerBPolicy.targetSha==='f'.repeat(40)){
+   // A different well-formed target is a *different installed grant*, not
+   // proof of authority for the original target.
+   assert.notEqual(installedControllerBPolicy(v).targetSha,f.policy.targetSha);
+  }else assert.throws(()=>installedControllerBPolicy(v),/CI_INSTALLED_POLICY_INVALID/);
+ }
+});
+
+test('Public B requires exact pinned request, origin and run receipt',async()=>{
+ const f=publicBAuthFixture();
+ const context={policy:f.policy,getJson:f.proof.getJson,
+  readJobLogs:f.proof.readJobLogs};
+ const denied=[
+  [{...f.actual,body:JSON.stringify({...f.request,targetControllerSha:'f'.repeat(40)})},
+   'CI_PUBLIC_EFFECT_SCOPE_MISMATCH'],
+  [{...f.actual,body:JSON.stringify({...f.request,approvalManifestSha256:'0'.repeat(64)})},
+   'CI_PUBLIC_EFFECT_SCOPE_MISMATCH'],
+  [{...f.actual,user:{id:123,type:'Bot',login:CI_CONTROLLER_ACTOR}},
+   'CI_ISSUE_ORIGIN_DENIED'],
+  [{...f.actual,labels:[{name:'bug'}]},'CI_ISSUE_ORIGIN_DENIED'],
+  [{...f.actual,state:'closed'},'CI_ISSUE_ORIGIN_DENIED']
+ ];
+ for(const [issue,code] of denied){
+  const r=await authenticateControllerBIssue(issue,context);
+  assert.equal(r.code,code);assert.equal(r.authorization,undefined);
+ }
+ f.run.repository.private=true;
+ assert.equal((await verifyControllerBIdentity(f.proof)).code,'CI_RUN_IDENTITY_MISMATCH');
+ f.run.repository.private=false;f.run.head_repository.private=true;
+ assert.equal((await verifyControllerBIdentity(f.proof)).code,'CI_RUN_IDENTITY_MISMATCH');
+ f.run.head_repository.private=false;f.job.conclusion='skipped';
+ assert.equal((await verifyControllerBIdentity(f.proof)).code,'CI_JOB_IDENTITY_MISMATCH');
+ f.job.conclusion='success';
+ const swapped=await verifyControllerBIdentity({...f.proof,issueNumber:43});
+ assert.equal(swapped.code,'CI_RECEIPT_ISSUE_OR_BYTES_MISMATCH');
 });
