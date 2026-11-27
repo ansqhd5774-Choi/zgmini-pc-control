@@ -74,7 +74,7 @@ function fixture(t,{denyApproval=false,failBeforeSignalAt=null,
    assert.equal(sha,manifestRawSha256);
    assert.match(afterIntentReadbackSha256,/^[a-f0-9]{64}$/);
    if(seat===approvalReadbackUnknownAt)throw Error('canonical readback unavailable');
-   const revoked=seat>=revokeBeforeSeat;
+   const revoked=revokeBeforeSeat!==null&&seat>=revokeBeforeSeat;
    return {source:'PRIVATE_B_FRESH_CANONICAL_OWNER_EFFECT_DECISION',
     status:revoked?'REVOKED':'CURRENT_OWNER_APPROVE_VERIFIED',
     seat,proposalId,requestId:id,manifestRawSha256,
