@@ -382,11 +382,18 @@ test('Windows CMD interprets immutable Public A gate with fail-closed missing-ho
 },()=>{
  const gate=publicA.match(/id: installed_controller\n\s+run: >-\n\s+"E:\\ZGmini\\runtime\\node\.exe" -e "([^"\n]+)"/);
  assert.ok(gate);
- const cmd='"'+process.execPath+'" -e "'+gate[1]+'"';
- const result=spawnSync('cmd.exe',['/d','/s','/c',cmd],{
-  encoding:'utf8',windowsHide:true,timeout:10000,maxBuffer:16384});
- assert.equal(result.error,undefined);
- assert.equal(result.status,2,'missing on-host manifest never permits Public action');
- assert.equal(result.stdout,'','Windows CMD guard must not reveal private data');
- assert.equal(result.stderr,'','Windows CMD guard failure must not echo local file paths');
+ // GitHub Actions cmd shell writes the run block to a temporary .cmd file;
+ // running cmd /s /c on a nested quoted command is not equivalent.
+ const temp=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-public-a-shell-'));
+ try{
+  const cmdFile=path.join(temp,'gate.cmd');
+  fs.writeFileSync(cmdFile,'@echo off\r\n"'+process.execPath+
+   '" -e "'+gate[1]+'"\r\nexit /b %ERRORLEVEL%\r\n');
+  const result=spawnSync('cmd.exe',['/d','/c',cmdFile],{
+   encoding:'utf8',windowsHide:true,timeout:10000,maxBuffer:16384});
+  assert.equal(result.error,undefined);
+  assert.equal(result.status,2,'missing on-host manifest never permits Public action');
+  assert.equal(result.stdout,'','Windows CMD guard must not reveal private data');
+  assert.equal(result.stderr,'','Windows CMD guard failure must not echo local file paths');
+ }finally{fs.rmSync(temp,{force:true,recursive:true});}
 });
