@@ -1,0 +1,14 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-46057348498-1-seat-1",
+  "requestId": "pc-f86612eb-9673-4c11-8963-b5647cbaee68",
+  "operation": "fear-greed-archive-status",
+  "seat": 1,
+  "status": "PASS",
+  "code": "PUBLIC_RESULT_CODE_REDACTED",
+  "actualExecutionSha": "555f95708984580cd7d5a0fd05a80b718e867710",
+  "reportTransfer": {
+    "status": "SUMMARY_ONLY",
+    "code": "PUBLIC_REPOSITORY_REDACTED"
+  }
+}
