@@ -49,6 +49,38 @@ export function assertSupervisorOwner(root,host,environment=process.env,io=fs){
  return 'SUPERVISOR_OWNERSHIP_VERIFIED';
 }
 
+// Public repository trust boundary for the *existing* fixed pc-job Issues path.
+// Repository visibility is not actor authentication. The immutable GitHub
+// repository/owner IDs, trusted owner event and default-branch workflow must
+// agree before any allowlisted A worker is launched. Never use for PR events.
+export function attestOwnerPcJobEvent(event,env,policy){
+ const repo='ansqhd5774-Choi/zgmini-pc-control',owner='ansqhd5774-Choi';
+ const repoId=1442936296,ownerId=327938088;
+ need(policy?.controlRepository===repo&&env?.GITHUB_REPOSITORY===repo,
+  'CONTROL_REPOSITORY_MISMATCH');
+ need(event?.repository?.id===repoId&&event.repository.full_name===repo&&
+  event.repository.owner?.login===owner&&event.repository.owner?.id===ownerId&&
+  typeof event.repository.private==='boolean',
+  'CONTROL_REPOSITORY_IDENTITY_UNVERIFIED');
+ need(env.GITHUB_EVENT_NAME==='issues'&&env.GITHUB_REF==='refs/heads/main'&&
+  env.GITHUB_WORKFLOW_REF===repo+'/.github/workflows/pc-job.yml@refs/heads/main'&&
+  String(env.GITHUB_RUN_ATTEMPT)==='1',
+  'CONTROL_WORKFLOW_OR_EVENT_UNTRUSTED');
+ need(env.GITHUB_ACTOR===owner&&
+  event.sender?.login===owner&&event.sender?.id===ownerId&&
+  event.issue?.user?.login===owner&&event.issue.user.id===ownerId,
+  'CONTROL_OWNER_IDENTITY_UNVERIFIED');
+ need(Number.isSafeInteger(event.issue?.number)&&event.issue.number>0&&
+  !event.issue.pull_request&&event.issue.title==='pc-job'&&
+  event.issue.labels?.some(x=>x.name==='pc-job'),
+  'CONTROL_ISSUE_SCOPE_UNTRUSTED');
+ need(event.action==='opened'||
+  (event.action==='labeled'&&event.label?.name==='pc-job'),
+  'CONTROL_EVENT_ACTION_UNTRUSTED');
+ return Object.freeze({repository:repo,visibility:event.repository.private?'PRIVATE':'PUBLIC',
+  ownerVerified:true,prCodeAllowed:false});
+}
+
 export function validateRequest(request,policy){
  need(request&&typeof request==='object'&&!Array.isArray(request),'REQUEST_OBJECT');
  const keys=['schema','requestId','chatId','operation','sourceRepository','sourceBranch','sourceSha'];
