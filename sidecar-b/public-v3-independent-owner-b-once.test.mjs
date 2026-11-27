@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {classifyW06PublicBEffect,matchesExactW06OwnerEffectComment,classifyW06BTerminalFailure} from './public-v3-independent-owner-b-once.mjs';
+import {classifyW06PublicBEffect,matchesExactW06OwnerEffectComment,classifyW06BTerminalFailure,matchesReviewedW06SourceMerge} from './public-v3-independent-owner-b-once.mjs';
 
 const fixture=()=>({
  approvedMergePinned:true,ownerApprovalVerified:true,
@@ -99,10 +99,11 @@ test('preflight module cannot be evaluated before its authenticated source CAS',
  const source=fs.readFileSync(new URL('./public-v3-independent-owner-b-once.mjs',import.meta.url),'utf8');
  assert.doesNotMatch(source,/^import\s+.*from\s+['"]\.\/public-v3-independent-preimage-readonly\.mjs['"]/m);
  const check=source.indexOf('for(const relative of [ENTRY,preflightSource])');
+ const sourceMergeCheck=source.indexOf('const reviewedSourceMerge=reviewedW06SourceMerge()');
  const dynamicImport=source.indexOf("await import('./public-v3-independent-preimage-readonly.mjs')");
  const invoke=source.indexOf('await inspectIndependent()');
- assert.ok(check>0&&dynamicImport>check&&invoke>dynamicImport);
- assert.match(source,/W06_PUBLIC_B_SOURCE_DRIFT_STOP/);
+ assert.ok(sourceMergeCheck>0&&check>sourceMergeCheck&&dynamicImport>check&&invoke>dynamicImport);
+ assert.match(source,/W06_PUBLIC_B_REVIEWED_SOURCE_DRIFT_STOP/);
  assert.match(source,/W06_PUBLIC_B_INDEPENDENT_WINDOWS_REQUIRED/);
 });
 
@@ -176,4 +177,43 @@ test('unknown lease-release after claimed rollback requires owner reconcile',()=
  });
  assert.equal(noReplace.status,'RECOVERY_REQUIRED');
  assert.equal(noReplace.operationalWrites,0);
+});
+
+test('reviewed W06 operator merge must be owner-authored, main ancestor and not a draft',()=>{
+ const sha='a'.repeat(40);
+ const pr={
+  number:4288,merged:true,merge_commit_sha:sha,
+  user:{id:327938088},
+  head:{repo:{full_name:'ansqhd5774-Choi/zgmini-pc-control'}},
+  base:{repo:{full_name:'ansqhd5774-Choi/zgmini-pc-control'},ref:'main'}
+ };
+ const comparison={behind_by:0,merge_base_commit:{sha}};
+ assert.equal(matchesReviewedW06SourceMerge(pr,comparison),true);
+ const variants=[
+  p=>{p.merged=false;},p=>{p.number=4287;},
+  p=>{p.user.id=1;},p=>{p.base.ref='other';},
+  p=>{p.head.repo.full_name='other/repo';},
+  p=>{p.merge_commit_sha='x';},
+ ];
+ for(const mutate of variants){
+  const changed=structuredClone(pr);mutate(changed);
+  assert.equal(matchesReviewedW06SourceMerge(changed,comparison),false);
+ }
+ for(const changed of [
+  {behind_by:1,merge_base_commit:{sha}},
+  {behind_by:0,merge_base_commit:{sha:'b'.repeat(40)}},
+  {behind_by:0}
+ ])
+  assert.equal(matchesReviewedW06SourceMerge(pr,changed),false);
+});
+test('reviewed immutable merge bytes are compared before any local preflight evaluation',()=>{
+ const s=fs.readFileSync(new URL('./public-v3-independent-owner-b-once.mjs',import.meta.url),'utf8');
+ const review=s.indexOf('const reviewedSourceMerge=reviewedW06SourceMerge()');
+ const file=s.indexOf('verifyReviewedSourceFile(relative,reviewedSourceMerge)');
+ const dynamic=s.indexOf("await import('./public-v3-independent-preimage-readonly.mjs')");
+ assert.ok(review>0&&file>review&&dynamic>file);
+ assert.match(s,/reviewed\.equals\(current\)/);
+ assert.match(s,/sha\(readLocal\(relative\)\)===sha\(reviewed\)/);
+ assert.match(s,/verifyNewDependencyClosure\(reviewedSourceMerge\)/);
+ assert.match(s,/W06_PUBLIC_B_OPERATOR_REVIEWED_MERGE_REQUIRED/);
 });

@@ -21,6 +21,9 @@ const APPROVAL='approvals/sidecar-b/w06-cnn-v2-to-v3-20261128.json';
 // changes) and a separate reviewed PR pins that approval's merge commit.
 const APPROVAL_PR=0;
 const APPROVAL_MERGE=null;
+// Executable bytes must come from this reviewed source PR's immutable merge.
+// A later unrelated main update must never silently replace approved code.
+const REVIEWED_SOURCE_PR=4288;
 const FIXED={
  schema:'ZGMINI_CNN_SIDECAR_ONEFILE_B_V3',
  target:'E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\archive-run.mjs',
@@ -97,12 +100,34 @@ function readLocal(relative) {
   'W06_PUBLIC_B_LOCAL_SOURCE_REDIRECT_STOP');
  return fs.readFileSync(file);
 }
-function verifyNewDependencyClosure() {
+export function matchesReviewedW06SourceMerge(pr,comparison) {
+ const merge=pr?.merge_commit_sha;
+ return pr?.number===REVIEWED_SOURCE_PR&&pr?.merged===true&&
+  pr?.user?.id===327938088&&
+  pr?.head?.repo?.full_name===REPO&&
+  pr?.base?.repo?.full_name===REPO&&pr?.base?.ref==='main'&&
+  hex40(merge)&&comparison?.behind_by===0&&
+  comparison?.merge_base_commit?.sha===merge;
+}
+function reviewedW06SourceMerge() {
+ const pr=api('repos/'+REPO+'/pulls/'+REVIEWED_SOURCE_PR);
+ need(pr?.merged===true&&hex40(pr?.merge_commit_sha),
+  'W06_PUBLIC_B_OPERATOR_REVIEWED_MERGE_REQUIRED');
+ const compare=api('repos/'+REPO+'/compare/'+pr.merge_commit_sha+'...main');
+ need(matchesReviewedW06SourceMerge(pr,compare),
+  'W06_PUBLIC_B_OPERATOR_SOURCE_LINEAGE_STOP');
+ return pr.merge_commit_sha;
+}
+function verifyReviewedSourceFile(relative,sourceMerge) {
+ const reviewed=readRemote(relative,sourceMerge),
+  current=readRemote(relative,'main');
+ need(reviewed.equals(current)&&sha(readLocal(relative))===sha(reviewed),
+  'W06_PUBLIC_B_REVIEWED_SOURCE_DRIFT_STOP');
+}
+function verifyNewDependencyClosure(sourceMerge) {
  // The imported read-only checker validates its own 7-file transitive closure
  // and trusted owner/Explorer ancestry before this is called.
- for(const relative of SOURCES)
-  need(sha(readLocal(relative))===sha(readRemote(relative,'main')),
-   'W06_PUBLIC_B_SOURCE_DRIFT_STOP');
+ for(const relative of SOURCES)verifyReviewedSourceFile(relative,sourceMerge);
 }
 
 // Preserve the distinction between a pre-replacement rejection, a verified
@@ -196,9 +221,9 @@ export async function main(args=process.argv.slice(2)) {
   !process.env.RUNNER_NAME&&!process.env.GITHUB_RUN_ID,
   'W06_PUBLIC_B_INDEPENDENT_WINDOWS_REQUIRED');
  const preflightSource='sidecar-b/public-v3-independent-preimage-readonly.mjs';
+ const reviewedSourceMerge=reviewedW06SourceMerge();
  for(const relative of [ENTRY,preflightSource])
-  need(sha(readLocal(relative))===sha(readRemote(relative,'main')),
-   'W06_PUBLIC_B_SOURCE_DRIFT_STOP');
+  verifyReviewedSourceFile(relative,reviewedSourceMerge);
  const {main:inspectIndependent}=
   await import('./public-v3-independent-preimage-readonly.mjs');
  // The verified preflight independently proves owner Explorer ancestry,
@@ -208,7 +233,7 @@ export async function main(args=process.argv.slice(2)) {
   current?.status==='DEFERRED'&&
   current.code==='W06_V3_NATURAL_CORE_ACTIVE'),
   'W06_PUBLIC_B_CURRENT_PREIMAGE_STOP');
- verifyNewDependencyClosure();
+ verifyNewDependencyClosure(reviewedSourceMerge);
  const manifest=verifyFixedOwnerApproval(); // intentionally never passes yet
  const verifiedCandidate=candidate();
  const {validateManifest,verifyCandidateBytes,applyOneFile,TARGET,sha256}=
