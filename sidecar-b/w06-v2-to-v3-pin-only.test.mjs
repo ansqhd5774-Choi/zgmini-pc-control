@@ -11,7 +11,10 @@ const oldPin=`const APPROVED='${V2_SOURCE}';`;
 const nextPin=`const APPROVED='${nextSource}';`;
 assert.equal(sha256(old),V2_AFTER);
 assert.equal(old.toString('utf8').split(oldPin).length,2);
-const after=Buffer.from(old.toString('utf8').replace(oldPin,nextPin),'utf8');
+const after=fs.readFileSync(new URL('./approved/archive-run-w06-v3.mjs',import.meta.url));
+const expected=Buffer.from(old.toString('utf8').replace(oldPin,nextPin),'utf8');
+assert.deepEqual(after,expected);
+assert.equal(sha256(after),'894411dea16462c4ee305f7ec80102d81662063f5f76c8a8384f04977e860ac3');
 const manifest=()=>({schema:NEXT_SUCCESSOR_SCHEMA,status:'APPROVED_B',
  requestId:'965ad702-1af9-4cf3-9003-93e9555ebc41',target:TARGET,
  beforeSha256:V2_AFTER,afterSha256:sha256(after),
