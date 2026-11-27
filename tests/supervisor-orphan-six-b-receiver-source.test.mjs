@@ -51,7 +51,7 @@ function sample(){
  const ports={
   getMainManifest:async(p,ref)=>{calls.push(['manifest',p,ref]);return raw;},
   getPullRequest:async(n)=>{calls.push(['pr',n]);return pr;},
-  getReviews:async(n)=>{calls.push(['reviews',n]);return reviews;},
+  getReviews:async(n)=>{calls.push(['reviews',n]);return {source:'GITHUB_CANONICAL_REVIEW_API',complete:true,items:reviews};},
   getInstalledReadback:async()=>{calls.push(['installed']);return installed;},
   readOriginalOneUseClaim:async(id)=>{calls.push(['claim',id]);return null;}
  };
@@ -123,6 +123,19 @@ test('PR merge and matching final head owner approval are mandatory',async()=>{
   const x=await receiveOrphanSixBApprovalSource({issue:f.issue,...f.ports});
   assert.equal(x.status,'BLOCKED');
   assert.equal(x.code,'ORPHAN_SIX_B_APPROVAL_REVIEW_OR_MERGE_UNVERIFIED');
+ }
+});
+test('incomplete review pagination or noncanonical responses never establish B approval',async()=>{
+ for(const readback of [
+  {source:'GITHUB_CANONICAL_REVIEW_API',complete:false,items:sample().reviews},
+  {source:'ISSUE_BODY',complete:true,items:sample().reviews},
+  sample().reviews
+ ]){
+  const f=sample();
+  f.ports.getReviews=async()=>readback;
+  const result=await receiveOrphanSixBApprovalSource({issue:f.issue,...f.ports});
+  assert.equal(result.code,'ORPHAN_SIX_B_APPROVAL_REVIEW_OR_MERGE_UNVERIFIED');
+  assert.equal(result.effectAuthorized,false);
  }
 });
 test('dismissed exact-head review is not approval',async()=>{
