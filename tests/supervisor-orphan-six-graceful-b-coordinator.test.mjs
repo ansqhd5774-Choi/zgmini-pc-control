@@ -45,7 +45,8 @@ function sample(){
  };
 }
 function fixture(t,{denyApproval=false,failBeforeSignalAt=null,
- firstIdentityDriftAt=null,failAfterSignalAt=null,breakExitAt=null}={}){
+ firstIdentityDriftAt=null,failAfterSignalAt=null,breakExitAt=null,
+ revokeBeforeSeat=null,approvalReadbackUnknownAt=null}={}){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-orphan-b-fixture-'));
  fs.mkdirSync(path.join(root,'requests'));
  const requestId='pc-'+randomUUID(),manifestRawSha256=d('d');
@@ -63,6 +64,26 @@ function fixture(t,{denyApproval=false,failBeforeSignalAt=null,
    return {state:'PRIVATE_SAME_HOST_B_ORIGIN_AND_APPROVAL_VERIFIED',
     manifestRawSha256,oneUseEffectClaimVerified:true,
     independentInstalledMaintainerVerified:true};
+  },
+  async verifyFreshOwnerEffectDecision({
+   seat,proposalId,requestId:id,approvalManifestSha256:sha,
+   afterIntentReadbackSha256
+  }){
+   events.push('fresh-approval-'+seat);
+   assert.equal(id,requestId);
+   assert.equal(sha,manifestRawSha256);
+   assert.match(afterIntentReadbackSha256,/^[a-f0-9]{64}$/);
+   if(seat===approvalReadbackUnknownAt)throw Error('canonical readback unavailable');
+   const revoked=seat>=revokeBeforeSeat;
+   return {source:'PRIVATE_B_FRESH_CANONICAL_OWNER_EFFECT_DECISION',
+    status:revoked?'REVOKED':'CURRENT_OWNER_APPROVE_VERIFIED',
+    seat,proposalId,requestId:id,manifestRawSha256,
+    intentReadbackSha256:afterIntentReadbackSha256,
+    observedAtUtc:new Date().toISOString(),
+    completeCanonicalCommentsReadbackVerified:!revoked,
+    latestOwnerDecisionApprovedUnrevokedVerified:!revoked,
+    unchangedOwnerCommentVerified:!revoked,
+    watchdogFenceUninterruptedVerified:true};
   },
   async readPrivateSnapshot(){events.push('snapshot');return original;},
   async attestPreSignal({seat,proposalId,afterIntentReadbackSha256}){
@@ -180,6 +201,46 @@ test('a signal with unknown outcome never causes duplicate signal on retry',asyn
  assert.equal(f.journal.read().record.intentCount,3);
  assert.equal((await f.run()).attemptedSignalCount,0);
  assert.deepEqual(f.sent,[1,2,3]);
+});
+test('owner B effect revoke before first seat prevents all signals',async t=>{
+ const f=fixture(t,{revokeBeforeSeat:1}),r=await f.run();
+ assert.equal(r.status,'RECOVERY_REQUIRED');
+ assert.equal(r.code,'ORPHAN_SIX_FRESH_OWNER_EFFECT_APPROVAL_UNVERIFIED');
+ assert.equal(r.attemptedSignalCount,0);
+ assert.deepEqual(f.sent,[]);
+ assert.equal(f.journal.read().record.intentCount,1);
+ assert.equal(f.journal.read().record.phase,'RECOVERY_REQUIRED');
+ assert.equal(f.events.includes('signal-1'),false);
+});
+test('owner B effect revoke after first seat blocks next signal and preserves journal',async t=>{
+ const f=fixture(t,{revokeBeforeSeat:2}),r=await f.run();
+ assert.equal(r.status,'RECOVERY_REQUIRED');
+ assert.equal(r.code,'ORPHAN_SIX_FRESH_OWNER_EFFECT_APPROVAL_UNVERIFIED');
+ assert.equal(r.attemptedSignalCount,1);
+ assert.deepEqual(f.sent,[1]);
+ const record=f.journal.read().record;
+ assert.equal(record.intentCount,2);
+ assert.equal(record.stoppedCount,1);
+ assert.equal(record.phase,'RECOVERY_REQUIRED');
+ assert.equal(f.events.includes('signal-2'),false);
+ assert.equal((await f.run()).attemptedSignalCount,0);
+});
+test('canonical approval readback outage after first seat blocks further signals',async t=>{
+ const f=fixture(t,{approvalReadbackUnknownAt:2}),r=await f.run();
+ assert.equal(r.status,'RECOVERY_REQUIRED');
+ assert.equal(r.attemptedSignalCount,1);
+ assert.deepEqual(f.sent,[1]);
+ assert.equal(f.journal.read().record.phase,'RECOVERY_REQUIRED');
+ assert.equal(f.events.includes('signal-2'),false);
+});
+test('missing live owner decision port blocks before source journal and effect',async t=>{
+ const f=fixture(t);
+ delete f.port.verifyFreshOwnerEffectDecision;
+ const r=await f.run();
+ assert.equal(r.status,'BLOCKED');
+ assert.equal(r.code,'ORPHAN_SIX_MAINTAINER_BINDINGS_MISSING');
+ assert.equal(f.journal.read(),null);
+ assert.deepEqual(f.sent,[]);
 });
 test('no WMI seat-exit readback retains original one-use recovery marker',async t=>{
  const f=fixture(t,{breakExitAt:4}),r=await f.run();
