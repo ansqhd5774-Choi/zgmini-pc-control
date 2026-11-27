@@ -9,7 +9,7 @@ import {requireHandoffApproval,handoffFilePlan,nextRuntimeFiles} from "../tools/
 
 import {createMaintenanceAgent,failedUpdaterResult,normalizedResult,attachApprovedNativeBReceipt,parseS6NonzeroRecoveryReport} from "../tools/maintenance-agent.mjs";
 import {prepareMaintenanceIssue,submitExistingControllerApprovalFromCi} from '../tools/maintenance-request.mjs';
-import {readIndependentlyInstalledControllerBPublisherPolicy,readAuthenticatedControllerBPublisherWorkflow,observeCompletedRun,observePublishedControllerApprovals,observeLateOwnerMergedControllerApproval,publishExistingControllerApprovals,publishLateOwnerMergedControllerApproval} from '../ci-approval/completed-run-intake.mjs';
+import {readIndependentlyInstalledControllerBPublisherPolicy,readAuthenticatedControllerBPublisherWorkflow,observeCompletedRun,observePublishedControllerApprovals,observeLateOwnerMergedControllerApproval,publishExistingControllerApprovals,publishLateOwnerMergedControllerApproval,publishConfiguredControllerApproval} from '../ci-approval/completed-run-intake.mjs';
 
 test('pre-install child rejection retains exact safe code and current installed SHA',()=>{
  const r=failedUpdaterResult({requestId:'fixture',targetControllerSha:'b'.repeat(40)},
@@ -1385,6 +1385,27 @@ test('Public B publisher on hosted source CI is default-denied until exact insta
  assert.equal(posts,1);
 });
 
+
+
+test('verified Public B never enters configured approval PR merge before exact Owner approval',async()=>{
+ const runtime=fs.readFileSync(new URL('../ci-approval/completed-run-intake.mjs',import.meta.url),'utf8');
+ assert.match(runtime,/autoApprovalPolicy:allowPublic\?null:initialControllerPublicationPolicy\(policy\)/);
+ assert.match(runtime,/if\(policy&&!allowPublic\)/);
+ let reads=0,merges=0,posts=0,stages=0;
+ const result=await publishConfiguredControllerApproval({
+  action:'completed',repository:{id:1442936296,full_name:REPO,private:false}
+ },{
+  allowPublic:true,
+  policy:{targetSha:TARGET,sourcePrNumber:10,approvalPrNumber:11},
+  runId:765,attempt:1,
+  getJson:async()=>{reads++;throw Error('PUBLIC_AUTO_MERGE_UNAUTHORIZED');},
+  ports:{mergeApprovalPr:async()=>{merges++},createIssue:async()=>{posts++}},
+  stageApprovalPr:async()=>{stages++;throw Error('PUBLIC_STAGING_UNAUTHORIZED');},
+  emitReceipt:()=>assert.fail('no Public configured receipt')
+ });
+ assert.deepEqual(result,{state:'DISABLED',code:'CI_PUBLIC_CONFIGURED_MERGE_NOT_AUTHORIZED',results:[]});
+ assert.equal(reads,0);assert.equal(merges,0);assert.equal(posts,0);assert.equal(stages,0);
+});
 
 test('Public source event stays Private-only by default but is observable with verified caller scope',async()=>{
  const repo={id:1442936296,full_name:REPO,private:false};
