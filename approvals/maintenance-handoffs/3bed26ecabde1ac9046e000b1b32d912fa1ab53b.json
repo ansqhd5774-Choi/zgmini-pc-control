@@ -1,0 +1,44 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "feaf0a380890663d8881881bea63587576188c76",
+  "targetSha": "3bed26ecabde1ac9046e000b1b32d912fa1ab53b",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "Approved continuation of existing independent maintenance receiver source handoff, to correct postcheck classification while preserving Public SOURCE_ONLY policy. This source-only C/operator handoff does not approve, enable, or execute Controller B operations. Current host CAS and origin must be verified independently by the fixed protected Windows handoff command; source CI and this manifest are not operating-PC installation proof.",
+  "files": {
+    "tools/maintenance-contract.mjs": "19bf293ab2647996fafd2a8380d463a525f2ecc9801c20de8fc437e08a9ed70a",
+    "tools/maintenance-apply.mjs": "cf0d9c82fa25c343c0d540b6c432c3e6d090c9924474851c22c277867d841096",
+    "tools/maintenance-agent.mjs": "7c3f6318b07844aaba68cc6f24d5bc82a45d4cde9bd5291cd3e9948778c945c2",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "3a48d18dd6e58650ed351b5a75d54e3a91aa616d2d9bd995909ca1f3c1659594",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "af31ab1f6a159aa1d8467d2585eb16750e8a1a293f9ecfb90b85c388d8640d70",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "23f3709ed0387cfb0132d9546f0fd6e2f10eabfad4212a67a170d5201a4a5de0"
+  },
+  "runtimeChangedFiles": [
+    "tools/maintenance-contract.mjs",
+    "tools/update.mjs"
+  ],
+  "checks": {
+    "sourceCi": "Reviewed source PR #4249 main 067c42a35a74afd2065529463c6fbc2ba4972bfb; reviewed failed-postcheck source PR #4250 main 3bed26ecabde1ac9046e000b1b32d912fa1ab53b, hosted source CI #46035036268 success (23/23 related regressions). Separate unchanged tests and exact new 9-file blob SHA256 verified in this candidate handoff PR.",
+    "byteProvenance": "Exact target Git tree at 3bed26ecabde1ac9046e000b1b32d912fa1ab53b vs last Windows operator-confirmed receiver source feaf0a380890663d8881881bea63587576188c76. 2/7 runtime files changed, remaining 5/7 unchanged, source registration and operator helper 2/2 unchanged. Target raw SHA256: maintenance-contract.mjs=19bf293ab2647996fafd2a8380d463a525f2ecc9801c20de8fc437e08a9ed70a, update.mjs=3a48d18dd6e58650ed351b5a75d54e3a91aa616d2d9bd995909ca1f3c1659594.",
+    "installedWindowsEvidence": "2026-11-28 independent operator C handoff PASS: STOPPED_RECEIVER_HANDOFF_AND_WINDOWS_ORIGIN_VERIFIED, installed target feaf0a380890663d8881881bea63587576188c76 (Issue #68 comment 7223128772). This is an observation at that execution time only, not a fresh readback or permission to run an unverified new handoff.",
+    "ciPolicyPreservation": "ciControllerBPolicy field omitted. Existing CI Controller B policy pin is inherited exactly; Public B effects are held by PUBLIC_B_EFFECT_SEPARATE_AUTH_REQUIRED. Never derive B effect from a Public metadata Issue, source test, or this manifest.",
+    "preflight": "Fixed tools/handoff-maintenance.mjs invoked only by an independently authorized Windows operator at medium integrity, outside GitHub Actions/Runner, once after previous actual installation CAS, exact 7-file SHA256 and protected startup bytes, target ancestry in main, clean scoped checkout, lease/nonce and Windows WMI receiver origin, path alias/hard-link exclusion, pending journal, versioned byte backups and rollback protectors all pass. No bulk kill/restart, no automatic retry if outcome unknown.",
+    "runtimeApprovalBoundaries": "Only two independent receiver executable source bytes may be changed in the existing protected seven-to-seven handoff; no new B work accepted, no policy pin rotation, no Controller install, no change to Public job workflow, no supervisor 6 Runner/Watchdog/Standby2 change, no raw private report publication."
+  },
+  "backup": "BYTE_VERIFIED_EXISTING_SEVEN_RUNTIME_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_WHILE_NEW_RECEIVER_NOT_STARTED_AND_PRIOR_RECEIVER_PROVEN_STOPPED; HOLD_FOR_RECOVERY_IF_RECEIVER_ORIGIN_UNVERIFIED",
+  "effects": [
+    "One-shot protected independent Windows maintenance receiver 7-to-7 source handoff; exactly tools/maintenance-contract.mjs and tools/update.mjs changed",
+    "Existing Public SOURCE_ONLY polling and immutable owner/repo attestation unchanged; public B effects remain blocked",
+    "Existing seven installed files and startup byte snapshot, lock/CAS, original receiver origin and new receiver WMI origin prove only permitted source effect. No Controller or Runner replacement."
+  ],
+  "preserve": [
+    "Controller last observed source 3c7d4cfefacf072fd35cb19706b352c64c5e4fd2, Supervisor/Runner6/Watchdog/Standby2",
+    "Historical UNKNOWN ledgers and DB/D1/Writer/schedules untouched",
+    "Control repository Public; Public A pc-job Workflow remains disabled until separately authorized new Controller install"
+  ]
+}

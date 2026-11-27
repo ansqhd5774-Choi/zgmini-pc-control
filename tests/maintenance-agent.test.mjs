@@ -1169,3 +1169,58 @@ test('public maintainer one-file handoff pins exact immutable source and leaves 
    assert.equal(approved.files[rel],previous.files[rel], 'unrelated file preserved: '+rel);
  }
 });
+
+
+test('public postcheck receiver handoff is exactly two source files with original installed CAS and Public B held',()=>{
+ const source='feaf0a380890663d8881881bea63587576188c76';
+ const target='3bed26ecabde1ac9046e000b1b32d912fa1ab53b';
+ const before=JSON.parse(fs.readFileSync(new URL(
+  '../approvals/maintenance-handoffs/'+source+'.json',import.meta.url),'utf8'));
+ const candidate=JSON.parse(fs.readFileSync(new URL(
+  '../approvals/maintenance-handoffs/'+target+'.json',import.meta.url),'utf8'));
+ assert.equal(candidate.schema,'ZGMINI_MAINTENANCE_HANDOFF_V2');
+ assert.equal(candidate.transition,'SEVEN_TO_SEVEN');
+ assert.equal(candidate.installedSha,source);
+ assert.equal(candidate.targetSha,target);
+ assert.equal(candidate.approved,true);
+ assert.equal(candidate.scope,'COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE');
+ assert.equal(requireHandoffApproval(candidate,target,source),'SEVEN_TO_SEVEN');
+ assert.throws(()=>requireHandoffApproval({...candidate,approved:false},target,source),
+  /HANDOFF_APPROVAL_REQUIRED/);
+ assert.throws(()=>requireHandoffApproval(candidate,target,'b'.repeat(40)),
+  /HANDOFF_APPROVAL_REQUIRED/);
+ assert.equal(Object.hasOwn(candidate,'ciControllerBPolicy'),false);
+ const runtime=[...nextRuntimeFiles];
+ const full=[...runtime,'tools/bootstrap-maintenance.mjs','tools/handoff-maintenance.mjs'];
+ assert.deepEqual(Object.keys(candidate.files).sort(),full.sort());
+ const planned=handoffFilePlan('SEVEN_TO_SEVEN',
+  Object.fromEntries(runtime.map(rel=>[rel,before.files[rel]])),candidate.files);
+ assert.deepEqual(planned.writes,[
+  'tools/maintenance-contract.mjs','tools/update.mjs'
+ ]);
+ assert.deepEqual(candidate.runtimeChangedFiles,planned.writes);
+ assert.deepEqual(planned.rollbackAdded,[]);
+ assert.equal(candidate.files['tools/maintenance-contract.mjs'],
+  '19bf293ab2647996fafd2a8380d463a525f2ecc9801c20de8fc437e08a9ed70a');
+ assert.equal(candidate.files['tools/update.mjs'],
+  '3a48d18dd6e58650ed351b5a75d54e3a91aa616d2d9bd995909ca1f3c1659594');
+ const workingTree=new URL('../',import.meta.url);
+ for(const rel of full){
+  const prev=execFileSync('git',['show',source+':'+rel],
+   {cwd:workingTree,maxBuffer:5_000_000});
+  const next=execFileSync('git',['show',target+':'+rel],
+   {cwd:workingTree,maxBuffer:5_000_000});
+  assert.equal(crypto.createHash('sha256').update(prev).digest('hex'),
+   before.files[rel],'existing C handoff raw byte CAS: '+rel);
+  assert.equal(crypto.createHash('sha256').update(next).digest('hex'),
+   candidate.files[rel],'new C handoff immutable raw byte CAS: '+rel);
+  if(!planned.writes.includes(rel))
+   assert.equal(before.files[rel],candidate.files[rel],
+    'same installed source file remains unchanged: '+rel);
+ }
+ const handoffSource=fs.readFileSync(new URL('../tools/handoff-maintenance.mjs',import.meta.url),'utf8');
+ assert.match(handoffSource,/requireNewReceiverOrigin\(/);
+ assert.match(handoffSource,/HANDOFF_OPERATOR_WINDOWS_REQUIRED/);
+ assert.match(handoffSource,/HANDOFF_MAIN_REQUIRED/);
+ assert.match(handoffSource,/requireNoUnfinishedHandoff/);
+});
