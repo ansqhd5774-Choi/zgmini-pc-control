@@ -58,7 +58,7 @@ function exactReviewedWorkflowBlob(file){
     file.content.length>200000)return false;
  const bytes=Buffer.from(file.content,'base64');
  if(bytes.length<1||bytes.length>120000)return false;
- const gitBlob=createHash('sha1').update(Buffer.from('blob '+bytes.length+' ')).update(Buffer.from([0]))
+ const gitBlob=createHash('sha1').update(Buffer.from('blob '+bytes.length)).update(Buffer.from([0]))
   .update(bytes).digest('hex');
  return gitBlob===SOURCE_WORKFLOW_BLOB;
 }
