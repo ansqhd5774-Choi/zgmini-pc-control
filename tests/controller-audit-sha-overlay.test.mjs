@@ -23,7 +23,7 @@ test('historical ledger SHA repair is an exact one-file child of installed Contr
  const original=old.toString('utf8'),updated=newer.toString('utf8');
  assert.equal(original.split(FROM).length-1,1);
  assert.equal(updated,original.replace(FROM,TO));
- assert.match(updated,/supervisor\.sourceSha===host\?\.controllerSourceSha/);
+ assert.ok(updated.includes('supervisor?.sourceSha===host?.controllerSourceSha'));
  assert.equal(git('show',BASE+':config/operations.json').equals(
   git('show',TARGET+':config/operations.json')),true);
  const syntax=spawnSync(process.execPath,['--check','--input-type=module'],{
