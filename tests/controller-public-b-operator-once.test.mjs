@@ -5,7 +5,8 @@ import {validatePublicOwnerBExactScope} from '../tools/update.mjs';
 import {classifyPublicBPreflight,main,verifyOperatorSourceClosure,
  withPublicBInstallLease} from '../tools/controller-public-b-operator-once.mjs';
 import {validateControllerSelectivePin,manifestFingerprint} from '../tools/maintenance-contract.mjs';
-import {classify4263Evidence,main as recover4263Main} from '../tools/controller-public-b-recover-4263.mjs';
+import {assemble4263Contracts,classify4263Evidence,main as recover4263Main} from '../tools/controller-public-b-recover-4263.mjs';
+import * as updater from '../tools/update.mjs';
 
 const target='555f95708984580cd7d5a0fd05a80b718e867710';
 const installed='3c7d4cfefacf072fd35cb19706b352c64c5e4fd2';
@@ -51,6 +52,15 @@ test('source-only Linux CI cannot create a Public B Issue or execute operator',a
  await assert.rejects(main(['inspect']),/PUBLIC_B_INDEPENDENT_WINDOWS_REQUIRED/);
  await assert.rejects(main(['apply']),/PUBLIC_B_INDEPENDENT_WINDOWS_REQUIRED/);
 });
+test('4263 recovery receives validator from authoritative contract module, not updater exports',()=>{
+ assert.equal(typeof updater.validateControllerSelectivePin,'undefined');
+ const recovered=assemble4263Contracts(updater,{validateControllerSelectivePin});
+ assert.equal(recovered.validateControllerSelectivePin(manifest,pin),true);
+ assert.equal(recovered.prevalidationInventory,updater.prevalidationInventory);
+ assert.equal(recovered.verifyPublicOwnerBWindows,updater.verifyPublicOwnerBWindows);
+ assert.throws(()=>assemble4263Contracts(updater,{}),/B4263_CONTRACT_EXPORT_MISSING/);
+ assert.throws(()=>assemble4263Contracts({}, {validateControllerSelectivePin}),/B4263_CONTRACT_EXPORT_MISSING/);
+});
 test('interrupted #4263 stays within original exact-source one-shot scope',()=>{
  const ready={originalLedger:true,ownerDead:true,leaseExact:true,
   installedTarget:true,supervisorHealthy:true,sixIdle:true,
@@ -63,7 +73,7 @@ test('interrupted #4263 stays within original exact-source one-shot scope',()=>{
  }
  assert.notEqual(classify4263Evidence({}),'B4263_RECOVERY_PREFLIGHT_ONLY');
  const src=fs.readFileSync(new URL('../tools/controller-public-b-recover-4263.mjs',import.meta.url),'utf8');
- assert.match(src,/const RECOVERY_PR=4264;/);
+ assert.match(src,/const RECOVERY_PR=4265;/);
  assert.match(src,/const ISSUE=4263;/);
  assert.match(src,/const REQUEST='pc-update-3f1c0413-37dd-4b44-900e-75c709d492ff';/);
  assert.match(src,/originalLedgerSha256:hash\(pre\.ledgerRaw\)/);
