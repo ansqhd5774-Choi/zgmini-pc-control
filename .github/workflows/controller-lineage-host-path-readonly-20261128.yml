@@ -113,6 +113,35 @@ jobs:
                 }
               }
               $remoteReadable = $null -ne $remoteSha
+              # Distinguish checkout aliases, detached HEAD and noncanonical origin without revealing paths or credentials.
+              $prefix = & $git.Source -C $checkout rev-parse --show-prefix 2>$null | Select-Object -First 1
+              $gitRoot = $LASTEXITCODE -eq 0 -and [string]::IsNullOrWhiteSpace([string]$prefix)
+              $symbolic = & $git.Source -C $checkout symbolic-ref --quiet --short HEAD 2>$null | Select-Object -First 1
+              $branchKind = if ($LASTEXITCODE -ne 0) { 'DETACHED_OR_UNREADABLE' } elseif ($symbolic -ceq 'main') { 'MAIN' } else { 'OTHER_BRANCH' }
+              $originPresent = -not [string]::IsNullOrWhiteSpace([string]$origin)
+              $originKind = 'OTHER_OR_MISSING'
+              $originHostGithub = $false
+              $originRepoExact = $false
+              if ($originPresent) {
+                if ($origin -match '^git@github\.com:(.+)$') {
+                  $originKind = 'SSH_SCP'
+                  $originHostGithub = $true
+                  $originRepoExact = $Matches[1] -ieq 'ansqhd5774-Choi/zgmini-pc-control.git' -or $Matches[1] -ieq 'ansqhd5774-Choi/zgmini-pc-control'
+                } elseif ($origin -match '^(?:https?://|ssh://)') {
+                  try {
+                    $originUri = [Uri]([string]$origin)
+                    $originKind = $originUri.Scheme.ToUpperInvariant()
+                    $originHostGithub = $originUri.Host -ieq 'github.com'
+                    $originRepoExact = $originUri.AbsolutePath.Trim('/') -ieq 'ansqhd5774-Choi/zgmini-pc-control.git' -or $originUri.AbsolutePath.Trim('/') -ieq 'ansqhd5774-Choi/zgmini-pc-control'
+                  } catch { $originKind = 'INVALID_URL' }
+                }
+              }
+              Write-Output "GIT_CHECKOUT_IS_ROOT=$gitRoot"
+              Write-Output "GIT_HEAD_KIND=$branchKind"
+              Write-Output "ORIGIN_PRESENT=$originPresent"
+              Write-Output "ORIGIN_KIND=$originKind"
+              Write-Output "ORIGIN_HOST_GITHUB=$originHostGithub"
+              Write-Output "ORIGIN_REPO_EXACT=$originRepoExact"
               Write-Output "CHECKOUT_ROOT_EXACT=$rootOk"
               Write-Output "CHECKOUT_BRANCH_MAIN=$branchOk"
               Write-Output "CHECKOUT_STATUS_READABLE=$statusOk"
