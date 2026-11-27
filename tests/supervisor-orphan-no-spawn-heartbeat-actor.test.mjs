@@ -175,16 +175,59 @@ test('attestor exception and missing bindings fail closed without source side ef
  assert.throws(()=>createNoSpawnHeartbeatActor(),/PRIVATE_BINDINGS_REQUIRED/);
 });
 
-test('Windows CI-compatible isolated TEMP heartbeat file never touches operating root',async()=>{
+test('Windows TEMP exact-file atomic CAS permits real three-tick rotating readback',async()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-orphan-fixture-'));
  try{
   const file=path.join(root,'SUPERVISOR_STATUS.json');
-  const a=actor(async()=>sample(),async hb=>{
-   fs.writeFileSync(file,JSON.stringify(hb)+'\n',{flag:'wx'});
-   return JSON.parse(fs.readFileSync(file,'utf8')).children.length===6;
+  const initial=Buffer.from(JSON.stringify({
+   at:'2026-11-26T23:00:00Z',pid:999999,sourceSha:'a'.repeat(40),
+   mode:'LISTENING',children:seats().map(x=>({seat:x.seat,pid:x.pid}))
+  })+'\n');
+  fs.writeFileSync(file,initial,{flag:'wx'});
+  const hash=b=>createHash('sha256').update(b).digest('hex');
+  const oldSha=hash(initial);
+  let clock=t,commits=0;
+  const sampleOnDisk=()=>{
+   const x=sample();
+   // The approved first heartbeat is immutable even as the *current*
+   // status-file bytes are replaced by this Actor's own fresh heartbeat.
+   x.preimage.heartbeatSha256=oldSha;
+   x.approvedPreimage.heartbeatSha256=oldSha;
+   x.observedAt=new Date(clock-1000).toISOString();
+   x.heartbeatRawObservation={source:'PRIVATE_FIXED_STATUS_FILE_RAW_BYTES',
+    sha256:hash(fs.readFileSync(file))};
+   return x;
+  };
+  const a=createNoSpawnHeartbeatActor({
+   now:()=>clock,
+   attest:async()=>sampleOnDisk(),
+   writeStatus:async packet=>{
+    if(packet.fixedFile!=='SUPERVISOR_STATUS.json'||!packet.canCommit())
+     return false;
+    if(hash(fs.readFileSync(file))!==packet.expectedRawSha256||
+       hash(packet.nextRawBytes)!==packet.nextRawSha256)return false;
+    const stage=path.join(root,'SUPERVISOR_STATUS.'+(++commits)+'.tmp');
+    fs.writeFileSync(stage,packet.nextRawBytes,{flag:'wx'});
+    if(!packet.canCommit())return false;
+    fs.renameSync(stage,file);
+    const readback=hash(fs.readFileSync(file));
+    return {status:'EXACT_RAW_CAS_READBACK_VERIFIED',
+     expectedRawSha256:packet.expectedRawSha256,
+     readbackRawSha256:readback};
+   }
   });
-  assert.equal((await a.tick()).status,'MONITORING');
-  assert.equal(JSON.parse(fs.readFileSync(file,'utf8')).children.length,6);
+  for(let i=0;i<3;i++){
+   const outcome=await a.tick();
+   assert.equal(outcome.status,'MONITORING','TEMP cycle '+i);
+   const body=JSON.parse(fs.readFileSync(file,'utf8'));
+   assert.equal(body.pid,process.pid);
+   assert.equal(body.at,new Date(clock).toISOString());
+   assert.equal(body.children.length,6);
+   assert.equal(body.adoptionMode,'ADOPT_EXISTING_SIX_NO_SPAWN');
+   clock+=15000;
+  }
+  assert.equal(commits,3);
+  assert.notEqual(hash(fs.readFileSync(file)),oldSha);
   a.stop();
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
