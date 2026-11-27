@@ -71,6 +71,12 @@ export function readS64078LocalBytes({
    return a;
   };
   const journal=readPair('journal.json'),backlog=readPair('backlog.json');
+  // Cross-file snapshot fence: double-reads of each individual file are
+  // insufficient if journal changes while the backlog is being sampled.
+  // Re-read both after sampling *both* source files. Source-only; no locks.
+  if(!safeFile(path.join(record,'journal.json')).equals(journal)||
+     !safeFile(path.join(record,'backlog.json')).equals(backlog))
+   return REFUSED('S6_LOCAL_CROSS_FILE_SNAPSHOT_CHANGED');
   // Recheck original claim and approval after the two local source reads.
   if(!safeFile(path.join(record,'claim.json'),32768).equals(claim)||
     !safeFile(path.join(sourceRoot,'approvals','controller-s6',APPROVAL_SHA+'.json'),32768).equals(approval)||
