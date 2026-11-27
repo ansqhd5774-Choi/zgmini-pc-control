@@ -46,6 +46,10 @@ function fixture(){
   assertClaimOwned:async()=>{events.push('assert');},
   writePostingCas:async()=>{events.push('posting');},
   postExactOriginal:async data=>{events.push('post');assert.equal(data.body,originalBody);n++;return {number:8000};},
+  readPostedIssue:async()=>{events.push('read-posted');return {number:8000,
+   title:'Maintenance replay '+FIXED.s6RequestId+' original #4078',
+   body:originalBody,state:'open',user:{login:'ansqhd5774-Choi'},
+   labels:[{name:'pc-job'}]};},
   writeDoneCas:async data=>{events.push('done');assert.equal(data.expectedStatus,'POSTING');},
   archiveClaim:async()=>{events.push('archive');}
  };
@@ -57,7 +61,7 @@ test('approved exact operation records durable POSTING then one exact POST, but 
  assert.equal(r.replayIssueNumber,8000);assert.equal(r.operationalSuccess,false);
  assert.equal(f.posts,1);
  assert.deepEqual(f.events,['read','authority','claim','assert','read','authority','assert',
-  'posting','assert','post','assert','done','archive']);
+  'posting','assert','post','assert','read-posted','assert','done','archive']);
 });
 test('missing independent port refuses before a claim',async()=>{
  const f=fixture();delete f.ports.writePostingCas;
@@ -98,6 +102,7 @@ for(const [name,point,phase] of [
  ['claim not confirmed','acquireExclusiveClaim','CLAIM_ATTEMPT'],
  ['POSTING CAS outcome unknown','writePostingCas','POSTING_ATTEMPT'],
  ['GitHub POST outcome unknown','postExactOriginal','GITHUB_POST_ATTEMPT'],
+ ['replay Issue GET outcome unknown','readPostedIssue','POSTED_ISSUE_READBACK_ATTEMPT'],
  ['DONE CAS outcome unknown','writeDoneCas','DONE_CAS_ATTEMPT'],
  ['claim archive outcome unknown','archiveClaim','DISPATCH_RECORDED']
 ]){
@@ -109,3 +114,28 @@ for(const [name,point,phase] of [
   assert.equal(f.events.filter(x=>x===point).length,1);
  });
 }
+
+test('replay Issue mismatch cannot commit DONE or archive claim',async()=>{
+ const f=fixture();
+ f.ports.readPostedIssue=async()=>({number:8000,title:'changed',
+  body:originalBody,state:'open',user:{login:'ansqhd5774-Choi'},
+  labels:[{name:'pc-job'}]});
+ const r=await execute(f.ports);
+ assert.equal(r.status,'RECOVERY_REQUIRED');
+ assert.equal(r.phase,'POSTED_ISSUE_READBACK_ATTEMPT');
+ assert.equal(f.posts,1);assert.ok(!f.events.includes('done'));
+ assert.ok(!f.events.includes('archive'));
+});
+test('replay Issue body and author must match exact original',async()=>{
+ for(const mutate of [
+  issue=>{issue.body+=' ';},issue=>{issue.user.login='github-actions[bot]';},
+  issue=>{issue.labels=[];},issue=>{issue.pull_request={url:'fake'};}
+ ]){
+  const f=fixture(),read=f.ports.readPostedIssue;
+  f.ports.readPostedIssue=async(...args)=>{const issue=await read(...args);mutate(issue);return issue;};
+  const r=await execute(f.ports);
+  assert.equal(r.status,'RECOVERY_REQUIRED');
+  assert.equal(r.phase,'POSTED_ISSUE_READBACK_ATTEMPT');
+  assert.ok(!f.events.includes('done'));
+ }
+});
