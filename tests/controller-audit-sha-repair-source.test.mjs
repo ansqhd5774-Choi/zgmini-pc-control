@@ -71,7 +71,7 @@ test('new independent operator pins entire six-source import closure before eval
   /PUBLIC_B_OPERATOR_SOURCE_CAS_FAILED/);
  const extra={...trusted,
   'tools/update.mjs':Buffer.concat([trusted['tools/update.mjs'],
-   Buffer.from("\\nimport './unapproved-sidecar.mjs';")])};
+   Buffer.from("\nimport './unapproved-sidecar.mjs';")])};
  assert.throws(()=>verifyOperatorSourceClosure(rel=>extra[rel],rel=>extra[rel]),
   /PUBLIC_B_OPERATOR_IMPORT_NOT_PINNED/);
 });
