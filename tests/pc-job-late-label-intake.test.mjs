@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {runInNewContext} from 'node:vm';
-import {execFileSync} from 'node:child_process';
+import {execFileSync,spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {executeJob} from '../controller/engine.mjs';
 import {attestOwnerPcJobEvent,publicPcReportProjection,publicJobLogEnvelope} from '../controller/common.mjs';
@@ -374,4 +374,19 @@ test('installed Public A Controller must pass immutable host gate before old PC 
  assert.ok(scope.indexOf('id: installed_controller')<scope.indexOf('Stage approved'));
  assert.ok(scope.indexOf('Stage approved')<scope.indexOf('Execute fixed'));
  assert.ok(scope.indexOf('Execute fixed')<scope.indexOf('Upload sanitized'));
+});
+
+
+test('Windows CMD interprets immutable Public A gate with fail-closed missing-host result and no output',{
+ skip:process.platform!=='win32'
+},()=>{
+ const gate=publicA.match(/id: installed_controller\n\s+run: >-\n\s+"E:\\ZGmini\\runtime\\node\.exe" -e "([^"\n]+)"/);
+ assert.ok(gate);
+ const cmd='"'+process.execPath+'" -e "'+gate[1]+'"';
+ const result=spawnSync('cmd.exe',['/d','/s','/c',cmd],{
+  encoding:'utf8',windowsHide:true,timeout:10000,maxBuffer:16384});
+ assert.equal(result.error,undefined);
+ assert.equal(result.status,2,'missing on-host manifest never permits Public action');
+ assert.equal(result.stdout,'','Windows CMD guard must not reveal private data');
+ assert.equal(result.stderr,'','Windows CMD guard failure must not echo local file paths');
 });
