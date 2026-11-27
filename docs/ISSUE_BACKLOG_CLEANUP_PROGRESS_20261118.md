@@ -495,3 +495,14 @@
 - 현재 GitHub `is:issue is:open` 검색 반환 24건, `is:pr is:open` 검색 반환 2건: [#4229](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4229) orphan-six 회복 Draft HOLD, [#4152](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4152) Controller B 정책 Draft HOLD. 두 후보는 현재 보류 지시/운영 조건을 해제하지 않고 Open 유지.
 - 기존 최근 운영 단회 #4270/#4164/#4159/#4156/#4140/#4135/#4131/#4122/#4117/#4110/#4082/#4078/#4069/#4068/#4055/#3947/#3767은 앞 절의 정확한 개별 완료조건을 충족하지 않아 임의 종료하지 않았다. #4079/#4075/#4061 인계 기록과 #2427/#2426/#1743/#68 장기 원장도 목적상 Open 유지.
 - 이번 배치 신규 Issue close **0건**, PR merge **0건**(기존 #4276 병합은 다른 담당자가 앞서 완료), 운영 파일 변경 **0건**. 기존 직접 종료 누적 207건 기록 보존. 후속은 새로운 원본 결과가 생긴 각 문제에서 필요한 정확 한 범위만 갱신한다.
+
+
+## 2026-11-28 브랜치 권한 실측 및 최신 운영 대상 정정
+
+- **권한/소속:** 역할 정본 `AGENTS.md`에 이슈 담당자 소속이 `zgmini-pc-control / codex/issues-lifecycle-manager-20261118`로 지정돼 있다. GitHub 연결에서 브랜치가 실제 존재함을 조회했고, 이 원장 파일을 기존 blob CAS로 갱신하는 방식으로 **해당 브랜치 파일 쓰기 권한만** 검증한다. 이 사실은 `main` 보호 우회, PR 병합 승인, B/C 운영 효과 승인 또는 PC 파일 접근 권한을 뜻하지 않는다.
+- **main 대비 분기:** 조회 기준 `main@54491e25856c603b993fc3ea3bc5ad868dad2dee`; 이 담당 루트 브랜치는 `diverged`, ahead 27 / behind 3750. 다수 기존 고유 변경이 있으므로 `reset/force/rebase`로 소거하지 않고 대상별 최신 전용 브랜치와 PR을 유지한다.
+- **PR #4312:** 실제 작업 전용 브랜치 `codex/issues-lifecycle-manager-20261128-s6-4078-plan`의 최신 HEAD `d90647a13766cc04ddd6be0bb66f27e616e73fe5`, 현재 main 대비 ahead 37 / behind 0. [정확 HEAD Actions #46085067931](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/46085067931) hosted `public-source-only` SUCCESS, 43/43 PASS; Windows `source-only` SKIPPED. PR은 Draft/HOLD, #4078 원본 실제 backlog replay/PC JSON-TXT 영수증 없음.
+- **#4078 승인 실측:** 기존 `approvals/controller-s6/1fceeba061f7f8731811220b27cac245bd91d44e87d68935cd8475117f094141.json` 승인 효과는 `EXACT_ONE_SUPERVISOR_TREE_STOP_WITH_WATCHDOG_AUTO_PROMOTION`뿐. 새 `S6_4078_BACKLOG_ONLY_REPLAY`는 별도 정확 승인과 독립 Owner 운영 포트 미확보. 원본 #4069 RECOVERY_REQUIRED 및 #4078 OPEN 보존. [원본 이슈 판정](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4078#issuecomment-7230518770).
+- **#4135 Writer B:** 원본 Run 45901622751 `WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED` (167/167 ACTIVE), 설치 전 중단. 소스 수정 PR #4314, #4315는 이미 main 병합돼 있어 중복 수정하지 않는다. 공개 저장소에서 기존 private-only B 실행 계약이 활성화되지 않고, 원본 4파일 manifest의 Runtime 효과와 최신 기능 승인/공급자 계약도 별도로 대조해야 한다. 운영 설치는 NOT DONE, 원본 요청 재실행 없음.
+- **#3767:** #4156의 후속 운영 정상 감사(83/83 파일 CAS, Standby 2/2 READY)와 독립 WMI 승격 분류 검증은 다른 범위다. [대표 추적 정합 기록](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3767#issuecomment-7230529772) 유지, 원래 #3767 R3 실패를 PASS로 소급하지 않음.
+- **완료 판정:** 이 항목은 역할·브랜치·원장 정합 및 GitHub 파일 쓰기 권한의 확인이다. 신규 원본 Issue 종결/PR 병합/Windows 설치·재발행/DB·D1 변경은 0. 다음 필수 행동은 승인된 기존 실제 효과가 있는 독립 Issue를 우선 처리하고, #4078은 정확 효과 승인·운영 포트 확보 후에만 이어간다.
