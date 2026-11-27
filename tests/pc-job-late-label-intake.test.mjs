@@ -36,7 +36,7 @@ test('workflow accepts exactly owner opened or pc-job labeled and retains pinned
  assert.match(wf,/github\.event\.action == 'opened'/);
  assert.match(wf,/github\.event\.action == 'labeled' &&\s*github\.event\.label\.name == 'pc-job' &&\s*vars\.ZGMINI_PC_JOB_LATE_LABEL_ENABLED == 'true'/);
  assert.match(wf,/github\.event\.action == 'opened' \|\|/);
- assert.match(wf,/Late-label entry is opt-in only after matching fixed Controller/);
+ assert.match(wf,/Late-label entry remains opt-in; duplicate claims are not replayed./);
  assert.match(wf,/contains\(github\.event\.issue\.labels\.\*\.name, 'pc-job'\)/);
  assert.match(wf,/github\.actor == 'ansqhd5774-Choi'/);
  assert.match(wf,/github\.event\.repository\.id == 1442936296/);
@@ -203,6 +203,6 @@ test('public pc-job preserves fixed A-grade source+report boundary',()=>{
  assert.match(entry,/assertSupervisorOwner\(root,host\)/);
  assert.match(entry,/digest\(fs\.readFileSync\(path\.join\(root,rel\)\)\)===sha/);
  assert.doesNotMatch(wf,/pull_request:\s*\n|pull_request_target:/);
- assert.match(wf,/controller\\\\entry\.mjs/);
- assert.match(wf,/controller\\\\upload\.mjs/);
+ assert.match(wf,/controller\\entry\.mjs/);
+ assert.match(wf,/controller\\upload\.mjs/);
 });
