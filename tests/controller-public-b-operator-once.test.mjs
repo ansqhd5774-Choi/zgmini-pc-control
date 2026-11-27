@@ -79,6 +79,27 @@ test('full local static import closure is pinned before module evaluation',()=>{
  assert.doesNotMatch(entry,/^import[^\n]*from\s+['"]\./m);
  assert.match(entry,/await Promise\.all\(\[/);
 });
+test('immutable reviewed source merge and moving-main byte parity are enforced',()=>{
+ const file=fs.readFileSync(new URL('../tools/controller-public-b-operator-once.mjs',import.meta.url),'utf8');
+ assert.match(file,/sourcePr=api\('repos\/'\+REPO\+'\/pulls\/4262'\)/);
+ assert.match(file,/sourcePr\?\.merged===true/);
+ assert.match(file,/sourceLineage\?\.merge_base_commit\?\.sha===sourceMerge/);
+ assert.match(file,/const approved=readRevision\(rel,sourceMerge\)/);
+ assert.match(file,/approved\.equals\(readMain\(rel\)\)/);
+ const rel='tools/update.mjs';
+ const current=fs.readFileSync(new URL('../'+rel,import.meta.url));
+ const local={};
+ const source=[
+  'tools/controller-public-b-operator-once.mjs','tools/update.mjs',
+  'tools/maintenance-contract.mjs','tools/maintenance-apply.mjs',
+  'tools/maintenance-lock.mjs','tools/source-bundle-register.mjs'
+ ];
+ for(const item of source)local[item]=fs.readFileSync(new URL('../'+item,import.meta.url));
+ const mutated=Buffer.concat([current,Buffer.from('// main drift')]);
+ assert.throws(()=>verifyOperatorSourceClosure(item=>local[item],
+  item=>item===rel?mutated:local[item]),/PUBLIC_B_OPERATOR_SOURCE_CAS_FAILED/);
+});
+
 test('lease is released only after positively verified terminal outcome',async()=>{
  const newLock=()=>({releaseCount:0,holdCount:0,release(){
   this.releaseCount++;},holdForRecovery(){this.holdCount++;}});
