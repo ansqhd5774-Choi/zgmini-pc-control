@@ -1,0 +1,14 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-46078431643-1-seat-5",
+  "requestId": "pc-operating-audit-d376-b3f57312-ea2e-4e78-b012-78a13569eeb8",
+  "operation": "controller-operating-audit-readonly",
+  "seat": 5,
+  "status": "PASS",
+  "code": "PUBLIC_RESULT_CODE_REDACTED",
+  "actualExecutionSha": "d3764580fdb08ecddd5f9b1064051eec30f90492",
+  "reportTransfer": {
+    "status": "SUMMARY_ONLY",
+    "code": "PUBLIC_REPOSITORY_REDACTED"
+  }
+}
