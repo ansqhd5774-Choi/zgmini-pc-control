@@ -1,6 +1,7 @@
 import test from 'node:test';
+import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
-import {inspectS64078BacklogOnly as inspect,FIXED} from '../tools/s6-4078-backlog-only-plan.mjs';
+import {inspectS64078BacklogOnly as inspect,inspectS64078PinnedReadback as pinned,FIXED} from '../tools/s6-4078-backlog-only-plan.mjs';
 const issueBody=JSON.stringify({schema:'ZGMINI_PC_JOB_V1',
  requestId:FIXED.originalRequestId,chatId:'chat-usbreadthr2-resource-window-20261127',
  operation:'shared-resource-release-readonly',sourceRepository:'ansqhd5774-Choi/zgmini',
@@ -41,6 +42,54 @@ for(const [name,edit,code] of [
  ['original CAS unknown',e=>e.backlogBytesCasVerified=false,'S6_ORIGINAL_LOCAL_CAS_UNVERIFIED']
 ]){
  test('reject '+name,()=>{const e=fixture();edit(e);const r=inspect(e);
+  assert.equal(r.status,'BLOCKED');assert.equal(r.code,code);
+  assert.equal(r.mutationAuthorized,false);assert.equal(r.operationalWrites,0);
+ });
+}
+
+const hash=x=>createHash('sha256').update(x).digest('hex');
+function pinnedFixture(){
+ const e=fixture(),journal=JSON.stringify(e.journal),backlog=JSON.stringify(e.backlog);
+ e.localReadback={
+  journalBefore:journal,journalAfter:journal,journalSha256:hash(journal),
+  backlogBefore:backlog,backlogAfter:backlog,backlogSha256:hash(backlog)
+ };
+ e.githubReadback={originalIssueNumber:4078,originalRequestId:FIXED.originalRequestId,
+  searchComplete:true,pcJobRuns:[],resultPairs:[],replayIssues:[]};
+ return e;
+}
+test('exact double-read CAS remains source-only and does not create a replay',()=>{
+ const r=pinned(pinnedFixture());
+ assert.equal(r.status,'SOURCE_PREFLIGHT_ELIGIBLE');
+ assert.equal(r.code,'S6_4078_PINNED_READBACK_SOURCE_ONLY');
+ assert.equal(r.mutationAuthorized,false);assert.equal(r.operationalWrites,0);
+});
+for(const [name,edit,code] of [
+ ['backlog changes between reads',e=>e.localReadback.backlogAfter+=' ',
+  'S6_LOCAL_READBACK_CAS_DRIFT'],
+ ['journal changes between reads',e=>e.localReadback.journalAfter+=' ',
+  'S6_LOCAL_READBACK_CAS_DRIFT'],
+ ['backlog hash incorrect',e=>e.localReadback.backlogSha256='0'.repeat(64),
+  'S6_LOCAL_READBACK_CAS_DRIFT'],
+ ['journal bytes malformed',e=>{e.localReadback.journalBefore='{';
+  e.localReadback.journalAfter='{';e.localReadback.journalSha256=hash('{');},
+  'S6_LOCAL_READBACK_JSON_INVALID'],
+ ['backlog read absent',e=>delete e.localReadback.backlogBefore,
+  'S6_LOCAL_READBACK_INCOMPLETE'],
+ ['github query incomplete',e=>e.githubReadback.searchComplete=false,
+  'BACKLOG_4078_GITHUB_READBACK_INCOMPLETE'],
+ ['wrong original request readback',e=>e.githubReadback.originalRequestId='pc-other',
+  'BACKLOG_4078_GITHUB_READBACK_INCOMPLETE'],
+ ['prior execution exists',e=>e.githubReadback.pcJobRuns.push({id:123}),
+  'BACKLOG_4078_PRIOR_EFFECT_PRESENT'],
+ ['prior replay issue exists',e=>e.githubReadback.replayIssues.push({number:4081}),
+  'BACKLOG_4078_PRIOR_EFFECT_PRESENT'],
+ ['owner CAS not attested',e=>e.ownerAndLeaseCasVerified=false,
+  'S6_ORIGINAL_LOCAL_CAS_UNVERIFIED']
+]){
+ test('double-read gate rejects '+name,()=>{
+  const e=pinnedFixture();edit(e);
+  const r=pinned(e);
   assert.equal(r.status,'BLOCKED');assert.equal(r.code,code);
   assert.equal(r.mutationAuthorized,false);assert.equal(r.operationalWrites,0);
  });
