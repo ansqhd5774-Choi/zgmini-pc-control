@@ -1,0 +1,7 @@
+name: Disposable stale PR audit fixture
+description: Source-only audit fixture; never invoked.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: ':'
