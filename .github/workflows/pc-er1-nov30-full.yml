@@ -8,12 +8,12 @@ permissions:
   contents: read
   issues: write
 
-concurrency:
-  group: zgmini-er1-nov30-full-b
-  cancel-in-progress: false
-
 jobs:
   november-full:
+    # Keep the existing lane for admitted requests only.
+    concurrency:
+      group: zgmini-er1-nov30-full-b
+      cancel-in-progress: false
     if: >-
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
       github.event.repository.private == true &&
