@@ -5,11 +5,12 @@ on:
 permissions:
   contents: write
   issues: write
-concurrency:
-  group: zgmini-pc-publication-b-single-lane
-  cancel-in-progress: false
 jobs:
   approved-publication-b:
+    # Reserve the existing lane only for admitted requests.
+    concurrency:
+      group: zgmini-pc-publication-b-single-lane
+      cancel-in-progress: false
     # PROPOSAL ONLY: disabled until separately approved activation and Windows proof.
     # Repo variable alone is NOT approval: raw manifest + owner's Issue comment
     # + exact clean dual-source proof must also pass inside the executor.
