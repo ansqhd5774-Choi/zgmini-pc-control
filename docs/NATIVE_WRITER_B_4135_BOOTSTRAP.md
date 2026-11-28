@@ -78,7 +78,7 @@ control SHA `b2dead3c87f88b35f1a05de77d72f33e3a618a10`,
   각 호스트 한 번, 기존 원본 두 파일 및 정확 ACL/관측/claim 부재/backup 경로 확인 후에만 보호된 stage를 교체한다.
   기존 영수증 root는 그대로 검증·재사용한다. `SCOPE_INSTALLED_VERIFIED` 및
   `previousScopeSha256`, `backupVerified=true`를 회수한다. STOPPED/UNKNOWN이면 재실행·삭제 금지.
-  중간 rename 실패로 새 root가 없는 경우에만 기존 backup의 ACL/hash 검증 후 원복한다.
+  새 scope와 관측은 교체 전에 함께 작성·검증한다. 첫 rename 전 보호된 intent를 기록한다. 교체 후 검증 또는 결과 저장 실패도 복구 대상이다. 새 root가 존재하면 정확한 새 scope/관측 및 ACL을 확인한 경우에만 별도 failed 경로로 보존하고, 기존 backup의 원본 정책·관측·ACL을 확인한 후 원복한다. 불일치/불명 또는 프로세스 강제 중단 시 intent와 기존 backup을 이용해 독립 관리자 readback으로 상태를 구분하며 자동 재실행·삭제하지 않는다.
 - 두 호스트 새 scope/원본 backup 검증 결과를 회수한 뒤 기존 finalize/proof/activate를 수행한다.
   finalize 및 activate는 현재 main ancestry, 정확 receiver workflow blob과 승인 runtime adapter,
   준비 source의 CI 미시작을 다시 확인한다. 기존 source HEAD와 단회 요청 ID는 변경하지 않는다.
