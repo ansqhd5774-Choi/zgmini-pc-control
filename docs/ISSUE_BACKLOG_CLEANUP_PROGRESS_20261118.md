@@ -655,3 +655,12 @@
 - #4339 closed/completed: [종결 근거](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4339#issuecomment-7237747418). 격리 호스트 ABSENT 관측은 유효하며 후속 #4356 설치와 구분. #4357 [실제 공개 A 결과](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4357#issuecomment-7237655768) JSON/TXT PASS, actualExecutionSha=15c109dcc2e64a9d2d443f50efc7fe4ce06ff807, SUMMARY_ONLY; 전체 파일 해시 원격 검증 아님.
 - 두 저장소 검색 반환: pc-control OPEN 7(운영 #4135/#4078/#3767 및 영속 원장 4), zgmini OPEN 0, 양쪽 OPEN PR 0. 이전 5개 운영 추적 중 #4345/#4339 종결 확인(2/5), 직접 종결 실적 아님.
 - #4078 역사적 replay는 #4334/#4335 source CI와 별개, 정확 승인/실제 원장 CAS 및 설치 증거 필요. #3767 현재 WMI ACTIVE 관측 완료, 역사적 승격 미검증; 정상 운영 강제 장애 시험 금지. #4135 적법 대체 입력 미확보. 신규 운영 변경·재발행·PR 병합 0.
+
+
+## 2026-11-28 19:23 KST 이후 사용자 명시 정정 — MarketParquet 유료 사용 유지 (현재 결정)
+
+사용자는 현재 MarketParquet를 결제하여 유료 사용 중이며 제외할 이유가 없다고 정정하고 관련 내용을 수정하라고 지시했다. 기존 2026-11-20 Complete Archive/Keep Current 재승인 및 공개 이용권 해결 기록(앱 main docs/MARKETPARQUET_REMOVAL.md)을 재사용한다. 11/16 무료 사용 중단 및 R6.1의 과거 의존성 제외 문구를 현재 승인된 유료 계약 금지로 해석한 것은 GPT 판단 오류다. 이전 #4135 댓글/원장의 '비-MarketParquet 대체 공급처·251일 신규 입력·신규 권리 확보' 필수 조건과 APPROVAL_EFFECT_CONFLICT(공급자 제외 사유)는 현재 결정으로 대체한다. 과거 실행 기록은 삭제하지 않는다.
+
+#4135 OPEN 유지. 기존 유료 저장 원자료 251거래일 및 250개 비교 결과의 실제 충족 여부, 승인된 R2 source/유니버스/파생 공개 범위, 원본 단회 요청의 STOP 및 복구 원장, 정확한 Writer 설치 전 CAS/자연유휴/lease/백업, Public 환경의 독립 승인 실행 경로를 검증하여 실제 기능을 정상화한다. 과거 167/167 ACTIVE 및 설치 전 STOP은 유효하다. 새 공급자·추가 결제·무료 공개 경로 복원·원본 요청 무단 재실행 금지. 기존 유료 사용을 중단하거나 대체 공급처 확보를 완료조건으로 요구하지 않는다. 현재 PC의 계약/파일/데이터/게시 실측은 아직 별도 미확인. 이번 정정은 운영 변경이 아니다.
+
+Issue 정정 댓글: https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4135#issuecomment-7237898271
