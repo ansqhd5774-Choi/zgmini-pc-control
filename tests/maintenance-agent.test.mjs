@@ -1649,22 +1649,24 @@ test('Public B publisher requires exact checked-out source to be ancestor of aut
  let reads=0,compares=0;
  const getJson=async route=>{
   reads++;
+  if(route==='commits/'+main)return {sha:main};
   assert.equal(route,'compare/'+source+'...'+main);
   compares++;
   return {status:'ahead',behind_by:0,
-   base_commit:{sha:source},head_commit:{sha:main},
+   base_commit:{sha:source},
    merge_base_commit:{sha:source}};
  };
  const accepted=await readAuthenticatedPublicBPublisherSourceAncestry({
   env,getJson,readCheckoutSha:async()=>source});
  assert.deepEqual(accepted,{sourceSha:source,mainSha:main});
  assert.equal(Object.isFrozen(accepted),true);
- assert.equal(reads,1);
+ assert.equal(reads,2);
  const identical=await readAuthenticatedPublicBPublisherSourceAncestry({
   env,getJson:async route=>{
+   if(route==='commits/'+main)return {sha:main};
    assert.equal(route,'compare/'+main+'...'+main);
    return {status:'identical',behind_by:0,
-    base_commit:{sha:main},head_commit:{sha:main},
+    base_commit:{sha:main},
     merge_base_commit:{sha:main}};
   },readCheckoutSha:()=>main});
  assert.equal(identical.sourceSha,main);
@@ -1677,13 +1679,14 @@ test('Public B publisher requires exact checked-out source to be ancestor of aut
   {name:'main moved backwards from source',data:{status:'behind',
    behind_by:2,base_commit:{sha:source},head_commit:{sha:main},
    merge_base_commit:{sha:main}}},
-  {name:'forged API head',data:{status:'ahead',behind_by:0,
+  {name:'forged API head',headSha:'c'.repeat(40),data:{status:'ahead',behind_by:0,
    base_commit:{sha:source},head_commit:{sha:'c'.repeat(40)},
    merge_base_commit:{sha:source}}},
   {name:'missing compare readback',data:null}
  ]){
   await assert.rejects(()=>readAuthenticatedPublicBPublisherSourceAncestry({
-   env,readCheckoutSha:()=>source,getJson:async()=>failure.data}),
+   env,readCheckoutSha:()=>source,getJson:async route=>route==='commits/'+main?
+    {sha:failure.headSha??main}:failure.data}),
    /CI_PUBLIC_PUBLISHER_MAIN_ANCESTRY_UNVERIFIED/,failure.name);
  }
  for(const invalid of [
