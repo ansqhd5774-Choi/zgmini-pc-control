@@ -672,3 +672,9 @@ Issue 정정 댓글: https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues
 - #4078은 별도 Owner 종결 이벤트(2026-11-28T10:45:53Z)로 현재 closed/completed. 본 담당자가 종결하거나 실제 원본 replay를 수행한 것이 아님. 실제 원본 requestId 실행/새 독립 승인·9개 실행 포트/로컬 replay ledger DONE 증거는 회수되지 않음. #4313 별도 현재 시점 A PASS는 기존 역사적 #4078의 실행 증거가 아님. Owner의 종결을 존중해 재개·중복 실행하지 않고 역사적 미입증을 별도 보존한다.
 - #3767 원본 읽기 진단은 직접 closed/not_planned로 종결 및 재조회 확인. 과거 승격 미입증 보존. #4135 유료 MarketParquet 정상화는 OPEN. #4360 별도 보안 효과를 포함하는 Draft는 실제 정확 승인/설치 readback 없는 병합·활성화 금지. 이번 운영 쓰기/원본 replay 0.
 
+
+
+## 2026-11-28 #4135 독립 지원 — 기존 승인 Writer 후보 실제 내용 검산
+
+- 앱 승인 후보 f7ea89305df8471ffb1827d974fc2e0c223d0b09의 4개 파일 직접 UTF-8 바이트 SHA256 재계산(표준 abc self-test 통과): local-cycle.mjs candidateSha256 365a29ccabb34cf42b4c2eee83b2c63e703d6cdf18e7eff836fc3515113e3998, marketparquet-paid-store.mjs afterSha256 40165c909392c9dd69fa5df49c2793e5361c2016a72ca6da8b0067d497e2c1c4, us-breadth-paid-r2-cycle.mjs afterSha256 6f194b20a13c21e1c458094069a3f709f4833ab5fd10fc522844581fae191ea1, us-breadth-paid-r2-stored.mjs afterSha256 be18875730948bbdcc0fca49f9de95a6c6e84022d3ba255cdb155c5ad51f7dae. 기존 승인 manifest와 4/4 일치. 앱 main c50439c8e88e9426f865ade57fa6d9b9621afe67 해당 4 Git blob도 후보와 4/4 동일. local-cycle은 insert-only candidateSha256이며 PC original/after CAS와 혼동 금지. baseHead c8ed53a3… 원격 조회 미확보는 로컬 원본 손상 증거가 아니다. 실제 PC 4 preimage, Task XML/launcher, 데이터/게시 검증 미완료.
+- 기존 maintenance-contract의 ciNativeApproval은 Owner 직접 승인된 selective controller maintenance만 허용하며 maintenance-agent attachApprovedNativeBReceipt는 결과에 effect/policy hash를 부착한다. 이 함수만으로 독립 host scope/proof가 설치되지 않는다. 기존 #4356 Controller B 성공을 Writer B 승인으로 확대 금지. #4360 latest 7840608c3fb19c6fedee2b05f1edce3e923708d5, Draft=true, 관련 Run 46137519026 status=completed, conclusion=success. 기존 Paid MarketParquet과 4파일 승인 유지. 다음 필수는 실제 PC 원본과 independent policy 설치 경로·정확 승인 확인, 정규 단회 실행 및 readback. 운영 변경 0.
