@@ -113,26 +113,31 @@ export function classifyBacklogOriginal(text){
 }
 
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
-// Runner state can change after draining and backup. Retry only Busy seats,
+// Runner state can change after draining and backup. Retry Busy/Offline samples
+// within the same existing deadline; require all six Online before any stop,
 // while rechecking the original owner and protection before each sample.
 export async function waitForSupervisorStopIdle({
  readRunners,verifySafety,pause=wait,now=()=>Date.now()
 }){
  const started=now(),deadline=started+30000;
- let retryCount=0,observedBusy=false;
+ let retryCount=0,observedBusy=false,observedOffline=false;
  for(;;){
   verifySafety();
-  const seats=dedicatedPcRunnerRows(readRunners(),{requireOnline:true});
-  need(seats!==null,'RUNNERS_NOT_ONLINE');
-  if(seats.every(seat=>seat.busy===false))
-   return {retryCount,elapsedMs:Math.max(0,now()-started),observedBusy};
-  observedBusy=true;
+  const seats=dedicatedPcRunnerRows(readRunners());
+  need(seats!==null&&seats.every(x=>['online','offline'].includes(x.status)),'RUNNERS_NOT_ONLINE');
+  const online=seats.every(x=>x.status==='online');
+  if(online&&seats.every(seat=>seat.busy===false))
+   return {retryCount,elapsedMs:Math.max(0,now()-started),observedBusy,
+    ...(observedOffline?{observedOffline:true}:{})};
+  observedBusy=observedBusy||seats.some(x=>x.busy===true);
+  observedOffline=observedOffline||!online;
   const remaining=deadline-now();
   // Exhaustion is an observed Busy refusal, not a successful stop.
   // Preserve only bounded non-sensitive counters on the exact failure.
-  if(remaining<=0)throw Object.assign(Error('RUNNERS_NOT_IDLE'),{
-   code:'RUNNERS_NOT_IDLE',supervisorIdleWait:{
-    retryCount,elapsedMs:Math.max(0,now()-started),observedBusy:true
+  if(remaining<=0)throw Object.assign(Error(online?'RUNNERS_NOT_IDLE':'RUNNERS_NOT_ONLINE'),{
+   code:online?'RUNNERS_NOT_IDLE':'RUNNERS_NOT_ONLINE',supervisorIdleWait:{
+    retryCount,elapsedMs:Math.max(0,now()-started),observedBusy,
+    ...(observedOffline?{observedOffline:true}:{})
    }
   });
   await pause(Math.min(3000,remaining));
