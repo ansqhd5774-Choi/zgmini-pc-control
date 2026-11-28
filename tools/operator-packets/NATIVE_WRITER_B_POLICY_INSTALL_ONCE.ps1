@@ -305,18 +305,42 @@ try{
    }
   }
  }
- Verify-NewScope $staging
- if($transition){
-  Verify-TransitionPreimage
+ function Verify-TransitionClaimAbsent {
   if($hostName -eq 'PC'){
    $live=Get-Content -LiteralPath 'E:\ZGmini\automation\pc-control\host.json' -Raw|ConvertFrom-Json
    if($live.controllerSourceSha -cne $p.installedControllerSha){Stop-N 'NATIVE_POLICY_CONTROLLER_CAS_STOP'}
    if(Test-Path -LiteralPath 'E:\ZGmini\data\pc-writer\writer-b-install-once\db6a4814-d8ea-5343-9539-cf797835c231'){
     Stop-N 'NATIVE_POLICY_RESERVED_WRITER_CLAIM_STOP'
    }
-  }elseif(Test-Path -LiteralPath ([IO.Path]::Combine($receiptRoot,'native-287c32ba0ae695f2b17176b48bdbf1828797d04e53f5d6d346ae4f66c7b818b4.json'))){
-   Stop-N 'NATIVE_POLICY_RESERVED_PUBLISHER_CLAIM_STOP'
+  }else{
+   [void](Exact-Acl $receiptRoot (New-Acl 'Modify'))
+   if(Test-Path -LiteralPath ([IO.Path]::Combine($receiptRoot,'native-287c32ba0ae695f2b17176b48bdbf1828797d04e53f5d6d346ae4f66c7b818b4.json'))){
+    Stop-N 'NATIVE_POLICY_RESERVED_PUBLISHER_CLAIM_STOP'
+   }
   }
+ }
+ function Restore-VerifiedTransitionPreimage {
+  # A surviving output may be a valid success receipt. Never restore the old
+  # root while leaving that receipt pointing at the now-inactive new scope.
+  if(Test-Path -LiteralPath $OutputFile){Stop-N 'NATIVE_POLICY_TRANSITION_RESULT_EXISTS_STOP'}
+  Verify-TransitionClaimAbsent
+  Verify-TransitionPreimage $backup
+  if(Test-Path -LiteralPath $root){
+   Verify-NewScope $root
+   if(Test-Path -LiteralPath $failed){Stop-N 'NATIVE_POLICY_TRANSITION_FAILED_ROOT_EXISTS_STOP'}
+  }
+  # Recheck the external result/claim immediately before any compensation.
+  if(Test-Path -LiteralPath $OutputFile){Stop-N 'NATIVE_POLICY_TRANSITION_RESULT_EXISTS_STOP'}
+  Verify-TransitionClaimAbsent
+  if(Test-Path -LiteralPath $root){[IO.Directory]::Move($root,$failed)}
+  if(Test-Path -LiteralPath $root){Stop-N 'NATIVE_POLICY_TRANSITION_ROLLBACK_ROOT_STOP'}
+  [IO.Directory]::Move($backup,$root)
+  Verify-TransitionPreimage $root
+ }
+ Verify-NewScope $staging
+ if($transition){
+  Verify-TransitionPreimage
+  Verify-TransitionClaimAbsent
   $backup=$root+'.backup-'+$TransitionFromScopeSha256
   $failed=$staging+'.failed'
   if((Test-Path -LiteralPath $backup) -or (Test-Path -LiteralPath $failed)){
@@ -344,14 +368,7 @@ try{
    # No automatic re-execution or deletion. A changed/unknown tree is not
    # overwritten. Preserve the failed new root before restoring the original.
    try{
-    Verify-TransitionPreimage $backup
-    if(Test-Path -LiteralPath $root){
-     Verify-NewScope $root
-     [IO.Directory]::Move($root,$failed)
-    }
-    if(Test-Path -LiteralPath $root){Stop-N 'NATIVE_POLICY_TRANSITION_ROLLBACK_ROOT_STOP'}
-    [IO.Directory]::Move($backup,$root)
-    Verify-TransitionPreimage $root
+    Restore-VerifiedTransitionPreimage
    }catch{Stop-N 'NATIVE_POLICY_TRANSITION_RECOVERY_REQUIRED_STOP'}
    Stop-N 'NATIVE_POLICY_TRANSITION_RESTORED_STOP'
   }
