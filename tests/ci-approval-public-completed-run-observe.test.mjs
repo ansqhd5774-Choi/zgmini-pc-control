@@ -190,3 +190,88 @@ test('Public CI observer is hosted and read-only; original Private B gate remain
  const publicCi=verify.split('  public-source-only:')[1]?.split('  source-only:')[0];
  assert.match(publicCi,/node --test --test-concurrency=1 tests\/ci-approval-public-completed-run-observe\.test\.mjs/);
 });
+
+import {createHash as nativeHash} from 'node:crypto';
+import {inspectPublicNativeACandidate} from '../ci-approval/public-native-a-candidate.mjs';
+const nativeDigest=b=>nativeHash('sha256').update(b).digest('hex');
+const nativeBlob=b=>nativeHash('sha1').update(Buffer.from('blob '+b.length+'\0')).update(b).digest('hex');
+const nativeFile=(path,b)=>({type:'file',path,encoding:'base64',sha:nativeBlob(b),content:b.toString('base64')});
+function nativeFixture(){
+ const e=event(),run=e.workflow_run,source=reviewedWorkflow(),jobProof=jobs(e);
+ const receiverPath='.github/workflows/ci-approved-a-once.yml';
+ const receiver=nativeFile(receiverPath,readFileSync(new URL('../'+receiverPath,import.meta.url)));
+ const approvalBytes=Buffer.from(JSON.stringify({controlRepository:REPO,
+  sourceRepository:'ansqhd5774-Choi/zgmini',mutationsEnabled:false,
+  allowedActors:['ansqhd5774-Choi'],operations:{'core-status':{grade:'A',resource:'light'}}}));
+ const requestBytes=Buffer.from(JSON.stringify({schema:'ZGMINI_PC_JOB_V1',
+  requestId:'pc-test-public-native-a',chatId:'chat-test-native-a',operation:'core-status',
+  sourceRepository:'ansqhd5774-Choi/zgmini',sourceBranch:'main',sourceSha:'a'.repeat(40)}));
+ const policy={schema:'ZGMINI_CI_NATIVE_DISPATCH_V1',effect:'A_READONLY',
+  repositoryVisibility:'public',enabled:true,nativeAExecutionEnabled:true,
+  nativeAOperation:'core-status',nativeAAdapterSha256:'b'.repeat(64),
+  installedControllerSha:'c'.repeat(40),sourceRunMode:'EVENT_COMPLETION_V1',
+  sourceAttempt:1,sourceWorkflowId:run.workflow_id,sourceHeadSha:run.head_sha,
+  sourceWorkflowPath:SOURCE_PATH,sourceWorkflowBlobSha:source.sha,
+  receiverWorkflowPath:receiverPath,receiverWorkflowBlobSha:receiver.sha,
+  policyRevision:'e'.repeat(40),businessApprovalSha256:nativeDigest(approvalBytes),
+  approvedRequestSha256:nativeDigest(requestBytes)};
+ const scope={policy,approvalBytes,requestBytes};
+ const proof={schema:'ZGMINI_CI_NATIVE_B_INSTALLED_PROOF_V1',effect:'A_READONLY',
+  policy:structuredClone(policy),nativePolicySha256:nativeDigest(Buffer.from(JSON.stringify(policy))),
+  installationRequestId:'pc-update-12345678-1234-4234-8234-123456789abc',
+  installationReceiptPath:'results/maintenance-pc-update-12345678-1234-4234-8234-123456789abc.json',
+  actualControllerSha:policy.installedControllerSha};
+ const receipt={schema:'ZGMINI_PC_MAINTENANCE_RESULT_V1',requestId:proof.installationRequestId,
+  actualControllerSha:proof.actualControllerSha,targetControllerSha:proof.actualControllerSha,
+  status:'SUCCEEDED',protectedStateUnchanged:true,ciNativeEffect:proof.effect,
+  ciNativePolicySha256:proof.nativePolicySha256};
+ const receiptBytes=Buffer.from(JSON.stringify(receipt));
+ proof.installationReceiptSha256=nativeDigest(receiptBytes);
+ let writes=0;
+ const ports={readNativeScope:async effect=>{assert.equal(effect,'A_READONLY');return scope},
+  readNativeInstalledProof:async effect=>{assert.equal(effect,'A_READONLY');return proof},
+  getRun:async(id,attempt)=>{assert.equal(id,run.id);assert.equal(attempt,1);return run},
+  getJobs:async(id,attempt)=>{assert.equal(id,run.id);assert.equal(attempt,1);return jobProof},
+  getWorkflow:async(path,ref)=>{if(path===SOURCE_PATH){assert.equal(ref,policy.sourceHeadSha);return source}
+   assert.equal(path,receiverPath);assert.equal(ref,'main');return receiver},
+  getJson:async route=>{assert.equal(route,'contents/'+proof.installationReceiptPath+'?ref=main');
+   return nativeFile(proof.installationReceiptPath,receiptBytes)},
+  dispatchWorkflow:async()=>{writes++;throw Error('unexpected dispatch')},
+  saveReceipt:async()=>{writes++;throw Error('unexpected write')}};
+ return {sourceRunId:run.id,ports,scope,proof,run,jobProof,source,receiver,writes:()=>writes};
+}
+function assertNoNativeAuthority(x,r){
+ for(const k of ['canPublish','canExecute','canInstall','selfHostedAuthorized'])
+  assert.equal(r[k],false,k);
+ assert.equal(r.operationalWrites,0);assert.equal(x.writes(),0);
+ assert.doesNotMatch(JSON.stringify(r),/pc-update-|pc-test-public-native-a|installationReceiptPath/);
+}
+test('Public Native A exact independent evidence remains candidate only',async()=>{
+ const x=nativeFixture(),r=await inspectPublicNativeACandidate(x);
+ assert.equal(r.state,'CANDIDATE_ONLY');assert.equal(r.code,'PUBLIC_NATIVE_A_EXACT_EVIDENCE_MATCH');
+ assertNoNativeAuthority(x,r);
+});
+for(const [name,mutate,code] of [
+ ['private grant',x=>{x.scope.policy.repositoryVisibility='private'},'PUBLIC_NATIVE_A_SCOPE_DENIED'],
+ ['Writer grant',x=>{x.scope.policy.effect='B_WRITER_SOURCE'},'PUBLIC_NATIVE_A_SCOPE_DENIED'],
+ ['disabled grant',x=>{x.scope.policy.enabled=false},'PUBLIC_NATIVE_A_SCOPE_DENIED'],
+ ['injected fixed run',x=>{x.scope.policy.sourceRunId=x.sourceRunId},'PUBLIC_NATIVE_A_SCOPE_DENIED'],
+ ['request drift',x=>{x.scope.requestBytes=Buffer.from('{}')},'PUBLIC_NATIVE_A_BYTES_DRIFT'],
+ ['approval drift',x=>{x.scope.approvalBytes=Buffer.from('{}')},'PUBLIC_NATIVE_A_BYTES_DRIFT'],
+ ['operation mismatch',x=>{x.scope.policy.nativeAOperation='runner-smoke'},'PUBLIC_NATIVE_A_FIXED_OPERATION_DENIED'],
+ ['attested policy drift',x=>{x.proof.policy.nativeAAdapterSha256='f'.repeat(64)},'PUBLIC_NATIVE_A_INSTALLED_PROOF_MISMATCH'],
+ ['wrong installed Controller',x=>{x.proof.actualControllerSha='f'.repeat(40)},'PUBLIC_NATIVE_A_INSTALLED_PROOF_MISMATCH'],
+ ['foreign receipt path',x=>{x.proof.installationReceiptPath='results/other.json'},'PUBLIC_NATIVE_A_INSTALLED_PROOF_MISMATCH'],
+ ['missing receipt',x=>{x.ports.getJson=async()=>{throw Error('missing')}},'PUBLIC_NATIVE_A_INSTALLATION_RECEIPT_UNVERIFIED'],
+ ['receipt bytes drift',x=>{x.ports.getJson=async()=>nativeFile(x.proof.installationReceiptPath,Buffer.from('{}'))},'PUBLIC_NATIVE_A_INSTALLATION_RECEIPT_UNVERIFIED'],
+ ['wrong attempt',x=>{x.run.run_attempt=2},'PUBLIC_NATIVE_A_SOURCE_RUN_MISMATCH'],
+ ['wrong source SHA',x=>{x.run.head_sha='f'.repeat(40)},'PUBLIC_NATIVE_A_SOURCE_RUN_MISMATCH'],
+ ['skipped public job',x=>{x.jobProof.jobs[0].conclusion='skipped'},'PUBLIC_NATIVE_A_SOURCE_EVIDENCE_UNVERIFIED'],
+ ['foreign source repository',x=>{x.run.head_repository.id++},'PUBLIC_NATIVE_A_SOURCE_EVIDENCE_UNVERIFIED'],
+ ['source bytes changed',x=>{x.source.content=Buffer.from('fake').toString('base64')},'PUBLIC_NATIVE_A_SOURCE_EVIDENCE_UNVERIFIED'],
+ ['receiver bytes changed',x=>{x.receiver.content=Buffer.from('fake').toString('base64')},'PUBLIC_NATIVE_A_RECEIVER_PIN_UNVERIFIED'],
+ ['missing installed scope',x=>{x.ports.readNativeScope=async()=>{throw Error('not installed')}},'PUBLIC_NATIVE_A_INSTALLED_SCOPE_UNAVAILABLE']
+])test('Public Native A rejects '+name,async()=>{
+ const x=nativeFixture();mutate(x);const r=await inspectPublicNativeACandidate(x);
+ assert.equal(r.code,code);assert.notEqual(r.state,'CANDIDATE_ONLY');assertNoNativeAuthority(x,r);
+});

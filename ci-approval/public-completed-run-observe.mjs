@@ -63,6 +63,22 @@ function exactReviewedWorkflowBlob(file){
  return gitBlob===SOURCE_WORKFLOW_BLOB;
 }
 
+// Pure verification of independently obtained GitHub REST records. The
+// hosted event adapter below retains its own environment/origin guard.
+export function inspectPublicSourceRunEvidence({run,jobs,workflow}={}){
+ if(!validRun(run))
+  return result('EVIDENCE_MISSING','PUBLIC_CI_COMPLETION_API_MISMATCH');
+ if(!exactPublicJobProof(jobs,run.id))
+  return result('EVIDENCE_MISSING','PUBLIC_CI_COMPLETION_JOB_EVIDENCE_UNVERIFIED');
+ if(!exactReviewedWorkflowBlob(workflow))
+  return result('EVIDENCE_MISSING','PUBLIC_CI_COMPLETION_WORKFLOW_BLOB_UNVERIFIED');
+ return result('OBSERVED_ONLY','PUBLIC_CI_COMPLETION_SOURCE_OBSERVED',{
+  runId:run.id,attempt:run.run_attempt,headSha:run.head_sha,
+  workflowId:SOURCE_WORKFLOW_ID,sourceJobId:jobs.jobs.find(j=>j.name==='public-source-only').id,
+  reviewedWorkflowBlobSha:SOURCE_WORKFLOW_BLOB
+ });
+}
+
 export async function observePublicSourceCompletion({event,env,getRun,getJobs,getWorkflow}={}){
  if(env?.GITHUB_EVENT_NAME!=='workflow_run'||
     env.GITHUB_REPOSITORY!==REPO||env.GITHUB_REF!=='refs/heads/main'||
@@ -81,18 +97,7 @@ export async function observePublicSourceCompletion({event,env,getRun,getJobs,ge
   const [jobs,workflow]=await Promise.all([
    getJobs(run.id,run.run_attempt),getWorkflow(SOURCE_PATH,run.head_sha)
   ]);
-  if(!exactPublicJobProof(jobs,run.id))
-   return result('EVIDENCE_MISSING','PUBLIC_CI_COMPLETION_JOB_EVIDENCE_UNVERIFIED');
-  if(!exactReviewedWorkflowBlob(workflow))
-   return result('EVIDENCE_MISSING','PUBLIC_CI_COMPLETION_WORKFLOW_BLOB_UNVERIFIED');
-  // Pinned source workflow and actual hosted checks are now observed.
-  // Approval, provenance of a reviewed business change, installed policy and
-  // execution authority are separate and remain explicitly false.
-  return result('OBSERVED_ONLY','PUBLIC_CI_COMPLETION_SOURCE_OBSERVED',{
-   runId:run.id,attempt:run.run_attempt,headSha:run.head_sha,
-   workflowId:SOURCE_WORKFLOW_ID,sourceJobId:jobs.jobs.find(j=>j.name==='public-source-only').id,
-   reviewedWorkflowBlobSha:SOURCE_WORKFLOW_BLOB
-  });
+  return inspectPublicSourceRunEvidence({run,jobs,workflow});
  }catch{return result('EVIDENCE_MISSING','PUBLIC_CI_COMPLETION_API_READ_FAILED');}
 }
 
