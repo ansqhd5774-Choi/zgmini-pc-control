@@ -678,3 +678,14 @@ Issue 정정 댓글: https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues
 
 - 앱 승인 후보 f7ea89305df8471ffb1827d974fc2e0c223d0b09의 4개 파일 직접 UTF-8 바이트 SHA256 재계산(표준 abc self-test 통과): local-cycle.mjs candidateSha256 365a29ccabb34cf42b4c2eee83b2c63e703d6cdf18e7eff836fc3515113e3998, marketparquet-paid-store.mjs afterSha256 40165c909392c9dd69fa5df49c2793e5361c2016a72ca6da8b0067d497e2c1c4, us-breadth-paid-r2-cycle.mjs afterSha256 6f194b20a13c21e1c458094069a3f709f4833ab5fd10fc522844581fae191ea1, us-breadth-paid-r2-stored.mjs afterSha256 be18875730948bbdcc0fca49f9de95a6c6e84022d3ba255cdb155c5ad51f7dae. 기존 승인 manifest와 4/4 일치. 앱 main c50439c8e88e9426f865ade57fa6d9b9621afe67 해당 4 Git blob도 후보와 4/4 동일. local-cycle은 insert-only candidateSha256이며 PC original/after CAS와 혼동 금지. baseHead c8ed53a3… 원격 조회 미확보는 로컬 원본 손상 증거가 아니다. 실제 PC 4 preimage, Task XML/launcher, 데이터/게시 검증 미완료.
 - 기존 maintenance-contract의 ciNativeApproval은 Owner 직접 승인된 selective controller maintenance만 허용하며 maintenance-agent attachApprovedNativeBReceipt는 결과에 effect/policy hash를 부착한다. 이 함수만으로 독립 host scope/proof가 설치되지 않는다. 기존 #4356 Controller B 성공을 Writer B 승인으로 확대 금지. #4360 latest 7840608c3fb19c6fedee2b05f1edce3e923708d5, Draft=true, 관련 Run 46137519026 status=completed, conclusion=success. 기존 Paid MarketParquet과 4파일 승인 유지. 다음 필수는 실제 PC 원본과 independent policy 설치 경로·정확 승인 확인, 정규 단회 실행 및 readback. 운영 변경 0.
+
+
+## 2026-11-28 KST 사용자 명시 승인 — #4135 Public Native Writer B 단회 전용
+
+사용자 원문: "Public Native Writer B 독립 실행 정책 설치 및 활성화를 승인한다. #4135 기존 승인 4파일 단회 설치에 한정하고 CAS·lease·백업·복구 조건을 유지한다. 다른 기능의 실행 권한은 확대하지 않는다."
+
+이 명시 승인으로 앞선 Public B 보안 효과 사용자 승인 대기는 해소된다. 실행 범위는 #4135 기존 승인 manifest approvals/writer-updates/us-breadth-paid-r2-guarded-fourfile-natural-idle-20261127.json, SHA256 c4f58408f4360f7d03b9c359cda78ce4602c447d86ff15ad538cdb57d820acda, 기존 4파일, 단회. 원본 d1e33802-9e86-4b4b-ae20-6cfdb0c2c2b8는 소비됨/재실행 금지, 새 고유 요청은 정규 실행 명세 완성 시 한 번 발행. 기존 A/Controller B/다른 Writer B/Task/공급자/DB/D1 권한 확대 금지.
+
+검증된 현재 소스 후보: PR #4360 HEAD 473e823cedb88f1916e5d7e2f96b977ccd949d0a, Run 46138141292 SUCCESS, source workflow id 416355595/blob a8f49337200d2e7ce902ab3ecf23d42c811fabe2, receiver blob 18f84a748eaeae8488bf7d65395955ca37a4de80, adapter blob a7c85275ca90f6bac8909937b9a009396ecb6722, publisher blob 905710e6afd59ef983572ccc94a1dc9184601376. 이는 검토 소스의 pin이며 최종 main/nativeWriterBControlSha 및 현재 installed proof의 대체가 아님. 사용자 승인을 신규 범위 재승인 대기로 되돌리지 않는다. 실제 승인 명세의 정합화/해시 완성은 담당자 책임.
+
+실행 제약: 기존 handoff-maintenance는 Controller B 정책만 설치하며 attachApprovedNativeBReceipt는 결과에 hash만 붙임; native scope/proof를 실제 배치하는 검증된 기존 쓰기 포트가 없음. GitHub connector에 repository Actions variables 쓰기 action 없음. 기존 C급 독립 운영자 권한/ACL·실제 두 호스트의 scope/proof/receipt root preimage readback 필요. 기존 Controller B receipt C1은 별개 효과이므로 재사용 실행 금지. 임의 shell/Runner/Workflow로 이 제약 우회 금지. 승인 기록 자체를 정책 설치·실행 proof로 사용하지 않음. 현재 운영 변경 0. #4360 Draft는 실제 설치 경로/정확 pin readback까지 유지.
