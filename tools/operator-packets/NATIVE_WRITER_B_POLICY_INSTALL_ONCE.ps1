@@ -187,18 +187,18 @@ try{
  }
  $transition=[bool]$TransitionFromScopeSha256
  $backup=$null
- function Verify-TransitionPreimage {
+ function Verify-TransitionPreimage([string]$candidateRoot=$root) {
   if($TransitionFromScopeSha256 -cne 'df097365ebc641a551f6e0b233ad333662f4ae12b82a2180cfb97637656f5736'){
    Stop-N 'NATIVE_POLICY_TRANSITION_PREIMAGE_STOP'
   }
-  Plain-Path $root
-  $oldAclText=Exact-Acl $root $scopeAcl
-  $names=@(Get-ChildItem -LiteralPath $root -Force | ForEach-Object {$_.Name} | Sort-Object)
+  Plain-Path $candidateRoot
+  $oldAclText=Exact-Acl $candidateRoot $scopeAcl
+  $names=@(Get-ChildItem -LiteralPath $candidateRoot -Force | ForEach-Object {$_.Name} | Sort-Object)
   if(($names -join '|') -cne 'ci-native-writer-b-approved.json|installation-observation.json'){
    Stop-N 'NATIVE_POLICY_TRANSITION_EXISTING_STATE_STOP'
   }
-  $oldPath=[IO.Path]::Combine($root,'ci-native-writer-b-approved.json')
-  $oldObservationPath=[IO.Path]::Combine($root,'installation-observation.json')
+  $oldPath=[IO.Path]::Combine($candidateRoot,'ci-native-writer-b-approved.json')
+  $oldObservationPath=[IO.Path]::Combine($candidateRoot,'installation-observation.json')
   foreach($oldFile in @($oldPath,$oldObservationPath)){
    $item=Get-Item -LiteralPath $oldFile -Force
    if($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
@@ -275,9 +275,37 @@ try{
  Write-Once ([IO.Path]::Combine($staging,'ci-native-writer-b-approved.json')) $bytes $true
  $stored=[IO.File]::ReadAllBytes([IO.Path]::Combine($staging,'ci-native-writer-b-approved.json'))
  if((Hash-Bytes $stored) -cne $ScopeSha256){Stop-N 'NATIVE_POLICY_STAGING_READBACK_STOP'}
- # Same-volume no-overwrite rename: failed/terminated stage remains inspectable.
- # For the exact old unactivated scope only, preserve the original directory
- # and its protected observation as a separately named backup. No deletion.
+ # Complete and verify the staged observation before exposing the new root.
+ $report=[ordered]@{host=$hostName;status='SCOPE_INSTALLED_VERIFIED';aclVerified=$true;
+  independentOperatorVerified=$true;reservedClaimAbsent=$true;scopeSha256=$ScopeSha256;
+  policySha256=(Hash-Bytes ([Text.Encoding]::UTF8.GetBytes(($p|ConvertTo-Json -Depth 30 -Compress))));
+  aclSha256=(Hash-Bytes ([Text.Encoding]::UTF8.GetBytes($aclText)));observedAt=[DateTime]::UtcNow.ToString('o')}
+ if($transition){
+  $report.Add('previousScopeSha256',$TransitionFromScopeSha256)
+  $report.Add('backupVerified',$true)
+ }
+ $reportBytes=[Text.Encoding]::UTF8.GetBytes(($report|ConvertTo-Json -Compress))
+ $reportHash=Hash-Bytes $reportBytes
+ Write-Once ([IO.Path]::Combine($staging,'installation-observation.json')) $reportBytes $true
+ function Verify-NewScope([string]$candidateRoot){
+  Plain-Path $candidateRoot
+  [void](Exact-Acl $candidateRoot $scopeAcl)
+  $names=@(Get-ChildItem -LiteralPath $candidateRoot -Force|ForEach-Object {$_.Name}|Sort-Object)
+  if(($names -join '|') -cne 'ci-native-writer-b-approved.json|installation-observation.json'){
+   Stop-N 'NATIVE_POLICY_TRANSITION_NEW_ROOT_CONTENT_STOP'
+  }
+  foreach($entry in @(@('ci-native-writer-b-approved.json',$ScopeSha256),@('installation-observation.json',$reportHash))){
+   $file=[IO.Path]::Combine($candidateRoot,$entry[0])
+   $item=Get-Item -LiteralPath $file -Force
+   if($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+     $item.Length -lt 2 -or $item.Length -gt 131072){Stop-N 'NATIVE_POLICY_TRANSITION_NEW_FILE_STOP'}
+   [void](Exact-Acl $file (New-PolicyFileAcl))
+   if((Hash-Bytes ([IO.File]::ReadAllBytes($file))) -cne $entry[1]){
+    Stop-N 'NATIVE_POLICY_FINAL_READBACK_STOP'
+   }
+  }
+ }
+ Verify-NewScope $staging
  if($transition){
   Verify-TransitionPreimage
   if($hostName -eq 'PC'){
@@ -290,36 +318,48 @@ try{
    Stop-N 'NATIVE_POLICY_RESERVED_PUBLISHER_CLAIM_STOP'
   }
   $backup=$root+'.backup-'+$TransitionFromScopeSha256
-  if(Test-Path -LiteralPath $backup){Stop-N 'NATIVE_POLICY_TRANSITION_BACKUP_EXISTS_STOP'}
-  [IO.Directory]::Move($root,$backup)
-  try{[IO.Directory]::Move($staging,$root)}catch{
-   # Restore only the verified original when the new destination is absent.
-   if(-not (Test-Path -LiteralPath $root)){
-    [void](Exact-Acl $backup $scopeAcl)
-    if((Hash-Bytes ([IO.File]::ReadAllBytes([IO.Path]::Combine($backup,'ci-native-writer-b-approved.json')))) -ceq $TransitionFromScopeSha256){
-     [IO.Directory]::Move($backup,$root)
-    }
-   }
-   Stop-N 'NATIVE_POLICY_TRANSITION_RENAME_STOP'
+  $failed=$staging+'.failed'
+  if((Test-Path -LiteralPath $backup) -or (Test-Path -LiteralPath $failed)){
+   Stop-N 'NATIVE_POLICY_TRANSITION_BACKUP_EXISTS_STOP'
   }
- }else{[IO.Directory]::Move($staging,$root)}
- Plain-Path $root
- $aclText=Exact-Acl $root $scopeAcl
- if((Hash-Bytes ([IO.File]::ReadAllBytes([IO.Path]::Combine($root,'ci-native-writer-b-approved.json')))) -cne $ScopeSha256){
-  Stop-N 'NATIVE_POLICY_FINAL_READBACK_STOP'
+  # The original and staged trees are both complete and protected. Persist an
+  # intent before the first rename so an interrupted process is reconcilable
+  # from exact paths and hashes, without repeating the transition.
+  $intentPath=$staging+'.intent.json'
+  $intent=[ordered]@{schema='ZGMINI_NATIVE_POLICY_TRANSITION_INTENT_V1';host=$hostName;
+   requestId=$request.requestId;root=$root;backup=$backup;staging=$staging;failed=$failed;
+   beforeScopeSha256=$TransitionFromScopeSha256;afterScopeSha256=$ScopeSha256;
+   afterObservationSha256=$reportHash}
+  Write-Once $intentPath ([Text.Encoding]::UTF8.GetBytes(($intent|ConvertTo-Json -Compress))) $true
+  [IO.Directory]::Move($root,$backup)
+  try{
+   [IO.Directory]::Move($staging,$root)
+   Verify-NewScope $root
+   Verify-TransitionPreimage $backup
+   Write-Once $OutputFile $reportBytes
+   if((Hash-Bytes ([IO.File]::ReadAllBytes($OutputFile))) -cne $reportHash){
+    Stop-N 'NATIVE_POLICY_TRANSITION_OUTPUT_READBACK_STOP'
+   }
+  }catch{
+   # No automatic re-execution or deletion. A changed/unknown tree is not
+   # overwritten. Preserve the failed new root before restoring the original.
+   try{
+    Verify-TransitionPreimage $backup
+    if(Test-Path -LiteralPath $root){
+     Verify-NewScope $root
+     [IO.Directory]::Move($root,$failed)
+    }
+    if(Test-Path -LiteralPath $root){Stop-N 'NATIVE_POLICY_TRANSITION_ROLLBACK_ROOT_STOP'}
+    [IO.Directory]::Move($backup,$root)
+    Verify-TransitionPreimage $root
+   }catch{Stop-N 'NATIVE_POLICY_TRANSITION_RECOVERY_REQUIRED_STOP'}
+   Stop-N 'NATIVE_POLICY_TRANSITION_RESTORED_STOP'
+  }
+ }else{
+  [IO.Directory]::Move($staging,$root)
+  Verify-NewScope $root
+  Write-Once $OutputFile $reportBytes
  }
- $report=[ordered]@{host=$hostName;status='SCOPE_INSTALLED_VERIFIED';aclVerified=$true;
-  independentOperatorVerified=$true;reservedClaimAbsent=$true;scopeSha256=$ScopeSha256;
-  policySha256=(Hash-Bytes ([Text.Encoding]::UTF8.GetBytes(($p|ConvertTo-Json -Depth 30 -Compress))));
-  aclSha256=(Hash-Bytes ([Text.Encoding]::UTF8.GetBytes($aclText)));observedAt=[DateTime]::UtcNow.ToString('o')}
- if($transition){
-  [void](Exact-Acl $backup $scopeAcl)
-  if((Hash-Bytes ([IO.File]::ReadAllBytes([IO.Path]::Combine($backup,'ci-native-writer-b-approved.json')))) -cne $TransitionFromScopeSha256){Stop-N 'NATIVE_POLICY_TRANSITION_BACKUP_READBACK_STOP'}
-  $report.Add('previousScopeSha256',$TransitionFromScopeSha256)
-  $report.Add('backupVerified',$true)
- }
- Write-Once ([IO.Path]::Combine($root,'installation-observation.json')) ([Text.Encoding]::UTF8.GetBytes(($report|ConvertTo-Json -Compress))) $true
- Write-Once $OutputFile ([Text.Encoding]::UTF8.GetBytes(($report|ConvertTo-Json -Compress)))
  Write-Output 'status=SCOPE_INSTALLED_VERIFIED'
  Write-Output 'variablesEnabled=false;dispatched=false;writerChanged=false'
  exit 0
