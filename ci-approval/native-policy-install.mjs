@@ -20,7 +20,8 @@ export function makeIndependentPolicyScope({policy,approvalBytes,requestBytes}){
   request.approvalManifestSha256===f.approvalSha256,'NATIVE_POLICY_REQUEST_SCOPE_STOP');
  need(policy?.schema==='ZGMINI_CI_NATIVE_DISPATCH_V1'&&policy.enabled===true&&
   policy.effect==='B_WRITER_SOURCE'&&policy.repositoryVisibility==='public'&&
-  policy.nativeWriterBExecutionEnabled===true&&policy.sourceAttempt===1&&
+  policy.nativeWriterBExecutionEnabled===true&&
+  (policy.nativeWriterBControlMode===undefined||policy.nativeWriterBControlMode==='PINNED_CHECKOUT_V1')&&policy.sourceAttempt===1&&
   policy.sourceRunMode==='EVENT_COMPLETION_V1'&&!Object.hasOwn(policy,'sourceRunId')&&
   policy.sourceWorkflowId===416355595&&
   policy.sourceWorkflowPath==='.github/workflows/controller-maintenance-source-tests.yml'&&
