@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {makeIndependentPolicyScope,makeIndependentPolicyProof,verifyIndependentPolicyReceipt,
- POLICY_INSTALL as F,policyDigest as hash} from '../ci-approval/native-policy-install.mjs';
+ verifyPolicyTransportTransition,verifyFirstScopeTransition,POLICY_INSTALL as F,policyDigest as hash} from '../ci-approval/native-policy-install.mjs';
 import {verifyNativeInstalledProof} from '../ci-approval/native-publisher-entry.mjs';
 function fixture(){
  const approvalBytes=fs.readFileSync(new URL('../'+F.approvalPath,import.meta.url));
@@ -76,4 +76,25 @@ test('Windows installer refuses non-Apply invocation before reading files or cre
   '-RunnerSid','S-1-5-21-1-2-3-1001','-OutputFile',output],{encoding:'utf8',windowsHide:true});
  assert.equal(result.status,1);assert.match(result.stdout,/NATIVE_POLICY_INDEPENDENT_APPLY_REQUIRED/);
  assert.equal(fs.existsSync(output),false);fs.rmdirSync(dir);
+});
+
+test('transport-only transition preserves original exact business effect and source event',()=>{
+ const x=fixture();
+ const policy={...x.policy,policyRevision:'2'.repeat(40),nativeWriterBControlSha:'2'.repeat(40),
+  nativeWriterBAdapterSha256:'3'.repeat(64),receiverWorkflowBlobSha:'4'.repeat(40),
+  nativeWriterBControlMode:'PINNED_CHECKOUT_V1'};
+ const next=makeIndependentPolicyScope({...x,policy});
+ const v=verifyPolicyTransportTransition(x.scope,next);
+ assert.equal(v.beforeScopeSha256,hash(x.scope));
+ assert.equal(v.afterScopeSha256,hash(next));
+ // A fixture can never become the exact deployed first-scope preimage.
+ assert.throws(()=>verifyFirstScopeTransition(x.scope,next),/TRANSITION_PREIMAGE_STOP/);
+ for(const edit of [
+  p=>{p.sourceHeadSha='5'.repeat(40)},p=>{p.installedControllerSha='6'.repeat(40)},
+  p=>{p.sourceWorkflowBlobSha='7'.repeat(40)},p=>{p.extra=true},
+  p=>{delete p.nativeWriterBControlMode},p=>{p.nativeWriterBControlSha=p.policyRevision=x.policy.policyRevision}
+ ]){
+  const p={...policy};edit(p);
+  assert.throws(()=>verifyPolicyTransportTransition(x.scope,makeIndependentPolicyScope({...x,policy:p})));
+ }
 });
