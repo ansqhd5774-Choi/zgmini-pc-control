@@ -1,0 +1,64 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "968fa9fd86777b5e2064b2a1618090bc6f578eb3",
+  "targetSha": "6290080d9215e7a4edc4a380cf77fc22661292dd",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "publisherApprovalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1",
+  "files": {
+    "tools/maintenance-contract.mjs": "527e71e20c8f12d4698a9b8aa04e9748b74bceaf615f24a775f4f904ca03aa74",
+    "tools/maintenance-apply.mjs": "cf0d9c82fa25c343c0d540b6c432c3e6d090c9924474851c22c277867d841096",
+    "tools/maintenance-agent.mjs": "0a80b485ddd9d1d78995a38759233b3c60b9273dc5ab37a0e5bf1e47fc350d34",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "0f31f3ae8a0cd495323289b7d0d81188ddd20eb06bff01f27469892c15a24407",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "af31ab1f6a159aa1d8467d2585eb16750e8a1a293f9ecfb90b85c388d8640d70",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "e58528d27aa529d8dfea4f4fe8352a644590617ba9fda66630c21fc3a70244b4"
+  },
+  "runtimeChangedFiles": [
+    "tools/maintenance-agent.mjs"
+  ],
+  "ciControllerBPolicy": {
+    "schema": "ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V2",
+    "enabled": true,
+    "workflowId": 430972394,
+    "workflowBlobSha": "096ed86c8ce75bc5a3a71d638ea57606d6b1d820",
+    "workflowPath": ".github/workflows/ci-approval-controller-b.yml",
+    "repositoryVisibility": "public",
+    "installedSha": "66b8a66c6112441576917e0ac9fbe4d39cbd5eea",
+    "targetSha": "ee8d8ea8fc7f29a64fb3636f4280e5c6ba51a5c9",
+    "manifestSha256": "71748d183f560f4f4545137274afc9d91151293423b213c6237bdfec3f24e8ea"
+  },
+  "preflightEvidence": {
+    "host": "PC",
+    "maintenanceManifestRawSha256": "ae76b3201d6be8189763289d0aaf08f726f56ae0fd57d69212532b65b928fdc4",
+    "fileHashesMatched": 7,
+    "note": "Exact pre-install rejection; no updater journal, stage, backup, backlog or install lease may exist. Runtime source and all original claim/report evidence are preserved."
+  },
+  "approvalBasis": "Owner user explicitly instructed completing the remaining prepared PR 4341/4342 work in this Codex session on 2026-11-28. This approves the exact Public CI V2 one-effect policy, existing independent 7-to-7 maintainer handoff and the single-file selective Controller update in PR 4341, followed by variable activation and actual unattended B verification. No historical 4069/4078 replay, data/provider/DB/D1/schedule changes or general Bot authority.",
+  "backup": "BYTE_VERIFIED_EXISTING_SEVEN_RUNTIME_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_WHILE_NEW_RECEIVER_NOT_STARTED_AND_PRIOR_RECEIVER_PROVEN_STOPPED; HOLD_FOR_RECOVERY_IF_RECEIVER_ORIGIN_UNVERIFIED",
+  "effects": [
+    "One maintenance-agent runtime update for explicit pre-install continuation",
+    "Same exact existing CI grant and Controller target/approval unchanged",
+    "Original request 4345 only; archive byte-exact prior ledger, preserve original effect claim and reports; continuation-1 receipts only",
+    "UNKNOWN or any operating artifact/lease/baseline change cannot continue"
+  ],
+  "preserve": [
+    "Public repository visibility",
+    "Core/Writer/data/DB/D1/schedules unchanged",
+    "Existing lease, backup, ancestry and exact CAS safeguards",
+    "No historical 4069/4078 replay or consumed approval reuse"
+  ],
+  "preinstallContinuation": {
+    "schema": "ZGMINI_PREINSTALL_CONTINUATION_V1",
+    "revision": 1,
+    "requestId": "pc-update-8c0cad7b-fe16-480f-9ae5-6ebed45d364d",
+    "issueNumber": 4345,
+    "bodyDigest": "859dc4045a3adc6249f55f6eb6e682fa53671965991dab94473f1d692011508e",
+    "priorLedgerSha256": "4dbaeee627ff549e68e063ae32f6d8142c77704affb57574432540c5dfd35538",
+    "baselineSha": "66b8a66c6112441576917e0ac9fbe4d39cbd5eea"
+  }
+}
