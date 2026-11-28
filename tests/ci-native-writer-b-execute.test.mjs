@@ -1,4 +1,6 @@
 import {test} from 'node:test';
+// Keep the approved Owner PowerShell parse check in an already selected Native B CI suite.
+import './ci-native-policy-powershell-parser.test.mjs';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import fs from 'node:fs';
