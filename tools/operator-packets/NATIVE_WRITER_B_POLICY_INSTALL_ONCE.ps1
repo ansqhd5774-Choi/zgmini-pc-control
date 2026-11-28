@@ -9,10 +9,13 @@ param(
  [Parameter(Mandatory=$true)][string]$OutputFile,
  [string]$ProofFile,
  [ValidatePattern('^[a-f0-9]{64}$')][string]$TransitionFromScopeSha256,
+ [string]$RecoverIntent,
  [switch]$Apply
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
+$policyLease=$null
+$leaseHeld=$false
 function Stop-N([string]$code){throw $code}
 function Plain-Path([string]$p){
  for($cur=[IO.Path]::GetFullPath($p);$cur;$cur=[IO.Path]::GetDirectoryName($cur)){
@@ -71,6 +74,36 @@ function Write-Once([string]$p,[byte[]]$bytes,[bool]$TrustedPolicyFile=$false){
  }
  try{$stream.Write($bytes,0,$bytes.Length);$stream.Flush($true)}finally{$stream.Dispose()}
 }
+function New-OwnerPolicyMutexSecurity {
+ $security=[Security.AccessControl.MutexSecurity]::new()
+ $security.SetAccessRuleProtection($true,$false)
+ $security.SetOwner([Security.Principal.SecurityIdentifier]::new('S-1-5-32-544'))
+ foreach($sid in @('S-1-5-18','S-1-5-32-544')){
+  $rule=[Security.AccessControl.MutexAccessRule]::new(
+   [Security.Principal.SecurityIdentifier]::new($sid),
+   [Security.AccessControl.MutexRights]::FullControl,
+   [Security.AccessControl.AccessControlType]::Allow)
+  [void]$security.AddAccessRule($rule)
+ }
+ return $security
+}
+function Require-Unactivated {
+ $gh=(Get-Command gh.exe -ErrorAction Stop).Source
+ $identityText=& $gh api 'user'
+ if($LASTEXITCODE -ne 0){Stop-N 'NATIVE_POLICY_OWNER_READ_STOP'}
+ $identity=($identityText -join "`n")|ConvertFrom-Json
+ if($identity.id -ne 327938088 -or $identity.login -cne 'ansqhd5774-Choi'){Stop-N 'NATIVE_POLICY_OWNER_READ_STOP'}
+ $varsText=& $gh api 'repos/ansqhd5774-Choi/zgmini-pc-control/actions/variables?per_page=100'
+ if($LASTEXITCODE -ne 0){Stop-N 'NATIVE_POLICY_VARIABLE_READ_STOP'}
+ $vars=($varsText -join "`n")|ConvertFrom-Json
+ if($vars.total_count -ne @($vars.variables).Count){Stop-N 'NATIVE_POLICY_VARIABLE_READ_STOP'}
+ foreach($name in @('ZGMINI_CI_NATIVE_WRITER_B_ENABLED','ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED','ZGMINI_CI_NATIVE_WRITER_B_EXEC_ENABLED')){
+  $values=@($vars.variables|Where-Object {$_.name -ceq $name})
+  if($values.Count -gt 1 -or ($values.Count -eq 1 -and $values[0].value -cne 'false')){
+   Stop-N 'NATIVE_POLICY_TRANSITION_ACTIVATION_STOP'
+  }
+ }
+}
 try{
  if($PSVersionTable.PSEdition -ne 'Desktop'){
   Stop-N 'NATIVE_POLICY_WINDOWS_POWERSHELL_REQUIRED'
@@ -107,6 +140,26 @@ try{
   }
  }
  if(-not $matched){Stop-N 'NATIVE_POLICY_RUNNER_NOT_OBSERVED_STOP'}
+ # One host-local Owner lease spans the entire policy/proof/recovery operation.
+ # A protected global kernel mutex serializes elevated operators without
+ # touching Core/Writer claims. The durable intent survives process death.
+ $mutexSecurity=New-OwnerPolicyMutexSecurity
+ $created=$false
+ $policyLease=[Threading.Mutex]::new($false,'Global\ZGMINI-NativeWriterB-4135-OwnerPolicy',[ref]$created,$mutexSecurity)
+ if($policyLease.GetAccessControl().GetSecurityDescriptorSddlForm('Access,Owner') -cne
+  $mutexSecurity.GetSecurityDescriptorSddlForm('Access,Owner')){
+  Stop-N 'NATIVE_POLICY_OWNER_LEASE_ACL_STOP'
+ }
+ $abandoned=$false
+ try{$leaseHeld=$policyLease.WaitOne(0)}catch [Threading.AbandonedMutexException]{
+  $leaseHeld=$true;$abandoned=$true
+ }
+ if(-not $leaseHeld){Stop-N 'NATIVE_POLICY_OWNER_LEASE_BUSY_STOP'}
+ if($abandoned -and -not $RecoverIntent){Stop-N 'NATIVE_POLICY_TRANSITION_RECOVERY_REQUIRED_STOP'}
+ if($RecoverIntent -and (-not $TransitionFromScopeSha256 -or $ProofFile)){
+  Stop-N 'NATIVE_POLICY_TRANSITION_MODE_STOP'
+ }
+ if($TransitionFromScopeSha256){Require-Unactivated}
  $bytes=[IO.File]::ReadAllBytes($ScopeFile)
  if($bytes.Length -gt 131072 -or (Hash-Bytes $bytes) -cne $ScopeSha256){Stop-N 'NATIVE_POLICY_SCOPE_SHA_STOP'}
  $scope=[Text.Encoding]::UTF8.GetString($bytes)|ConvertFrom-Json
@@ -130,7 +183,8 @@ try{
  $root=if($hostName -eq 'PC'){'E:\ZGmini\data\pc-writer\ci-native'}else{'C:\ProgramData\ZGMINI-CI\NativeWriterBPolicy'}
  $parent=[IO.Path]::GetDirectoryName($root)
  Plain-Path $parent
- if(Test-Path -LiteralPath $OutputFile){Stop-N 'NATIVE_POLICY_EXISTING_OUTPUT_STOP'}
+ $OutputFile=[IO.Path]::GetFullPath($OutputFile)
+ if(-not $RecoverIntent -and (Test-Path -LiteralPath $OutputFile)){Stop-N 'NATIVE_POLICY_EXISTING_OUTPUT_STOP'}
  $scopeAcl=New-Acl 'ReadAndExecute'
  if($ProofFile -and $TransitionFromScopeSha256){Stop-N 'NATIVE_POLICY_TRANSITION_MODE_STOP'}
  if($ProofFile){
@@ -242,8 +296,8 @@ try{
    Stop-N 'NATIVE_POLICY_TRANSITION_OLD_OBSERVATION_STOP'
   }
  }
- if($transition){Verify-TransitionPreimage}
- elseif(Test-Path -LiteralPath $root){Stop-N 'NATIVE_POLICY_EXISTING_INSTALL_OR_OUTPUT_STOP'}
+ if($transition -and -not $RecoverIntent){Verify-TransitionPreimage}
+ elseif(-not $transition -and (Test-Path -LiteralPath $root)){Stop-N 'NATIVE_POLICY_EXISTING_INSTALL_OR_OUTPUT_STOP'}
  if($hostName -eq 'PC'){
   $hostFile='E:\ZGmini\automation\pc-control\host.json'
   $hostData=Get-Content -LiteralPath $hostFile -Raw|ConvertFrom-Json
@@ -269,24 +323,6 @@ try{
    [void](Exact-Acl $receiptRoot $receiptAcl)
   }
  }
- $staging=$root+'.staging-'+[Guid]::NewGuid().ToString()
- [void][IO.Directory]::CreateDirectory($staging,$scopeAcl)
- $aclText=Exact-Acl $staging $scopeAcl
- Write-Once ([IO.Path]::Combine($staging,'ci-native-writer-b-approved.json')) $bytes $true
- $stored=[IO.File]::ReadAllBytes([IO.Path]::Combine($staging,'ci-native-writer-b-approved.json'))
- if((Hash-Bytes $stored) -cne $ScopeSha256){Stop-N 'NATIVE_POLICY_STAGING_READBACK_STOP'}
- # Complete and verify the staged observation before exposing the new root.
- $report=[ordered]@{host=$hostName;status='SCOPE_INSTALLED_VERIFIED';aclVerified=$true;
-  independentOperatorVerified=$true;reservedClaimAbsent=$true;scopeSha256=$ScopeSha256;
-  policySha256=(Hash-Bytes ([Text.Encoding]::UTF8.GetBytes(($p|ConvertTo-Json -Depth 30 -Compress))));
-  aclSha256=(Hash-Bytes ([Text.Encoding]::UTF8.GetBytes($aclText)));observedAt=[DateTime]::UtcNow.ToString('o')}
- if($transition){
-  $report.Add('previousScopeSha256',$TransitionFromScopeSha256)
-  $report.Add('backupVerified',$true)
- }
- $reportBytes=[Text.Encoding]::UTF8.GetBytes(($report|ConvertTo-Json -Compress))
- $reportHash=Hash-Bytes $reportBytes
- Write-Once ([IO.Path]::Combine($staging,'installation-observation.json')) $reportBytes $true
  function Verify-NewScope([string]$candidateRoot){
   Plain-Path $candidateRoot
   [void](Exact-Acl $candidateRoot $scopeAcl)
@@ -332,11 +368,83 @@ try{
   # Recheck the external result/claim immediately before any compensation.
   if(Test-Path -LiteralPath $OutputFile){Stop-N 'NATIVE_POLICY_TRANSITION_RESULT_EXISTS_STOP'}
   Verify-TransitionClaimAbsent
+  Require-Unactivated
   if(Test-Path -LiteralPath $root){[IO.Directory]::Move($root,$failed)}
   if(Test-Path -LiteralPath $root){Stop-N 'NATIVE_POLICY_TRANSITION_ROLLBACK_ROOT_STOP'}
   [IO.Directory]::Move($backup,$root)
   Verify-TransitionPreimage $root
  }
+
+ # End compensation helpers.
+ # Recovery is a separate explicit invocation, never a retry of Apply.
+ if($transition -and $RecoverIntent){
+  $intentPath=[IO.Path]::GetFullPath($RecoverIntent)
+  $intentPattern='^'+[regex]::Escape($root)+
+   '\.staging-[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}\.intent\.json$'
+  if($intentPath -notmatch $intentPattern){Stop-N 'NATIVE_POLICY_TRANSITION_INTENT_PATH_STOP'}
+  $intentItem=Get-Item -LiteralPath $intentPath -Force
+  if($intentItem.PSIsContainer -or ($intentItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+   $intentItem.Length -lt 2 -or $intentItem.Length -gt 16384){Stop-N 'NATIVE_POLICY_TRANSITION_INTENT_FILE_STOP'}
+  [void](Exact-Acl $intentPath (New-PolicyFileAcl))
+  $intent=Get-Content -LiteralPath $intentPath -Raw|ConvertFrom-Json
+  $staging=$intentPath.Substring(0,$intentPath.Length-'.intent.json'.Length)
+  $backup=$root+'.backup-'+$TransitionFromScopeSha256
+  $failed=$staging+'.failed'
+  if($intent.schema -cne 'ZGMINI_NATIVE_POLICY_TRANSITION_INTENT_V1' -or
+   $intent.host -cne $hostName -or $intent.requestId -cne $request.requestId -or
+   $intent.root -cne $root -or $intent.backup -cne $backup -or
+   $intent.staging -cne $staging -or $intent.failed -cne $failed -or
+   $intent.outputFile -cne $OutputFile -or
+   $intent.beforeScopeSha256 -cne $TransitionFromScopeSha256 -or
+   $intent.afterScopeSha256 -cne $ScopeSha256 -or
+   $intent.afterObservationSha256 -notmatch '^[a-f0-9]{64}$'){
+   Stop-N 'NATIVE_POLICY_TRANSITION_INTENT_DRIFT_STOP'
+  }
+  $reportHash=$intent.afterObservationSha256
+  Verify-TransitionClaimAbsent
+  if(Test-Path -LiteralPath $OutputFile){Stop-N 'NATIVE_POLICY_TRANSITION_RESULT_EXISTS_STOP'}
+  $stagePresent=Test-Path -LiteralPath $staging
+  $failedPresent=Test-Path -LiteralPath $failed
+  if($stagePresent -and $failedPresent){Stop-N 'NATIVE_POLICY_TRANSITION_RECOVERY_REQUIRED_STOP'}
+  if($stagePresent){Verify-NewScope $staging}
+  if($failedPresent){Verify-NewScope $failed}
+  if(Test-Path -LiteralPath $backup){
+   Verify-TransitionPreimage $backup
+   if(Test-Path -LiteralPath $root){
+    if($stagePresent -or $failedPresent){Stop-N 'NATIVE_POLICY_TRANSITION_RECOVERY_REQUIRED_STOP'}
+    Verify-NewScope $root
+   }elseif(-not ($stagePresent -or $failedPresent)){
+    Stop-N 'NATIVE_POLICY_TRANSITION_RECOVERY_REQUIRED_STOP'
+   }
+   Restore-VerifiedTransitionPreimage
+  }else{
+   Verify-TransitionPreimage $root
+  }
+  Write-Output 'status=TRANSITION_OLD_SCOPE_VERIFIED;dispatched=false;writerChanged=false'
+  exit 0
+ }
+ if($transition){
+  $existingIntents=@(Get-ChildItem -LiteralPath $parent -Filter (([IO.Path]::GetFileName($root))+'.staging-*.intent.json') -Force)
+  if($existingIntents.Count -ne 0){Stop-N 'NATIVE_POLICY_TRANSITION_RECOVERY_REQUIRED_STOP'}
+ }
+ $staging=$root+'.staging-'+[Guid]::NewGuid().ToString()
+ [void][IO.Directory]::CreateDirectory($staging,$scopeAcl)
+ $aclText=Exact-Acl $staging $scopeAcl
+ Write-Once ([IO.Path]::Combine($staging,'ci-native-writer-b-approved.json')) $bytes $true
+ $stored=[IO.File]::ReadAllBytes([IO.Path]::Combine($staging,'ci-native-writer-b-approved.json'))
+ if((Hash-Bytes $stored) -cne $ScopeSha256){Stop-N 'NATIVE_POLICY_STAGING_READBACK_STOP'}
+ # Complete and verify the staged observation before exposing the new root.
+ $report=[ordered]@{host=$hostName;status='SCOPE_INSTALLED_VERIFIED';aclVerified=$true;
+  independentOperatorVerified=$true;reservedClaimAbsent=$true;scopeSha256=$ScopeSha256;
+  policySha256=(Hash-Bytes ([Text.Encoding]::UTF8.GetBytes(($p|ConvertTo-Json -Depth 30 -Compress))));
+  aclSha256=(Hash-Bytes ([Text.Encoding]::UTF8.GetBytes($aclText)));observedAt=[DateTime]::UtcNow.ToString('o')}
+ if($transition){
+  $report.Add('previousScopeSha256',$TransitionFromScopeSha256)
+  $report.Add('backupVerified',$true)
+ }
+ $reportBytes=[Text.Encoding]::UTF8.GetBytes(($report|ConvertTo-Json -Compress))
+ $reportHash=Hash-Bytes $reportBytes
+ Write-Once ([IO.Path]::Combine($staging,'installation-observation.json')) $reportBytes $true
  Verify-NewScope $staging
  if($transition){
   Verify-TransitionPreimage
@@ -351,10 +459,11 @@ try{
   # from exact paths and hashes, without repeating the transition.
   $intentPath=$staging+'.intent.json'
   $intent=[ordered]@{schema='ZGMINI_NATIVE_POLICY_TRANSITION_INTENT_V1';host=$hostName;
-   requestId=$request.requestId;root=$root;backup=$backup;staging=$staging;failed=$failed;
+   requestId=$request.requestId;root=$root;backup=$backup;staging=$staging;failed=$failed;outputFile=$OutputFile;
    beforeScopeSha256=$TransitionFromScopeSha256;afterScopeSha256=$ScopeSha256;
    afterObservationSha256=$reportHash}
   Write-Once $intentPath ([Text.Encoding]::UTF8.GetBytes(($intent|ConvertTo-Json -Compress))) $true
+  Require-Unactivated
   [IO.Directory]::Move($root,$backup)
   try{
    [IO.Directory]::Move($staging,$root)
@@ -386,4 +495,7 @@ try{
  Write-Output ('status=STOPPED;code='+$code)
  # Never delete partial state or retry a rename/write automatically.
  exit 1
+}finally{
+ if($leaseHeld -and $null -ne $policyLease){$policyLease.ReleaseMutex()}
+ if($null -ne $policyLease){$policyLease.Dispose()}
 }
