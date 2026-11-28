@@ -551,3 +551,10 @@
 ## 2026-11-28 #3767 WMI 분리 관측 source 병합
 
 - PR #4317, 정확 HEAD `eb9b4e3cd8d2ec8f5148523f18e44c581a5e448b`, 기존 Watchdog classifier 재사용, R3 원본 상태 유지, 동일 표본 JSON/TXT 고정 분류값 기록 및 직접 서비스 PID 관측 일치. 2파일만 변경. [Actions 46088307092](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/46088307092) public-source-only SUCCESS, 통합 158/158 PASS, Windows skipped. squash `7d31c585a8805e686104ac4c3e2f459ce8a130cb`, 2파일 blob readback. #3767 OPEN: 실제 운영 승격 WMI 분류·계보 미확인, 기존 private 전용 Workflow/공개 summary-only 경계 유지. 신규 PR 병합 1건, PC/설치/DB/D1/Runner 변경 0. #4069/#4078/#4135는 별도 미완료.
+
+
+## 2026-11-28 독립 Owner S6/WMI 로컬 읽기 경로 통합
+
+- [PR #4319](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4319) HEAD `1b25baf12c77925549f3ab3d4013f5bd4e090063`, [Actions 46088894859](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/46088894859) public-source-only SUCCESS, 통합 159/159 PASS, Windows skipped. squash main `a879f8e81049cefce9a3733d0b88544923501c57`, 2파일 blob readback. `tools/s6-local-owner-readonly.mjs`는 기존 local S6 bytes/Watchdog WMI scanner 재사용, GH Owner/Windows OPERATOR ancestry/main source byte pin, 로컬 고정 enum·boolean만 출력. 운영 쓰기/공개 raw 원장/POST/lease/설치/재발행 0. 실제 PC 실행 전임.
+- 병행 [PR #4318](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4318) main `edf29d1fe748fb542b30f4096c63d81d1c016447` #4069 Public A 등록 확인. 설치 후보 `66b8a66c...`는 별도 정확 운영 승인/설치/사후 pin 미확보, 기존 설치 증거 `d3764580...` 재사용. 새 A와 독립 로컬 상세 관측의 목적 분리, 중복 설치 금지.
+- [#4078 기록](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4078#issuecomment-7231108657). #4069 동시 종결 상태 closed/completed는 마지막 원본 댓글 `7231087788`의 설치 미완료·원본 성공 미입증과 상충. 원본 B의 polling/claim 때문에 성공 판정 또는 자동 재접수 없이 상태 불일치 보존. #4078/#3767 OPEN. #4135 독립 미해결. 다음은 기존 정상 checkout/독립 Windows Owner local-only entry 1회 관측, 실제 로컬 결과 기반 정합 및 정규 A 설치와 중복되지 않는 조치. 새로운 원본 S6 실행 금지.
