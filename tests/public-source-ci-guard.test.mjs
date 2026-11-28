@@ -117,3 +117,5 @@ test('W06 V3 operator pins owner merged effect #4289 and reviewed source #4293',
  assert.equal(manifest.runCount,1);
  for(const key of ['allowProviderCalls','allowDbChanges','allowD1Writes','allowTaskChanges'])assert.equal(manifest[key],false);
 });
+
+import './controller-s6-4069-b-approval.test.mjs';
