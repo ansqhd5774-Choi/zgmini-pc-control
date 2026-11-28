@@ -1,0 +1,9 @@
+schema=ZGMINI_PC_RESULT_V1
+jobId=run-46090590261-1-seat-3
+requestId=pc-issues-s6-install-readback-20261128-01
+operation=core-status
+seat=3
+status=PASS
+code=PUBLIC_RESULT_CODE_REDACTED
+actualExecutionSha=d3764580fdb08ecddd5f9b1064051eec30f90492
+reportTransfer={"status":"SUMMARY_ONLY","code":"PUBLIC_REPOSITORY_REDACTED"}
