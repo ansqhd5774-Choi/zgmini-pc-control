@@ -1,0 +1,41 @@
+{
+  "schema": "ZGMINI_PC_ROLLBACK_APPROVAL_V1",
+  "approved": true,
+  "requestId": "pc-update-8c0cad7b-fe16-480f-9ae5-6ebed45d364d",
+  "sourceSha": "6290080d9215e7a4edc4a380cf77fc22661292dd",
+  "issueNumber": 4345,
+  "toolSha256": "b0689caec650b567e8f55f876f58168d296161bdb246dfdb0d32d23327a22bea",
+  "files": [
+    {
+      "path": "tools/controller-rollback-recovery.mjs",
+      "sha256": "b0689caec650b567e8f55f876f58168d296161bdb246dfdb0d32d23327a22bea"
+    },
+    {
+      "path": "tools/update.mjs",
+      "sha256": "0f31f3ae8a0cd495323289b7d0d81188ddd20eb06bff01f27469892c15a24407"
+    },
+    {
+      "path": "tools/maintenance-apply.mjs",
+      "sha256": "cf0d9c82fa25c343c0d540b6c432c3e6d090c9924474851c22c277867d841096"
+    },
+    {
+      "path": "tools/maintenance-contract.mjs",
+      "sha256": "527e71e20c8f12d4698a9b8aa04e9748b74bceaf615f24a775f4f904ca03aa74"
+    },
+    {
+      "path": "tools/maintenance-lock.mjs",
+      "sha256": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd"
+    }
+  ],
+  "ledgerSha256": "2c582e5707d6bb8e60ce63e557247ffddf825a1363abf990c96bb38fa6c9af08",
+  "ownerSha256": "230727b2b90da81d46aea1f5b9ea61c57d20a8983a4757e31f5554fa3f994e8b",
+  "markerSha256": "69cb6733cb6e470a70b6ab323c763e608fc09479e5affff1ccebb5f0ffacab44",
+  "snapshotHostSha256": "f9382d41272dad0917c505679d3d18c56c8e053d6e114d4414d152af37f6edb5",
+  "protectionSha256": "c1292f1eafd8ac05294fddcbdfe73bacf0997cb27dfe5b685587608a1b53aa0d",
+  "approvalBasis": "User requested completion and continued recovery. Exact restore-first reconciliation of BACKED_UP stopOwnSupervisor RUNNERS_NOT_ONLINE before any switch. Existing Controller/Supervisor tree is preserved after independent byte snapshot and six-online verification; original journal and install lease are archived, never forcibly deleted. No new B installation.",
+  "effects": [
+    "Verify existing 66b8a66c Controller and original snapshot without unnecessary restore/restart",
+    "Resume original pc-job intake and reconcile only this pause window",
+    "Archive exact dead-owner install lease after verified rollback and retain original request journal"
+  ]
+}
