@@ -22,6 +22,8 @@ import './controller-audit-public-b-operator-once.test.mjs';
 import './controller-audit-lineage-public-b-operator-once.test.mjs';
 // Fixed S6 journal regression on GitHub-hosted source only; no Windows access.
 import './controller-s6-4069-public-a.test.mjs';
+// Completed #3650 lifecycle and historical upload contract; injected source-only fixtures.
+import './report-recovery-3650-once.test.mjs';
 
 const repo='ansqhd5774-Choi/zgmini-pc-control', id=1442936296;
 const owner='ansqhd5774-Choi', ownerId=327938088;

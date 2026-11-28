@@ -273,8 +273,10 @@ test('source pinning rejects scratch execution; synthetic installed contract val
 });
 
 
-test('one-time #3650 recovery workflow is owner-only, original issue-only and upload-only',()=>{
-  const workflow=fs.readFileSync(new URL('../.github/workflows/pc-report-recovery-3650-once.yml',import.meta.url),'utf8');
+test('retired #3650 recovery workflow is inactive; historical owner-only upload contract is preserved',()=>{
+  // #3650 recovered both original reports on 2026-11-26; never subscribe to new comments again.
+  assert.equal(fs.existsSync(new URL('../.github/workflows/pc-report-recovery-3650-once.yml',import.meta.url)),false);
+  const workflow=fs.readFileSync(new URL('./fixtures/retired-workflows/pc-report-recovery-3650-once.yml',import.meta.url),'utf8');
   assert.match(workflow,/issue_comment:/);
   assert.match(workflow,/github\.event\.repository\.private == true/);
   assert.match(workflow,/github\.actor == 'ansqhd5774-Choi'/);
