@@ -194,7 +194,17 @@ test('Public Writer B reads the actual fixed host.json bytes, refusing absence a
  assert.throws(()=>readInstalledControllerSha({root}),
   {code:'WRITER_B_NATIVE_INSTALLED_CONTROLLER_UNVERIFIED_STOP'});
  fs.unlinkSync(file);
- assert.throws(()=>readInstalledControllerSha({root}));
+ assert.throws(()=>readInstalledControllerSha({root}),
+  {code:'WRITER_B_NATIVE_INSTALLED_CONTROLLER_UNVERIFIED_STOP'});
+ const ioDenied={
+  lstatSync:p=>fs.lstatSync(p),
+  readFileSync:()=>{const e=new Error('access denied');e.code='EACCES';throw e;}
+ };
+ fs.writeFileSync(file,JSON.stringify({controllerSourceSha:sourceSha}));
+ assert.throws(()=>readInstalledControllerSha({root,io:ioDenied}),
+  {code:'WRITER_B_NATIVE_INSTALLED_CONTROLLER_UNVERIFIED_STOP'});
+ assert.throws(()=>readInstalledControllerSha({root:path.join(root,'missing')}),
+  {code:'WRITER_B_NATIVE_INSTALLED_CONTROLLER_UNVERIFIED_STOP'});
  fs.writeFileSync(file,JSON.stringify({controllerSourceSha:sourceSha}));
  const bytes=fs.readFileSync(file);
  let calls=0;
