@@ -1,3 +1,8 @@
+import './ci-native-receiver-contract.test.mjs';
+import './ci-native-dispatch.test.mjs';
+import './ci-native-publisher-entry.test.mjs';
+import './ci-native-receiver-observe.test.mjs';
+import './ci-native-writer-b-execute.test.mjs';
 import './ci-public-owner-submission-scope.test.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';

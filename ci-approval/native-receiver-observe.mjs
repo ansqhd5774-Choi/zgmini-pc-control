@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {inspectNativeReceiver} from './native-receiver-contract.mjs';
+import {publicWriterEventOptIn} from './native-visibility.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const EFFECTS=Object.freeze({
@@ -62,7 +63,9 @@ const assertEvent=(event,env,effect)=>{
   env.GITHUB_EVENT_NAME!=='workflow_dispatch'||
   env.GITHUB_REF!=='refs/heads/main'||!sha(env.GITHUB_SHA)||
   env.GITHUB_ACTOR!=='github-actions[bot]'||env.GITHUB_RUN_ATTEMPT!=='1'||
-  event?.repository?.id!==1442936296||event.repository.private!==true||
+  event?.repository?.id!==1442936296||
+  !(event.repository.private===true||
+    publicWriterEventOptIn(effect,env,event.repository.private))||
   event.repository.full_name!==REPO||event.sender?.id!==41898282||
   event.sender.login!=='github-actions[bot]'||event.sender.type!=='Bot')
   throw Error('CI_NATIVE_RECEIVER_EVENT_DENIED');

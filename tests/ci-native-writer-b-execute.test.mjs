@@ -113,3 +113,17 @@ test('extended Core Task pause approval is not silently included in initial nati
  ]));
  assert.throws(()=>authorizeWriterBNative(x),{code:'WRITER_B_NATIVE_MAINTENANCE_SCOPE_STOP'});
 });
+
+test('public Writer B seal remains bound to exact independent execution opt-in',()=>{
+ const x=fixture();
+ Object.assign(x.scope.policy,{repositoryVisibility:'public',installedControllerSha:'f'.repeat(40)});
+ assert.throws(()=>authorizeWriterBNative(x),{code:'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP'});
+ x.env.ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED='true';
+ const a=authorizeWriterBNative(x);
+ assert.equal(a.issueNumber,null);
+ const wrong=fixture();
+ wrong.scope.policy.repositoryVisibility='public';
+ wrong.scope.policy.installedControllerSha='not-a-sha';
+ wrong.env.ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED='true';
+ assert.throws(()=>authorizeWriterBNative(wrong),{code:'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP'});
+});

@@ -37,7 +37,9 @@ jobs:
       vars.ZGMINI_CI_NATIVE_WRITER_B_ENABLED == 'true' &&
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
       github.event.repository.id == 1442936296 &&
-      github.event.repository.private == true &&
+      (github.event.repository.private == true ||
+       (github.event.repository.private == false &&
+        vars.ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED == 'true')) &&
       github.event.sender.id == 41898282 &&
       github.event.sender.login == 'github-actions[bot]' &&
       github.actor == 'github-actions[bot]' &&
@@ -66,6 +68,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           ZGMINI_CI_NATIVE_EFFECT: B_WRITER_SOURCE
+          ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED: ${{ vars.ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED }}
         run: '"E:\ZGmini\runtime\node.exe" ci-approval\native-receiver-observe.mjs'
       # Independent opt-in: receiver admission alone must never install Writer B.
       - name: Verify installed native Writer B grant and emit exact approved candidate
@@ -74,6 +77,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           ZGMINI_CI_NATIVE_WRITER_B_EXEC_ENABLED: ${{ vars.ZGMINI_CI_NATIVE_WRITER_B_EXEC_ENABLED }}
+          ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED: ${{ vars.ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED }}
         run: '"E:\ZGmini\runtime\node.exe" ci-approval\native-writer-b-execute.mjs --preflight'
       - name: Checkout only the independently approved Writer B candidate SHA
         if: steps.native-writer-preflight.outcome == 'success'
@@ -88,6 +92,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           ZGMINI_CI_NATIVE_WRITER_B_EXEC_ENABLED: ${{ vars.ZGMINI_CI_NATIVE_WRITER_B_EXEC_ENABLED }}
+          ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED: ${{ vars.ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED }}
         run: '"E:\ZGmini\runtime\node.exe" ci-approval\native-writer-b-execute.mjs --execute'
       - name: Upload bounded native Writer B result pair
         if: always() && vars.ZGMINI_CI_NATIVE_WRITER_B_EXEC_ENABLED == 'true'
