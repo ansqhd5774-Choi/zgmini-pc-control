@@ -539,3 +539,10 @@
 - [PR #4312](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4312) 실제 merged=true, HEAD `404c8de4a5c6e6e1297765007973b37b29e4634c`, merge `4fe6fc0705be0802b1674cb2cd8bec89f18f0b6d` 직접 조회. #4078 closed/completed 상태이나 마지막 원본 댓글은 `SOURCE_MERGED / OPERATING_REPLAY_NOT_EXECUTED`로 기록, 실제 backlog 재발행 성공 증거로 간주하지 않는다. 현재 source 병합을 다시 수행하지 않음.
 - 검색 `is:open` 반환 8→7건(신규 close 1건), Open PR 0. 실제 미해결 3건: #4135 대체 공급자 적법 입력/새 명세/설치, #4069 원래 S6 RECOVERY_REQUIRED·최신 로컬 원장 정합, #3767 실제 승격 WMI 분류 미확인. 영속 원장 #68/#1743/#2426/#2427 유지. 다음은 기존 정상 읽기 경로에서 #4069/#3767의 정확한 로컬 증거 확보, #4135는 대체 입력이 확인될 경우 정확 B 명세와 정규 적용. #4313 공개 SUMMARY_ONLY 결과로 로컬 원장 성공을 추정하지 않는다.
 - 이번 신규 PR 병합 0, 원본 재실행/신규 PC 작업/Windows/DB/D1/공급자 변경 0. 기존 완료 증거 보존.
+
+
+## 2026-11-28 #4078 원본 완료 상태 정정 및 직접 읽기 경계
+
+- [#4078 정정 기록](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4078#issuecomment-7230923109): `closed/completed`는 마지막 `SOURCE_MERGED / OPERATING_REPLAY_NOT_EXECUTED` 및 #4105 `NOT_RECORDED / executionEstablished=false`와 상충. #4312 병합 소스 `inspectS64078BacklogOnly`는 원본 `state==='open'`을 요구. 이슈 추적 상태만 `open/reopened`로 정정 후 원격 재조회. 본문·라벨·requestId 불변. pc-job workflow는 opened/labeled만 수신하므로 reopen은 실행 요청 아님. PR 병합 보존.
+- 직접 기술 차단: 운영 저장소와 기능 저장소 모두 public; 기존 S6 journal/WMI process inventory Workflow는 private 전용. 설치 증거 SHA `d3764580fdb08ecddd5f9b1064051eec30f90492`의 `config/operations.json`에 해당 S6/WMI 직접 연산 없음. `controller/common.mjs::publicPcReportProjection`은 status와 고정 redacted code만 내보내며 로컬 원장 상세는 전송하지 않음. 기존 #4313 같은 공개 A 재실행은 필요한 증거를 회수하지 못함. 실제 Windows Owner/승인된 비공개 결과 회수 경로 확보가 남음. 보호조건 변경 없음.
+- 신규 reopen 1건, 신규 close/merge/PC 요청/운영 변경 0. 현재 검색 Open 8건(영속 원장 4건), Open PR 0건. #4069/#4078/#3767 운영 증거와 #4135 대체 데이터 입력을 각각 분리.
