@@ -43,3 +43,25 @@ test('independent Native Writer B Owner installer parses in Windows PowerShell 5
  assert.equal(p.error,undefined,'Windows PowerShell 5.1 must be available');
  assert.equal(p.status,0,'PowerShell parser rejected Owner installer:\n'+p.stdout+'\n'+p.stderr);
 });
+
+test('Owner installer passes PowerShell Core AST parse without running its body',t=>{
+ // An installed pwsh provides a second, full-file parse on hosted Linux CI.
+ // Windows PowerShell 5.1 remains the authoritative syntax/runtime check.
+ const probe=spawnSync('pwsh',['-NoLogo','-NoProfile','-NonInteractive','-Command',
+  '$PSVersionTable.PSVersion.ToString()'],{encoding:'utf8',timeout:15000});
+ if(probe.error?.code==='ENOENT'){t.skip('PowerShell Core unavailable on this host');return;}
+ assert.equal(probe.error,undefined,'PowerShell Core probe must run');
+ assert.equal(probe.status,0,'PowerShell Core probe failed: '+probe.stderr);
+ const literal=installer.replace(/'/g,"''");
+ const command=[
+  '$tokens=$null',
+  '$parseErrors=$null',
+  "[void][System.Management.Automation.Language.Parser]::ParseFile('"+literal+"',[ref]$tokens,[ref]$parseErrors)",
+  'if($parseErrors.Count -gt 0){$parseErrors|ForEach-Object{Write-Output $_.ToString()};exit 1}',
+  'exit 0'
+ ].join(';');
+ const parsed=spawnSync('pwsh',['-NoLogo','-NoProfile','-NonInteractive','-Command',command],
+  {encoding:'utf8',timeout:30000});
+ assert.equal(parsed.error,undefined,'PowerShell Core parser must be available after probe');
+ assert.equal(parsed.status,0,'PowerShell Core AST parse rejected Owner installer:\n'+parsed.stdout+'\n'+parsed.stderr);
+});
