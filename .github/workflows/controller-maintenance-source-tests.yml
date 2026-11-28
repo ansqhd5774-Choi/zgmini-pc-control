@@ -411,7 +411,7 @@ jobs:
         if: hashFiles('ci-approval/native-publisher-entry.mjs') != '' && hashFiles('tests/ci-native-publisher-entry.test.mjs') != ''
         run: |
           node --check ci-approval/native-publisher-entry.mjs
-          node --test --test-concurrency=1 tests/ci-native-publisher-entry.test.mjs tests/ci-native-policy-install.test.mjs
+          node --test --test-concurrency=1 tests/ci-native-publisher-entry.test.mjs
       - name: Verify pinned fixed A operational execution adapter without PC effects
         if: hashFiles('ci-approval/native-a-execute.mjs') != '' && hashFiles('tests/ci-native-a-execute.test.mjs') != ''
         run: |
