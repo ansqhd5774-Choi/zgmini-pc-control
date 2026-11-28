@@ -1,3 +1,4 @@
+import {inspectS64069ReconciliationReadonly} from './s6-journal-readonly.mjs';
 import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import {execFileSync,spawn,spawnSync} from 'node:child_process';import {TextDecoder} from 'node:util';import {need,digest,writeJson} from './common.mjs';
 import {waitForMemoryAdmission} from './memory-admission.mjs';
 import {inspectFearGreedArchive} from './fear-greed-archive-readonly.mjs';
@@ -307,6 +308,7 @@ export function nativeTaskXml(task){return execFileSync(path.join(process.env.Sy
 export async function runOperation(request,context){
  const {workspace,dataRoot,policy,host,queryTask=nativeTaskXml,retiredTaskEvidence=nativeRetiredIranEvidence}=context;
  if(request.operation==='controller-operating-audit-readonly')return inspectControllerOperatingAuditReadonly();
+ if(request.operation==='controller-s6-4069-journal-readonly')return inspectS64069ReconciliationReadonly();
  if(request.operation==='runner-smoke')return {status:'PASS',code:'RUNNER_COMMAND_EXECUTED',seat:context.seat,resource:{totalMiB:Math.floor(os.totalmem()/1048576),freeMiB:Math.floor(os.freemem()/1048576)},execution: 'CMD_TO_PINNED_NODE',providerCalls:0,d1Writes:0};
  if(request.operation==='core-status'){
   // Only the fixed engine's missing pre-snapshot activates this scope. The

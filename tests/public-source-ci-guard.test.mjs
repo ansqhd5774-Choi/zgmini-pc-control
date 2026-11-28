@@ -19,6 +19,8 @@ import '../sidecar-b/public-v3-independent-owner-b-once.test.mjs';
 // Exact approved Controller audit two-file B source-only regression.
 import './controller-audit-public-b-operator-once.test.mjs';
 import './controller-audit-lineage-public-b-operator-once.test.mjs';
+// Fixed S6 journal regression on GitHub-hosted source only; no Windows access.
+import './controller-s6-4069-public-a.test.mjs';
 
 const repo='ansqhd5774-Choi/zgmini-pc-control', id=1442936296;
 const owner='ansqhd5774-Choi', ownerId=327938088;

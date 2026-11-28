@@ -3837,3 +3837,4 @@ test('six-birth TXT result returns only age/stability counts, never original WMI
  assert.match(x,/orphanSixBirthEffectAuthorized=false/);
  assert.doesNotMatch(x,/88338|SUPER_SECRET|ORIGINAL_PRIVATE_NONCE/);
 });
+
