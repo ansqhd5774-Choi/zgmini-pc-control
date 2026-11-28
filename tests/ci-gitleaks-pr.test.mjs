@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {GITLEAKS_LINUX_SHA256,selectScanRelease,GITLEAKS_ZIP_SHA256,GITLEAKS_FINDINGS_EXIT_CODE,prCommitRange,requireExactSha256,requireGitleaksClean,summarizeRuleOnlyOutput} from '../tools/ci-gitleaks-pr.mjs';
+import {verifiedPublicMergeRange} from '../tools/public-ci-merge-tree.mjs';
 const base='a'.repeat(40),head='b'.repeat(40);
 test('validate exact PR base/head with no ambiguous ref',()=>{
  assert.deepEqual(prCommitRange({pull_request:{base:{sha:base},head:{sha:head}}},head),
@@ -55,4 +56,15 @@ test('Linux Gitleaks release requires exact Public hosted owner PR and pinned x6
  }
  assert.throws(()=>selectScanRelease(env,event,'win32','x64'),/GITLEAKS_ISOLATED_EVENT_REQUIRED/);
  assert.equal(selectScanRelease({RUNNER_OS:'Windows'},null,'win32','x64').sha256,GITLEAKS_ZIP_SHA256);
+});
+
+ test('Public merge checkout binds both event parents and preserves original PR commit range',()=>{
+ const repo='ansqhd5774-Choi/zgmini-pc-control',id=1442936296,owner='ansqhd5774-Choi',ownerId=327938088,merge='c'.repeat(40);
+ const env={GITHUB_EVENT_NAME:'pull_request',GITHUB_REPOSITORY:repo,RUNNER_ENVIRONMENT:'github-hosted',GITHUB_SHA:merge};
+ const event={action:'opened',number:42,repository:{id,full_name:repo,private:false,visibility:'public',owner:{id:ownerId,login:owner}},pull_request:{number:42,user:{id:ownerId,login:owner},head:{sha:head,repo:{id,full_name:repo}},base:{ref:'main',sha:base,repo:{id,full_name:repo}}}};
+ const git=(actual,parents)=>args=>args[0]==='rev-parse'?actual:parents;
+ assert.deepEqual(verifiedPublicMergeRange(event,env,git(merge,[merge,base,head].join(' '))),{base,head});
+ for(const [actual,parents] of [[head,[head,base].join(' ')],[merge,[merge,head,base].join(' ')],[merge,[merge,base,'d'.repeat(40)].join(' ')],[merge,[merge,base,head,'e'.repeat(40)].join(' ')]])
+  assert.throws(()=>verifiedPublicMergeRange(event,env,git(actual,parents)),/PUBLIC_CI_MERGE_TREE_MISMATCH/);
+ assert.throws(()=>verifiedPublicMergeRange(event,{...env,RUNNER_ENVIRONMENT:'self-hosted'},git(merge,[merge,base,head].join(' '))),/PUBLIC_CI_MERGE_ORIGIN_UNTRUSTED/);
 });

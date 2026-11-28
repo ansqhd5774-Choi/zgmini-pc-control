@@ -6,6 +6,7 @@ import {fileURLToPath} from 'node:url';
 import crypto from 'node:crypto';
 import {execFileSync,spawnSync} from 'node:child_process';
 import {assessPublicSourceCi} from './public-source-ci-guard.mjs';
+import {verifiedPublicMergeRange} from './public-ci-merge-tree.mjs';
 
 export const GITLEAKS_VERSION='8.30.1';
 export const GITLEAKS_ZIP_SHA256='d29144deff3a68aa93ced33dddf84b7fdc26070add4aa0f4513094c8332afc4e';
@@ -70,7 +71,9 @@ export function scanPr(){
   const release=selectScanRelease(process.env,event);
   const git=args=>execFileSync('git',args,{encoding:'utf8',windowsHide:true}).trim();
   const head=git(['rev-parse','HEAD']);
-  const range=prCommitRange(event,head);
+  const range=release.archive==='gitleaks.tar.gz'
+    ?verifiedPublicMergeRange(event,process.env,git)
+    :prCommitRange(event,head);
   git(['cat-file','-e',range.base+'^{commit}']);
   const folder=fs.mkdtempSync(path.join(process.env.RUNNER_TEMP,'zgmini-gitleaks-'));
   try{
