@@ -159,7 +159,7 @@ const json=file=>JSON.parse(fs.readFileSync(file,'utf8'));
 const writeJson=(file,data)=>{fs.mkdirSync(path.dirname(file),{recursive:true});const tmp=file+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,JSON.stringify(data,null,2)+'\n',{flag:'wx'});fs.renameSync(tmp,file);};
 const git=(args,options={})=>execFileSync('git',args,{cwd:checkout,encoding:Object.hasOwn(options,'encoding')?options.encoding:'utf8',windowsHide:true,timeout:120000,maxBuffer:8e6});
 const github=(route,method='GET',input)=>{
- const args=['api',`repos/${controlRepository}/${route}`,'--method',method];
+ const args=['api',`repos/${controlRepository}${route?'/'+route:''}`,'--method',method];
  if(input)args.push('--input',input);
  const out=execFileSync(gh,args,{encoding:'utf8',windowsHide:true,timeout:60000,maxBuffer:4e6});
  return out.trim()?JSON.parse(out):{};
@@ -2596,6 +2596,9 @@ function replayR6Backlog(requestId,backlogFile){
  need(ledger.pauseAttempted===true&&windows[0].pausedAt===ledger.pauseStartedAt,
   'R6_HOST_BACKLOG_START_DRIFT');
  need(windows.length>0&&windows.every(w=>w.resumedAt),'R6_HOST_BACKLOG_WINDOW_UNCLOSED');
+ // Public uses the same fixed A-only replay contract as ordinary maintenance.
+ if(backlogRepoVisibility(github)==='public')
+  return reconcileMaintenanceBacklog({backlogFile,requestId});
  const candidates=new Map();
  for(const window of windows){
   const from=Date.parse(window.pausedAt)-2000,to=Date.parse(window.resumedAt);
@@ -3537,13 +3540,152 @@ export async function readS6OncePhaseReadback({phase,baseline,
  * installs and S6 after the unique standby promotion. A POSTING marker is
  * durable before the GitHub POST; an uncertain result never retries.
  * Injection is for isolated source tests, not a new operational command. */
+export function backlogRepoVisibility(callGithub){
+ const repo=callGithub('');
+ need(repo?.id===1442936296&&repo?.full_name===controlRepository&&
+  repo?.owner?.id===327938088&&repo?.owner?.login==='ansqhd5774-Choi'&&
+  typeof repo.private==='boolean','BACKLOG_REPOSITORY_IDENTITY_UNVERIFIED');
+ return repo.private?'private':'public';
+}
+function readPublicBacklogPolicy(){
+ const host=json(hostPath),rel='config/operations.json';
+ const file=path.join(controlRoot,rel),stat=fs.lstatSync(file);
+ need(stat.isFile()&&!stat.isSymbolicLink()&&stat.nlink===1&&stat.size>0&&stat.size<=1048576,
+  'BACKLOG_PUBLIC_POLICY_UNVERIFIED');
+ const bytes=fs.readFileSync(file);
+ need(bytes.length===stat.size&&prevalidationInventory(host)!==null&&
+  sha256(bytes)===host.controllerFiles[rel],'BACKLOG_PUBLIC_POLICY_UNVERIFIED');
+ return JSON.parse(bytes.toString('utf8'));
+}
+function exactPublicReplayIssue(row,original){
+ return Number.isSafeInteger(row?.number)&&row.number>original.number&&
+  row.title==='pc-job'&&row.body===original.body&&!row.pull_request&&
+  row.user?.id===327938088&&row.user?.login==='ansqhd5774-Choi'&&
+  row.labels?.some(x=>x.name==='pc-job')&&Number.isFinite(Date.parse(row.created_at));
+}
+function publicReplayHistory(callGithub,original,requestId){
+ // No indexed search absence assumption; exhaust the bounded issue listing.
+ // If the repository grows beyond the bound, refuse rather than post twice.
+ const matches=new Map();
+ for(let page=1;page<=100;page++){
+  const rows=callGithub('issues?state=all&sort=created&direction=asc&per_page=100&page='+page);
+  need(Array.isArray(rows),'BACKLOG_PUBLIC_HISTORY_UNVERIFIED');
+  for(const row of rows){
+   if(row?.pull_request||typeof row?.body!=='string')continue;
+   let body;try{body=JSON.parse(row.body);}catch{continue;}
+   if(body?.schema==='ZGMINI_PC_JOB_V1'&&body.requestId===requestId){
+    need(Number.isSafeInteger(row.number)&&!matches.has(row.number),
+     'BACKLOG_PUBLIC_HISTORY_UNVERIFIED');
+    matches.set(row.number,row);
+   }
+  }
+  if(rows.length<100){
+   const found=matches.get(original.number);
+   need(found?.body===original.body&&found?.title===original.title&&
+    found?.state===original.state&&found?.user?.id===327938088&&
+    found?.labels?.some(x=>x.name==='pc-job'),'BACKLOG_PUBLIC_ORIGINAL_DRIFT');
+   matches.delete(original.number);
+   return [...matches.values()];
+  }
+ }
+ need(false,'BACKLOG_PUBLIC_HISTORY_TRUNCATED');
+}
+// Only within the existing approved maintenance transaction. Never grants
+// B authority or authorizes a historical S6 retry. DONE is dispatch only.
+// Match the existing compact Public hosted review envelope before any POST.
+ // No dependency on unverified local Controller modules during recovery.
+export function validPublicBacklogEnvelope(text,body,policy){
+ const fields=['schema','requestId','chatId','operation','sourceRepository','sourceBranch','sourceSha'];
+ return typeof text==='string'&&Buffer.byteLength(text,'utf8')<=16384&&
+  body!==null&&typeof body==='object'&&!Array.isArray(body)&&
+  text===JSON.stringify(body)&&Object.keys(body).length===fields.length&&
+  fields.every(k=>Object.hasOwn(body,k))&&body.schema==='ZGMINI_PC_JOB_V1'&&
+  /^pc-[a-z0-9][a-z0-9-]{7,75}$/.test(body.requestId??'')&&
+  !body.requestId.endsWith('-postcheck')&&
+  /^chat-[a-z0-9][a-z0-9-]{3,58}$/.test(body.chatId??'')&&
+  /^[a-z0-9-]{3,80}$/.test(body.operation??'')&&
+  body.sourceRepository==='ansqhd5774-Choi/zgmini'&&body.sourceBranch==='main'&&
+  /^[a-f0-9]{40}$/.test(body.sourceSha??'')&&
+  policy?.schema==='ZGMINI_PC_OPERATIONS_V1'&&
+  policy.controlRepository===controlRepository&&
+  policy.sourceRepository===body.sourceRepository&&
+  policy.mutationsEnabled===false&&policy.maxAutomaticRetries===0&&
+  policy.operations!==null&&typeof policy.operations==='object'&&!Array.isArray(policy.operations);
+}
+function reconcilePublicBacklogOriginal({original,state,backlogFile,requestId,
+ callGithub,approvedRoot,readPublicPolicy,clock}){
+ const key=String(original.number),prior=state.replays[key];
+ const decision=classifyBacklogOriginal(original.body);
+ need(decision.valid&&original.title==='pc-job'&&original.state==='open'&&
+  original.user?.id===327938088&&!decision.body.requestId.endsWith('-postcheck'),
+  'BACKLOG_PUBLIC_ORIGINAL_NOT_FIXED_A');
+ const body=decision.body,policy=readPublicPolicy();
+ need(validPublicBacklogEnvelope(original.body,body,policy),'BACKLOG_PUBLIC_ENVELOPE_UNVERIFIED');
+ need(Object.hasOwn(policy.operations,body.operation)&&
+  policy.operations[body.operation]?.grade==='A','BACKLOG_PUBLIC_GRADE_A_UNVERIFIED');
+ const matches=publicReplayHistory(callGithub,original,body.requestId);
+ const exact=row=>exactPublicReplayIssue(row,original)&&
+  Date.parse(row.created_at)>=Date.parse(state.replays[key].postingAt)-2000;
+ const done=number=>{
+  state.replays[key]={...state.replays[key],status:'DONE',replayIssueNumber:number};
+  writeJson(backlogFile,state);
+ };
+ if(prior){
+  need(prior.status==='POSTING'&&prior.publicReplay===true&&
+   prior.originalRequestId===body.requestId&&
+   prior.originalBodySha256===decision.originalBodySha256&&
+   Number.isFinite(Date.parse(prior.postingAt))&&matches.length===1&&exact(matches[0]),
+   'BACKLOG_PUBLIC_REPLAY_OUTCOME_UNKNOWN');
+  const actual=callGithub('issues/'+matches[0].number);
+  need(actual?.number===matches[0].number&&exact(actual),'BACKLOG_PUBLIC_REPLAY_READBACK_UNVERIFIED');
+  done(actual.number);
+  return;
+ }
+ // A previous replay can itself appear in a later pause window. A duplicate
+ // identity without our own durable POSTING marker is never reposted.
+ need(matches.length===0,'BACKLOG_PUBLIC_DUPLICATE_REQUEST_UNVERIFIED');
+ // A previously completed original must not be replayed from an old listing.
+ const fresh=callGithub('issues/'+original.number);
+ need(fresh?.number===original.number&&fresh.state==='open'&&
+  fresh.title===original.title&&fresh.body===original.body&&!fresh.pull_request&&
+  fresh.user?.id===327938088&&fresh.user?.login==='ansqhd5774-Choi'&&
+  fresh.labels?.some(x=>x.name==='pc-job'),'BACKLOG_PUBLIC_ORIGINAL_DRIFT');
+ const finalComments=readAllMaintenancePages(page=>callGithub(`issues/${original.number}/comments?per_page=100&page=${page}`));
+ if(finalComments.some(c=>c.user?.login==='github-actions[bot]'&&c.body?.includes('zgmini-pc-result:'))){
+  state.replays[key]={status:'SKIPPED_RESULT_PRESENT'};writeJson(backlogFile,state);return;
+ }
+ need(backlogRepoVisibility(callGithub)==='public','BACKLOG_PUBLIC_VISIBILITY_CHANGED');
+ const postingAt=new Date(clock()).toISOString();
+ state.replays[key]={status:'POSTING',publicReplay:true,originalRequestId:body.requestId,
+  originalBodySha256:decision.originalBodySha256,postingAt};
+ writeJson(backlogFile,state);
+ const input=path.join(approvedRoot,requestId+'.replay-'+original.number+'.json');
+ writeJson(input,{title:'pc-job',body:original.body,labels:['pc-job']});
+ let posted;
+ try{posted=callGithub('issues','POST',input);}
+ catch{need(false,'BACKLOG_PUBLIC_REPLAY_OUTCOME_UNKNOWN');}
+ need(Number.isSafeInteger(posted?.number)&&posted.number>original.number,
+  'BACKLOG_PUBLIC_REPLAY_OUTCOME_UNKNOWN');
+ const actual=callGithub('issues/'+posted.number);
+ need(actual?.number===posted.number&&exact(actual),'BACKLOG_PUBLIC_REPLAY_READBACK_UNVERIFIED');
+ done(actual.number);
+ const notification=`<!-- zgmini-pc-backlog-replay:${requestId}:${original.number} -->\n`+
+  `Verified exact dispatch: #${actual.number}. Verify actual PC result separately.`;
+ const commentFile=path.join(approvedRoot,requestId+'.replay-comment-'+original.number+'.json');
+ writeJson(commentFile,{body:notification});
+ try{callGithub(`issues/${original.number}/comments`,'POST',commentFile);}catch{/* durable ledger */}
+}
+
 export function reconcileMaintenanceBacklog({backlogFile,requestId,
- callGithub=github,approvedRoot=path.join(maintenanceRoot,'approved')}={}){
+ callGithub=github,approvedRoot=path.join(maintenanceRoot,'approved'),
+ readPublicPolicy=readPublicBacklogPolicy,clock=Date.now}={}){
  safeId(requestId);
  need(typeof backlogFile==='string'&&path.isAbsolute(backlogFile),
   'BACKLOG_FILE_ABSOLUTE_REQUIRED');
    need(fs.existsSync(backlogFile),'BACKLOG_STATE_MISSING');
    let state=json(backlogFile);
+   need(state?.requestId===requestId&&state.replays!==null&&typeof state.replays==='object'&&
+    !Array.isArray(state.replays),'BACKLOG_REQUEST_OR_LEDGER_DRIFT');
    const windows=backlogPauseWindows(state);
    need(windows.every(w=>w.resumedAt),'BACKLOG_WINDOW_NOT_CLOSED');
    // A workflow disabled on an Issue `opened` event does not replay it when
@@ -3562,6 +3704,7 @@ export function reconcileMaintenanceBacklog({backlogFile,requestId,
        need(page<20,'BACKLOG_LIST_TRUNCATED');
      }
    }
+   let visibility;
    for(const original of [...candidates.values()].sort((a,b)=>a.number-b.number)){
      const key=String(original.number);
      if(state.replays[key]?.status==='DONE'||state.replays[key]?.status==='SKIPPED_RESULT_PRESENT')continue;
@@ -3569,6 +3712,11 @@ export function reconcileMaintenanceBacklog({backlogFile,requestId,
        const rejected=classifyBacklogOriginal(original.body);
        need(!rejected.valid&&rejected.originalBodySha256===state.replays[key].originalBodySha256,
         'BACKLOG_REJECTED_ORIGINAL_CHANGED');continue;
+     }
+     visibility??=backlogRepoVisibility(callGithub);
+     if(visibility==='public'&&state.replays[key]){
+      reconcilePublicBacklogOriginal({original,state,backlogFile,requestId,callGithub,approvedRoot,readPublicPolicy,clock});
+      continue;
      }
      if(state.replays[key])throw Object.assign(Error('BACKLOG_REPLAY_OUTCOME_UNKNOWN'),{code:'BACKLOG_REPLAY_OUTCOME_UNKNOWN'});
      const comments=readAllMaintenancePages(page=>callGithub(`issues/${original.number}/comments?per_page=100&page=${page}`));
@@ -3580,6 +3728,10 @@ export function reconcileMaintenanceBacklog({backlogFile,requestId,
        state.replays[key]={status:'REJECTED_INVALID_ORIGINAL',reason:decision.code,
         originalBodySha256:decision.originalBodySha256,replayed:false};
        writeJson(backlogFile,state);continue;
+     }
+     if(visibility==='public'){
+      reconcilePublicBacklogOriginal({original,state,backlogFile,requestId,callGithub,approvedRoot,readPublicPolicy,clock});
+      continue;
      }
      const body=decision.body;
      const marker=`Maintenance replay ${requestId} original #${original.number}`;

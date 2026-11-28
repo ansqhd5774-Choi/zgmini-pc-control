@@ -2155,3 +2155,97 @@ import '../writer-b/report-rejection.test.mjs';
   assert.equal(projectWmiObservation('arbitrary sensitive value',false).referenceClassification,'UNVERIFIED');
   if(process.platform!=='win32')await assert.rejects(main(),/S6_LOCAL_INDEPENDENT_WINDOWS_REQUIRED/);
  });
+
+
+// Public backlog transport: isolated temporary fixture only; no PC or GitHub IO.
+test('Public common replay uses exact A title, verifies readback and never reposts an uncertain effect',async t=>{
+ const {reconcileMaintenanceBacklog}=await import('../tools/update.mjs');
+ const fs=await import('node:fs'),os=await import('node:os'),path=await import('node:path');
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-public-backlog-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const owner={id:327938088,login:'ansqhd5774-Choi'};
+ const repo={id:1442936296,full_name:'ansqhd5774-Choi/zgmini-pc-control',owner,private:false};
+ const requestId='pc-s6-fixture-12345678',now=Date.parse('2026-11-28T01:00:00Z');
+ const original={number:77,title:'pc-job',state:'open',user:owner,
+  labels:[{name:'pc-job'}],created_at:'2026-11-28T00:00:30Z',
+  body:JSON.stringify({schema:'ZGMINI_PC_JOB_V1',requestId:'pc-fixture-readonly-12345678',
+   chatId:'chat-fixture',operation:'core-status',sourceRepository:'ansqhd5774-Choi/zgmini',
+   sourceBranch:'main',sourceSha:'a'.repeat(40)})};
+ const runFixture=(mode)=>{
+  const dir=path.join(root,mode);fs.mkdirSync(dir);
+  const backlogFile=path.join(dir,'backlog.json');
+  fs.writeFileSync(backlogFile,JSON.stringify({schema:'ZGMINI_PC_BACKLOG_V1',requestId,
+   windows:[{pausedAt:'2026-11-28T00:00:00Z',resumedAt:'2026-11-28T00:01:00Z'}],replays:{}}));
+  let posts=0,posted=null,repoReads=0,commentReads=0;
+  const candidate=structuredClone(original);
+  const body=JSON.parse(candidate.body);
+  if(mode==='bad-chat')body.chatId='x';
+  if(mode==='bad-branch')body.sourceBranch='other';
+  if(mode==='bad-source')body.sourceRepository='other/repo';
+  if(mode==='bad-sha')body.sourceSha='wrong';
+  if(mode==='bad-extra')body.pit04Offset=1;
+  if(mode==='bad-id')body.requestId='abcdefghijk';
+  candidate.body=mode==='noncompact'?JSON.stringify(body,null,2):JSON.stringify(body);
+  const row={...candidate,number:78,created_at:new Date(now).toISOString()};
+  const callGithub=(route,method='GET',input)=>{
+   if(route===''){repoReads++;return mode==='bad-repo'?{...repo,id:0}:
+    mode==='visibility-drift'&&repoReads>1?{...repo,private:true}:repo;}
+   if(route.startsWith('issues?state=all&since='))return [candidate];
+   if(route.startsWith('issues?state=all&sort=')){
+    if(mode==='duplicate')return [candidate,row];
+    if(mode==='truncated')return Array.from({length:100},(_,i)=>({number:i+1000,body:'not json'}));
+    return posted?[candidate,posted]:[candidate];
+   }
+   if(route==='issues/77')return mode==='closed-original'?{...candidate,state:'closed'}:candidate;
+   if(route==='issues/77/comments?per_page=100&page=1'){
+    commentReads++;return mode==='late-result'&&commentReads>1?
+     [{user:{login:'github-actions[bot]'},body:'zgmini-pc-result:'}]:[];
+   }
+   if(route==='issues/77/comments'&&method==='POST')return {id:1};
+   if(route==='issues'&&method==='POST'){
+    posts++;
+    assert.deepEqual(JSON.parse(fs.readFileSync(input,'utf8')),
+     {title:'pc-job',body:candidate.body,labels:['pc-job']});
+    if(mode!=='lost-no-post')posted=row;
+    if(mode.startsWith('lost'))throw Error('UNCERTAIN');
+    return {number:78};
+   }
+   if(route==='issues/78')return mode==='bad-readback'?{...row,body:'other'}:posted;
+   throw Error('UNEXPECTED_FIXTURE_ROUTE '+route);
+  };
+  return {args:{backlogFile,requestId,approvedRoot:dir,callGithub,
+   readPublicPolicy:()=>({schema:'ZGMINI_PC_OPERATIONS_V1',controlRepository:repo.full_name,
+    sourceRepository:'ansqhd5774-Choi/zgmini',mutationsEnabled:mode==='bad-policy',
+    maxAutomaticRetries:0,operations:{'core-status':{grade:mode==='grade-b'?'B':'A'}}}),
+   clock:()=>now},posts:()=>posts,ledger:()=>JSON.parse(fs.readFileSync(backlogFile,'utf8')).replays['77']};
+ };
+ const success=runFixture('success');reconcileMaintenanceBacklog(success.args);
+ assert.equal(success.posts(),1);assert.equal(success.ledger().status,'DONE');
+ reconcileMaintenanceBacklog(success.args);assert.equal(success.posts(),1);
+ const lost=runFixture('lost-ack');
+ assert.throws(()=>reconcileMaintenanceBacklog(lost.args),/BACKLOG_PUBLIC_REPLAY_OUTCOME_UNKNOWN/);
+ assert.equal(lost.ledger().status,'POSTING');reconcileMaintenanceBacklog(lost.args);
+ assert.equal(lost.posts(),1);assert.equal(lost.ledger().status,'DONE');
+ const absent=runFixture('lost-no-post');
+ for(let i=0;i<2;i++)assert.throws(()=>reconcileMaintenanceBacklog(absent.args),/BACKLOG_PUBLIC_REPLAY_OUTCOME_UNKNOWN/);
+ assert.equal(absent.posts(),1);assert.equal(absent.ledger().status,'POSTING');
+ const bad=runFixture('bad-readback');
+ assert.throws(()=>reconcileMaintenanceBacklog(bad.args),/BACKLOG_PUBLIC_REPLAY_READBACK_UNVERIFIED/);
+ assert.equal(bad.ledger().status,'POSTING');
+ for(const [mode,error] of [['grade-b','BACKLOG_PUBLIC_GRADE_A_UNVERIFIED'],
+  ['duplicate','BACKLOG_PUBLIC_DUPLICATE_REQUEST_UNVERIFIED'],
+  ['bad-repo','BACKLOG_REPOSITORY_IDENTITY_UNVERIFIED'],
+  ['truncated','BACKLOG_PUBLIC_HISTORY_TRUNCATED'],
+  ['bad-chat','BACKLOG_PUBLIC_ENVELOPE_UNVERIFIED'],['bad-branch','BACKLOG_PUBLIC_ENVELOPE_UNVERIFIED'],
+  ['bad-source','BACKLOG_PUBLIC_ENVELOPE_UNVERIFIED'],['bad-sha','BACKLOG_PUBLIC_ENVELOPE_UNVERIFIED'],
+  ['bad-id','BACKLOG_PUBLIC_ENVELOPE_UNVERIFIED'],['noncompact','BACKLOG_PUBLIC_ENVELOPE_UNVERIFIED'],
+  ['bad-policy','BACKLOG_PUBLIC_ENVELOPE_UNVERIFIED'],
+  ['closed-original','BACKLOG_PUBLIC_ORIGINAL_DRIFT'],['visibility-drift','BACKLOG_PUBLIC_VISIBILITY_CHANGED']]){
+  const f=runFixture(mode);assert.throws(()=>reconcileMaintenanceBacklog(f.args),new RegExp(error));
+  assert.equal(f.posts(),0);assert.equal(f.ledger(),undefined);
+ }
+ const extra=runFixture('bad-extra');reconcileMaintenanceBacklog(extra.args);
+ assert.equal(extra.posts(),0);assert.equal(extra.ledger().status,'REJECTED_INVALID_ORIGINAL');
+ const late=runFixture('late-result');reconcileMaintenanceBacklog(late.args);
+ assert.equal(late.posts(),0);assert.equal(late.ledger().status,'SKIPPED_RESULT_PRESENT');
+});
