@@ -2,7 +2,8 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import fs from 'node:fs';
-import {authorizeWriterBNative,assertAuthenticatedWriterBIssue}
+import {authorizeWriterBNative,assertAuthenticatedWriterBIssue,
+ validateWriterBRequestManifest,ISSUE_LABEL}
  from '../writer-b/contract.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
@@ -126,4 +127,39 @@ test('public Writer B seal remains bound to exact independent execution opt-in',
  wrong.scope.policy.installedControllerSha='not-a-sha';
  wrong.env.ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED='true';
  assert.throws(()=>authorizeWriterBNative(wrong),{code:'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP'});
+});
+
+test('#4135 paid MarketParquet four-file manifest is exact native B scope, never an execution grant',()=>{
+ // Historical request reconstructed for source-only validation, not replayed.
+ const p='approvals/writer-updates/us-breadth-paid-r2-guarded-fourfile-natural-idle-20261127.json';
+ const bytes=fs.readFileSync(new URL('../'+p,import.meta.url));
+ const digest='c4f58408f4360f7d03b9c359cda78ce4602c447d86ff15ad538cdb57d820acda';
+ assert.equal(hash(bytes),digest);
+ const original={schema:'ZGMINI_PC_WRITER_SOURCE_B_REQUEST_V1',
+  requestId:'d1e33802-9e86-4b4b-ae20-6cfdb0c2c2b8',
+  chatId:'a67cd0f6-508a-4a73-87e3-88174bd8e52e',
+  operation:'pc-writer-source-install',controlRepository:REPO,
+  approvalManifestPath:p,approvalManifestSha256:digest};
+ const input={body:JSON.stringify(original),
+  labels:[{name:ISSUE_LABEL}],manifestBytes:bytes};
+ const {request,manifest}=validateWriterBRequestManifest(input);
+ assert.equal(request.approvalManifestPath,p);
+ assert.equal(request.requestId,original.requestId);
+ assert.equal(Object.hasOwn(manifest,'coreMaintenance'),false);
+ assert.equal(manifest.runCount,1);
+ assert.deepEqual(manifest.files.map(f=>f.path),[
+  'scripts/pc-writer/local-cycle.mjs',
+  'scripts/pc-writer/marketparquet-paid-store.mjs',
+  'scripts/pc-writer/us-breadth-paid-r2-cycle.mjs',
+  'scripts/pc-writer/us-breadth-paid-r2-stored.mjs'
+ ]);
+ for(const key of ['allowProviderCalls','allowDbChanges','allowD1Writes',
+  'allowTaskDefinitionChanges','allowOtherSourceChanges'])
+  assert.equal(manifest[key],false,key);
+ const mutated={...original,approvalManifestSha256:'0'.repeat(64)};
+ assert.throws(()=>validateWriterBRequestManifest({...input,body:JSON.stringify(mutated)}),
+  {code:'WRITER_B_MANIFEST_HASH_STOP'});
+ const noLabel={...input,labels:[]};
+ assert.throws(()=>validateWriterBRequestManifest(noLabel),
+  {code:'WRITER_B_ISSUE_AUTH_STOP'});
 });
