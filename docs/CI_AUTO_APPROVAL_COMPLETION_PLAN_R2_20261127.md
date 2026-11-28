@@ -1089,3 +1089,8 @@
 - [Draft PR #4325](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4325), exact HEAD `8c5323bd7d68da6e2e6ac60e0b5edd16ed6f66fa`, 3파일 (+32/-3) 변경. 누락, 다른 요청/승인, forged optional scope field, 불일치 optional scope field의 5개 회귀 추가. 기존 hosted source suite에서 해당 시험을 import하므로 Workflow blob/권한은 변경하지 않는다.
 - [Run 46090349868](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/46090349868) public-source-only Job 140809551195: 최초 조회 in_progress, private source-only skipped. C996/Secret Scan skipped. 최종 CI와 원본 로그는 종료 후 exact HEAD로 판정. 아직 merge/install/운영 실행 0. Adapter SHA가 변경되므로 설치 정책의 기존 pin은 배포 전 정확히 재검토한다.
 - 다음: #4325 최종 CI 확인 후 승인 범위의 소스 통합 여부 판단. 이후 Public용 독립 source-run/installed grant의 기존 수신·발행 연계 후보를 검증한다. Private gate·운영 권한·설정·DB/D1·예약 변경 없음. 무인 종단 0/3, P0 완료(1/7) 유지.
+
+### #4325 최종 CI 및 소스 통합
+- exact HEAD 8c5323bd의 [Run 46090349868](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/46090349868), public-source-only Job 140809551195 **SUCCESS**. 원본 로그의 신규 effect binding 5/5 (ok 27~31) 및 관련 suite **74/74 PASS, 0 FAIL**. Private Windows source-only/C996/Secret Scan은 SKIPPED로 구분.
+- main에 추가된 #4324 (adfd7f95)는 S6 journal/test 2파일이며 본 PR 3파일과 비중복임을 직접 확인. exact HEAD CI, mergeable 확인 후 #4325 squash merge `d9114b2156f6415930dc1f5e439bd5cb613622b2`. 실제 main의 변경 3개 blob 모두 일치, 기존 public source CI Workflow blob a8f49337 유지. #4324 포함 신규 통합 HEAD에서 별도 CI를 수행했다는 주장은 하지 않는다.
+- 기존 Public 저장소에서 native 실행 Workflow는 여전히 Private 전용 조건. 운영 자동 발행/실행/설치 0, 권한·정책 활성화·PC 변경 없음. Adapter hash pin 재검토 필요. P3의 선행 실행기 결함 수정 완료, P3 자체는 미완료. 다음: Public A의 독립 승인/영수증 인증 후보 연계, Writer B 독립 경계 병행. 전체 무인 종단 0/3 유지.
