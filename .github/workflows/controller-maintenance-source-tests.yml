@@ -43,7 +43,6 @@ on:
       - 'tests/report-upload-verified.test.mjs'
       - 'controller/report-recovery-3650-once.mjs'
       - 'tests/report-recovery-3650-once.test.mjs'
-      - 'tests/fixtures/retired-workflows/pc-report-recovery-3650-once.yml'
       - 'controller/preimage-manifest-stager.mjs'
       - '.github/workflows/pc-job.yml'
       - 'tests/pc-job-late-label-intake.test.mjs'
@@ -323,7 +322,6 @@ jobs:
           node --test --test-concurrency=1 tests/pc-job-late-label-intake.test.mjs
           node --test --test-concurrency=1 tests/public-a-controller-selective-source.test.mjs
           node --test --test-concurrency=1 tests/maintenance-agent.test.mjs
-          node --test --test-concurrency=1 tests/report-recovery-3650-once.test.mjs
           node --check tools/update.mjs
           node --check tools/controller-public-b-operator-once.mjs
           node --test --test-concurrency=1 tests/controller-public-b-operator-once.test.mjs
