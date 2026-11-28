@@ -219,7 +219,7 @@ try{
   foreach($file in @($newScope,$oldScope,$oldObservation)){
    $item=Get-Item -LiteralPath $file -Force
    if($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
-      $item.Length -lt 2 -or $item.Length -gt 131072 -or $item.LinkType){
+      $item.Length -lt 2 -or $item.Length -gt 131072){
     Stop-N 'NATIVE_POLICY_TRANSITION_FILE_DRIFT_STOP'
    }
    [void](Exact-Acl $file (New-PolicyFileAcl))
@@ -238,7 +238,7 @@ try{
    $newObservation=[IO.Path]::Combine($root,'installation-observation.json')
    $item=Get-Item -LiteralPath $newObservation -Force
    if($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
-      $item.Length -lt 2 -or $item.Length -gt 131072 -or $item.LinkType){
+      $item.Length -lt 2 -or $item.Length -gt 131072){
     Stop-N 'NATIVE_POLICY_TRANSITION_NEW_OBSERVATION_DRIFT_STOP'
    }
    [void](Exact-Acl $newObservation (New-PolicyFileAcl))
