@@ -259,11 +259,17 @@ export async function readAuthenticatedPublicBPublisherSourceAncestry({
  try{
   const checkedOut=await readCheckoutSha();
   if(!sha(checkedOut))fail();
-  const comparison=await getJson('compare/'+checkedOut+'...'+env.GITHUB_WORKFLOW_SHA);
+  // The compare API has no head_commit property. Authenticate the requested
+  // immutable head using the commit endpoint; compare proves its ancestry.
+  // Do not depend on the last commits[] entry (the list may be paginated).
+  const [comparison,head]=await Promise.all([
+   getJson('compare/'+checkedOut+'...'+env.GITHUB_WORKFLOW_SHA),
+   getJson('commits/'+env.GITHUB_WORKFLOW_SHA)
+  ]);
   if(!['ahead','identical'].includes(comparison?.status)||
      comparison.behind_by!==0||
      comparison.base_commit?.sha!==checkedOut||
-     comparison.head_commit?.sha!==env.GITHUB_WORKFLOW_SHA||
+     head?.sha!==env.GITHUB_WORKFLOW_SHA||
      comparison.merge_base_commit?.sha!==checkedOut)fail();
   return Object.freeze({sourceSha:checkedOut,mainSha:env.GITHUB_WORKFLOW_SHA});
  }catch{fail()}

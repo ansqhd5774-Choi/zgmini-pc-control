@@ -1430,7 +1430,7 @@ test('new Public B submission branch is separately opt-in and bound to installed
  assert.match(section,/name: Checkout existing Private B source pin\s+if: github\.event\.repository\.private == true/);
  assert.match(section,/ref: cfe57f3d720219613c87eff21338de0d35edbf6b/);
  assert.match(section,/name: Checkout separately approved Public B candidate source pin\s+if: github\.event\.repository\.private == false/);
- assert.match(section,/ref: 147a6613f6b2a9e89787d493e26a971aeb870831/);
+ assert.match(section,/ref: d8b8090d80fc09f4462ae5d5c17d5244d7159cc3/);
  assert.match(section,/runs-on: \[self-hosted, Windows, X64, zgmini-handoff-ci-isolated\]/);
  assert.match(section,/persist-credentials: false/);
  assert.match(section,/run: node ci-approval\/completed-run-intake\.mjs --publish-existing/);
@@ -1649,22 +1649,24 @@ test('Public B publisher requires exact checked-out source to be ancestor of aut
  let reads=0,compares=0;
  const getJson=async route=>{
   reads++;
+  if(route==='commits/'+main)return {sha:main};
   assert.equal(route,'compare/'+source+'...'+main);
   compares++;
   return {status:'ahead',behind_by:0,
-   base_commit:{sha:source},head_commit:{sha:main},
+   base_commit:{sha:source},
    merge_base_commit:{sha:source}};
  };
  const accepted=await readAuthenticatedPublicBPublisherSourceAncestry({
   env,getJson,readCheckoutSha:async()=>source});
  assert.deepEqual(accepted,{sourceSha:source,mainSha:main});
  assert.equal(Object.isFrozen(accepted),true);
- assert.equal(reads,1);
+ assert.equal(reads,2);
  const identical=await readAuthenticatedPublicBPublisherSourceAncestry({
   env,getJson:async route=>{
+   if(route==='commits/'+main)return {sha:main};
    assert.equal(route,'compare/'+main+'...'+main);
    return {status:'identical',behind_by:0,
-    base_commit:{sha:main},head_commit:{sha:main},
+    base_commit:{sha:main},
     merge_base_commit:{sha:main}};
   },readCheckoutSha:()=>main});
  assert.equal(identical.sourceSha,main);
@@ -1677,13 +1679,14 @@ test('Public B publisher requires exact checked-out source to be ancestor of aut
   {name:'main moved backwards from source',data:{status:'behind',
    behind_by:2,base_commit:{sha:source},head_commit:{sha:main},
    merge_base_commit:{sha:main}}},
-  {name:'forged API head',data:{status:'ahead',behind_by:0,
+  {name:'forged API head',headSha:'c'.repeat(40),data:{status:'ahead',behind_by:0,
    base_commit:{sha:source},head_commit:{sha:'c'.repeat(40)},
    merge_base_commit:{sha:source}}},
   {name:'missing compare readback',data:null}
  ]){
   await assert.rejects(()=>readAuthenticatedPublicBPublisherSourceAncestry({
-   env,readCheckoutSha:()=>source,getJson:async()=>failure.data}),
+   env,readCheckoutSha:()=>source,getJson:async route=>route==='commits/'+main?
+    {sha:failure.headSha??main}:failure.data}),
    /CI_PUBLIC_PUBLISHER_MAIN_ANCESTRY_UNVERIFIED/,failure.name);
  }
  for(const invalid of [
