@@ -5,11 +5,12 @@ on:
     types: [opened]
 permissions:
   contents: read
-concurrency:
-  group: zgmini-er1-dec31-symbol-batch-a-one-shot
-  cancel-in-progress: false
 jobs:
   batch:
+    # Keep the existing lane for admitted requests only.
+    concurrency:
+      group: zgmini-er1-dec31-symbol-batch-a-one-shot
+      cancel-in-progress: false
     if: >-
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
       github.event.repository.private == true &&
@@ -61,6 +62,10 @@ jobs:
   # One separately user-approved TOL/CASY pair-only recovery. The original
   # immutable 40-call job above remains intact and is never re-opened.
   resume-pair:
+    # Keep the existing lane for admitted requests only.
+    concurrency:
+      group: zgmini-er1-dec31-symbol-batch-a-one-shot
+      cancel-in-progress: false
     if: >-
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
       github.event.repository.private == true &&
