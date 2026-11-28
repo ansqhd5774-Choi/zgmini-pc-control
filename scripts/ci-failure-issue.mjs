@@ -5,6 +5,36 @@ import {pathToFileURL} from 'node:url';
 
 export const REPO='ansqhd5774-Choi/zgmini-pc-control';
 export const WORKFLOWS=Object.freeze(["C996 R5 Readonly Source Checks","ZGMINI PC Secret Scan","ZGMINI Controller Maintenance Source Tests","W05 QFR Publication - Focused Source CI","Issue Lifecycle Eligibility (offline)","ZGMINI Automation Status Readonly Source Tests","ZGMINI CNN Sidecar B Source Contract CI","ZGMINI D05 Readonly Source Tests","ZGMINI 092 Writer B Source and Lineage Tests","SEC Core four-file Writer B approval source tests","ZGMINI W04 DOL Manual Source Tests","SEC Core Structural Insert Contract (source-only)","ZGMINI Agent Handoff PR Evidence CI"]);
+// Public intake accepts only the existing source CI names and their reviewed file paths.
+const PUBLIC_REPO_ID=1442936296;
+const PUBLIC_WORKFLOW_PATHS=Object.freeze({
+  "C996 R5 Readonly Source Checks": ".github/workflows/c996-r5-readonly-source-checks.yml",
+  "ZGMINI PC Secret Scan": ".github/workflows/pc-secret-scan.yml",
+  "ZGMINI Controller Maintenance Source Tests": ".github/workflows/controller-maintenance-source-tests.yml",
+  "W05 QFR Publication - Focused Source CI": ".github/workflows/w05-publication-source-ci.yml",
+  "Issue Lifecycle Eligibility (offline)": ".github/workflows/issue-lifecycle-eligibility-ci.yml",
+  "ZGMINI Automation Status Readonly Source Tests": ".github/workflows/automation-status-readonly-source-tests.yml",
+  "ZGMINI CNN Sidecar B Source Contract CI": ".github/workflows/cnn-sidecar-b-source-ci.yml",
+  "ZGMINI D05 Readonly Source Tests": ".github/workflows/controller-d05-source-readonly-tests.yml",
+  "ZGMINI 092 Writer B Source and Lineage Tests": ".github/workflows/core092-writer-b-source-ci.yml",
+  "SEC Core four-file Writer B approval source tests": ".github/workflows/sec-core-fourfile-writer-b-ci.yml",
+  "ZGMINI W04 DOL Manual Source Tests": ".github/workflows/w04-r6-dol-manual-source-tests.yml",
+  "SEC Core Structural Insert Contract (source-only)": ".github/workflows/sec-core-structural-insert-test.yml",
+  "ZGMINI Agent Handoff PR Evidence CI": ".github/workflows/agent-handoff-pr-evidence.yml"
+});
+const exactPublicRepo=r=>r?.id===PUBLIC_REPO_ID&&r.full_name===REPO&&r.private===false;
+function publicRunIdentity(run){
+ return exactPublicRepo(run?.repository)&&exactPublicRepo(run?.head_repository)&&
+   goodId(run.workflow_id)&&PUBLIC_WORKFLOW_PATHS[run.name]===run.path;
+}
+async function verifyPublicRun(request,run){
+ // Read the exact attempt, not the latest run (a rerun may have started).
+ const actual=await request('actions/runs/'+run.id+'/attempts/'+run.run_attempt);
+ if(!publicRunIdentity(actual)||
+    ['id','run_attempt','workflow_id','path','name','head_sha','event','status','conclusion'].some(k=>actual[k]!==run[k]))
+   fail('PUBLIC_RUN_IDENTITY_UNVERIFIED');
+}
+
 const fail=code=>{throw Error('CI_INCIDENT_'+code);};
 const goodId=value=>Number.isSafeInteger(value)&&value>0;
 const clean=value=>String(value??'').replace(/[^A-Za-z0-9 ._():/\-]/g,' ').trim().slice(0,110);
@@ -90,7 +120,7 @@ export async function triage({event,repository=REPO,request}){
  if(typeof request!=='function')fail('IO_MISSING');
  const run=event?.workflow_run;
  if(event?.action!=='completed'||event.repository?.full_name!==REPO||
-    event.repository.private!==true||
+    typeof event.repository.private!=='boolean'||
     repository!==REPO||!run||!WORKFLOWS.includes(run.name)||
     !['pull_request','push','workflow_dispatch'].includes(run.event)||
     run.head_repository?.full_name!==REPO||
@@ -98,6 +128,10 @@ export async function triage({event,repository=REPO,request}){
   return {state:'IGNORED'};
  if(!goodId(run.id)||!goodId(run.run_attempt)||
     !/^[a-f0-9]{40}$/.test(run.head_sha??''))fail('RUN_IDENTITY_INVALID');
+ if(event.repository.private===false){
+  if(!exactPublicRepo(event.repository)||!publicRunIdentity(run))return {state:'IGNORED'};
+  await verifyPublicRun(request,run);
+ }
  const jobs=await verifiedJobsForAttempt(request,run);
  const broken=jobs.filter(j=>['failure','timed_out'].includes(j.conclusion))
    .sort((a,b)=>String(a.name).localeCompare(String(b.name))||a.id-b.id);
