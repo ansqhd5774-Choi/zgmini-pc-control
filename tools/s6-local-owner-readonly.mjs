@@ -144,7 +144,8 @@ export async function main(){
  const wmi=scanControllerRunnersReadOnly();
  const after=installedMatch(ref);
  const wmiObservation=projectWmiObservation(wmi,before===after?before:null);
- return {...base(),status:'READ_ONLY_OBSERVED',ownerVerified:true,
+ return {...base(),status:s6.status==='READ_ONLY_OBSERVED'||
+  wmiObservation.referenceClassification!=='UNVERIFIED'?'READ_ONLY_OBSERVED':'STATE_UNKNOWN',ownerVerified:true,
   independentOperatorVerified:true,reviewedSourceSha:head,
   observedAtUtc:new Date().toISOString(),s6,wmi:wmiObservation};
 }
