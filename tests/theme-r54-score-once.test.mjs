@@ -116,8 +116,9 @@ test('unverified current manifest prevents score replay; exact resource gate',as
  }finally{fs.rmSync(f.cwd,{recursive:true,force:true});}
 });
 
-test('workflow uses only bounded existing self-hosted runner with pinned source',()=>{
- const yml=fs.readFileSync(path.join(root,'.github/workflows/pc-theme-r54-score-once.yml'),'utf8');
+test('retired workflow preserves bounded existing self-hosted runner and pinned source contract',()=>{
+ assert.equal(fs.existsSync(path.join(root,'.github/workflows/pc-theme-r54-score-once.yml')),false);
+ const yml=fs.readFileSync(path.join(root,'tests/fixtures/retired-workflows/pc-theme-r54-score-once.yml'),'utf8');
  assert.match(yml,/timeout-minutes: 4/);assert.match(yml,/issues:\s*\n\s*types: \[opened\]/);
  assert.match(yml,/ref: 5ee597cc6c0da9f38ab54c8aeb46b89f60a1ef36/);
  assert.match(yml,/ref: 77c6cc43a2450f34a7cfe81f39040807e727f1cf/);
