@@ -1155,7 +1155,9 @@ export function createMaintenanceAgent({
         return {status:"BLOCKED",code:"CI_ISSUE_READBACK_MISMATCH",issueNumber:issue.number};
       const checked=await authenticateControllerBIssue(actual,{policy:ciPolicy,
         getJson:route=>githubJson(["api",`repos/${repo}/${route}`],"CI_IDENTITY_READ_FAILED"),
-        readJobLogs:async jobId=>(await github(["api",`repos/${repo}/actions/jobs/${jobId}/logs`])).stdout,
+        // Machine-only pipe: gh otherwise refuses Actions logs containing ANSI.
+        // Never render these raw bytes; the verifier extracts the exact receipt.
+        readJobLogs:async jobId=>(await github(["api",`repos/${repo}/actions/jobs/${jobId}/logs`,"--allow-escape-sequences"])).stdout,
       });
       if(checked.state!=='CI_WORKLOAD_IDENTITY_VERIFIED_ONLY')
         return {status:checked.state==='QUEUED'?'QUEUED':checked.state==='EVIDENCE_MISSING'?'STATE_UNKNOWN':'BLOCKED',

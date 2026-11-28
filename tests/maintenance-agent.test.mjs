@@ -110,6 +110,7 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
         }
         if(publicCiProof&&args[1].startsWith(`repos/${REPO}/actions/jobs/`)
           &&args[1].endsWith('/logs')){
+          if(!args.includes('--allow-escape-sequences'))throw Error('gh refuses ANSI log bytes');
           const jobId=Number(args[1].split('/').at(-2));
           return {stdout:publicCiProof.readJobLogs(jobId,issue)};
         }
@@ -1826,7 +1827,7 @@ test('Public receiver poll performs exact installed V2 CI proof, one isolated ap
     ...p.installed.ciControllerBPolicy,manifestSha256:digest(raw)}}),
   publicCiProof:{actual:p.actual,getJson:p.proof.getJson,
     readJobLogs:(id,issue)=>id===p.job.id?
-      '2026-11-28T00:00:00Z '+controllerBReceiptMarker(issue.number,Buffer.from(issue.body))+'\n':''}
+      '\u001b[36;1mgroup header\u001b[0m\n2026-11-28T00:00:00Z '+controllerBReceiptMarker(issue.number,Buffer.from(issue.body))+'\n':''}
  });
  const observed=await f.agent.pollOnce();
  const successful=observed.find(x=>x.status==='SUCCEEDED');
@@ -1837,6 +1838,10 @@ test('Public receiver poll performs exact installed V2 CI proof, one isolated ap
  assert.equal(f.stats.manifestReads,1);
  assert.equal(f.agent.loadLedger(f.request.requestId)?.status,'SUCCEEDED');
  assert.equal(f.remote.size,2,'sanitized JSON and TXT pair');
+ const rawFlagCalls=f.calls.filter(x=>x.args.includes('--allow-escape-sequences'));
+ assert.equal(rawFlagCalls.length,1);
+ assert.match(rawFlagCalls[0].args[1],/\/actions\/jobs\/888\/logs$/);
+ assert.doesNotMatch(JSON.stringify([...f.remote.values()]),/group header|\\u001b/);
  const again=await f.agent.pollOnce();
  assert.equal(again.find(x=>x.code==='DUPLICATE_REQUEST_SUPPRESSED')?.status,
    'SUCCEEDED','existing completed ledger status is preserved on duplicate');
