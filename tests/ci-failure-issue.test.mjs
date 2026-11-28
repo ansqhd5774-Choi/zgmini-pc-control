@@ -373,3 +373,58 @@ test('closed issue read failure does not block original incident submission or a
  assert.match(created.body,/재발 판정: 미확인/);
  assert.equal(calls.filter(x=>x.method==='POST').length,1);
 });
+
+// Use exact GitHub public attempt metadata; all writes below are in-memory fakes.
+const publicEvent=(patch={})=>{
+ const r={full_name:REPO,id:1442936296,private:false};
+ const e=event({repository:r,head_repository:r,workflow_id:415136577,
+  path:'.github/workflows/c996-r5-readonly-source-checks.yml',...patch});
+ e.repository=r;return e;
+};
+test('Public CI failure verifies exact attempt before existing metadata-only Issue intake',async()=>{
+ const e=publicEvent(),f=fixture();
+ const calls=[];
+ const result=await triage({event:e,request:async(resource,options)=>{
+  calls.push(resource);
+  if(resource==='actions/runs/123456/attempts/1')return structuredClone(e.workflow_run);
+  return f.request(resource,options);
+ }});
+ assert.deepEqual(result,{state:'CREATED',issue:6200});
+ assert.equal(calls[0],'actions/runs/123456/attempts/1');
+ assert.equal(f.calls.filter(x=>x.method==='POST').length,1);
+ const posted=f.calls.find(x=>x.method==='POST');
+ assert.match(posted.body.body,/actions\/runs\/123456/);
+ assert.doesNotMatch(posted.body.body,/secret value|raw trace|job log/i);
+ assert.ok(!calls.some(x=>/\/logs|\/artifacts/.test(x)));
+});
+test('Public success, cancellation, skipped, fork, unknown path or missing privacy do not intake',async()=>{
+ const inputs=[publicEvent({conclusion:'success'}),publicEvent({conclusion:'cancelled'}),
+  publicEvent({conclusion:'skipped'}),publicEvent({head_repository:{full_name:'other/fork',id:1,private:false}}),
+  publicEvent({path:'.github/workflows/other.yml'}),publicEvent({workflow_id:0}),publicEvent()];
+ inputs.at(-1).repository={full_name:REPO,id:1442936296};
+ for(const e of inputs){
+  let calls=0;
+  assert.deepEqual(await triage({event:e,request:async()=>{calls++;throw Error('unexpected');}}),{state:'IGNORED'});
+  assert.equal(calls,0);
+ }
+});
+test('Public stale or mismatched exact run attempt cannot write an Issue',async()=>{
+ for(const patch of [{run_attempt:2},{head_sha:'b'.repeat(40)},{conclusion:'success'},{workflow_id:1},
+   {path:'.github/workflows/other.yml'},{repository:{full_name:REPO,id:1442936296,private:true}}]){
+  const e=publicEvent(),calls=[];
+  await assert.rejects(triage({event:e,request:async(resource,{method='GET'}={})=>{
+   calls.push({resource,method});
+   return {...e.workflow_run,...patch};
+  }}),/CI_INCIDENT_PUBLIC_RUN_IDENTITY_UNVERIFIED/);
+  assert.deepEqual(calls,[{resource:'actions/runs/123456/attempts/1',method:'GET'}]);
+ }
+});
+test('Public intake timeout and repeated exact receipt preserve idempotency',async()=>{
+ const e=publicEvent({conclusion:'timed_out'});
+ const f=fixture({existing:true,comments:[{body:'<!-- zgmini-ci-run:123456:1:job:87:step:2 -->'}]});
+ assert.deepEqual(await triage({event:e,request:async(resource,options)=>{
+  if(resource==='actions/runs/123456/attempts/1')return e.workflow_run;
+  return f.request(resource,options);
+ }}),{state:'REUSED',issue:6200});
+ assert.equal(f.calls.filter(x=>x.method==='POST').length,0);
+});
