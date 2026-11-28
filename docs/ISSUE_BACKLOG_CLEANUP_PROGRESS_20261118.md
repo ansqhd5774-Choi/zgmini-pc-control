@@ -506,3 +506,12 @@
 - **#4135 Writer B:** 원본 Run 45901622751 `WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED` (167/167 ACTIVE), 설치 전 중단. 소스 수정 PR #4314, #4315는 이미 main 병합돼 있어 중복 수정하지 않는다. 공개 저장소에서 기존 private-only B 실행 계약이 활성화되지 않고, 원본 4파일 manifest의 Runtime 효과와 최신 기능 승인/공급자 계약도 별도로 대조해야 한다. 운영 설치는 NOT DONE, 원본 요청 재실행 없음.
 - **#3767:** #4156의 후속 운영 정상 감사(83/83 파일 CAS, Standby 2/2 READY)와 독립 WMI 승격 분류 검증은 다른 범위다. [대표 추적 정합 기록](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/3767#issuecomment-7230529772) 유지, 원래 #3767 R3 실패를 PASS로 소급하지 않음.
 - **완료 판정:** 이 항목은 역할·브랜치·원장 정합 및 GitHub 파일 쓰기 권한의 확인이다. 신규 원본 Issue 종결/PR 병합/Windows 설치·재발행/DB·D1 변경은 0. 다음 필수 행동은 승인된 기존 실제 효과가 있는 독립 Issue를 우선 처리하고, #4078은 정확 효과 승인·운영 포트 확보 후에만 이어간다.
+
+
+## 2026-11-28 #4312 최신 소스 회귀 및 운영 경계
+
+- 이슈 담당 전용 PR [#4312](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4312)의 최신 관측 HEAD는 `404c8de4a5c6e6e1297765007973b37b29e4634c`, `main@54491e25856c603b993fc3ea3bc5ad868dad2dee` 대비 `ahead 42 / behind 0`. PR 변경 범위는 고정 S6 source/test 7파일이며 Draft/HOLD다. 동일 브랜치를 기초 없이 다시 합치거나 영구 담당 브랜치의 과거 28개 커밋을 재작성하지 않는다.
+- 기존 #4078 source-only 실패 입력 결함 수정: `original.labels` 비배열/원소 null은 예외 대신 `BLOCKED/BACKLOG_4078_ORIGINAL_CAS_FAILED`로 처리. 테스트 진입점을 `tests/maintenance-agent.test.mjs`에 연결해 부정 케이스 실제 실행. 정확 HEAD 이전 [Actions #46085503666](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/46085503666) hosted SUCCESS, 관련 통합 그룹 155/155 PASS.
+- 최신 #4078 read-only adapter에서 승인·Supervisor owner 파일의 부모 디렉터리 심볼릭 링크 우회를 차단하도록 동일 `safeDir` 검사를 연결. [Actions #46085704726](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/46085704726) 정확 HEAD `completed/success`; 운영이 아닌 GitHub hosted `public-source-only` Job #140794671042에서 신규 경로 부정 시험 **2/2 PASS**, 관련 통합 테스트 그룹 **157/157 PASS, fail 0**. Windows `source-only`는 SKIPPED.
+- 승인 정본 #4069은 `EXACT_ONE_SUPERVISOR_TREE_STOP_WITH_WATCHDOG_AUTO_PROMOTION` 단회 stop만 승인. #4078 `S6_4078_BACKLOG_ONLY_REPLAY` 운영 효과·독립 Windows B/C Owner 포트의 별도 승인 및 원본 원장/lease CAS 입증 없음. #4313 현행 다른 A PASS는 원본 #4078 역사적 replay 영수증이 아님. #4078 OPEN/PR Draft 유지, 기존 원본 S6 재발행·Workflow/Task/Runner/DB/D1 변경·원본 Issue 부당 종결 0.
+- 이 기록은 이미 완료된 GitHub source-only 검증의 이슈 담당 원장 정합화다. 추가 진단/새 gate/중복 CI를 완료 조건으로 만들지 않고, 새로운 정확 승인과 정규 운영 권한이 생길 때에만 해당 운영 단계에 진입한다.
