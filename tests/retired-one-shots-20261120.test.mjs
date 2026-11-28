@@ -196,3 +196,16 @@ test('consumed gas refresh and superseded fixed R54 replay triggers are retired'
  for(const name of ['pc-inflation-19-inventory-b-once.yml','pc-theme-r54-evidence-once.yml','pc-theme-r54-readiness-once.yml','pc-job.yml','pc-writer-b-source-once.yml'])
   assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
 });
+
+// #363 consumed the original three-symbol private pilot approval. Preserve its
+// historical PASS receipt scope, not a claim of full collection/publication.
+test('consumed ER1 three-symbol pilot intake is retired with approval and successors intact',()=>{
+ const name='pc-er1-nov30-actual-pilot.yml';
+ assert.equal(existsSync(path.join(root,'.github/workflows',name)),false,name);
+ const bytes=readFileSync(path.join(root,'tests/fixtures/retired-workflows',name));
+ assert.equal(createHash('sha1').update(Buffer.from('blob '+bytes.length+'\0')).update(bytes).digest('hex'),'65c7b5d7c6db376837c774428bc66a4503f0b302');
+ for(const file of ['er1-nov30-actual-pilot-entry.mjs','ER1_NOV30_ACTUAL_PILOT_B_APPROVAL.json'])
+  assert.equal(existsSync(path.join(root,file)),true,file);
+ for(const file of ['pc-er1-nov30-full.yml','pc-er1-nov30-capture.yml','pc-er1-nov30-saved-actual-audit.yml','pc-er1-nov-forecast-shadow.yml','pc-er1-nov-forecast-publish.yml','pc-job.yml'])
+  assert.equal(existsSync(path.join(root,'.github/workflows',file)),true,file);
+});
