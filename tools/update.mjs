@@ -3563,6 +3563,31 @@ function exactPublicReplayIssue(row,original){
   row.user?.id===327938088&&row.user?.login==='ansqhd5774-Choi'&&
   row.labels?.some(x=>x.name==='pc-job')&&Number.isFinite(Date.parse(row.created_at));
 }
+// A verified DONE replay may itself fall inside a later rollback pause.
+// Skip only the exact previously dispatched Issue, not an arbitrary duplicate
+// requestId. DONE remains dispatch evidence, never proof of PC execution.
+function isRecordedPublicReplay({candidate,state,windows,callGithub}){
+ const links=Object.entries(state.replays).filter(([,entry])=>
+  entry?.publicReplay===true&&entry.status==='DONE'&&entry.replayIssueNumber===candidate.number);
+ if(!links.length)return false;
+ need(links.length===1,'BACKLOG_PUBLIC_RECORDED_REPLAY_UNVERIFIED');
+ const [key,entry]=links[0],number=Number(key);
+ const postedAt=Date.parse(entry.postingAt??'');
+ need(Number.isSafeInteger(number)&&number>0&&String(number)===key&&
+  number<candidate.number&&Number.isFinite(postedAt),'BACKLOG_PUBLIC_RECORDED_REPLAY_UNVERIFIED');
+ const original=callGithub('issues/'+number),actual=callGithub('issues/'+candidate.number);
+ const decision=classifyBacklogOriginal(original?.body);
+ need(original?.number===number&&original.title==='pc-job'&&
+  original.user?.id===327938088&&original.user?.login==='ansqhd5774-Choi'&&
+  windows.some(window=>backlogIssueInPause(original,window))&&
+  decision.valid&&decision.body.requestId===entry.originalRequestId&&
+  decision.originalBodySha256===entry.originalBodySha256&&
+  actual?.number===candidate.number&&exactPublicReplayIssue(actual,original)&&
+  exactPublicReplayIssue(candidate,original)&&actual.created_at===candidate.created_at&&
+  Date.parse(actual.created_at)>=postedAt-2000,
+  'BACKLOG_PUBLIC_RECORDED_REPLAY_UNVERIFIED');
+ return true;
+}
 function publicReplayHistory(callGithub,original,requestId){
  // No indexed search absence assumption; exhaust the bounded issue listing.
  // If the repository grows beyond the bound, refuse rather than post twice.
@@ -3714,6 +3739,7 @@ export function reconcileMaintenanceBacklog({backlogFile,requestId,
         'BACKLOG_REJECTED_ORIGINAL_CHANGED');continue;
      }
      visibility??=backlogRepoVisibility(callGithub);
+     if(visibility==='public'&&isRecordedPublicReplay({candidate:original,state,windows,callGithub}))continue;
      if(visibility==='public'&&state.replays[key]){
       reconcilePublicBacklogOriginal({original,state,backlogFile,requestId,callGithub,approvedRoot,readPublicPolicy,clock});
       continue;
