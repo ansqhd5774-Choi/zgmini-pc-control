@@ -4,6 +4,8 @@
 
 이슈담당자는 최신 생성 Open Issue·Open PR을 각각 확인해 실제 문제를 **인수**하면 원인 분석, 최소 소스 수정, 관련 시험, 승인된 병합·운영 설치/복구·저장/게시 검증, 결과 기록, 종결을 직접 수행한다. 프로젝트 전체 총괄 직책이 되는 것은 아니며 **인수하지 않은 타 담당의 기능·브랜치를 임의 수정하지 않는다**. 실제 도구 권한·개별 운영 승인·B/C 안전 검사, 기존 PC와 격리 PC의 물리적 구분, 공유 자원 lease/CAS·백업·결과 검증은 유지한다. 과거 권한 제한을 기술한 문구는 해당 시점의 이력이며 이 담당자의 현행 업무 제한으로 사용하지 않는다.
 
+**2026-11-28 사용자 직접 권한 부여:** 이슈·PR 담당자의 승인된 B급 운영 변경 직접 실행 및 독립 Windows Owner 인증 업무 권한을 [담당자 작업 지침 5-1절](docs/ISSUE_LIFECYCLE_MANAGEMENT_STANDARD_20261118.md)에 반영한다. 역할상 추가 승인·총괄 인계를 요구하지 않는다. 실제 인증·설치된 grant·정확 효과 승인·CAS/lease·백업/복구 검증 및 사용자 직접 C급 계약은 유지한다. 문서상의 권한 부여를 기술적 인증 성공으로 간주하지 않는다.
+
 ## 저장소·담당 소속 — 2026-11-23 사용자 지정
 
 프로세스 총괄은 **`zgmini` / `codex/controller-ops-lessons-20261105`**, 이슈 담당자는 **`zgmini-pc-control` / `codex/issues-lifecycle-manager-20261118`**, 자동화 담당자는 **`zgmini-pc-control` / `codex/pc-automation-process-improvement-20261119`**에 소속된다. [역할 정본](https://github.com/ansqhd5774-Choi/zgmini/blob/main/docs/REPOSITORY_ROLES.md)을 따른다. 아래 과거 소속·호칭과 충돌하면 이 결정을 우선한다. 업무 소속과 실제 코드 변경 저장소는 구분하며 기존 승인·운영 보호·기능 담당자의 독립 작업은 유지한다. 새 승인 Gate를 추가하지 않는다.
