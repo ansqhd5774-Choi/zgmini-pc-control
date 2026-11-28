@@ -49,3 +49,30 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node tools/ci-zizmor-pr.mjs
+
+  # Public source-only workflow audit; Windows-only C996 groups remain isolated.
+  public-workflow-audit:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == false &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login == 'ansqhd5774-Choi' &&
+      github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify exact Public hosted source-only origin
+        run: node tools/public-source-ci-guard.mjs
+      - name: Verify Public workflow audit scope and pinned release
+        run: node --test tests/ci-zizmor-pr.test.mjs
+      - name: Audit Public changed workflows offline
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node tools/ci-zizmor-pr.mjs

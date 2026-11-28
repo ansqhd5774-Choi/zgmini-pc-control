@@ -6,10 +6,21 @@ import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {changedFiles} from './c996-source-checks.mjs';
+import {assessPublicSourceCi} from './public-source-ci-guard.mjs';
 
 export const OXLINT_VERSION='1.95.0';
 export const OXLINT_ARCHIVE_SHA256='8a0e8384ee8ff23892ff878dead150c8632fb447ca905e95aed2c5e6684ab921';
 const DOWNLOAD='https://github.com/oxc-project/oxc/releases/download/oxlint_v1.95.0/oxlint-x86_64-pc-windows-msvc.zip';
+export const OXLINT_LINUX_SHA256='180d51ffd469995f394ba379a4b6f73c55ddb98443df442e3e456951d874a5f1';
+const LINUX_URL='https://github.com/oxc-project/oxc/releases/download/oxlint_v1.95.0/oxlint-x86_64-unknown-linux-gnu.tar.gz';
+export function selectOxlintRelease(env,event,platform=process.platform,arch=process.arch){
+ if(env?.RUNNER_OS==='Windows'&&platform==='win32'&&arch==='x64')
+  return {url:DOWNLOAD,sha256:OXLINT_ARCHIVE_SHA256,archive:'oxlint.zip',curl:'curl.exe',tar:'tar.exe',platform};
+ if(env?.RUNNER_OS==='Linux'&&env.RUNNER_ARCH==='X64'&&platform==='linux'&&arch==='x64'&&assessPublicSourceCi({event,env}).status==='PASS')
+  return {url:LINUX_URL,sha256:OXLINT_LINUX_SHA256,archive:'oxlint.tar.gz',curl:'curl',tar:'tar',platform};
+ throw Error('OXLINT_ISOLATED_PR_REQUIRED');
+}
+
 const SOURCE=/\.(?:mjs|cjs|js|jsx|ts|tsx)$/i;
 export function selectSourceFiles(paths,exists=fs.existsSync){
  if(!Array.isArray(paths))throw Error('OXLINT_CHANGE_SCOPE_UNVERIFIED');
@@ -32,24 +43,27 @@ function checkedRun(command,args){
 export async function runChangedLint(){
  if(process.env.GITHUB_REPOSITORY!=='ansqhd5774-Choi/zgmini-pc-control'
   ||process.env.GITHUB_EVENT_NAME!=='pull_request'
-  ||process.env.RUNNER_OS!=='Windows'
   ||!process.env.RUNNER_TEMP)throw Error('OXLINT_ISOLATED_PR_REQUIRED');
+ const event=JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH,'utf8'));
+ const release=selectOxlintRelease(process.env,event);
  const changed=await changedFiles();
  const files=selectSourceFiles(changed);
  if(files.length===0){console.log('OXLINT_NO_CHANGED_SOURCE');return;}
  const folder=fs.mkdtempSync(path.join(process.env.RUNNER_TEMP,'zgmini-oxlint-'));
  try{
-  const zip=path.join(folder,'oxlint.zip');
-  checkedRun('curl.exe',['--fail','--location','--silent','--show-error',
-   '--max-time','90','--output',zip,DOWNLOAD]);
-  verifyArchive(fs.readFileSync(zip));
-  checkedRun('tar.exe',['-xf',zip,'-C',folder]);
+  const zip=path.join(folder,release.archive);
+  checkedRun(release.curl,['--fail','--location','--silent','--show-error',
+   '--max-time','90','--output',zip,release.url]);
+  verifyArchive(fs.readFileSync(zip),release.sha256);
+  checkedRun(release.tar,['-xf',zip,'-C',folder]);
   // Official ZIP file names/layouts differ by platform and release.
-  // Identify its single Windows PE executable by magic bytes, not a guessed name.
+  // Identify the single platform executable by magic bytes.
   const executables=fs.readdirSync(folder,{recursive:true})
    .map(relative=>path.join(folder,relative))
    .filter(file=>fs.statSync(file).isFile()
-     &&fs.readFileSync(file).subarray(0,2).toString('ascii')==='MZ');
+     && (release.platform==='win32'
+       ?fs.readFileSync(file).subarray(0,2).toString('ascii')==='MZ'
+       :fs.readFileSync(file).subarray(0,4).equals(Buffer.from([0x7f,0x45,0x4c,0x46]))));
   if(executables.length!==1)throw Error('OXLINT_BINARY_MISSING');
   const exe=executables[0];
   // Do not echo source snippets or credential-looking literals to CI logs.
