@@ -221,8 +221,9 @@ export function authorizeWriterBIssue({event,env,manifestBytes}){
 // The caller must obtain observation from observeNativeReceiver, and scope
 // from readNativeScope on the PC in the SAME process before invoking this.
 const VERIFIED_NATIVE=new WeakSet();
+// A public Writer receiver cannot inherit a Private or Controller B grant.
 export function authorizeWriterBNative({
- observation,scope,env,controlHead,adapterBytes
+ observation,scope,env,controlHead,adapterBytes,installedControllerSha
 }={}){
  const p=scope?.policy;
  need(observation?.state==='CONTRACT_MATCH_ONLY'&&
@@ -237,7 +238,13 @@ export function authorizeWriterBNative({
    SHA64.test(p.businessApprovalSha256??'')&&
    SHA64.test(p.approvedRequestSha256??''),
    'WRITER_B_NATIVE_INDEPENDENT_GRANT_STOP');
- need(env?.GITHUB_REPOSITORY===CONTROL_REPO&&
+ need((p.repositoryVisibility===undefined||p.repositoryVisibility==='private'||
+    (p.repositoryVisibility==='public'&&
+     env?.ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED==='true'&&
+     SHA40.test(p.installedControllerSha??'')&&
+     SHA40.test(installedControllerSha??'')&&
+     installedControllerSha===p.installedControllerSha))&&
+   env?.GITHUB_REPOSITORY===CONTROL_REPO&&
    env.GITHUB_EVENT_NAME==='workflow_dispatch'&&
    env.GITHUB_ACTOR==='github-actions[bot]'&&
    env.GITHUB_REF==='refs/heads/main'&&

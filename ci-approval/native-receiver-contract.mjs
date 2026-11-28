@@ -4,6 +4,7 @@
 // from an installed trusted source, not from event inputs or candidate code.
 // No receipt writes, network calls, PC execution, or process-local B seal.
 import {createHash} from 'node:crypto';
+import {nativeVisibilityMatches} from './native-visibility.mjs';
 import {validateRequest} from '../controller/common.mjs';
 import {validateWriterBRequestManifest,ISSUE_LABEL,EXTENDED_DRAIN_LABEL,DRAIN_1200_LABEL} from '../writer-b/contract.mjs';
 
@@ -57,7 +58,8 @@ export function inspectNativeReceiver({
     env.GITHUB_REF!=='refs/heads/main'||env.GITHUB_RUN_ATTEMPT!=='1'||
     !sha(env.GITHUB_SHA,40)||env.GITHUB_ACTOR!==BOT||
     event?.repository?.id!==ID||event.repository.full_name!==CONTROL||
-    event.repository.private!==true||event.sender?.id!==BOT_ID||
+    !nativeVisibilityMatches(policy,effect,event.repository.private)||
+    event.sender?.id!==BOT_ID||
     event.sender.login!==BOT||event.sender.type!=='Bot')
   return result('REJECTED','CI_NATIVE_RECEIVER_EVENT_ORIGIN_DENIED');
  const inKeys=['effect','source_run_id','source_attempt','approval_sha256','request_sha256','effect_key'];
@@ -83,7 +85,9 @@ export function inspectNativeReceiver({
     sourceRun.head_sha!==policy.sourceHeadSha||sourceRun.status!=='completed'||
     sourceRun.conclusion!=='success'||sourceRun.event!=='pull_request'||
     sourceRun.repository?.id!==ID||sourceRun.repository.full_name!==CONTROL||
-    sourceRun.repository.private!==true||sourceRun.head_repository?.id!==ID)
+    !nativeVisibilityMatches(policy,effect,sourceRun.repository.private)||
+    sourceRun.repository.private!==event.repository.private||
+    sourceRun.head_repository?.id!==ID)
   return result('EVIDENCE_MISSING','CI_NATIVE_RECEIVER_SOURCE_RUN_UNVERIFIED');
  if(!checkFile(sourceWorkflow,policy.sourceHeadSha,
    policy.sourceWorkflowPath,policy.sourceWorkflowBlobSha))

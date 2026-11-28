@@ -8,6 +8,7 @@ import {createHash} from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import {isDeepStrictEqual} from 'node:util';
+import {nativeVisibilityMatches} from './native-visibility.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control', REPO_ID=1442936296;
 const RECEIVERS=Object.freeze({
@@ -63,7 +64,8 @@ export async function dispatchApprovedCiEffect({policy,requestBytes,ports}={}){
    run.workflow_id!==policy.sourceWorkflowId||run.path!==policy.sourceWorkflowPath||
    run.head_sha!==policy.sourceHeadSha||run.status!=='completed'||run.conclusion!=='success'||
    run.event!=='pull_request'||run.repository?.id!==REPO_ID||
-   run.repository.full_name!==REPO||run.repository.private!==true||
+   run.repository.full_name!==REPO||
+   !nativeVisibilityMatches(policy,effect,run.repository.private)||
    run.head_repository?.id!==REPO_ID)
   return denied('EVIDENCE_MISSING','CI_NATIVE_DISPATCH_RUN_UNVERIFIED',{effectKey:key});
  // A successful run ID alone does not prove that it executed the pinned

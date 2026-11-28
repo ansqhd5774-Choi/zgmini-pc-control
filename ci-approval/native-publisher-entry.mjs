@@ -6,6 +6,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 import {readNativeScope} from './native-receiver-observe.mjs';
+import {nativeVisibilityMatches,publicWriterEventOptIn} from './native-visibility.mjs';
 import {dispatchApprovedCiEffect,createCiNativeReceiptStore} from './native-dispatch.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control',REPO_ID=1442936296;
@@ -137,12 +138,17 @@ function sourceEventMatches(event,env,policy){
  return (eventBound||fixed)&&env?.GITHUB_EVENT_NAME==='workflow_run'&&
   env.GITHUB_REPOSITORY===REPO&&env.GITHUB_REF==='refs/heads/main'&&
   event?.action==='completed'&&event.repository?.id===REPO_ID&&
-  event.repository.full_name===REPO&&event.repository.private===true&&
+  event.repository.full_name===REPO&&
+  nativeVisibilityMatches(policy,policy.effect,event.repository.private)&&
+  (event.repository.private===true||
+   publicWriterEventOptIn(policy.effect,env,event.repository.private))&&
   run.run_attempt===policy.sourceAttempt&&
   run.workflow_id===policy.sourceWorkflowId&&run.path===policy.sourceWorkflowPath&&
   run.head_sha===policy.sourceHeadSha&&run.status==='completed'&&
   run.conclusion==='success'&&run.event==='pull_request'&&
-  run.repository?.id===REPO_ID&&run.head_repository?.id===REPO_ID;
+  run.repository?.id===REPO_ID&&
+  run.repository.private===event.repository.private&&
+  run.head_repository?.id===REPO_ID;
 }
 export async function publishNativeCompletion({effect,event,env,ports}={}){
  if(!Object.hasOwn(RECEIVERS,effect))return out('REJECTED','CI_NATIVE_PUBLISH_EFFECT_DENIED');

@@ -207,3 +207,23 @@ test('native A snapshot preserves missing scope refusal without second read',asy
  assert.equal(observation.code,'CI_NATIVE_RECEIVER_LOCAL_SCOPE_UNAVAILABLE');
  assert.equal(scope,undefined);assert.equal(reads,1);assert.equal(x.reads.length,0);
 });
+
+test('public Writer receiver refuses absent opt-in before reading local scope',async()=>{
+ const x=make('B_WRITER_SOURCE');
+ x.event.repository.private=false;
+ const refused=await observeNativeReceiver(x);
+ assert.equal(refused.code,'CI_NATIVE_RECEIVER_EVENT_DENIED');
+ assert.equal(x.reads.length,0);
+ x.env.ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED='true';
+ Object.assign(x.policy,{repositoryVisibility:'public',nativeWriterBExecutionEnabled:true,
+  nativeWriterBControlSha:'d'.repeat(40),
+  nativeWriterBAdapterSha256:'e'.repeat(64),installedControllerSha:'f'.repeat(40)});
+ const get=x.ports.getJson;
+ x.ports.getJson=async route=>{
+  const v=await get(route);
+  if(route.startsWith('actions/'))v.repository.private=false;
+  return v;
+ };
+ const matched=await observeNativeReceiver(x);
+ assert.equal(matched.state,'CONTRACT_MATCH_ONLY');assert.equal(matched.canInstall,false);
+});

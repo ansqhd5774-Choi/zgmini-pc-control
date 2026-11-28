@@ -295,3 +295,17 @@ test('common installed proof validation binds exact request, policy digest and o
   }
  }
 });
+
+test('public Writer publisher requires explicit independent effect policy and opt-in',async()=>{
+ const x=fixture('B_WRITER_SOURCE');
+ Object.assign(x.policy,{repositoryVisibility:'public',nativeWriterBExecutionEnabled:true,
+  nativeWriterBControlSha:'d'.repeat(40),
+  nativeWriterBAdapterSha256:'e'.repeat(64),installedControllerSha:'f'.repeat(40)});
+ x.event.repository.private=false;x.event.workflow_run.repository.private=false;
+ const before=await publishNativeCompletion({...x,effect:'B_WRITER_SOURCE'});
+ assert.equal(before.state,'IGNORED');assert.equal(x.readCount(),0);
+ x.env.ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED='true';
+ const accepted=await publishNativeCompletion({...x,effect:'B_WRITER_SOURCE'});
+ assert.equal(accepted.state,'DISPATCH_ACCEPTED_NOT_EXECUTED');
+ assert.equal(accepted.executed,false);assert.equal(x.readCount(),1);
+});

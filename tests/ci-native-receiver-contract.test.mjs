@@ -174,3 +174,33 @@ test('receiver rejects unknown event-binding policy schemas even with a successf
  f.policy.sourceRunMode='UNREVIEWED';
  expect(f,'CI_NATIVE_RECEIVER_INSTALLED_POLICY_INVALID');
 });
+
+test('Public Writer receiver requires independent public B policy and exact public source',()=>{
+ const f=fixture('B_WRITER_SOURCE');
+ f.policy.repositoryVisibility='public';
+ f.policy.nativeWriterBExecutionEnabled=true;
+ f.policy.nativeWriterBControlSha='d'.repeat(40);
+ f.policy.nativeWriterBAdapterSha256='e'.repeat(64);
+ f.policy.installedControllerSha='f'.repeat(40);
+ f.event.repository={...repo,private:false};
+ f.sourceRun.repository={...repo,private:false};
+ const r=inspectNativeReceiver(f);
+ assert.equal(r.state,'CONTRACT_MATCH_ONLY');assert.equal(r.canExecute,false);
+ const missing=structuredClone(f);delete missing.policy.nativeWriterBExecutionEnabled;
+ expect(missing,'CI_NATIVE_RECEIVER_EVENT_ORIGIN_DENIED','REJECTED');
+ const cross={...f,sourceRun:{...f.sourceRun,
+  repository:{...f.sourceRun.repository,private:true}}};
+ expect(cross,'CI_NATIVE_RECEIVER_SOURCE_RUN_UNVERIFIED');
+ const other=structuredClone(f);other.policy.effect='A_READONLY';
+ expect(other,'CI_NATIVE_RECEIVER_INSTALLED_POLICY_INVALID');
+});
+
+test('Public repository never inherits native A authority from a Writer B policy shape',()=>{
+ const a=fixture('A_READONLY');
+ Object.assign(a.policy,{repositoryVisibility:'public',effect:'A_READONLY',
+  nativeWriterBExecutionEnabled:true,nativeWriterBControlSha:'d'.repeat(40),
+  nativeWriterBAdapterSha256:'e'.repeat(64),installedControllerSha:'f'.repeat(40)});
+ a.event.repository={...repo,private:false};
+ a.sourceRun.repository={...repo,private:false};
+ expect(a,'CI_NATIVE_RECEIVER_EVENT_ORIGIN_DENIED','REJECTED');
+});

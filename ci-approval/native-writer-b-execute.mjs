@@ -21,6 +21,43 @@ const HASH=/^[a-f0-9]{40}$/;
 const SAFE_CODE=/^WRITER_B_[A-Z0-9_]{1,100}$/;
 const FILE=/^approvals\/writer-updates\/[a-z0-9][a-z0-9._-]{0,95}\.json$/;
 
+// The installed Controller identity comes from fixed operating-host metadata,
+// never an event input, the PR checkout, or the native policy itself.
+// Public Writer B re-reads this on both preflight and execution admissions.
+const INSTALLED_CONTROLLER_ROOT='E:\\ZGmini\\automation\\pc-control';
+export function readInstalledControllerSha({
+ root=INSTALLED_CONTROLLER_ROOT,io=fs
+}={}){
+ const stop=()=>fail('WRITER_B_NATIVE_INSTALLED_CONTROLLER_UNVERIFIED_STOP');
+ if(typeof root!=='string'||!path.isAbsolute(root)||root.includes('\0'))stop();
+ const resolved=path.resolve(root);
+ for(let cursor=resolved;;){
+  let st;
+  try{st=io.lstatSync(cursor);}catch{stop();}
+  if(!st.isDirectory()||st.isSymbolicLink())stop();
+  const parent=path.dirname(cursor);
+  if(parent===cursor)break;
+  cursor=parent;
+ }
+ const filename=path.join(resolved,'host.json');
+ let before,after,a,b;
+ try{
+  before=io.lstatSync(filename);
+  if(!before.isFile()||before.isSymbolicLink()||
+   before.size<2||before.size>65536||before.nlink!==1)stop();
+  a=io.readFileSync(filename);b=io.readFileSync(filename);
+  after=io.lstatSync(filename);
+ }catch{stop();}
+ if(!Buffer.isBuffer(a)||!Buffer.isBuffer(b)||!a.equals(b)||
+  a.length!==before.size||after.size!==before.size||
+  after.mtimeMs!==before.mtimeMs||after.ino!==before.ino)stop();
+ let metadata;
+ try{metadata=JSON.parse(a.toString('utf8'));}catch{stop();}
+ if(!metadata||typeof metadata!=='object'||Array.isArray(metadata)||
+  !HASH.test(metadata.controllerSourceSha??''))stop();
+ return metadata.controllerSourceSha;
+}
+
 function safeApprovedManifest(root,relative){
  need(typeof root==='string'&&path.isAbsolute(root)&&
   FILE.test(relative??''),'WRITER_B_NATIVE_APPROVAL_PATH_STOP');
@@ -85,8 +122,11 @@ async function prepare(env){
  });
  const controlRoot=env.GITHUB_WORKSPACE;
  const controlHead=gitHead(controlRoot);
+ // The private legacy receiver keeps its existing admission contract.
+ const installedControllerSha=scope.policy?.repositoryVisibility==='public'
+  ?readInstalledControllerSha():undefined;
  const auth=authorizeWriterBNative({observation,scope,env,controlHead,
-  adapterBytes:fs.readFileSync(SELF)});
+  installedControllerSha,adapterBytes:fs.readFileSync(SELF)});
  const reviewed=safeApprovedManifest(controlRoot,auth.manifestPath);
  need(reviewed.equals(scope.approvalBytes),'WRITER_B_NATIVE_CHECKOUT_APPROVAL_DRIFT_STOP');
  return {auth,controlRoot};
@@ -111,6 +151,45 @@ function safeResultTemp(env,auth,sanitized){
   'WRITER_B_NATIVE_RECEIPT_SIZE_STOP');
  for(const [ext,data] of [['json',json],['txt',txt]]){
   fs.writeFileSync(path.join(dir,basename+'.'+ext),data,{flag:'wx'});
+ }
+}
+// A refused native preflight never reaches the installer. An execute-stage
+// exception, however, has an UNKNOWN effect until the existing journal is
+// reconciled. Publish only fixed, bounded metadata; never the exception text.
+export function recordNativeWriterBFailure({
+ env,mode,error,io=fs
+}={}){
+ const code=SAFE_CODE.test(error?.code??'')?error.code:
+  'WRITER_B_NATIVE_SETUP_UNVERIFIED_STOP';
+ if(!['--preflight','--execute'].includes(mode)||
+  !/^[1-9][0-9]{0,18}$/.test(env?.GITHUB_RUN_ID??'')||
+  env.GITHUB_RUN_ATTEMPT!=='1')
+  return Object.freeze({recorded:false,code});
+ const stage=mode==='--preflight'?'preflight':'execute';
+ const dir=env.RUNNER_TEMP,base='zgmini-ci-native-writer-b-'+
+  env.GITHUB_RUN_ID+'-setup-'+stage;
+ try{
+  if(typeof dir!=='string'||!path.isAbsolute(dir))throw Error('TEMP');
+  const root=io.lstatSync(dir);
+  if(!root.isDirectory()||root.isSymbolicLink())throw Error('TEMP');
+  const report=Object.freeze({
+   schema:'ZGMINI_CI_NATIVE_WRITER_B_FAILURE_V1',
+   runId:env.GITHUB_RUN_ID,attempt:1,stage,
+   status:stage==='preflight'?'WRITER_B_SETUP_STOP':'WRITER_B_STATE_UNKNOWN',
+   code,requestId:null,installEffect:stage==='preflight'?'NOT_STARTED':'UNVERIFIED',
+   retry:'READ_ONLY_RECONCILE_NO_REEXECUTE'
+  });
+  const json=JSON.stringify(report)+'\n';
+  const txt=['RUN_ID='+report.runId,'STAGE='+stage,'STATUS='+report.status,
+   'CODE='+code,'REQUEST_ID=UNVERIFIED','INSTALL_EFFECT='+report.installEffect,
+   'RETRY=READ_ONLY_RECONCILE_NO_REEXECUTE',''].join('\n');
+  if(Buffer.byteLength(json)>1024||Buffer.byteLength(txt)>1024)
+   throw Error('SIZE');
+  for(const [ext,body] of [['json',json],['txt',txt]])
+   io.writeFileSync(path.join(dir,base+'.'+ext),body,{flag:'wx',mode:0o600});
+  return Object.freeze({recorded:true,code});
+ }catch{
+  return Object.freeze({recorded:false,code});
  }
 }
 async function main(){
@@ -146,8 +225,11 @@ if(process.argv[1]&&path.resolve(process.argv[1])===SELF){
  catch(error){
   // Do not publish exception text, environment, absolute paths, raw approval,
   // local source or provider data. Unknown post-claim outcomes are never retried.
-  console.error(SAFE_CODE.test(error?.code??'')?
-   error.code:'WRITER_B_NATIVE_SETUP_UNVERIFIED_STOP');
+  const receipt=recordNativeWriterBFailure({
+   env:process.env,mode:process.argv[2],error
+  });
+  console.error(receipt.code);
+  if(!receipt.recorded)console.error('WRITER_B_NATIVE_RESULT_RECEIPT_UNVERIFIED_STOP');
   process.exitCode=1;
  }
 }

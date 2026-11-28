@@ -258,3 +258,23 @@ for(const mode of ['FIXED','EVENT_COMPLETION_V1'])test('equivalent independently
  assert.equal(r.code,'CI_NATIVE_DISPATCH_WAKEUP_ONLY');
  assert.equal(x.dispatches.length,1);
 });
+
+test('public Writer dispatch still needs installed exact policy and durable effect claim',async()=>{
+ const x=make('B_WRITER_SOURCE');
+ Object.assign(x.policy,{repositoryVisibility:'public',nativeWriterBExecutionEnabled:true,
+  nativeWriterBControlSha:'d'.repeat(40),
+  nativeWriterBAdapterSha256:'e'.repeat(64),installedControllerSha:'f'.repeat(40)});
+ x.run.repository={...repo,private:false};
+ const first=await dispatchApprovedCiEffect({policy:x.policy,requestBytes:x.bytes,ports:x.ports});
+ assert.equal(first.state,'DISPATCH_ACCEPTED_NOT_EXECUTED');
+ assert.equal(first.executed,false);assert.equal(x.dispatches.length,1);
+ const second=await dispatchApprovedCiEffect({policy:x.policy,requestBytes:x.bytes,ports:x.ports});
+ assert.equal(second.code,'CI_NATIVE_DISPATCH_PRIOR_EFFECT_NO_REPOST');
+ const noInstalled=make('B_WRITER_SOURCE');
+ Object.assign(noInstalled.policy,x.policy);
+ noInstalled.run.repository={...repo,private:false};
+ noInstalled.ports.readInstalledReceiver=async()=>null;
+ const refusal=await dispatchApprovedCiEffect({policy:noInstalled.policy,requestBytes:noInstalled.bytes,ports:noInstalled.ports});
+ assert.equal(refusal.code,'CI_NATIVE_DISPATCH_RECEIVER_NOT_ATTESTED');
+ assert.equal(noInstalled.dispatches.length,0);
+});
