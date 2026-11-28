@@ -209,3 +209,26 @@ test('consumed ER1 three-symbol pilot intake is retired with approval and succes
  for(const file of ['pc-er1-nov30-full.yml','pc-er1-nov30-capture.yml','pc-er1-nov30-saved-actual-audit.yml','pc-er1-nov-forecast-shadow.yml','pc-er1-nov-forecast-publish.yml','pc-job.yml'])
   assert.equal(existsSync(path.join(root,'.github/workflows',file)),true,file);
 });
+
+// #166 was a fixed three-symbol probe, #383 a fixed WTI/gas one-key D1 delta.
+// Neither historical receipt establishes current production freshness or full ER1 coverage.
+test('consumed December symbol probe and Inflation delta intakes are retired with exact evidence',()=>{
+ for(const [name,sha] of [
+  [
+    "pc-er1-dec31-symbol-probe.yml",
+    "1fe2227d2e39e9e5a0661b09fc5f1704f6811dac"
+  ],
+  [
+    "pc-inflation19-wti-gas-delta-d1-b-once.yml",
+    "29a837a745bf1ef5d2cc9e0bcad9ebf6a41878f5"
+  ]
+]){
+  assert.equal(existsSync(path.join(root,'.github/workflows',name)),false,name);
+  const bytes=readFileSync(path.join(root,'tests/fixtures/retired-workflows',name));
+  assert.equal(createHash('sha1').update(Buffer.from('blob '+bytes.length+'\0')).update(bytes).digest('hex'),sha,name);
+ }
+ for(const file of ['ER1_DEC31_SYMBOL_PROBE_B_APPROVAL.json','er1-dec31-symbol-probe-entry.mjs','infl19-d1-publish-candidate/INFLATION19_DELTA_B_CANDIDATE_APPROVAL.json','infl19-d1-publish-candidate/inflation19-delta-b-receiver.mjs','infl19-d1-publish-candidate/inflation19-delta-b-contract.mjs','infl19-d1-publish-candidate/inflation19-delta-b-contract.test.mjs'])
+  assert.equal(existsSync(path.join(root,file)),true,file);
+ for(const name of ['pc-er1-dec31-symbol-batch-a.yml','pc-er1-dec31-html-publish-v3.yml','pc-er1-dec31-derived-score-v2.yml','pc-inflation-19-inventory-b-once.yml','pc-job.yml','pc-publication-b.yml'])
+  assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
+});
