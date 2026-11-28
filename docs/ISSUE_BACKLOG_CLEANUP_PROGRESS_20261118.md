@@ -664,3 +664,11 @@
 #4135 OPEN 유지. 기존 유료 저장 원자료 251거래일 및 250개 비교 결과의 실제 충족 여부, 승인된 R2 source/유니버스/파생 공개 범위, 원본 단회 요청의 STOP 및 복구 원장, 정확한 Writer 설치 전 CAS/자연유휴/lease/백업, Public 환경의 독립 승인 실행 경로를 검증하여 실제 기능을 정상화한다. 과거 167/167 ACTIVE 및 설치 전 STOP은 유효하다. 새 공급자·추가 결제·무료 공개 경로 복원·원본 요청 무단 재실행 금지. 기존 유료 사용을 중단하거나 대체 공급처 확보를 완료조건으로 요구하지 않는다. 현재 PC의 계약/파일/데이터/게시 실측은 아직 별도 미확인. 이번 정정은 운영 변경이 아니다.
 
 Issue 정정 댓글: https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4135#issuecomment-7237898271
+
+
+## 2026-11-28 #4078 지원 완료 범위 및 외부 종결 상태
+
+- 직접 #4359 Draft 해제·squash merge `e08dfc1d88245e5be1aa11f9f94032dc3f6ffcd3`, exact HEAD `52cae07435b27e7d11514547094c464288d78d64`, Run 46136611130 Job 140953226236 public-source-only SUCCESS, 미해결 리뷰 0, 병합 3파일 blob 3/3 직접 일치. Windows source-only SKIPPED. 전용 POSTING/DONE 공통 publicReplay/postingAt 계약 및 회귀 완료. #4358 기존 선행 완료 상태 수정 유지.
+- #4078은 별도 Owner 종결 이벤트(2026-11-28T10:45:53Z)로 현재 closed/completed. 본 담당자가 종결하거나 실제 원본 replay를 수행한 것이 아님. 실제 원본 requestId 실행/새 독립 승인·9개 실행 포트/로컬 replay ledger DONE 증거는 회수되지 않음. #4313 별도 현재 시점 A PASS는 기존 역사적 #4078의 실행 증거가 아님. Owner의 종결을 존중해 재개·중복 실행하지 않고 역사적 미입증을 별도 보존한다.
+- #3767 원본 읽기 진단은 직접 closed/not_planned로 종결 및 재조회 확인. 과거 승격 미입증 보존. #4135 유료 MarketParquet 정상화는 OPEN. #4360 별도 보안 효과를 포함하는 Draft는 실제 정확 승인/설치 readback 없는 병합·활성화 금지. 이번 운영 쓰기/원본 replay 0.
+
