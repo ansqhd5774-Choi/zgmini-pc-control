@@ -26,6 +26,8 @@ import './controller-s6-4069-public-a.test.mjs';
 import './report-recovery-3650-once.test.mjs';
 // Reuse existing lifecycle checks in Public hosted CI; no pinned YAML edits.
 import './retired-one-shots-20261120.test.mjs';
+import './er1-nov30-batch20-one-shot-entry.test.mjs';
+import './er1-nov30-batch20-recovery-entry.test.mjs';
 
 const repo='ansqhd5774-Choi/zgmini-pc-control', id=1442936296;
 const owner='ansqhd5774-Choi', ownerId=327938088;
