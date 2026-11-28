@@ -2117,6 +2117,11 @@ import '../writer-b/report-rejection.test.mjs';
   assert.equal(project(sample({}, {}, {replays:null})).replayLedgerStatus,'UNVERIFIED');
   assert.equal(project(sample({}, {}, {windows:undefined,pausedAt:'2026-11-26T19:12:00Z',resumedAt:'2026-11-26T19:16:00Z'})).replayLedgerStatus,'NOT_RECORDED');
   assert.equal(project(sample({}, {}, {windows:[{pausedAt:'2026-11-26T19:12:00Z',resumedAt:null}]})).replayLedgerStatus,'WINDOW_NOT_CLOSED');
+  // Missing end is also an open pause; a prior closed matching window cannot hide it.
+  const missingEnd=project(sample({}, {}, {windows:[{pausedAt:'2026-11-26T19:12:00Z',resumedAt:'2026-11-26T19:16:00Z'},{pausedAt:'2026-11-26T19:17:00Z'}]}));
+  assert.equal(missingEnd.replayLedgerStatus,'WINDOW_NOT_CLOSED');
+  assert.equal(missingEnd.pauseWindowContainsIssueOpenedAt,null);
+  assert.equal(project(sample({}, {}, {windows:undefined,pausedAt:'2026-11-26T19:12:00Z',resumedAt:undefined})).replayLedgerStatus,'WINDOW_NOT_CLOSED');
   assert.equal(project(sample({}, {}, {windows:[{pausedAt:'invalid'}]})).replayLedgerStatus,'UNVERIFIED');
   const drift=sample();drift.localReadback.journalAfter+=' ';
   assert.equal(project(drift).status,'STATE_UNKNOWN');
