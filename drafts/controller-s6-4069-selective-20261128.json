@@ -1,0 +1,49 @@
+{
+  "schema": "ZGMINI_CONTROLLER_PUBLIC_A_SELECTIVE_CANDIDATE_V1",
+  "approved": false,
+  "status": "SOURCE_ONLY_NOT_APPROVED",
+  "installedSha": "d3764580fdb08ecddd5f9b1064051eec30f90492",
+  "targetSha": "66b8a66c6112441576917e0ac9fbe4d39cbd5eea",
+  "sourceMainSha": "edf29d1fe748fb542b30f4096c63d81d1c016447",
+  "targetBranch": "codex/controller-s6-4069-selective-20261128",
+  "customPaths": [
+    "config/operations.json",
+    "controller/operations.mjs"
+  ],
+  "allowFiles": [
+    {
+      "path": "config/operations.json",
+      "sha256": "95873e17a8e0d44be78b7353f99c99288500a2566cf7b1708ff51c463abaf32c"
+    },
+    {
+      "path": "controller/operations.mjs",
+      "sha256": "d8d26f2ff7e0740676a2be3d25a35bd3799ab8d08b4f82d4d7426b9a89942631"
+    },
+    {
+      "path": "controller/s6-journal-readonly.mjs",
+      "sha256": "0801332a91641be02ca62f9237e9b8fc01b052651ac99caa07044b305351b46d"
+    }
+  ],
+  "preimageFiles": [
+    {
+      "path": "config/operations.json",
+      "sha256": "177cb15b40ca34fc415a091bf93f8f6ac6d607ce4d6f7f429a77d73c8abdcccf"
+    },
+    {
+      "path": "controller/operations.mjs",
+      "sha256": "6c0441108c244d1d5dd58e7793b785a371169a9d96b69e606200d905e8f59966"
+    }
+  ],
+  "postOperation": "core-status",
+  "operatingInstallationVerified": false,
+  "operatingPreimageRawCasVerified": false,
+  "publicBEffectAuthorized": false,
+  "publicAWorkflowActivated": false,
+  "backup": {
+    "strategy": "VERSIONED_SNAPSHOT",
+    "rollback": {
+      "kind": "RESTORE_INSTALLED_SHA",
+      "sha": "d3764580fdb08ecddd5f9b1064051eec30f90492"
+    }
+  }
+}

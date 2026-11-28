@@ -167,3 +167,5 @@ test('stage 5 postcheck-aware overlay is exact four-file installed-parent and no
  assert.equal(validateControllerOnlyInstallDelta(
   next.allowFiles.map(f=>f.path),next.allowFiles),true);
 });
+
+import './controller-s6-4069-selective.test.mjs';
