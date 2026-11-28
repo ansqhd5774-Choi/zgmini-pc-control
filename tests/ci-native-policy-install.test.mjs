@@ -136,7 +136,7 @@ test('transition stages observation before the first rename and covers post-swap
  const swap=s.indexOf('[IO.Directory]::Move($staging,$root)',move);
  const output=s.indexOf('Write-Once $OutputFile $reportBytes',swap);
  const recovery=s.indexOf('Restore-VerifiedTransitionPreimage',s.indexOf('}catch{',output));
- const helper=s.slice(s.indexOf(' function Restore-VerifiedTransitionPreimage {'),s.indexOf(' Verify-NewScope $staging'));
+ const helper=s.slice(s.indexOf(' function Restore-VerifiedTransitionPreimage {'),s.indexOf(' # End compensation helpers.'));
  const guard=helper.indexOf('Test-Path -LiteralPath $OutputFile');
  const claim=helper.indexOf('Verify-TransitionClaimAbsent');
  const quarantine=helper.indexOf('[IO.Directory]::Move($root,$failed)');
@@ -153,7 +153,7 @@ test('Windows parser and TEMP rollback guard refuse surviving output and claims'
  const file=new URL('../tools/operator-packets/NATIVE_WRITER_B_POLICY_INSTALL_ONCE.ps1',import.meta.url);
  const s=fs.readFileSync(file,'utf8');
  const start=s.indexOf(' function Restore-VerifiedTransitionPreimage {');
- const end=s.indexOf(' Verify-NewScope $staging',start);
+ const end=s.indexOf(' # End compensation helpers.',start);
  assert.ok(start>=0&&end>start);
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'native-policy-restore-'));
  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
@@ -171,6 +171,7 @@ test('Windows parser and TEMP rollback guard refuse surviving output and claims'
   "$OutputFile=Join-Path $base 'result.json'",
   "$claim=Join-Path $base 'claim'",
   "function Stop-N([string]$code){throw $code}",
+  "function Require-Unactivated {}",
   "function Verify-TransitionClaimAbsent {if(Test-Path -LiteralPath $claim){throw 'CLAIM_EXISTS'}}",
   "function Verify-TransitionPreimage([string]$dir){if([IO.File]::ReadAllText((Join-Path $dir 'scope')) -cne 'OLD'){throw 'OLD_DRIFT'}}",
   "function Verify-NewScope([string]$dir){if([IO.File]::ReadAllText((Join-Path $dir 'scope')) -cne 'NEW'){throw 'NEW_DRIFT'}}",
@@ -199,4 +200,29 @@ test('Windows parser and TEMP rollback guard refuse surviving output and claims'
  assert.equal(result.error,undefined);
  assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
  assert.match(result.stdout,/TEMP_RESTORE_PASS/);
+});
+
+test('Owner policy lease and interrupted recovery stay within the fixed unactivated scope',()=>{
+ const s=fs.readFileSync(new URL('../tools/operator-packets/NATIVE_WRITER_B_POLICY_INSTALL_ONCE.ps1',import.meta.url),'utf8');
+ const lease=s.indexOf('$policyLease=[Threading.Mutex]::new');
+ const wait=s.indexOf('$policyLease.WaitOne(0)',lease);
+ const recover=s.indexOf('if($transition -and $RecoverIntent)',wait);
+ const stage=s.indexOf("$staging=$root+'.staging-'",recover);
+ const move=s.indexOf('[IO.Directory]::Move($root,$backup)',stage);
+ const release=s.indexOf('$policyLease.ReleaseMutex()',move);
+ assert.ok(lease>=0&&wait>lease&&recover>wait&&stage>recover&&move>stage&&release>move);
+ assert.match(s,/NATIVE_POLICY_OWNER_LEASE_ACL_STOP/);
+ assert.match(s,/NATIVE_POLICY_OWNER_LEASE_BUSY_STOP/);
+ const recovery=s.slice(recover,stage);
+ for(const check of [
+  'Exact-Acl $intentPath','intent.requestId','intent.outputFile','intent.beforeScopeSha256',
+  'intent.afterScopeSha256','intent.afterObservationSha256','Verify-TransitionClaimAbsent',
+  'Restore-VerifiedTransitionPreimage','TRANSITION_OLD_SCOPE_VERIFIED'
+ ])assert.ok(recovery.includes(check),check);
+ assert.doesNotMatch(recovery,/Write-Once|CreateDirectory|SCOPE_INSTALLED_VERIFIED/);
+ assert.match(s,/existingIntents.Count -ne 0/);
+ const pack=fs.readFileSync(new URL('../tools/native-writer-b-policy-package.mjs',import.meta.url),'utf8');
+ assert.match(pack,/merged.merge_commit_sha===reviewedControlSha/);
+ assert.match(pack,/git\('rev-parse','HEAD'\)===controlHead/);
+ assert.match(pack,/verifyPinnedDeployment\(preview.proposedPolicy/);
 });
