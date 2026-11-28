@@ -1,3 +1,4 @@
+import {readOwnerApprovedSubmissionScope,ownerSubmissionPolicy} from './public-owner-submission-scope.mjs';
 // Read-only event intake, not a trust root or approval. Never execute candidate
 // code here. The follow-up must independently establish authority, tested tree,
 // exact effect and live preconditions before any operational submission.
@@ -268,7 +269,7 @@ export async function readAuthenticatedPublicBPublisherSourceAncestry({
  }catch{fail()}
 }
 
-export function createControllerPublicationPorts({getJson,postIssue,store,autoApprovalPolicy,readJobLogs,putMerge,readIndependentInstalledCiPolicy,readPublisherWorkflowIdentity}){
+export function createControllerPublicationPorts({getJson,postIssue,store,autoApprovalPolicy,readJobLogs,putMerge,readIndependentInstalledCiPolicy,readOwnerApprovedSubmissionScope:readOwnerScope,readPublisherWorkflowIdentity}){
  const readBytes=async(target,revision)=>{
   if(!sha(target)||!(revision==='main'||sha(revision)))throw Error('CI_PUBLICATION_SOURCE_INVALID');
   const path='approvals/controller-updates/'+target+'.json';
@@ -311,6 +312,7 @@ export function createControllerPublicationPorts({getJson,postIssue,store,autoAp
   createIssue:expected=>postIssue({title:expected.title,body:expected.body,labels:expected.labels}),
   loadReceipt:store.loadReceipt,saveReceipt:store.saveReceipt,
   ...(typeof readIndependentInstalledCiPolicy==='function'?{readIndependentInstalledCiPolicy}:{}),
+  ...(typeof readOwnerScope==='function'?{readOwnerApprovedSubmissionScope:readOwnerScope}:{}),
   ...(typeof readPublisherWorkflowIdentity==='function'?{readPublisherWorkflowIdentity}:{}),
   ...(autoApprovalPolicy&&typeof putMerge==='function'?{mergeApprovalPr:(n,head)=>{
    if(!id(n)||n!==autoApprovalPolicy.approvalPrNumber||!sha(head))
@@ -708,14 +710,17 @@ export async function main({eventPath=process.env.GITHUB_EVENT_PATH,token=proces
   // Public may interpret an event ONLY after the independent Windows grant
   // and running publisher identity are already verified. Check before any PR
   // staging, Issue POST, or durable effect receipt claim.
-  let allowPublic=false,publicEffectPin=null;
+  let allowPublic=false,publicEffectPin=null,readOwnerScope=null;
   if(event?.repository?.private===false){
    try{
     const live=await getJson('');
     if(live?.id!==repositoryId||live.full_name!==repo||live.private!==false||
        live.owner?.id!==327938088||live.owner?.login!=='ansqhd5774-Choi')
      throw Error('PUBLIC_REPOSITORY_READBACK_MISMATCH');
-    const grant=installedControllerBPolicy(readIndependentlyInstalledControllerBPublisherPolicy());
+    const roleSeparated=Object.hasOwn(policy??{},'maintenanceSourceSha');
+    if(roleSeparated)readOwnerScope=()=>readOwnerApprovedSubmissionScope({getJson,handoffSourceSha:policy.maintenanceSourceSha});
+    const grant=roleSeparated?ownerSubmissionPolicy(await readOwnerScope()):
+     installedControllerBPolicy(readIndependentlyInstalledControllerBPublisherPolicy());
     const current=await readAuthenticatedControllerBPublisherWorkflow({getJson});
     // The checked-out executor must be a validated ancestor of main, not a
     // still-unmerged Draft branch SHA or a GitHub Actions event-supplied SHA.
@@ -739,6 +744,7 @@ export async function main({eventPath=process.env.GITHUB_EVENT_PATH,token=proces
   }
   const ports=createControllerPublicationPorts({getJson,postIssue:body=>github('issues',body),store,
    readIndependentInstalledCiPolicy:()=>readIndependentlyInstalledControllerBPublisherPolicy(),
+   ...(readOwnerScope?{readOwnerApprovedSubmissionScope:readOwnerScope}:{}),
    readPublisherWorkflowIdentity:()=>readAuthenticatedControllerBPublisherWorkflow({getJson}),
    autoApprovalPolicy:allowPublic?null:initialControllerPublicationPolicy(policy),readJobLogs,
    putMerge:(n,body)=>github('pulls/'+n+'/merge',body,'PUT')});

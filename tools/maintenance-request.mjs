@@ -1,3 +1,4 @@
+import {ownerSubmissionPolicy} from '../ci-approval/public-owner-submission-scope.mjs';
 // Owner-side request submission. This is not a PC installer or approval source.
 import fs from 'node:fs';
 import {createHash} from 'node:crypto';
@@ -263,16 +264,19 @@ export async function submitExistingControllerApprovalFromCi({targetSha,approval
  const publicMode=repo.private===false;
  let publicPolicy=null;
  if(publicMode){
-  // Not the CI variable, candidate PR, event, or Issue: production must bind
-  // this port to the independently installed, protected Windows 7-file
-  // maintenance manifest. Default production ports do not expose it, so Public
-  // remains disabled until that *separate* operator-approved connection.
-  if(typeof ports.readIndependentInstalledCiPolicy!=='function')
-   fail('MAINTENANCE_CI_PUBLIC_POLICY_NOT_INSTALLED');
-  let installed;
-  try{installed=await ports.readIndependentInstalledCiPolicy();
-   publicPolicy=installedControllerBPolicy(installed);
-  }catch{fail('MAINTENANCE_CI_PUBLIC_POLICY_UNVERIFIED');}
+  // The isolated publisher may use the immutable Owner-approved submission
+  // scope. This authorizes an exact Issue POST only; the operating receiver
+  // still independently requires its installed V2 execution grant.
+  if(typeof ports.readOwnerApprovedSubmissionScope==='function'){
+   try{publicPolicy=ownerSubmissionPolicy(await ports.readOwnerApprovedSubmissionScope());}
+   catch{fail('MAINTENANCE_CI_OWNER_SUBMISSION_SCOPE_UNVERIFIED');}
+  }else{
+   // Retain the previously approved local-manifest publication path.
+   if(typeof ports.readIndependentInstalledCiPolicy!=='function')
+    fail('MAINTENANCE_CI_PUBLIC_POLICY_NOT_INSTALLED');
+   try{publicPolicy=installedControllerBPolicy(await ports.readIndependentInstalledCiPolicy());}
+   catch{fail('MAINTENANCE_CI_PUBLIC_POLICY_UNVERIFIED');}
+  }
   if(publicPolicy?.repositoryVisibility!=='public')
    fail('MAINTENANCE_CI_PUBLIC_POLICY_UNVERIFIED');
   if(publicPolicy.targetSha!==targetSha||
