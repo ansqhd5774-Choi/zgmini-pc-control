@@ -2082,3 +2082,40 @@ import '../writer-b/report-rejection.test.mjs';
   assert.equal(malformed.watchdogPromotionProof,'UNVERIFIED');
   assert.equal(malformed.status,'STATE_UNKNOWN');
  });
+
+ // Fixed independent local-only S6/Watchdog observation: fixtures only.
+ test('S6 independent local readback preserves original failure and hides raw bytes',async()=>{
+  const {projectLocalS6,projectWmiObservation,main}=await import('../tools/s6-local-owner-readonly.mjs');
+  const requestId='pc-s6-63afb126-72dc-4ec5-a721-4819771fa9ee';
+  const sample=(patch={},replays={})=>{
+   const journal=JSON.stringify({schema:'ZGMINI_S6_ONCE_JOURNAL_V1',requestId,
+    phase:'RECOVERY_REQUIRED',failedAt:'WATCHDOG_RELEASE_OUTCOME_UNVERIFIED',
+    code:'S6_PORT_PROMOTION_UNVERIFIED',leaseReleaseAcknowledged:true,
+    nonce:'PRIVATE_FIXTURE_NEVER_RETURN',...patch});
+   const backlog=JSON.stringify({schema:'ZGMINI_PC_BACKLOG_V1',requestId,
+    windows:[{pausedAt:'2026-11-26T19:12:00Z',resumedAt:'2026-11-26T19:16:00Z'}],replays});
+   const hash=v=>crypto.createHash('sha256').update(v).digest('hex');
+   return {status:'READ_ONLY_OBSERVED',code:'S6_4078_LOCAL_BYTES_SAMPLED',
+    originalOwnerMatchesCurrent:false,localReadback:{journalBefore:journal,journalAfter:journal,
+     journalSha256:hash(journal),backlogBefore:backlog,backlogAfter:backlog,
+     backlogSha256:hash(backlog)}};
+  };
+  const r=projectLocalS6(sample());
+  assert.equal(r.status,'READ_ONLY_OBSERVED');
+  assert.equal(r.journalPhase,'RECOVERY_REQUIRED');
+  assert.equal(r.originalFailureMatches,true);
+  assert.equal(r.pauseWindowContainsIssueOpenedAt,true);
+  assert.equal(r.replayLedgerStatus,'NOT_RECORDED');
+  assert.equal(r.originalOwnerMatchesCurrent,false);
+  assert.doesNotMatch(JSON.stringify(r),/PRIVATE_FIXTURE|nonce|journalBefore|Sha256/);
+  assert.equal(projectLocalS6(sample({}, {4078:{status:'DONE'}})).replayLedgerStatus,'DONE');
+  assert.equal(projectLocalS6(sample({}, {4078:{status:'PRIVATE_FIXTURE'}})).replayLedgerStatus,'UNVERIFIED');
+  assert.equal(projectLocalS6(sample({requestId:'wrong'})).status,'STATE_UNKNOWN');
+  const drift=sample();drift.localReadback.journalAfter+=' ';
+  assert.equal(projectLocalS6(drift).status,'STATE_UNKNOWN');
+  assert.deepEqual(projectWmiObservation('ACTIVE_RUNNER_PROCESS',true),{
+   referenceClassification:'ACTIVE_RUNNER_PROCESS',installedSourceMatch:true,
+   historicalPromotionVerified:false,liveWatchdogExecutionVerified:false});
+  assert.equal(projectWmiObservation('arbitrary sensitive value',false).referenceClassification,'UNVERIFIED');
+  if(process.platform!=='win32')await assert.rejects(main(),/S6_LOCAL_INDEPENDENT_WINDOWS_REQUIRED/);
+ });
