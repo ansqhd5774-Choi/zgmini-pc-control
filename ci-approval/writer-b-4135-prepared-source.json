@@ -1,0 +1,8 @@
+{
+  "schema": "ZGMINI_NATIVE_WRITER_B_PREPARED_SOURCE_V1",
+  "issue": 4135,
+  "requestId": "db6a4814-d8ea-5343-9539-cf797835c231",
+  "controlSourceSha": "b2dead3c87f88b35f1a05de77d72f33e3a618a10",
+  "approvalManifestSha256": "c4f58408f4360f7d03b9c359cda78ce4602c447d86ff15ad538cdb57d820acda",
+  "purpose": "Prepared source CI trigger only after independent policy installation; no authority or execution by this file."
+}
