@@ -120,6 +120,11 @@ test('public Writer B seal remains bound to exact independent execution opt-in',
  Object.assign(x.scope.policy,{repositoryVisibility:'public',installedControllerSha:'f'.repeat(40)});
  assert.throws(()=>authorizeWriterBNative(x),{code:'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP'});
  x.env.ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED='true';
+ // A valid-looking policy SHA alone is not evidence of current installation.
+ assert.throws(()=>authorizeWriterBNative(x),{code:'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP'});
+ x.installedControllerSha='e'.repeat(40);
+ assert.throws(()=>authorizeWriterBNative(x),{code:'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP'});
+ x.installedControllerSha=x.scope.policy.installedControllerSha;
  const a=authorizeWriterBNative(x);
  assert.equal(a.issueNumber,null);
  const wrong=fixture();
@@ -162,4 +167,32 @@ test('#4135 paid MarketParquet four-file manifest is exact native B scope, never
  const noLabel={...input,labels:[]};
  assert.throws(()=>validateWriterBRequestManifest(noLabel),
   {code:'WRITER_B_ISSUE_AUTH_STOP'});
+});
+
+
+test('Public Writer fixed host reader refuses missing, redirected or changing metadata',async()=>{
+ const {readInstalledControllerSha}=await import('../ci-approval/native-writer-b-execute.mjs');
+ const pin='f'.repeat(40);
+ const bytes=Buffer.from(JSON.stringify({controllerSourceSha:pin}));
+ const io=({mode='good'}={})=>{
+  let reads=0;
+  return {
+   lstatSync(file){
+    const host=file.endsWith('host.json');
+    if(mode==='missing'&&host)throw Error('ENOENT');
+    return {isDirectory:()=>!host,isFile:()=>host,
+     isSymbolicLink:()=>mode==='redirect'&&host,
+     size:bytes.length,mtimeMs:1};
+   },
+   readFileSync(file){
+    assert.equal(file,'E:\\ZGmini\\automation\\pc-control\\host.json');
+    reads++;
+    return mode==='drift'&&reads>1?
+     Buffer.from(JSON.stringify({controllerSourceSha:'e'.repeat(40)})):bytes;
+   }
+  };
+ };
+ assert.equal(readInstalledControllerSha(io()),pin);
+ for(const mode of ['missing','redirect','drift'])
+  assert.equal(readInstalledControllerSha(io({mode})),null,mode);
 });

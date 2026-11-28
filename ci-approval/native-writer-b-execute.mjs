@@ -15,6 +15,7 @@ import {sanitizeWriterBResult} from '../writer-b/report.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const SELF=fileURLToPath(import.meta.url);
+const INSTALLED_ROOT='E:\\ZGmini\\automation\\pc-control';
 const fail=code=>{throw Object.assign(new Error(code),{code});};
 const need=(yes,code)=>{if(!yes)fail(code);};
 const HASH=/^[a-f0-9]{40}$/;
@@ -64,6 +65,35 @@ async function getJson(route,token){
  return JSON.parse(body);
 }
 
+// Read only the installed Controller's fixed host metadata, not candidate checkout
+// or event data. Missing or changing metadata cannot authorize Public Writer B.
+// The Writer's original CAS/lease checks remain in the existing installer.
+export function readInstalledControllerSha(io=fs){
+ try{
+  for(let at=INSTALLED_ROOT;;){
+   const st=io.lstatSync(at);
+   if(!st.isDirectory()||st.isSymbolicLink())return null;
+   const parent=path.win32.dirname(at);
+   if(parent===at)break;
+   at=parent;
+  }
+  const file=path.win32.join(INSTALLED_ROOT,'host.json');
+  const fixed=()=>{
+   const before=io.lstatSync(file);
+   if(!before.isFile()||before.isSymbolicLink()||before.size<2||before.size>1048576)return null;
+   const raw=io.readFileSync(file);
+   const after=io.lstatSync(file);
+   if(!Buffer.isBuffer(raw)||raw.length!==before.size||!after.isFile()||
+      after.isSymbolicLink()||after.size!==before.size||after.mtimeMs!==before.mtimeMs)return null;
+   return raw;
+  };
+  const a=fixed(),b=fixed();
+  if(!a||!b||!a.equals(b))return null;
+  const sha=JSON.parse(a.toString('utf8'))?.controllerSourceSha;
+  return typeof sha==='string'&&HASH.test(sha)?sha:null;
+ }catch{return null;}
+}
+
 async function prepare(env){
  need(process.platform==='win32','WRITER_B_NATIVE_WINDOWS_ONLY_STOP');
  need(env.GITHUB_EVENT_NAME==='workflow_dispatch'&&
@@ -86,7 +116,9 @@ async function prepare(env){
  const controlRoot=env.GITHUB_WORKSPACE;
  const controlHead=gitHead(controlRoot);
  const auth=authorizeWriterBNative({observation,scope,env,controlHead,
-  adapterBytes:fs.readFileSync(SELF)});
+  adapterBytes:fs.readFileSync(SELF),
+  installedControllerSha:scope.policy.repositoryVisibility==='public'?
+   readInstalledControllerSha():undefined});
  const reviewed=safeApprovedManifest(controlRoot,auth.manifestPath);
  need(reviewed.equals(scope.approvalBytes),'WRITER_B_NATIVE_CHECKOUT_APPROVAL_DRIFT_STOP');
  return {auth,controlRoot};
