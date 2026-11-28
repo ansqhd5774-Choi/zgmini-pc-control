@@ -647,3 +647,11 @@
 | tools/handoff-maintenance.mjs | 23f3709ed0387cfb0132d9546f0fd6e2f10eabfad4212a67a170d5201a4a5de0 | e58528d27aa529d8dfea4f4fe8352a644590617ba9fda66630c21fc3a70244b4 | 변경 |
 
 운영 7파일 중 3개 변경, 인계 helper 1개 변경. 과거 기준 비교이므로 실제 설치 전 CAS 필수. 운영 효과 확대 자동 추정 금지. 운영 변경·재발행 0건.
+
+
+## 2026-11-28 — #4345 복구 및 #4339 종결 후속 정합
+
+- #4345 closed/not_planned: [원본 복구 기록](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4345#issuecomment-7237569799) 및 [rollback receipt](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4345#issuecomment-7237515095)에서 #4352 ROLLED_BACK/INTERRUPTED_ROLLBACK_VERIFIED, 기존 66b8a66c… 유지, 보호 상태 유지, lease 보관, pc-job active 및 Runner 7 Online 확인 기록. 원본 설치 실패 보존, 재실행 금지.
+- #4339 closed/completed: [종결 근거](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4339#issuecomment-7237747418). 격리 호스트 ABSENT 관측은 유효하며 후속 #4356 설치와 구분. #4357 [실제 공개 A 결과](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4357#issuecomment-7237655768) JSON/TXT PASS, actualExecutionSha=15c109dcc2e64a9d2d443f50efc7fe4ce06ff807, SUMMARY_ONLY; 전체 파일 해시 원격 검증 아님.
+- 두 저장소 검색 반환: pc-control OPEN 7(운영 #4135/#4078/#3767 및 영속 원장 4), zgmini OPEN 0, 양쪽 OPEN PR 0. 이전 5개 운영 추적 중 #4345/#4339 종결 확인(2/5), 직접 종결 실적 아님.
+- #4078 역사적 replay는 #4334/#4335 source CI와 별개, 정확 승인/실제 원장 CAS 및 설치 증거 필요. #3767 현재 WMI ACTIVE 관측 완료, 역사적 승격 미검증; 정상 운영 강제 장애 시험 금지. #4135 적법 대체 입력 미확보. 신규 운영 변경·재발행·PR 병합 0.
