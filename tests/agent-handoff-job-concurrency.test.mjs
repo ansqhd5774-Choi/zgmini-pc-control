@@ -214,3 +214,12 @@ test('direct intake keeps all three optional proofs read-only and falls back on 
  assert.equal((original.match(/steps\.selection-noop\.outcome == 'success' && steps\.selection-noop\.outputs\.reusable == 'true'/g)||[]).length,3);
  assert.equal((original.match(/if: github\.ref == 'refs\/heads\/main'/g)||[]).length,3);
 });
+
+
+test('direct handoff workflow grants only the original permissions to each admitted job',()=>{
+ const yaml=read('agent-handoff.yml');
+ assert.match(yaml,/^permissions: \{\}$/m);
+ const route=yaml.slice(yaml.indexOf('  route-sanitized-incident:'),yaml.indexOf('  record-verified-return:'));
+ assert.match(route,/permissions:\s*\n\s*contents: read\s*\n\s*issues: write/);
+ assert.doesNotMatch(route,/actions: write|contents: write|pull-requests: write/);
+});

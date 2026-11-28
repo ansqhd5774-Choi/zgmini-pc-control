@@ -4,11 +4,12 @@ on:
     types: [opened, labeled]
   issue_comment:
     types: [created]
-permissions:
-  contents: read
-  issues: write
+permissions: {}
 jobs:
   route-sanitized-incident:
+    permissions:
+      contents: read
+      issues: write
     outputs:
       selection_reused: ${{ steps.selection-noop.outcome == 'success' && steps.selection-noop.outputs.reusable == 'true' && 'true' || 'false' }}
     concurrency:

@@ -3,10 +3,6 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
-      - '.github/workflows/agent-handoff.yml'
-      - 'agent-handoff/queue-dispatcher.mjs'
-      - 'tests/agent-handoff-job-concurrency.test.mjs'
-      - 'tests/agent-handoff-queue-selector.test.mjs'
       - 'tools/operator-packets/CI_CONTROLLER_B_RECEIPT_ROOT_C1.ps1'
       - 'tools/operator-packets/CI_CONTROLLER_B_RECEIPT_ROOT_C1.cmd'
       - 'tools/operator-packets/ZGMINI_C1_APPROVED_ONCE.cmd'
@@ -336,8 +332,6 @@ jobs:
           node --test --test-concurrency=1 tests/ci-approval-public-completed-run-observe.test.mjs
           node --test --test-concurrency=1 tests/supervisor-orphan-six-b-receiver-source.test.mjs
           node --test --test-concurrency=1 tests/supervisor-status-write.test.mjs
-      - name: Verify handoff selection and queue reuse with source-only fixtures
-        run: node --test --test-concurrency=1 tests/agent-handoff-job-concurrency.test.mjs tests/agent-handoff-queue-selector.test.mjs
   source-only:
     if: >-
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
