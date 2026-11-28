@@ -58,3 +58,17 @@ jobs:
         shell: cmd
         run: |
           node --test --test-concurrency=1 tests/ci-native-policy-install.test.mjs
+      # Diagnostic only: instrument an ephemeral checkout *after* the genuine
+      # immutable source test ran. Nothing from this step is committed.
+      - name: Diagnose failed TEMP intent regex without changing production source
+        if: failure()
+        continue-on-error: true
+        shell: powershell
+        run: |
+          $p='tools/operator-packets/NATIVE_WRITER_B_POLICY_INSTALL_ONCE.ps1'
+          $source=[IO.File]::ReadAllText((Resolve-Path -LiteralPath $p).Path)
+          $needle="if(`$intentPath -notmatch `$intentPattern){Stop-N 'NATIVE_POLICY_TRANSITION_INTENT_PATH_STOP'}"
+          if(-not $source.Contains($needle)){throw 'DIAGNOSTIC_NEEDLE_MISSING'}
+          $diagnostic="Write-Output ('INTENT_ROOT='+`$root); Write-Output ('INTENT_PATH='+`$intentPath); Write-Output ('INTENT_PATTERN='+`$intentPattern); Write-Output ('INTENT_MATCH='+[bool](`$intentPath -match `$intentPattern)); "+$needle
+          [IO.File]::WriteAllText((Resolve-Path -LiteralPath $p).Path,$source.Replace($needle,$diagnostic))
+          node --test --test-name-pattern="Windows TEMP recovery reads the durable intent" tests/ci-native-policy-install.test.mjs
