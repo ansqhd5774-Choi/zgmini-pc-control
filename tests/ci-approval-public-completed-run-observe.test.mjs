@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {observePublicSourceCompletion} from '../ci-approval/public-completed-run-observe.mjs';
+// Reuse the existing hosted source-only step for the shared Native A
+// effect-binding regression. No public self-hosted admission or workflow pin changes.
+import './ci-native-a-execute.test.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const repository=()=>({id:1442936296,full_name:REPO,private:false,

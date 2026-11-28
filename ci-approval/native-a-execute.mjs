@@ -44,8 +44,7 @@ export function inspectNativeAExecution({
  observation,scope,host,controllerPolicyBytes,adapterBytes,readInstalledFile,env
 }={}){
  if(observation?.state!=='CONTRACT_MATCH_ONLY'||
-   observation.code!=='CI_NATIVE_RECEIVER_INDEPENDENT_EVIDENCE_MATCH'||
-   observation.effectKey!==scope?.effectKey && scope?.effectKey!==undefined)
+   observation.code!=='CI_NATIVE_RECEIVER_INDEPENDENT_EVIDENCE_MATCH')
   return failed('CI_NATIVE_A_RECEIVER_ADMISSION_MISSING');
  const p=scope?.policy;
  if(p?.effect!=='A_READONLY'||p?.schema!=='ZGMINI_CI_NATIVE_DISPATCH_V1'||
@@ -53,6 +52,14 @@ export function inspectNativeAExecution({
     !hex(p.nativeAAdapterSha256,64)||!hex(p.installedControllerSha,40)||
     !hex(p.approvedRequestSha256,64)||!hex(p.businessApprovalSha256,64))
   return failed('CI_NATIVE_A_EXECUTION_SCOPE_UNVERIFIED');
+ // readNativeScope returns policy and raw bytes, not a top-level effectKey.
+ // Derive the same stable effect identity as the receiver and dispatcher.
+ // Missing or mismatched observation must never authorize the existing engine.
+ const expectedEffectKey=sha(Buffer.from(JSON.stringify([p.effect,
+  p.businessApprovalSha256,p.approvedRequestSha256])));
+ if(observation.effectKey!==expectedEffectKey||
+    (scope.effectKey!==undefined&&scope.effectKey!==expectedEffectKey))
+  return failed('CI_NATIVE_A_RECEIVER_EFFECT_KEY_MISMATCH');
  if(!Buffer.isBuffer(scope.requestBytes)||!Buffer.isBuffer(scope.approvalBytes)||
     !Buffer.isBuffer(controllerPolicyBytes)||!Buffer.isBuffer(adapterBytes)||
     sha(scope.requestBytes)!==p.approvedRequestSha256||
