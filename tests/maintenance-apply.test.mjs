@@ -988,17 +988,33 @@ test('a persistently Busy runner is refused after at most 30 seconds',async()=>{
  assert.equal(reads,11);
 });
 
-test('Offline or missing Runner prevents stop without waiting',async()=>{
- for(const inventory of [
-  ()=>{const rows=idleRaceSeats();rows[4].status='offline';return rows;},
-  ()=>idleRaceSeats().slice(1)
- ]){
+test('missing Runner still prevents stop without waiting',async()=>{
+ for(const inventory of [()=>idleRaceSeats().slice(1)]){
   let waits=0;
   await assert.rejects(waitForSupervisorStopIdle({
    readRunners:inventory,verifySafety:()=>{},now:()=>0,pause:async()=>{waits++;}
   }),{code:'RUNNERS_NOT_ONLINE'});
   assert.equal(waits,0);
  }
+});
+
+test('transient Offline observation can recover within the existing stop deadline',async()=>{
+ let clock=0,reads=0,checks=0;
+ const r=await waitForSupervisorStopIdle({readRunners:()=>{
+  const rows=idleRaceSeats();if(++reads===1)rows[4].status='offline';return rows;
+ },verifySafety:()=>{checks++;},now:()=>clock,pause:async ms=>{clock+=ms;}});
+ assert.deepEqual(r,{retryCount:1,elapsedMs:3000,observedBusy:false,observedOffline:true});
+ assert.equal(checks,2);assert.equal(reads,2);
+});
+
+test('persistent Offline observation never grants stop and retains the 30 second limit',async()=>{
+ let clock=0;
+ await assert.rejects(waitForSupervisorStopIdle({readRunners:()=>{
+  const rows=idleRaceSeats();rows[4].status='offline';return rows;
+ },verifySafety:()=>{},now:()=>clock,pause:async ms=>{clock+=ms;}}),e=>{
+  assert.equal(e.code,'RUNNERS_NOT_ONLINE');assert.equal(e.supervisorIdleWait.observedOffline,true);return true;
+ });
+ assert.equal(clock,30000);
 });
 
 test('owner or protection drift aborts next idle retry before readback or stop',async()=>{
