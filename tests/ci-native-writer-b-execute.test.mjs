@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {readInstalledControllerSha,recordNativeWriterBFailure} from '../ci-approval/native-writer-b-execute.mjs';
+import {readInstalledControllerSha,recordNativeWriterBFailure,selectNativeWriterControlRoot} from '../ci-approval/native-writer-b-execute.mjs';
 import {authorizeWriterBNative,assertAuthenticatedWriterBIssue,
  validateWriterBRequestManifest,ISSUE_LABEL}
  from '../writer-b/contract.mjs';
@@ -323,4 +323,43 @@ test('denied native B receiver still emits a bounded preflight refusal without c
  assert.match(upload,/if: always\(\) && vars\.ZGMINI_CI_NATIVE_WRITER_B_EXEC_ENABLED == 'true'/);
  assert.match(upload,/if-no-files-found: error/);
  assert.match(y,/vars\.ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED == 'true'/);
+});
+
+test('Public Writer exact pinned source remains bound across a separate authenticated dispatch origin',()=>{
+ const x=fixture();
+ Object.assign(x.scope.policy,{repositoryVisibility:'public',installedControllerSha:'f'.repeat(40),
+  nativeWriterBControlMode:'PINNED_CHECKOUT_V1'});
+ x.env.ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED='true';
+ x.installedControllerSha='f'.repeat(40);
+ x.env.GITHUB_SHA='b'.repeat(40);
+ x.dispatchControlHead=x.env.GITHUB_SHA;
+ assert.equal(authorizeWriterBNative(x).controlSha,'a'.repeat(40));
+ for(const mutate of [
+  y=>{y.dispatchControlHead='c'.repeat(40)},
+  y=>{y.controlHead='c'.repeat(40)},
+  y=>{delete y.scope.policy.nativeWriterBControlMode},
+  y=>{y.scope.policy.nativeWriterBControlMode='UNKNOWN'},
+  y=>{y.scope.policy.repositoryVisibility='private'},
+  y=>{y.adapterBytes=Buffer.from('different')}
+ ]){
+  const y={...x,scope:{...x.scope,policy:{...x.scope.policy}},env:{...x.env}};
+  mutate(y);
+  assert.throws(()=>authorizeWriterBNative(y),{code:'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP'});
+ }
+});
+test('checkout selection binds the actual origin and exact separate approved checkout',()=>{
+ const root=path.resolve('synthetic-workspace'),pinned=path.join(root,'writer-b-control');
+ const policy={repositoryVisibility:'public',nativeWriterBControlMode:'PINNED_CHECKOUT_V1',
+  nativeWriterBControlSha:'a'.repeat(40)};
+ const env={GITHUB_SHA:'b'.repeat(40)};
+ const readHead=p=>p===root?'b'.repeat(40):p===pinned?'a'.repeat(40):'c'.repeat(40);
+ const x={workspace:root,ownRoot:root,policy,env,readHead,mode:'--resolve-control'};
+ assert.equal(selectNativeWriterControlRoot(x).dispatchControlHead,env.GITHUB_SHA);
+ assert.equal(selectNativeWriterControlRoot({...x,ownRoot:pinned,mode:'--preflight'}).controlHead,policy.nativeWriterBControlSha);
+ for(const bad of [
+  {...x,mode:'--preflight'},
+  {...x,ownRoot:pinned,mode:'--resolve-control'},
+  {...x,ownRoot:pinned,mode:'--execute',readHead:()=>env.GITHUB_SHA},
+  {...x,env:{GITHUB_SHA:'c'.repeat(40)}}
+ ])assert.throws(()=>selectNativeWriterControlRoot(bad),{code:'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP'});
 });
