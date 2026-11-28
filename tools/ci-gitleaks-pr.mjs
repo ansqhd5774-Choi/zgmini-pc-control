@@ -5,6 +5,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import crypto from 'node:crypto';
 import {execFileSync,spawnSync} from 'node:child_process';
+import {assessPublicSourceCi} from './public-source-ci-guard.mjs';
 
 export const GITLEAKS_VERSION='8.30.1';
 export const GITLEAKS_ZIP_SHA256='d29144deff3a68aa93ced33dddf84b7fdc26070add4aa0f4513094c8332afc4e';
@@ -31,6 +32,17 @@ export function requireGitleaksClean(scan){
   throw Error('GITLEAKS_SCAN_EXECUTION_FAILED');
 }
 const RELEASE_URL='https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_windows_x64.zip';
+// Official v8.30.1 release asset digest, Linux x64 tar.gz.
+export const GITLEAKS_LINUX_SHA256='551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb';
+const LINUX_URL='https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz';
+export function selectScanRelease(env,event,platform=process.platform,arch=process.arch){
+  if(env?.RUNNER_OS==='Windows'&&platform==='win32'&&arch==='x64')
+    return {url:RELEASE_URL,sha256:GITLEAKS_ZIP_SHA256,archive:'gitleaks.zip',exe:'gitleaks.exe',curl:'curl.exe',tar:'tar.exe'};
+  if(env?.RUNNER_OS==='Linux'&&env.RUNNER_ARCH==='X64'&&platform==='linux'&&arch==='x64'&&
+     assessPublicSourceCi({event,env}).status==='PASS')
+    return {url:LINUX_URL,sha256:GITLEAKS_LINUX_SHA256,archive:'gitleaks.tar.gz',exe:'gitleaks',curl:'curl',tar:'tar'};
+  throw Error('GITLEAKS_ISOLATED_EVENT_REQUIRED');
+}
 const SHA=/^[0-9a-f]{40}$/;
 export function prCommitRange(event,actualHead){
   const base=event?.pull_request?.base?.sha;
@@ -52,22 +64,22 @@ function run(command,args){
 export function scanPr(){
   if(process.env.GITHUB_REPOSITORY!=='ansqhd5774-Choi/zgmini-pc-control'
      ||process.env.GITHUB_EVENT_NAME!=='pull_request'
-     ||process.env.RUNNER_OS!=='Windows'
      ||!process.env.GITHUB_EVENT_PATH
      ||!process.env.RUNNER_TEMP)throw Error('GITLEAKS_ISOLATED_EVENT_REQUIRED');
   const event=JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH,'utf8'));
+  const release=selectScanRelease(process.env,event);
   const git=args=>execFileSync('git',args,{encoding:'utf8',windowsHide:true}).trim();
   const head=git(['rev-parse','HEAD']);
   const range=prCommitRange(event,head);
   git(['cat-file','-e',range.base+'^{commit}']);
   const folder=fs.mkdtempSync(path.join(process.env.RUNNER_TEMP,'zgmini-gitleaks-'));
   try{
-    const archive=path.join(folder,'gitleaks.zip');
-    run('curl.exe',['--fail','--location','--silent','--show-error','--max-time','90',
-      '--output',archive,RELEASE_URL]);
-    requireExactSha256(fs.readFileSync(archive),GITLEAKS_ZIP_SHA256);
-    run('tar.exe',['-xf',archive,'-C',folder]);
-    const exe=path.join(folder,'gitleaks.exe');
+    const archive=path.join(folder,release.archive);
+    run(release.curl,['--fail','--location','--silent','--show-error','--max-time','90',
+      '--output',archive,release.url]);
+    requireExactSha256(fs.readFileSync(archive),release.sha256);
+    run(release.tar,['-xf',archive,'-C',folder]);
+    const exe=path.join(folder,release.exe);
     if(!fs.existsSync(exe))throw Error('GITLEAKS_EXE_MISSING');
     // Never log findings, raw matches, reports or unredacted tool stderr.
     // The official reporter writes rule IDs only to captured stdout, never to
