@@ -3592,6 +3592,26 @@ function publicReplayHistory(callGithub,original,requestId){
 }
 // Only within the existing approved maintenance transaction. Never grants
 // B authority or authorizes a historical S6 retry. DONE is dispatch only.
+// Match the existing compact Public hosted review envelope before any POST.
+ // No dependency on unverified local Controller modules during recovery.
+export function validPublicBacklogEnvelope(text,body,policy){
+ const fields=['schema','requestId','chatId','operation','sourceRepository','sourceBranch','sourceSha'];
+ return typeof text==='string'&&Buffer.byteLength(text,'utf8')<=16384&&
+  body!==null&&typeof body==='object'&&!Array.isArray(body)&&
+  text===JSON.stringify(body)&&Object.keys(body).length===fields.length&&
+  fields.every(k=>Object.hasOwn(body,k))&&body.schema==='ZGMINI_PC_JOB_V1'&&
+  /^pc-[a-z0-9][a-z0-9-]{7,75}$/.test(body.requestId??'')&&
+  !body.requestId.endsWith('-postcheck')&&
+  /^chat-[a-z0-9][a-z0-9-]{3,58}$/.test(body.chatId??'')&&
+  /^[a-z0-9-]{3,80}$/.test(body.operation??'')&&
+  body.sourceRepository==='ansqhd5774-Choi/zgmini'&&body.sourceBranch==='main'&&
+  /^[a-f0-9]{40}$/.test(body.sourceSha??'')&&
+  policy?.schema==='ZGMINI_PC_OPERATIONS_V1'&&
+  policy.controlRepository===controlRepository&&
+  policy.sourceRepository===body.sourceRepository&&
+  policy.mutationsEnabled===false&&policy.maxAutomaticRetries===0&&
+  policy.operations!==null&&typeof policy.operations==='object'&&!Array.isArray(policy.operations);
+}
 function reconcilePublicBacklogOriginal({original,state,backlogFile,requestId,
  callGithub,approvedRoot,readPublicPolicy,clock}){
  const key=String(original.number),prior=state.replays[key];
@@ -3600,7 +3620,8 @@ function reconcilePublicBacklogOriginal({original,state,backlogFile,requestId,
   original.user?.id===327938088&&!decision.body.requestId.endsWith('-postcheck'),
   'BACKLOG_PUBLIC_ORIGINAL_NOT_FIXED_A');
  const body=decision.body,policy=readPublicPolicy();
- need(policy?.operations&&Object.hasOwn(policy.operations,body.operation)&&
+ need(validPublicBacklogEnvelope(original.body,body,policy),'BACKLOG_PUBLIC_ENVELOPE_UNVERIFIED');
+ need(Object.hasOwn(policy.operations,body.operation)&&
   policy.operations[body.operation]?.grade==='A','BACKLOG_PUBLIC_GRADE_A_UNVERIFIED');
  const matches=publicReplayHistory(callGithub,original,body.requestId);
  const exact=row=>exactPublicReplayIssue(row,original)&&
@@ -3623,6 +3644,17 @@ function reconcilePublicBacklogOriginal({original,state,backlogFile,requestId,
  // A previous replay can itself appear in a later pause window. A duplicate
  // identity without our own durable POSTING marker is never reposted.
  need(matches.length===0,'BACKLOG_PUBLIC_DUPLICATE_REQUEST_UNVERIFIED');
+ // A previously completed original must not be replayed from an old listing.
+ const fresh=callGithub('issues/'+original.number);
+ need(fresh?.number===original.number&&fresh.state==='open'&&
+  fresh.title===original.title&&fresh.body===original.body&&!fresh.pull_request&&
+  fresh.user?.id===327938088&&fresh.user?.login==='ansqhd5774-Choi'&&
+  fresh.labels?.some(x=>x.name==='pc-job'),'BACKLOG_PUBLIC_ORIGINAL_DRIFT');
+ const finalComments=readAllMaintenancePages(page=>callGithub(`issues/${original.number}/comments?per_page=100&page=${page}`));
+ if(finalComments.some(c=>c.user?.login==='github-actions[bot]'&&c.body?.includes('zgmini-pc-result:'))){
+  state.replays[key]={status:'SKIPPED_RESULT_PRESENT'};writeJson(backlogFile,state);return;
+ }
+ need(backlogRepoVisibility(callGithub)==='public','BACKLOG_PUBLIC_VISIBILITY_CHANGED');
  const postingAt=new Date(clock()).toISOString();
  state.replays[key]={status:'POSTING',publicReplay:true,originalRequestId:body.requestId,
   originalBodySha256:decision.originalBodySha256,postingAt};
@@ -3652,6 +3684,8 @@ export function reconcileMaintenanceBacklog({backlogFile,requestId,
   'BACKLOG_FILE_ABSOLUTE_REQUIRED');
    need(fs.existsSync(backlogFile),'BACKLOG_STATE_MISSING');
    let state=json(backlogFile);
+   need(state?.requestId===requestId&&state.replays!==null&&typeof state.replays==='object'&&
+    !Array.isArray(state.replays),'BACKLOG_REQUEST_OR_LEDGER_DRIFT');
    const windows=backlogPauseWindows(state);
    need(windows.every(w=>w.resumedAt),'BACKLOG_WINDOW_NOT_CLOSED');
    // A workflow disabled on an Issue `opened` event does not replay it when
