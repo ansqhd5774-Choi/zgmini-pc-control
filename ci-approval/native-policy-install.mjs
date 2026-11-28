@@ -98,6 +98,9 @@ export function verifyIndependentPolicyReceipt(receipt,policy){
    /^[a-f0-9]{64}$/.test(x.aclSha256??'')&&
    typeof x.observedAt==='string'&&Number.isFinite(Date.parse(x.observedAt)),
    'NATIVE_POLICY_INSTALL_HOST_PROOF_STOP');
+  if(policy.nativeWriterBControlMode==='PINNED_CHECKOUT_V1')
+   need(x.previousScopeSha256===FIRST_SCOPE_SHA256&&x.backupVerified===true,
+    'NATIVE_POLICY_TRANSITION_HOST_BACKUP_STOP');
  }
  need(receipt.hosts[0].scopeSha256===receipt.hosts[1].scopeSha256,
   'NATIVE_POLICY_INSTALL_HOST_BYTES_STOP');
