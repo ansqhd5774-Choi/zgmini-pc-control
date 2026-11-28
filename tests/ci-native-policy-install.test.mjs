@@ -98,3 +98,29 @@ test('transport-only transition preserves original exact business effect and sou
   assert.throws(()=>verifyPolicyTransportTransition(x.scope,makeIndependentPolicyScope({...x,policy:p})));
  }
 });
+
+test('new pinned policy receipt requires both preserved original host backups',()=>{
+ const x=fixture(),policy={...x.policy,nativeWriterBControlMode:'PINNED_CHECKOUT_V1'};
+ const receipt={...x.receipt,nativePolicySha256:hash(JSON.stringify(policy)),
+  hosts:x.receipt.hosts.map(h=>({...h,policySha256:hash(JSON.stringify(policy))}))};
+ assert.throws(()=>verifyIndependentPolicyReceipt(receipt,policy),/TRANSITION_HOST_BACKUP_STOP/);
+ const old='df097365ebc641a551f6e0b233ad333662f4ae12b82a2180cfb97637656f5736';
+ for(const h of receipt.hosts){h.previousScopeSha256=old;h.backupVerified=true}
+ assert.equal(verifyIndependentPolicyReceipt(receipt,policy),receipt);
+ receipt.hosts[1].backupVerified=false;
+ assert.throws(()=>verifyIndependentPolicyReceipt(receipt,policy),/TRANSITION_HOST_BACKUP_STOP/);
+});
+test('Windows transition installer keeps elevated gate, exact preimage, protected backup and claims',()=>{
+ const s=fs.readFileSync(new URL('../tools/operator-packets/NATIVE_WRITER_B_POLICY_INSTALL_ONCE.ps1',import.meta.url),'utf8');
+ const apply=s.indexOf("if(-not $Apply");
+ const admin=s.indexOf("NATIVE_POLICY_ADMIN_REQUIRED");
+ const preimage=s.indexOf("function Verify-TransitionPreimage");
+ const move=s.indexOf("[IO.Directory]::Move($root,$backup)");
+ assert.ok(apply>=0&&admin>apply&&preimage>admin&&move>preimage);
+ assert.match(s,/NATIVE_POLICY_TRANSITION_SCOPE_CAS_STOP/);
+ assert.match(s,/NATIVE_POLICY_RESERVED_PUBLISHER_CLAIM_STOP/);
+ assert.match(s,/NATIVE_POLICY_RESERVED_WRITER_CLAIM_STOP/);
+ assert.match(s,/\[IO.Directory\]::Move\(\$backup,\$root\)/);
+ assert.match(s,/NATIVE_POLICY_TRANSITION_BACKUP_READBACK_STOP/);
+ assert.doesNotMatch(s,/Remove-Item|Set-ExecutionPolicy|Stop-Process/);
+});
