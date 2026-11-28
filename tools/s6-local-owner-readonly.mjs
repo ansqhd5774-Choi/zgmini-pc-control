@@ -16,9 +16,9 @@ const CSCRIPT='C:/Windows/System32/cscript.exe';
 const ANCESTRY='E:/ZGmini/automation/pc-maintenance/tools/maintenance-ancestry.vbs';
 const WATCHDOG='E:/ZGmini/automation/pc-watchdog';
 const SOURCE_FILES=[REL,'tools/s6-4078-windows-local-readonly.mjs',
- 'tools/s6-4078-backlog-only-plan.mjs','tools/runner-watchdog.mjs'];
+ 'tools/s6-4078-backlog-only-plan.mjs','tools/runner-watchdog.mjs',
+ 'controller/s6-journal-readonly.mjs','controller/common.mjs'];
 const REQUEST='pc-s6-63afb126-72dc-4ec5-a721-4819771fa9ee';
-const OPENED=Date.parse('2026-11-26T19:14:52Z');
 const PHASES=new Set(['CLAIMED','INSTALL_LEASE_ACQUIRE_ATTEMPT',
  'INSTALL_LEASE_ACQUIRED','INTAKE_PAUSE_ATTEMPT','INTAKE_PAUSED','DRAINED',
  'OLD_TREE_STOP_ATTEMPT','OLD_TREE_STOP_SUBMITTED','OLD_TREE_STOP_VERIFIED',
@@ -26,7 +26,6 @@ const PHASES=new Set(['CLAIMED','INSTALL_LEASE_ACQUIRE_ATTEMPT',
  'OWNED_LEASE_RELEASED','WATCHDOG_RELEASE_OBSERVED','FAST_PROMOTION_OBSERVED',
  'WATCHDOG_RELEASE_OUTCOME_UNVERIFIED','BACKLOG_RECONCILE_ATTEMPT',
  'BACKLOG_RECONCILED','PROMOTED_READBACK_VERIFIED','RECOVERY_REQUIRED']);
-const REPLAY_STATES=new Set(['POSTING','DONE','SKIPPED_RESULT_PRESENT','REJECTED_INVALID_ORIGINAL']);
 const CLASSIFICATIONS=new Set(['UNVERIFIED','ACTIVE_RUNNER_PROCESS','NO_CONTROLLER_RUNNER_PROCESS']);
 const sha=x=>createHash('sha256').update(x).digest('hex');
 const need=(ok,code)=>{if(!ok)throw Object.assign(new Error(code),{code});};
@@ -38,7 +37,7 @@ const base=()=>({schema:'ZGMINI_S6_LOCAL_OWNER_READONLY_V1',
 
 // Only fixed enums/booleans leave this projection, never original bytes,
 // arbitrary journal strings, owner IDs, nonces, PIDs, paths or raw hashes.
-export function projectLocalS6(sample){
+export function projectLocalS6(sample,projectBacklog){
  const unknown={status:'STATE_UNKNOWN',journalPhase:null,failedAt:null,
   originalFailureMatches:null,leaseReleaseAcknowledged:null,
   originalOwnerMatchesCurrent:null,pauseWindowContainsIssueOpenedAt:null,
@@ -54,20 +53,18 @@ export function projectLocalS6(sample){
   const j=JSON.parse(l.journalBefore),b=JSON.parse(l.backlogBefore);
   if(j?.schema!=='ZGMINI_S6_ONCE_JOURNAL_V1'||j.requestId!==REQUEST||
      !phase(j.phase)||b?.schema!=='ZGMINI_PC_BACKLOG_V1'||b.requestId!==REQUEST||
-     !Array.isArray(b.windows)||b.windows.length<1||b.windows.length>256||
-     !b.replays||typeof b.replays!=='object'||Array.isArray(b.replays))
-   return unknown;
-  const windows=b.windows.map(w=>[Date.parse(w?.pausedAt),Date.parse(w?.resumedAt)]);
-  const closed=windows.every(([a,z])=>Number.isFinite(a)&&Number.isFinite(z)&&z>=a);
-  const replay=Object.hasOwn(b.replays,'4078')?
-   (REPLAY_STATES.has(b.replays['4078']?.status)?b.replays['4078'].status:'UNVERIFIED'):
-   'NOT_RECORDED';
+     typeof projectBacklog!=='function')return unknown;
+  // Reuse the current Controller's bounded legacy/window and replay contract.
+  // Missing historical replays is different from a malformed replay object.
+  const observed=projectBacklog(b);
+  const replay=observed?.replayLedgerStatus;
+  if(!['NOT_RECORDED','POSTING','DONE','SKIPPED_RESULT_PRESENT',
+    'REJECTED_INVALID_ORIGINAL','WINDOW_NOT_CLOSED','UNVERIFIED'].includes(replay))return unknown;
   return {status:'READ_ONLY_OBSERVED',journalPhase:j.phase,failedAt:phase(j.failedAt),
    originalFailureMatches:j.code==='S6_PORT_PROMOTION_UNVERIFIED',
    leaseReleaseAcknowledged:bool(j.leaseReleaseAcknowledged),
    originalOwnerMatchesCurrent:bool(sample.originalOwnerMatchesCurrent),
-   pauseWindowContainsIssueOpenedAt:closed?
-    windows.some(([a,z])=>OPENED>=a-2000&&OPENED<=z):null,
+   pauseWindowContainsIssueOpenedAt:bool(observed.pauseWindowContainsIssueOpenedAt),
    replayLedgerStatus:replay};
  }catch{return unknown;}
 }
@@ -138,7 +135,8 @@ export async function main(){
  const {head,sources}=verifyOwnerSource();
  const {readS64078LocalBytes}=await import('./s6-4078-windows-local-readonly.mjs');
  const {scanControllerRunnersReadOnly}=await import('./runner-watchdog.mjs');
- const s6=projectLocalS6(readS64078LocalBytes());
+ const {projectS64078BacklogReadonly}=await import('../controller/s6-journal-readonly.mjs');
+ const s6=projectLocalS6(readS64078LocalBytes(),projectS64078BacklogReadonly);
  const ref=sources.get('tools/runner-watchdog.mjs');
  const before=installedMatch(ref);
  const wmi=scanControllerRunnersReadOnly();
