@@ -546,3 +546,8 @@
 - [#4078 정정 기록](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4078#issuecomment-7230923109): `closed/completed`는 마지막 `SOURCE_MERGED / OPERATING_REPLAY_NOT_EXECUTED` 및 #4105 `NOT_RECORDED / executionEstablished=false`와 상충. #4312 병합 소스 `inspectS64078BacklogOnly`는 원본 `state==='open'`을 요구. 이슈 추적 상태만 `open/reopened`로 정정 후 원격 재조회. 본문·라벨·requestId 불변. pc-job workflow는 opened/labeled만 수신하므로 reopen은 실행 요청 아님. PR 병합 보존.
 - 직접 기술 차단: 운영 저장소와 기능 저장소 모두 public; 기존 S6 journal/WMI process inventory Workflow는 private 전용. 설치 증거 SHA `d3764580fdb08ecddd5f9b1064051eec30f90492`의 `config/operations.json`에 해당 S6/WMI 직접 연산 없음. `controller/common.mjs::publicPcReportProjection`은 status와 고정 redacted code만 내보내며 로컬 원장 상세는 전송하지 않음. 기존 #4313 같은 공개 A 재실행은 필요한 증거를 회수하지 못함. 실제 Windows Owner/승인된 비공개 결과 회수 경로 확보가 남음. 보호조건 변경 없음.
 - 신규 reopen 1건, 신규 close/merge/PC 요청/운영 변경 0. 현재 검색 Open 8건(영속 원장 4건), Open PR 0건. #4069/#4078/#3767 운영 증거와 #4135 대체 데이터 입력을 각각 분리.
+
+
+## 2026-11-28 #3767 WMI 분리 관측 source 병합
+
+- PR #4317, 정확 HEAD `eb9b4e3cd8d2ec8f5148523f18e44c581a5e448b`, 기존 Watchdog classifier 재사용, R3 원본 상태 유지, 동일 표본 JSON/TXT 고정 분류값 기록 및 직접 서비스 PID 관측 일치. 2파일만 변경. [Actions 46088307092](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/46088307092) public-source-only SUCCESS, 통합 158/158 PASS, Windows skipped. squash `7d31c585a8805e686104ac4c3e2f459ce8a130cb`, 2파일 blob readback. #3767 OPEN: 실제 운영 승격 WMI 분류·계보 미확인, 기존 private 전용 Workflow/공개 summary-only 경계 유지. 신규 PR 병합 1건, PC/설치/DB/D1/Runner 변경 0. #4069/#4078/#4135는 별도 미완료.
