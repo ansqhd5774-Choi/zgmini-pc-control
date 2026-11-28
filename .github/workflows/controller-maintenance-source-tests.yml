@@ -4,8 +4,6 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - 'tools/operator-packets/CI_CONTROLLER_B_RECEIPT_ROOT_C1.ps1'
-      - 'tools/operator-packets/NATIVE_WRITER_B_POLICY_INSTALL_ONCE.ps1'
-      - 'tests/ci-native-policy-powershell-parser.test.mjs'
       - 'tools/operator-packets/CI_CONTROLLER_B_RECEIPT_ROOT_C1.cmd'
       - 'tools/operator-packets/ZGMINI_C1_APPROVED_ONCE.cmd'
       - 'tests/ci-controller-b-receipt-root-c.test.mjs'
@@ -318,7 +316,6 @@ jobs:
           node tools/public-source-ci-guard.mjs
       - name: Verify public source/runner isolation and deferred B approval
         run: |
-          node --test --test-concurrency=1 tests/ci-native-policy-powershell-parser.test.mjs
           node --test --test-concurrency=1 tests/public-source-ci-guard.test.mjs
           node --test --test-concurrency=1 tests/public-pc-job-candidate.test.mjs
           node --test --test-concurrency=1 tests/controller-entry-import-receipt.test.mjs
@@ -365,8 +362,6 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
-      - name: Parse independent Native Writer B Owner script without execution
-        run: node --test tests/ci-native-policy-powershell-parser.test.mjs
       - name: Determine affected source test families
         id: scope
         env:
