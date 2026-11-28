@@ -12,7 +12,7 @@
   "approval": {
     "grade": "B",
     "scope": "PC_CONTROL_CONTROLLER_UPDATE",
-    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1"
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4341"
   },
   "checks": {
     "targetSha": "ee8d8ea8fc7f29a64fb3636f4280e5c6ba51a5c9",
