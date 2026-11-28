@@ -1,4 +1,6 @@
 import {test} from 'node:test';
+// Exercise the installer contract without changing pinned workflow bytes.
+import './ci-native-policy-install.test.mjs';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import fs from 'node:fs';
