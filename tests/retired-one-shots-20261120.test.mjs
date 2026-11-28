@@ -263,3 +263,20 @@ test('consumed December HTML V3 and derived score V2 publication intakes are arc
  for(const name of ['pc-er1-dec31-symbol-batch-a.yml','pc-er1-nov30-full.yml','pc-er1-nov30-capture.yml','pc-publication-b.yml','pc-job.yml'])
   assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
 });
+
+// #215 consumed a fixed two-key historical HTML publication approval.
+// Current production freshness, full Actual data and scores are independent.
+test('consumed November 3051-event HTML publication intake is archived with approval intact',()=>{
+ const name='pc-er1-nov30-html-publish.yml';
+ assert.equal(existsSync(path.join(root,'.github/workflows',name)),false,name);
+ const bytes=readFileSync(path.join(root,'tests/fixtures/retired-workflows',name));
+ assert.equal(createHash('sha1').update(Buffer.from('blob '+bytes.length+'\0')).update(bytes).digest('hex'),'a095bd4a953483e01d544a424c23dc9e9cd884fc');
+ const a=JSON.parse(readFileSync(path.join(root,'ER1_NOV30_HTML_PUBLISH_B_APPROVAL.json'),'utf8'));
+ assert.equal(a.sourceSha,'f8c7ba3f2ec407d01b9b2b57ce2c8e28b52dbac8');
+ assert.equal(a.expectedEvents,3051);assert.equal(a.expectedDates,30);
+ assert.deepEqual(a.outputKeys,['market-calendar:earnings-nov2026-h1-display-html','market-calendar:earnings-nov2026-h2-display-html']);
+ for(const k of ['allowProviderCalls','allowExistingFeedWrites','allowRawVendorPublic','allowFormulaChanges','allowSchedulerChanges','allowDirectDeployment'])assert.equal(a[k],false,k);
+ assert.equal(a.maxAutomaticRetries,0);
+ assert.equal(existsSync(path.join(root,'er1-nov30-html-publish-entry.mjs')),true);
+ for(const n of ['pc-er1-nov30-full.yml','pc-er1-nov30-capture.yml','pc-er1-nov30-saved-actual-audit.yml','pc-er1-nov-forecast-shadow.yml','pc-er1-nov-forecast-publish.yml','pc-publication-b.yml','pc-job.yml'])assert.equal(existsSync(path.join(root,'.github/workflows',n)),true,n);
+});

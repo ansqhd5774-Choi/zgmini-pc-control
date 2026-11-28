@@ -142,3 +142,11 @@ test('all archived workflow fixtures remain outside the live workflow directory'
  assert.ok(names.length>0);
  for(const name of names)assert.equal(fs.existsSync(new URL(name,active)),false,name);
 });
+
+// A completed-event subscription is necessary for failure intake; only
+// admitted failure jobs may reserve its serialized write lane.
+test('CI failure intake keeps its writer queue inside the admitted job',()=>{
+ const yml=fs.readFileSync(new URL('../.github/workflows/ci-failure-issue-intake.yml',import.meta.url),'utf8');
+ assert.equal(yml.split('\n').filter(line=>line==='concurrency:').length,0);
+ assert.ok(yml.includes('    concurrency:\n      group: ci-failure-issue-intake\n      queue: max\n      cancel-in-progress: false'));
+});

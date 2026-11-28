@@ -162,7 +162,11 @@ test('an incorrect Issue creation readback is rejected',async()=>{
 
 test('failure intake queues overlapping events instead of replacing earlier pending failures',()=>{
  const yml=readFileSync(new URL('../.github/workflows/ci-failure-issue-intake.yml',import.meta.url),'utf8').replace(/\r\n/g,'\n');
- assert.match(yml,/concurrency:\n  group: ci-failure-issue-intake\n  queue: max\n  cancel-in-progress: false/);
+ assert.doesNotMatch(yml,/^concurrency:/m);
+ const job=yml.split('  record-verified-failure:\n')[1];
+ assert.ok(job);
+ assert.match(job,/^    concurrency:\n      group: ci-failure-issue-intake\n      queue: max\n      cancel-in-progress: false/m);
+ assert.match(job,/github\.event\.workflow_run\.conclusion == 'failure' \|\|\n       github\.event\.workflow_run\.conclusion == 'timed_out'/);
  assert.match(yml,/workflow_run:/);
 });
 
