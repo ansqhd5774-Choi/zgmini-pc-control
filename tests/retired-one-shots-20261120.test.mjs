@@ -6,7 +6,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const retired=["handoff-watch-runner-context-readonly.yml","pc-calendar-twofile-b-install-once.yml","pc-configured-runtime-proof-once.yml","pc-inflation19-public-d1-once.yml","pc-r17-sip-b-install-once.yml","pc-r17-sip-refresh-onefile-b-once.yml","pc-r17-writer-b-install-once.yml","pc-report-recovery-540-once.yml","pc-writer-b-1063-recovery-once.yml","pc-writer-config-b-once.yml","pc-writer-config-b-proof-once.yml"];
-const kept=['pc-approved-runtime-a-once.yml','pc-approved-runtime-b-once.yml','pc-job.yml','pc-writer-b-source-once.yml','pc-inflation-19-inventory-b-once.yml','pc-theme-r54-evidence-once.yml','pc-theme-r54-readiness-once.yml','pc-theme-r54-score-once.yml'];
+const kept=['pc-approved-runtime-a-once.yml','pc-approved-runtime-b-once.yml','pc-job.yml','pc-writer-b-source-once.yml','pc-inflation-19-inventory-b-once.yml','pc-theme-r54-evidence-once.yml','pc-theme-r54-readiness-once.yml'];
 test('eleven completed one-shot Issue intakes are retired',()=>{
  assert.equal(retired.length,11);assert.equal(new Set(retired).size,11);
  for(const name of retired)assert.equal(existsSync(path.join(root,'.github/workflows',name)),false,name);
@@ -78,8 +78,7 @@ test('superseded fixed gas-electric dual-source Issue intake is retired',()=>{
    'tests/inflation-gas-electric-b-once.test.mjs'])
   assert.equal(existsSync(path.join(root,name)),true,name);
  for(const name of ['pc-inflation-19-inventory-b-once.yml','pc-approved-runtime-a-once.yml',
-   'pc-approved-runtime-b-once.yml','pc-job.yml','pc-writer-b-source-once.yml',
-   'pc-inflation-gas-refresh-approved-once.yml'])
+   'pc-approved-runtime-b-once.yml','pc-job.yml','pc-writer-b-source-once.yml'])
   assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
 });
 // Frozen 2026-11-04 ER1 November cached-cohort readers were consumed by
@@ -100,7 +99,7 @@ test('terminal November saved15 read-only event intakes are retired with origina
   'pc-writer-b-source-once.yml','pc-er1-nov30-capture.yml','pc-er1-nov30-full.yml'])
   assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
 });
-test('common A/B and unfinished inflation and R54 readers are preserved',()=>{
+test('common A/B and reusable inflation inventory and R54 diagnostics are preserved',()=>{
  for(const name of kept)assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
 });
 test('pinned adapters, safety checks, approved manifests and historical recovery code remain',()=>{
@@ -172,4 +171,28 @@ test('superseded ER1 fixed one-shot workflows are retired with exact history and
   assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
  for(const file of ['er1-dec31-html-publish-entry.mjs','er1-dec31-html-publish-v2-entry.mjs','er1-dec31-derived-score-v1-entry.mjs','er1-nov30-batch20-one-shot-entry.mjs','er1-nov30-batch20-recovery-entry.mjs','ER1_NOV30_BATCH20_B_APPROVAL.json','ER1_NOV30_BATCH20_RECOVERY_B_APPROVAL.json'])
   assert.equal(existsSync(path.join(root,file)),true,file);
+});
+
+// #380 used the fixed November 3 gas observation approval; the original run
+// 41919412878 completed with a saved-file readback. #274/#276 are terminal,
+// superseded R54 replay requests, not successful historical score calculations.
+test('consumed gas refresh and superseded fixed R54 replay triggers are retired',()=>{
+ for(const [name,sha] of [
+  [
+    "pc-inflation-gas-refresh-approved-once.yml",
+    "36fd0979f2dc517d090cbc4a56e6dfc83ca85778"
+  ],
+  [
+    "pc-theme-r54-score-once.yml",
+    "c1ca1a041ea1517924fa1dcd3584a19a47ea062d"
+  ]
+]){
+  assert.equal(existsSync(path.join(root,'.github/workflows',name)),false,name);
+  const bytes=readFileSync(path.join(root,'tests/fixtures/retired-workflows',name));
+  assert.equal(createHash('sha1').update(Buffer.from('blob '+bytes.length+'\0')).update(bytes).digest('hex'),sha,name);
+ }
+ for(const file of ['inflation19-gas-refresh-b/receiver.mjs','inflation19-gas-refresh-b/upload.mjs','inflation19-gas-refresh-b/gas-refresh.mjs','inflation19-gas-refresh-b/inflation-gas-refresh-b-approval.json','r54-score-once/entry.mjs','THEME_R54_SCORE_REPLAY_B_APPROVAL.json','tests/theme-r54-score-once.test.mjs'])
+  assert.equal(existsSync(path.join(root,file)),true,file);
+ for(const name of ['pc-inflation-19-inventory-b-once.yml','pc-theme-r54-evidence-once.yml','pc-theme-r54-readiness-once.yml','pc-job.yml','pc-writer-b-source-once.yml'])
+  assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
 });
