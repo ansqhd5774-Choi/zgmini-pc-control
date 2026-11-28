@@ -70,8 +70,8 @@ control SHA `b2dead3c87f88b35f1a05de77d72f33e3a618a10`,
 최초 배치 원본과 관측은 보호된 backup으로 유지한다. 다른 정책/요청에 재사용하지 않는다.
 
 - **병합 후 Owner 준비:** 정확 병합 source 및 기존 승인 원본 확인 후
-  `node tools/native-writer-b-policy-package.mjs prepare-transition 55e40e183d5d85fa4897e6449f3c8a13161f9adf <새 TEMP 절대경로>`.
-  기존 운영 PC scope bytes 및 고정 preimage hash, Writer 기존 4파일 CAS, 예약 claim 부재,
+  `node tools/native-writer-b-policy-package.mjs prepare-transition 55e40e183d5d85fa4897e6449f3c8a13161f9adf <새 TEMP 절대경로> <#4387 실제 병합 commit SHA>`.
+  검토된 실제 #4387 병합 commit의 clean checkout 및 현재 main ancestry/receiver blob을 확인한다. 실행 pin은 호출 당시 움직이는 main이 아니다. 기존 운영 PC scope bytes 및 고정 preimage hash, Writer 기존 4파일 CAS, 예약 claim 부재,
   비활성 변수, source CI 미시작을 확인한다. 바뀌는 값은 실행 control/adapter/receiver pin 및 명시된 checkout mode뿐.
 - 양쪽 독립 관리자에게 새 sealed package를 전달한다. 기존 최초 설치 명령에
   `-TransitionFromScopeSha256 <package.json migration.beforeScopeSha256>`만 추가한다.
@@ -85,3 +85,9 @@ control SHA `b2dead3c87f88b35f1a05de77d72f33e3a618a10`,
   이전 패키지/결과를 사용해 새 proof를 만들지 않는다.
 - 실제 Windows 관리자 transition/backup/ACL readback 전에는 완료로 표시하지 않는다.
   일반챗은 `POLICY_AND_VARIABLES_READY_NOT_EXECUTED`가 확인될 때만 기존 준비 PR을 한 번 연다.
+
+### 전환 잠금 및 중단 후 복구
+
+모든 독립 관리자 설치/Proof/복구 호출은 같은 호스트의 `Global\ZGMINI-NativeWriterB-4135-OwnerPolicy` 보호 mutex를 사용한다. 이는 이 정책 리소스에 한정되며 Core/Writer 작업의 lease를 삭제하거나 다른 Runner를 멈추지 않는다. Windows 관리자/SYSTEM 외 ACL, 동시 실행, abandoned 상태 또는 기존 intent가 있으면 일반 전환을 중단한다. 실행 정책 및 원격 변수는 임의 변경하지 않는다. 전환·원복 전에 기존 Owner gh 인증으로 Writer B 전용 실행 flag 미등록/false를 읽고 확인한다.
+
+강제 중단 시 **같은 새 sealed scope, 같은 이전 scope SHA, 원래 OutputFile 경로**와 보호 intent 파일의 정확 경로를 독립 관리자에게 전달한다. 기존 전환 명령에 `-RecoverIntent <root.staging-GUID.intent.json의 정확 절대경로>`를 추가해 복구 모드로 한 번 실행한다. 보호 intent의 host/request/고정 root·backup·stage·failed 경로 및 old/new/observation hashes, 실제 claim/ACL을 검증한다. 원래 결과 파일이 존재하거나 불명확한 상태이면 STOP; 결과 삭제/덮어쓰기/전환 재실행 금지. 정확 원본이 이미 활성 상태라면 그대로 두고, 검증된 backup이 남은 교체 중단 상태라면 기존 복구 helper만 사용한다. 정상 복구 출력은 `TRANSITION_OLD_SCOPE_VERIFIED`이며 **새 정책 설치 성공 영수증이 아니다**. intent/backup/failed 파일은 보존한다.
