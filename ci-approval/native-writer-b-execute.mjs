@@ -85,6 +85,21 @@ function gitHead(root){
  need(HASH.test(head),'WRITER_B_NATIVE_CHECKOUT_SHA_STOP');
  return head;
 }
+// The nested checkout must be its own exact Git worktree, not an arbitrary
+// directory that inherits the parent repository HEAD. Tracked source drift
+// is rejected; the separately checked-out candidate is not a tracked change.
+function gitControlHead(root){
+ const head=gitHead(root);
+ const read=args=>spawnSync('git',['-C',root,...args],{
+  encoding:'utf8',shell:false,windowsHide:true,timeout:15000});
+ const top=read(['rev-parse','--show-toplevel']);
+ const comparable=v=>process.platform==='win32'?path.resolve(v).toLowerCase():path.resolve(v);
+ need(top.status===0&&comparable(top.stdout.trim())===comparable(root),
+  'WRITER_B_NATIVE_CHECKOUT_ROOT_STOP');
+ const status=read(['status','--porcelain','--untracked-files=no']);
+ need(status.status===0&&status.stdout.trim()==='','WRITER_B_NATIVE_CHECKOUT_DIRTY_STOP');
+ return head;
+}
 async function getJson(route,token){
  need(typeof route==='string'&&
   /^(?:actions\/runs\/[0-9]+\/attempts\/[0-9]+|contents\/\.github\/workflows\/[a-z0-9-]+\.yml\?ref=[a-f0-9]{40})$/.test(route),
@@ -101,7 +116,7 @@ async function getJson(route,token){
  return JSON.parse(body);
 }
 
-export function selectNativeWriterControlRoot({workspace,ownRoot,policy,mode,env,readHead=gitHead}){
+export function selectNativeWriterControlRoot({workspace,ownRoot,policy,mode,env,readHead=gitControlHead}){
  need(typeof workspace==='string'&&path.isAbsolute(workspace)&&typeof ownRoot==='string'&&
   path.isAbsolute(ownRoot),'WRITER_B_NATIVE_CHECKOUT_MISSING_STOP');
  const origin=path.resolve(workspace),actual=path.resolve(ownRoot);
@@ -110,7 +125,8 @@ export function selectNativeWriterControlRoot({workspace,ownRoot,policy,mode,env
  const pinned=policy?.repositoryVisibility==='public'&&policy.nativeWriterBControlMode==='PINNED_CHECKOUT_V1';
  need(policy?.nativeWriterBControlMode===undefined||pinned,'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP');
  const expected=mode==='--resolve-control'||!pinned?origin:path.join(origin,'writer-b-control');
- need(actual===expected,'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP');
+ const comparable=v=>process.platform==='win32'?v.toLowerCase():v;
+ need(comparable(actual)===comparable(expected),'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP');
  const controlHead=readHead(actual);
  if(mode==='--resolve-control'){
   need(pinned&&HASH.test(policy.nativeWriterBControlSha??''),'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP');
