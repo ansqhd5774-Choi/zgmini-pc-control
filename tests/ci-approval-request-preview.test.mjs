@@ -82,7 +82,7 @@ for(const [name,edit,state] of [
 });
 
 
-import {preparePublicWriter4135PolicyPreview,PUBLIC_WRITER_4135} from '../ci-approval/request-preview.mjs';
+import {preparePublicWriter4135PolicyPreview,preparePublicWriter4135LocalBundleCandidate,PUBLIC_WRITER_4135} from '../ci-approval/request-preview.mjs';
 function public4135Fixture(){
  const fixed=PUBLIC_WRITER_4135;
  const bytes=readFileSync(new URL('../'+fixed.manifestPath,import.meta.url));
@@ -131,4 +131,112 @@ for(const [name,edit,state] of [
 ])test('exact #4135 policy preview refuses '+name,()=>{
  const x=public4135Fixture();edit(x);const r=preparePublicWriter4135PolicyPreview(x);
  check(r,state);assert.equal(Object.hasOwn(r,'proposedPolicy'),false);
+});
+
+
+// The fake maintenance receipt below is strictly a unit-test fixture. Production
+// bundle composition must read a real signed Owner B receipt from GitHub Contents
+// via the independently authenticated getJson port. The helper cannot install.
+function nativeBundleFixture(){
+ const x=public4135Fixture(),preview=preparePublicWriter4135PolicyPreview(x);
+ assert.equal(preview.state,'PUBLIC_WRITER_POLICY_PREVIEW_ONLY');
+ const installationRequestId='pc-update-12345678-1234-4234-8234-123456789abc';
+ const receiptPath='results/maintenance-'+installationRequestId+'.json';
+ const receipt={schema:'ZGMINI_PC_MAINTENANCE_RESULT_V1',
+  requestId:installationRequestId,status:'SUCCEEDED',protectedStateUnchanged:true,
+  actualControllerSha:x.installedControllerSha,targetControllerSha:x.installedControllerSha,
+  ciNativeEffect:'B_WRITER_SOURCE',
+  ciNativePolicySha256:preview.proposedPolicySha256};
+ const raw=Buffer.from(JSON.stringify(receipt));
+ const contents={type:'file',path:receiptPath,encoding:'base64',
+  content:raw.toString('base64')};
+ const calls=[];
+ const getJson=async route=>{calls.push(route);return contents;};
+ return {preview,approvedManifestBytes:x.requestInput.observation.bytes,
+  installationRequestId,getJson,receipt,contents,calls,receiptPath};
+}
+test('#4135 native B creates exact local policy/proof bytes only after a verified independent B receipt',async()=>{
+ const input=nativeBundleFixture();
+ const v=await preparePublicWriter4135LocalBundleCandidate(input);
+ assert.equal(v.state,'PUBLIC_WRITER_LOCAL_BUNDLE_CANDIDATE_ONLY');
+ assert.equal(v.canPublish,false);assert.equal(v.canExecute,false);
+ assert.equal(v.canInstall,false);assert.equal(v.operationalWrites,0);
+ assert.deepEqual(input.calls,['contents/'+input.receiptPath+'?ref=main']);
+ assert.equal(v.scopeFile.name,'ci-native-writer-b-approved.json');
+ assert.equal(v.proofFile.name,'ci-native-writer-b-installed-proof.json');
+ assert.equal(hash('sha256',v.scopeFile.bytes),v.scopeFile.sha256);
+ assert.equal(hash('sha256',v.proofFile.bytes),v.proofFile.sha256);
+ const scope=JSON.parse(v.scopeFile.bytes.toString('utf8'));
+ const proof=JSON.parse(v.proofFile.bytes.toString('utf8'));
+ assert.equal(scope.schema,'ZGMINI_CI_NATIVE_READONLY_SCOPE_V1');
+ assert.deepEqual(scope.policy,input.preview.proposedPolicy);
+ assert.deepEqual(proof.policy,scope.policy);
+ assert.equal(proof.schema,'ZGMINI_CI_NATIVE_B_INSTALLED_PROOF_V1');
+ assert.equal(proof.effect,'B_WRITER_SOURCE');
+ assert.equal(proof.nativePolicySha256,v.nativePolicySha256);
+ assert.equal(proof.nativePolicySha256,input.preview.proposedPolicySha256);
+ assert.equal(proof.installationReceiptSha256,hash('sha256',Buffer.from(input.contents.content,'base64')));
+ assert.equal(proof.installationReceiptSha256,v.installationReceiptSha256);
+ assert.equal(proof.installationRequestId,input.installationRequestId);
+ assert.equal(proof.actualControllerSha,scope.policy.installedControllerSha);
+ assert.equal(scope.approvalBytesBase64,Buffer.from(input.approvedManifestBytes).toString('base64'));
+ assert.equal(scope.requestBytesBase64,Buffer.from(input.preview.body).toString('base64'));
+ assert.equal(JSON.parse(Buffer.from(scope.requestBytesBase64,'base64')).requestId,
+  input.preview.requestId);
+ assert.ok(Buffer.isBuffer(v.scopeFile.bytes));assert.ok(Buffer.isBuffer(v.proofFile.bytes));
+ assert.equal(Object.hasOwn(v,'installedProof'),false);
+});
+for(const [name,alter,expected] of [
+ ['unscoped preview',x=>{x.preview={state:'WRONG'}},'PUBLIC_WRITER_LOCAL_PREVIEW_SCOPE_DENIED'],
+ ['changed proposed policy',x=>{x.preview={...x.preview,proposedPolicy:{
+  ...x.preview.proposedPolicy,sourceAttempt:2}}},'PUBLIC_WRITER_LOCAL_PREVIEW_SCOPE_DENIED'],
+ ['changed installed Controller pin',x=>{x.preview={...x.preview,proposedPolicy:{
+  ...x.preview.proposedPolicy,installedControllerSha:'f'.repeat(40)}}},
+  'PUBLIC_WRITER_LOCAL_PREVIEW_SCOPE_DENIED'],
+ ['unbound request',x=>{x.preview={...x.preview,body:'{}'}},'PUBLIC_WRITER_LOCAL_REQUEST_MISMATCH'],
+ ['unapproved manifest bytes',x=>{x.approvedManifestBytes=Buffer.from('{}')},
+  'PUBLIC_WRITER_LOCAL_APPROVAL_BYTES_MISMATCH'],
+ ['old consumed original request',x=>{const req=JSON.parse(x.preview.body);
+  req.requestId=PUBLIC_WRITER_4135.originalRequestId;
+  const body=JSON.stringify(req),policy={...x.preview.proposedPolicy,
+   approvedRequestSha256:hash('sha256',Buffer.from(body))};
+  x.preview={...x.preview,requestId:req.requestId,body,proposedPolicy:policy,
+   proposedPolicySha256:hash('sha256',Buffer.from(JSON.stringify(policy)))}},
+  'PUBLIC_WRITER_LOCAL_REQUEST_MISMATCH'],
+ ['missing receipt port',x=>{delete x.getJson},
+  'PUBLIC_WRITER_LOCAL_INSTALL_RECEIPT_PORT_REQUIRED'],
+ ['receipt unavailable',x=>{x.getJson=async()=>{throw Error('missing')}},
+  'PUBLIC_WRITER_LOCAL_INSTALLED_RECEIPT_UNVERIFIED'],
+ ['noncanonical Contents bytes',x=>{x.contents.content='!!!'},
+  'PUBLIC_WRITER_LOCAL_INSTALLED_RECEIPT_UNVERIFIED'],
+ ['forged Contents path',x=>{x.contents.path='results/another.json'},
+  'PUBLIC_WRITER_LOCAL_INSTALLED_RECEIPT_UNVERIFIED'],
+ ['ordinary #4356 B success without native effect',x=>{delete x.receipt.ciNativeEffect;
+  x.contents.content=Buffer.from(JSON.stringify(x.receipt)).toString('base64')},
+  'PUBLIC_WRITER_LOCAL_INSTALL_EFFECT_UNVERIFIED'],
+ ['wrong native effect',x=>{x.receipt.ciNativeEffect='A_READONLY';
+  x.contents.content=Buffer.from(JSON.stringify(x.receipt)).toString('base64')},
+  'PUBLIC_WRITER_LOCAL_INSTALL_EFFECT_UNVERIFIED'],
+ ['wrong native digest',x=>{x.receipt.ciNativePolicySha256='0'.repeat(64);
+  x.contents.content=Buffer.from(JSON.stringify(x.receipt)).toString('base64')},
+  'PUBLIC_WRITER_LOCAL_INSTALL_EFFECT_UNVERIFIED'],
+ ['B claim failed',x=>{x.receipt.status='BLOCKED';
+  x.contents.content=Buffer.from(JSON.stringify(x.receipt)).toString('base64')},
+  'PUBLIC_WRITER_LOCAL_INSTALL_EFFECT_UNVERIFIED'],
+ ['B rollback state unknown',x=>{x.receipt.protectedStateUnchanged=false;
+  x.contents.content=Buffer.from(JSON.stringify(x.receipt)).toString('base64')},
+  'PUBLIC_WRITER_LOCAL_INSTALL_EFFECT_UNVERIFIED'],
+ ['live installed SHA drift',x=>{x.receipt.actualControllerSha='a'.repeat(40);
+  x.contents.content=Buffer.from(JSON.stringify(x.receipt)).toString('base64')},
+  'PUBLIC_WRITER_LOCAL_INSTALL_EFFECT_UNVERIFIED']
+])test('#4135 local bundle refuses '+name,async()=>{
+ const input=nativeBundleFixture();alter(input);
+ const v=await preparePublicWriter4135LocalBundleCandidate(input);
+ assert.equal(v.state,expected==='PUBLIC_WRITER_LOCAL_INSTALL_RECEIPT_PORT_REQUIRED'||
+  expected==='PUBLIC_WRITER_LOCAL_INSTALLED_RECEIPT_UNVERIFIED'?
+  'EVIDENCE_MISSING':'REJECTED');
+ assert.equal(v.reason,expected);
+ assert.equal(v.canInstall,false);assert.equal(v.operationalWrites,0);
+ assert.equal(Object.hasOwn(v,'scopeFile'),false);
+ assert.equal(Object.hasOwn(v,'proofFile'),false);
 });
