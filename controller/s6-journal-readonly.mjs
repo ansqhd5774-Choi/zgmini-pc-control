@@ -60,7 +60,7 @@ export function projectS64078BacklogReadonly(backlog){
  try{windows=backlogPauseWindows(backlog);}
  catch{return out;}
  const count=windows.length;
- if(windows.some(w=>w.resumedAt===null))
+ if(windows.some(w=>w.resumedAt==null))
   return {...out,windowCount:count,replayLedgerStatus:'WINDOW_NOT_CLOSED'};
  const issueOpened=Date.parse('2026-11-26T19:14:52Z');
  const overlaps=windows.some(w=>issueOpened>=Date.parse(w.pausedAt)-2000&&
