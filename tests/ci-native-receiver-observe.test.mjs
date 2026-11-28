@@ -227,3 +227,39 @@ test('public Writer receiver refuses absent opt-in before reading local scope',a
  const matched=await observeNativeReceiver(x);
  assert.equal(matched.state,'CONTRACT_MATCH_ONLY');assert.equal(matched.canInstall,false);
 });
+
+test('Writer B installed scope refuses hardlink aliases, accepts an independent regular file',()=>withRoot(root=>{
+ const obj={schema:'ZGMINI_CI_NATIVE_READONLY_SCOPE_V1',
+  policy:{effect:'B_WRITER_SOURCE'},
+  approvalBytesBase64:Buffer.from('a').toString('base64'),
+  requestBytesBase64:Buffer.from('b').toString('base64')};
+ const file=path.join(root,'ci-native-writer-b-approved.json');
+ fs.writeFileSync(file,JSON.stringify(obj));
+ assert.equal(readNativeScope('B_WRITER_SOURCE',{root}).policy.effect,'B_WRITER_SOURCE');
+ const alias=path.join(root,'untrusted-hardlink.json');
+ fs.linkSync(file,alias);
+ assert.throws(()=>readNativeScope('B_WRITER_SOURCE',{root}),
+  /CI_NATIVE_SCOPE_FILE_UNVERIFIED/);
+ fs.unlinkSync(alias);
+ assert.equal(readNativeScope('B_WRITER_SOURCE',{root}).approvalBytes.toString(),'a');
+}));
+test('Writer B refuses policy bytes changing between two pinned file reads',()=>withRoot(root=>{
+ const obj={schema:'ZGMINI_CI_NATIVE_READONLY_SCOPE_V1',
+  policy:{effect:'B_WRITER_SOURCE'},
+  approvalBytesBase64:Buffer.from('a').toString('base64'),
+  requestBytesBase64:Buffer.from('b').toString('base64')};
+ const file=path.join(root,'ci-native-writer-b-approved.json');
+ fs.writeFileSync(file,JSON.stringify(obj));
+ const bytes=fs.readFileSync(file);
+ let reads=0;
+ const io={lstatSync:p=>fs.lstatSync(p),readFileSync:()=>{
+  reads++;return reads===2?Buffer.concat([bytes,Buffer.from(' ')]):Buffer.from(bytes);
+ }};
+ assert.throws(()=>readNativeScope('B_WRITER_SOURCE',{root,io}),
+  /CI_NATIVE_SCOPE_FILE_UNVERIFIED/);
+ assert.equal(reads,2);
+ // The pre-existing A reader remains single-read and otherwise unchanged.
+ const a=path.join(root,'ci-native-a-approved.json');
+ fs.writeFileSync(a,JSON.stringify({...obj,policy:{effect:'A_READONLY'}}));
+ assert.equal(readNativeScope('A_READONLY',{root}).policy.effect,'A_READONLY');
+}));
