@@ -37,6 +37,8 @@ const start="if(h.controllerSourceSha!=='"+old+"')process.exit(2);";
 const replacement="const next='"+next+"',lineage='"+lineage+"';if(h.controllerSourceSha!==next&&h.controllerSourceSha!==lineage){if(h.controllerSourceSha!=='"+old+"')process.exit(2);}if(h.controllerSourceSha===next||h.controllerSourceSha===lineage){p['controller/operations.mjs']=h.controllerSourceSha===lineage?'"+lineagePin['controller/operations.mjs']+"':'"+nextPin['controller/operations.mjs']+"';p['config/operations.json']='"+nextPin['config/operations.json']+"';}";
 
 const s6='66b8a66c6112441576917e0ac9fbe4d39cbd5eea';
+const s6fix='ee8d8ea8fc7f29a64fb3636f4280e5c6ba51a5c9';
+const s6fixHash='79a0480ac66454829bd7cfe6fb93d2a3fd3c57371c1ea2537f58e92624af4a52';
 const s6Pin={
  'controller/operations.mjs':'d8d26f2ff7e0740676a2be3d25a35bd3799ab8d08b4f82d4d7426b9a89942631',
  'config/operations.json':'95873e17a8e0d44be78b7353f99c99288500a2566cf7b1708ff51c463abaf32c',
@@ -48,7 +50,11 @@ const newS6Pins="if(h.controllerSourceSha===s6){p['controller/operations.mjs']='
 
 test('Public A audit transition changes only exact version-pinned guard, never issue admission or other effects',()=>{
  const baseline=gitBytes(sourceBaseline,'.github/workflows/pc-job.yml').toString('utf8');
- assert.equal(workflow.replace(newS6Guard,priorS6Guard).replace(newS6Pins,'').replace(replacement,start),baseline);
+ const prior=workflow.replace(",s6fix='"+s6fix+"'",'')
+  .replace('h.controllerSourceSha!==s6&&h.controllerSourceSha!==s6fix&&','h.controllerSourceSha!==s6&&')
+  .replace('if(h.controllerSourceSha===s6||h.controllerSourceSha===s6fix){','if(h.controllerSourceSha===s6){')
+  .replace("h.controllerSourceSha===s6fix?'"+s6fixHash+"':'"+s6Pin['controller/s6-journal-readonly.mjs']+"'","'"+s6Pin['controller/s6-journal-readonly.mjs']+"'");
+ assert.equal(prior.replace(newS6Guard,priorS6Guard).replace(newS6Pins,'').replace(replacement,start),baseline);
  assert.match(workflow,/github\.event\.repository\.private == false/);
  assert.match(workflow,/github\.actor_id == 327938088/);
  assert.match(workflow,/github\.run_attempt == 1/);
@@ -56,8 +62,8 @@ test('Public A audit transition changes only exact version-pinned guard, never i
 });
 
 function guard({installed=old,drift=null,manifestDrift=null,alias=null}={}){
- const source=installed===s6?s6:installed===next||installed===lineage?next:old;
- const expected={...pin,...(installed===next?nextPin:installed===lineage?lineagePin:installed===s6?s6Pin:{})};
+ const source=installed===s6fix?s6fix:installed===s6?s6:installed===next||installed===lineage?next:old;
+ const expected={...pin,...(installed===next?nextPin:installed===lineage?lineagePin:installed===s6?s6Pin:installed===s6fix?{...s6Pin,'controller/s6-journal-readonly.mjs':s6fixHash}:{})};
  const data=new Map();
  const rootPath='E:/ZGmini/automation/pc-control';
  for(const p of Object.keys(expected)){
@@ -114,5 +120,14 @@ test('S6 successor guard preserves all old pins and requires exact three additio
   assert.equal(guard({installed:s6,drift:key}),2,key);
   assert.equal(guard({installed:s6,manifestDrift:key}),2,key);
   assert.equal(guard({installed:s6,alias:key}),2,key);
+ }
+});
+
+test('S6 nullish successor requires its exact new file and preserves all prior guards',()=>{
+ assert.equal(guard({installed:s6fix}),0);
+ for(const key of Object.keys({...pin,...s6Pin})){
+  assert.equal(guard({installed:s6fix,drift:key}),2,key);
+  assert.equal(guard({installed:s6fix,manifestDrift:key}),2,key);
+  assert.equal(guard({installed:s6fix,alias:key}),2,key);
  }
 });
