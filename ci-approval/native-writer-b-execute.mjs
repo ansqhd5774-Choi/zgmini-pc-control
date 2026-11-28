@@ -153,6 +153,45 @@ function safeResultTemp(env,auth,sanitized){
   fs.writeFileSync(path.join(dir,basename+'.'+ext),data,{flag:'wx'});
  }
 }
+// A refused native preflight never reaches the installer. An execute-stage
+// exception, however, has an UNKNOWN effect until the existing journal is
+// reconciled. Publish only fixed, bounded metadata; never the exception text.
+export function recordNativeWriterBFailure({
+ env,mode,error,io=fs
+}={}){
+ const code=SAFE_CODE.test(error?.code??'')?error.code:
+  'WRITER_B_NATIVE_SETUP_UNVERIFIED_STOP';
+ if(!['--preflight','--execute'].includes(mode)||
+  !/^[1-9][0-9]{0,18}$/.test(env?.GITHUB_RUN_ID??'')||
+  env.GITHUB_RUN_ATTEMPT!=='1')
+  return Object.freeze({recorded:false,code});
+ const stage=mode==='--preflight'?'preflight':'execute';
+ const dir=env.RUNNER_TEMP,base='zgmini-ci-native-writer-b-'+
+  env.GITHUB_RUN_ID+'-setup-'+stage;
+ try{
+  if(typeof dir!=='string'||!path.isAbsolute(dir))throw Error('TEMP');
+  const root=io.lstatSync(dir);
+  if(!root.isDirectory()||root.isSymbolicLink())throw Error('TEMP');
+  const report=Object.freeze({
+   schema:'ZGMINI_CI_NATIVE_WRITER_B_FAILURE_V1',
+   runId:env.GITHUB_RUN_ID,attempt:1,stage,
+   status:stage==='preflight'?'WRITER_B_SETUP_STOP':'WRITER_B_STATE_UNKNOWN',
+   code,requestId:null,installEffect:stage==='preflight'?'NOT_STARTED':'UNVERIFIED',
+   retry:'READ_ONLY_RECONCILE_NO_REEXECUTE'
+  });
+  const json=JSON.stringify(report)+'\n';
+  const txt=['RUN_ID='+report.runId,'STAGE='+stage,'STATUS='+report.status,
+   'CODE='+code,'REQUEST_ID=UNVERIFIED','INSTALL_EFFECT='+report.installEffect,
+   'RETRY=READ_ONLY_RECONCILE_NO_REEXECUTE',''].join('\n');
+  if(Buffer.byteLength(json)>1024||Buffer.byteLength(txt)>1024)
+   throw Error('SIZE');
+  for(const [ext,body] of [['json',json],['txt',txt]])
+   io.writeFileSync(path.join(dir,base+'.'+ext),body,{flag:'wx',mode:0o600});
+  return Object.freeze({recorded:true,code});
+ }catch{
+  return Object.freeze({recorded:false,code});
+ }
+}
 async function main(){
  const mode=process.argv[2];
  need(mode==='--preflight'||mode==='--execute',
@@ -186,8 +225,11 @@ if(process.argv[1]&&path.resolve(process.argv[1])===SELF){
  catch(error){
   // Do not publish exception text, environment, absolute paths, raw approval,
   // local source or provider data. Unknown post-claim outcomes are never retried.
-  console.error(SAFE_CODE.test(error?.code??'')?
-   error.code:'WRITER_B_NATIVE_SETUP_UNVERIFIED_STOP');
+  const receipt=recordNativeWriterBFailure({
+   env:process.env,mode:process.argv[2],error
+  });
+  console.error(receipt.code);
+  if(!receipt.recorded)console.error('WRITER_B_NATIVE_RESULT_RECEIPT_UNVERIFIED_STOP');
   process.exitCode=1;
  }
 }
