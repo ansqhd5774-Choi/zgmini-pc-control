@@ -60,7 +60,7 @@ function verifyPinnedDeployment(p,pack){
  const past=api('repos/'+repo+'/actions/runs?head_sha='+p.sourceHeadSha+'&event=pull_request&per_page=100');
  need(past.total_count===0,'NATIVE_POLICY_SOURCE_EVENT_ALREADY_STARTED_STOP');
 }
-const [mode,arg,output]=process.argv.slice(2);
+const [mode,arg,output,reviewedControlSha]=process.argv.slice(2);
 try{
  authenticate();
  if(mode==='prepare'||mode==='prepare-transition'){
@@ -68,11 +68,29 @@ try{
   if(transition){requireUnactivated();need(arg===FIRST_SOURCE_HEAD,'NATIVE_POLICY_TRANSITION_SOURCE_STOP');}
   need(/^[a-f0-9]{40}$/.test(arg??'')&&output&&path.isAbsolute(output)&&!fs.existsSync(output),
    'NATIVE_POLICY_PREPARE_ARGS_STOP');
-  const controlHead=api('repos/'+repo+'/commits/main').sha;
+  const liveMain=api('repos/'+repo+'/commits/main').sha;
+  let controlHead=liveMain;
+  if(transition){
+   need(/^[a-f0-9]{40}$/.test(reviewedControlSha??''),'NATIVE_POLICY_REVIEWED_CONTROL_REQUIRED_STOP');
+   const merged=api('repos/'+repo+'/pulls/4387');
+   need(merged.merged===true&&merged.base?.ref==='main'&&
+    merged.merge_commit_sha===reviewedControlSha,'NATIVE_POLICY_REVIEWED_MERGE_STOP');
+   const cmp=api('repos/'+repo+'/compare/'+reviewedControlSha+'...'+liveMain);
+   need(['ahead','identical'].includes(cmp.status)&&cmp.merge_base_commit?.sha===reviewedControlSha,
+    'NATIVE_POLICY_CONTROL_ANCESTRY_STOP');
+   controlHead=reviewedControlSha;
+  }
   const past=api('repos/'+repo+'/actions/runs?head_sha='+arg+'&event=pull_request&per_page=100');
   need(past.total_count===0,'NATIVE_POLICY_SOURCE_EVENT_ALREADY_STARTED_STOP');
   // Source tooling must itself be the reviewed, immutable main bytes.
   const sourceRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+  if(transition){
+   const git=(...args)=>execFileSync('git',['-C',sourceRoot,...args],
+    {encoding:'utf8',windowsHide:true}).trim();
+   need(git('rev-parse','HEAD')===controlHead&&
+    git('status','--porcelain','--untracked-files=no')==='',
+    'NATIVE_POLICY_REVIEWED_CHECKOUT_STOP');
+  }
   for(const rel of ['tools/native-writer-b-policy-package.mjs','ci-approval/native-policy-install.mjs',
    'ci-approval/native-publisher-entry.mjs','tools/operator-packets/NATIVE_WRITER_B_POLICY_INSTALL_ONCE.ps1']){
    need(fs.readFileSync(path.join(sourceRoot,rel)).equals(read(rel,controlHead).bytes),
@@ -103,6 +121,7 @@ try{
   const scope=makeIndependentPolicyScope({policy:preview.proposedPolicy,approvalBytes:m.bytes,
    requestBytes:Buffer.from(preview.body)});
   const migration=transition?verifyFirstScopeTransition(fs.readFileSync(beforeScopePath),scope):null;
+  if(transition)verifyPinnedDeployment(preview.proposedPolicy,{controlHead,sourceHeadSha:arg});
   fs.mkdirSync(output,{recursive:false});
   write(output,'scope.json',scope);write(output,'policy.json',JSON.stringify(preview.proposedPolicy));
   const ps=read('tools/operator-packets/NATIVE_WRITER_B_POLICY_INSTALL_ONCE.ps1',controlHead).bytes;
