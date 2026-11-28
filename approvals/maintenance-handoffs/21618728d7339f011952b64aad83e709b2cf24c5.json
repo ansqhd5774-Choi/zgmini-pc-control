@@ -5,7 +5,7 @@
   "targetSha": "21618728d7339f011952b64aad83e709b2cf24c5",
   "approved": true,
   "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
-  "publisherApprovalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1",
+  "publisherApprovalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4347",
   "files": {
     "tools/maintenance-contract.mjs": "6ded3471eaa5c5caa661595bdce95676a665d2a30b7122474cd6a293f99b4441",
     "tools/maintenance-apply.mjs": "cf0d9c82fa25c343c0d540b6c432c3e6d090c9924474851c22c277867d841096",
