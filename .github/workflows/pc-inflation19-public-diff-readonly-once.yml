@@ -5,11 +5,12 @@ on:
 permissions:
   contents: read
   issues: write
-concurrency:
-  group: zgmini-inflation19-pc-public-diff-readonly
-  cancel-in-progress: false
 jobs:
   compare:
+    # Reserve the existing single lane only for admitted read-only requests.
+    concurrency:
+      group: zgmini-inflation19-pc-public-diff-readonly
+      cancel-in-progress: false
     if: >-
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
       github.event.repository.private == true &&

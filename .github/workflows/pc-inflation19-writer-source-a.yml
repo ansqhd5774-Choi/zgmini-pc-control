@@ -5,11 +5,12 @@ on:
 permissions:
   contents: write
   issues: write
-concurrency:
-  group: inflation19-writer-source-a-single-lane
-  cancel-in-progress: false
 jobs:
   read-only-source-identity:
+    # Reserve the existing single lane only for admitted read-only requests.
+    concurrency:
+      group: inflation19-writer-source-a-single-lane
+      cancel-in-progress: false
     if: >-
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
       github.event.repository.private == true &&
