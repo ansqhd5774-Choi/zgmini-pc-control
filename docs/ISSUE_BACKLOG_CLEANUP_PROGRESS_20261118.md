@@ -593,3 +593,10 @@
 - 새 public-native-a-candidate는 승인/설치 영수증/정확 Run·Job·workflow bytes만 확인하고 허용 operation도 runner-smoke/core-status 한정. 반환 CANDIDATE_ONLY, canPublish/canExecute/canInstall/selfHostedAuthorized 모두 false. 기존 native receiver private-only. #4327을 #4069 신규 A 활성화나 B 설치 승인/실행으로 해석하지 않음.
 - 현행 main의 정확 신규 B operator는 tools/controller-s6-4069-public-b-operator-once.mjs, TARGET=66b8a66c6112441576917e0ac9fbe4d39cbd5eea. 실제 코드에서 GITHUB_ACTIONS/RUNNER_NAME/GITHUB_RUN_ID 존재 시 거부 및 verifyRecoveryOperator 요구 확인. 기존 tools/s6-local-owner-readonly.mjs도 같은 독립 Windows 조건을 요구. Workflow 추가/환경변수 제거로 인증을 우회하지 않음. #4326의 유효 설치 계보 재사용; 현재 독립 인증 Windows 실행 수단 미확보로 inspect/apply 및 로컬 결과 미실행.
 - 다음: 실제 독립 Owner 경로에서 현재 main 검토 바이트 일치 확인 후 기존 local read 및 exact successor operator inspect, PASS일 때 승인된 apply 단회, 새 고정 A 결과/설치 SHA 대조. #4078 별도 replay 효과 승인과 원장 CAS, #3767 실제 승격 WMI, #4135 대체 적법 입력은 독립 미완료. 이번 직접 신규 PR/Issue 종결/운영 쓰기/재실행 0건.
+
+
+## 2026-11-28 — #4329 S6 로컬 조회 실패 분류 보존
+
+- 직접 수정 [PR #4329](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4329) HEAD 6798e557ebe1784b0984b8d932a55bf8c98b6517: 기존 독립 로컬 reader가 원본 claim/승인/CAS/교차 snapshot 거부 이유를 STATE_UNKNOWN으로 일괄 손실하는 결함. 고정 adapter 코드 8종과 projection 실패 분류만 보존. 기존 STATE_UNKNOWN·null 증거·원본 비공개·운영 효과 차단 불변. 2파일 변경, 신규 assertion 추가.
+- [Actions 46091793542](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/46091793542) exact HEAD, attempt 1, public-source-only Job 140814156935 SUCCESS, 원본 로그 유지보수 통합 159/159 PASS, fail 0, Windows source-only skipped. 병행 #4328은 다른 담당의 Public Writer B 후보 source-only 병합으로, 실제 실행 권한 아님. #4329 squash 9f21b5e2987e144c5d9b081ec6682d9613111389, 정확 2파일 HEAD/merge/main blob 2/2 일치. [#4078 원본 회신](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4078#issuecomment-7231492288).
+- 승인된 #4069 selective Controller target 66b8a66c 불변. 독립 Owner 인증 Windows 실행 수단은 여전히 미확보이며, #4078 실제 원장/재발행, #3767 승격 WMI, #4135 적법 비-MarketParquet 원자료 미확보. 기존 R17 IEX reader는 SP500 잠정치, source inventory는 고정 DB 메타데이터이며 현재 공개 A 출력은 SUMMARY_ONLY이므로 R2 전체시장 251일 원자료/권리를 입증하지 못함. 신규 Windows/DB/D1/공급자 작업/원본 재실행 0. 직접 PR 병합 1건, Issue 종결 0건. 다음은 독립 Owner 실제 읽기 및 승인 설치/사후 A 검증.
