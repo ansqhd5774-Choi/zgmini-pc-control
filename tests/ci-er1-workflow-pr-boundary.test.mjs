@@ -17,7 +17,13 @@ test('PC ER1 execution remains restricted to original owner-issued issue event',
  assert.doesNotMatch(operational,/pair-contract-tests:|if: github\.event_name == 'pull_request'/);
  assert.match(operational,/issues: write/);
  const header=operational.slice(0,operational.indexOf('\njobs:'));
- assert.match(header,/^permissions:\n  contents: read\nconcurrency:/m);
+ assert.match(header,/^permissions:\n  contents: read\s*$/m);
+ assert.doesNotMatch(header,/^concurrency:/m);
+ for(const job of ['batch','resume-pair']){
+  const block=operational.split('  '+job+':\n')[1];
+  assert.ok(block);
+  assert.match(block,/^\s*# Keep the existing lane for admitted requests only\.\n    concurrency:\n      group: zgmini-er1-dec31-symbol-batch-a-one-shot\n      cancel-in-progress: false\n    if: >-/);
+ }
  assert.doesNotMatch(header,/issues:\s*write/);
  const scoped=[...operational.matchAll(/^    permissions:\n      contents: read\n      issues: write\n    runs-on: \[self-hosted, Windows, X64, zgmini-pc-control\]/gm)];
  assert.equal(scoped.length,2,'both operational upload jobs must be explicitly scoped');

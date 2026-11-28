@@ -7,12 +7,12 @@ permissions:
   contents: read
   issues: write
 
-concurrency:
-  group: zgmini-er1-nov-forecast-publish-b
-  cancel-in-progress: false
-
 jobs:
   saved-forecast-publish:
+    # Keep the existing lane for admitted requests only.
+    concurrency:
+      group: zgmini-er1-nov-forecast-publish-b
+      cancel-in-progress: false
     if: >-
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
       github.event.repository.private == true &&

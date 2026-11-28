@@ -197,3 +197,125 @@ test('Inflation read-only workflows serialize only admitted diagnostic jobs',()=
   assert.equal(yml.includes('workflow_dispatch:'),false,name);
  }
 });
+
+// Preserve the shared batch/pair lane and every original admission condition.
+test('ER1 queues are scoped to admitted jobs with original lane names',()=>{
+ const cases=[
+  [
+    "pc-er1-nov-forecast-publish.yml",
+    "zgmini-er1-nov-forecast-publish-b",
+    [
+      [
+        "saved-forecast-publish",
+        "pc-er1-nov-forecast-publish"
+      ]
+    ]
+  ],
+  [
+    "pc-er1-nov-forecast-shadow.yml",
+    "zgmini-er1-nov-forecast-shadow",
+    [
+      [
+        "saved-forecast-shadow",
+        "pc-er1-nov-forecast-shadow"
+      ]
+    ]
+  ],
+  [
+    "pc-er1-nov30-capture.yml",
+    "zgmini-er1-nov30-one-shot",
+    [
+      [
+        "capture",
+        "pc-er1-nov30-capture-one-shot"
+      ]
+    ]
+  ],
+  [
+    "pc-er1-nov30-full.yml",
+    "zgmini-er1-nov30-full-b",
+    [
+      [
+        "november-full",
+        "pc-er1-nov30-full"
+      ]
+    ]
+  ],
+  [
+    "pc-er1-nov30-saved-actual-audit.yml",
+    "zgmini-er1-nov30-saved-audit",
+    [
+      [
+        "saved-audit",
+        "pc-er1-nov30-saved-actual-audit"
+      ]
+    ]
+  ],
+  [
+    "pc-er1-dec31-symbol-batch-a.yml",
+    "zgmini-er1-dec31-symbol-batch-a-one-shot",
+    [
+      [
+        "batch",
+        "pc-er1-dec31-symbol-batch-a-one-shot"
+      ],
+      [
+        "resume-pair",
+        "pc-er1-dec31-symbol-pair-resume-once"
+      ]
+    ]
+  ]
+];
+ for(const [name,group,jobs] of cases){
+  const yml=fs.readFileSync(new URL('../.github/workflows/'+name,import.meta.url),'utf8').replace(/\r\n/g,'\n');
+  assert.equal(yml.split('\n').filter(line=>line==='concurrency:').length,0,name);
+  assert.equal(yml.split('    concurrency:\n').length-1,jobs.length,name);
+  for(const [job,title] of jobs){
+   const block=yml.split('  '+job+':\n')[1];
+   assert.ok(block,name+':'+job);
+   assert.ok(block.startsWith('    # Keep the existing lane for admitted requests only.\n    concurrency:\n      group: '+group+'\n      cancel-in-progress: false\n    if: >-'),name+':'+job);
+   const guard=block.split('    runs-on:')[0];
+   for(const condition of ["github.event.repository.private == true","github.actor == 'ansqhd5774-Choi'","github.event.issue.user.login == 'ansqhd5774-Choi'","github.event.issue.title == '"+title+"'","contains(github.event.issue.labels.*.name, 'pc-er1-approved')"])assert.ok(guard.includes(condition),name+':'+job+':'+condition);
+  }
+  assert.ok(yml.includes('runs-on: [self-hosted, Windows, X64, zgmini-pc-control]'),name);
+  assert.ok(!yml.includes('workflow_dispatch:'),name);
+ }
+});
+
+// Reuse existing effect/issue locks only after admission; no authority changes.
+test('Common publication and approval admission lanes belong to admitted jobs',()=>{
+ const cases=[
+  [
+    "pc-publication-b.yml",
+    "approved-publication-b",
+    "zgmini-pc-publication-b-single-lane",
+    false
+  ],
+  [
+    "pc-shared-issue-admission.yml",
+    "inspect-known-approval-issue",
+    "zgmini-shared-admission-${{ github.event.issue.number }}",
+    true
+  ],
+  [
+    "pc-approved-runtime-a-once.yml",
+    "read-approved-runtime",
+    "zgmini-approved-runtime-a-${{ github.event.issue.number }}",
+    false
+  ]
+];
+ for(const [name,job,group,queue] of cases){
+  const yml=fs.readFileSync(new URL('../.github/workflows/'+name,import.meta.url),'utf8').replace(/\r\n/g,'\n');
+  assert.equal(yml.split('\n').filter(line=>line==='concurrency:').length,0,name);
+  const block=yml.split('  '+job+':\n')[1];
+  assert.ok(block,name);
+  assert.ok(block.startsWith('    # Reserve the existing lane only for admitted requests.\n    concurrency:\n      group: '+group+'\n      cancel-in-progress: false\n'+(queue?'      queue: max\n':'')),name);
+  assert.ok(block.includes("github.event.repository.private == true"),name);
+  assert.ok(block.includes("github.actor == 'ansqhd5774-Choi'"),name);
+  assert.ok(!yml.includes('workflow_dispatch:'),name);
+ }
+});
+import './publication-preflight.test.mjs';
+import './publication-executor.test.mjs';
+import './shared-resource-issue-admission.test.mjs';
+import './shared-resource-controller-independent.test.mjs';

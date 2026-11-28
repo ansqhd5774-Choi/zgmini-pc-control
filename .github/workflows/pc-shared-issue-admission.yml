@@ -7,12 +7,13 @@ on:
 permissions:
   contents: read
   issues: write
-concurrency:
-  group: zgmini-shared-admission-${{ github.event.issue.number }}
-  cancel-in-progress: false
-  queue: max
 jobs:
   inspect-known-approval-issue:
+    # Reserve the existing lane only for admitted requests.
+    concurrency:
+      group: zgmini-shared-admission-${{ github.event.issue.number }}
+      cancel-in-progress: false
+      queue: max
     if: >-
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
       github.event.repository.private == true &&
