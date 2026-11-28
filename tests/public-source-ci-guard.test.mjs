@@ -133,3 +133,12 @@ test('W06 V3 operator pins owner merged effect #4289 and reviewed source #4293',
 import './controller-s6-4069-b-approval.test.mjs';
 
 import './controller-s6-4069-owner-install.test.mjs';
+
+// All archived YAMLs are evidence, never GitHub event subscriptions.
+test('all archived workflow fixtures remain outside the live workflow directory',()=>{
+ const archive=new URL('./fixtures/retired-workflows/',import.meta.url);
+ const active=new URL('../.github/workflows/',import.meta.url);
+ const names=fs.readdirSync(archive).filter(name=>/\.ya?ml$/i.test(name));
+ assert.ok(names.length>0);
+ for(const name of names)assert.equal(fs.existsSync(new URL(name,active)),false,name);
+});
