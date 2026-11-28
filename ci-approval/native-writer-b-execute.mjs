@@ -101,7 +101,24 @@ async function getJson(route,token){
  return JSON.parse(body);
 }
 
-async function prepare(env){
+export function selectNativeWriterControlRoot({workspace,ownRoot,policy,mode,env,readHead=gitHead}){
+ need(typeof workspace==='string'&&path.isAbsolute(workspace)&&typeof ownRoot==='string'&&
+  path.isAbsolute(ownRoot),'WRITER_B_NATIVE_CHECKOUT_MISSING_STOP');
+ const origin=path.resolve(workspace),actual=path.resolve(ownRoot);
+ const dispatchControlHead=readHead(origin);
+ need(dispatchControlHead===env.GITHUB_SHA,'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP');
+ const pinned=policy?.repositoryVisibility==='public'&&policy.nativeWriterBControlMode==='PINNED_CHECKOUT_V1';
+ need(policy?.nativeWriterBControlMode===undefined||pinned,'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP');
+ const expected=mode==='--resolve-control'||!pinned?origin:path.join(origin,'writer-b-control');
+ need(actual===expected,'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP');
+ const controlHead=readHead(actual);
+ if(mode==='--resolve-control'){
+  need(pinned&&HASH.test(policy.nativeWriterBControlSha??''),'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP');
+ }else need(controlHead===policy.nativeWriterBControlSha,'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP');
+ return {controlRoot:actual,controlHead,dispatchControlHead};
+}
+
+async function prepare(env,mode){
  need(process.platform==='win32','WRITER_B_NATIVE_WINDOWS_ONLY_STOP');
  need(env.GITHUB_EVENT_NAME==='workflow_dispatch'&&
   env.GITHUB_REPOSITORY===REPO&&env.GITHUB_ACTOR==='github-actions[bot]'&&
@@ -120,13 +137,20 @@ async function prepare(env){
   effect:'B_WRITER_SOURCE',event,env,
   ports:{readNativeScope:()=>scope,getJson:route=>getJson(route,env.GITHUB_TOKEN)}
  });
- const controlRoot=env.GITHUB_WORKSPACE;
- const controlHead=gitHead(controlRoot);
+ const {controlRoot,controlHead,dispatchControlHead}=selectNativeWriterControlRoot({
+  workspace:env.GITHUB_WORKSPACE,ownRoot:path.resolve(path.dirname(SELF),'..'),
+  policy:scope.policy,mode,env});
+ if(mode==='--resolve-control'){
+  need(observation.state==='CONTRACT_MATCH_ONLY'&&
+   observation.code==='CI_NATIVE_RECEIVER_INDEPENDENT_EVIDENCE_MATCH'&&
+   scope.policy.nativeWriterBExecutionEnabled===true,'WRITER_B_NATIVE_INDEPENDENT_GRANT_STOP');
+  return {pinnedControlSha:scope.policy.nativeWriterBControlSha};
+ }
  // The private legacy receiver keeps its existing admission contract.
  const installedControllerSha=scope.policy?.repositoryVisibility==='public'
   ?readInstalledControllerSha():undefined;
  const auth=authorizeWriterBNative({observation,scope,env,controlHead,
-  installedControllerSha,adapterBytes:fs.readFileSync(SELF)});
+  installedControllerSha,dispatchControlHead,adapterBytes:fs.readFileSync(SELF)});
  const reviewed=safeApprovedManifest(controlRoot,auth.manifestPath);
  need(reviewed.equals(scope.approvalBytes),'WRITER_B_NATIVE_CHECKOUT_APPROVAL_DRIFT_STOP');
  return {auth,controlRoot};
@@ -194,10 +218,16 @@ export function recordNativeWriterBFailure({
 }
 async function main(){
  const mode=process.argv[2];
- need(mode==='--preflight'||mode==='--execute',
+ need(mode==='--preflight'||mode==='--execute'||mode==='--resolve-control',
   'WRITER_B_NATIVE_MODE_STOP');
  const env=process.env;
- const {auth,controlRoot}=await prepare(env);
+ const {auth,controlRoot,pinnedControlSha}=await prepare(env,mode);
+ if(mode==='--resolve-control'){
+  need(typeof env.GITHUB_OUTPUT==='string'&&path.isAbsolute(env.GITHUB_OUTPUT),
+   'WRITER_B_NATIVE_OUTPUT_STOP');
+  fs.appendFileSync(env.GITHUB_OUTPUT,'controlSha='+pinnedControlSha+'\n');
+  console.log('WRITER_B_NATIVE_CONTROL_PIN_RESOLVED');return 0;
+ }
  if(mode==='--preflight'){
   need(typeof env.GITHUB_OUTPUT==='string'&&
    path.isAbsolute(env.GITHUB_OUTPUT),'WRITER_B_NATIVE_OUTPUT_STOP');
@@ -206,7 +236,7 @@ async function main(){
   console.log('WRITER_B_NATIVE_PREFLIGHT_PIN_VERIFIED');
   return 0;
  }
- const candidateRoot=path.join(controlRoot,'writer-b-candidate');
+ const candidateRoot=path.join(env.GITHUB_WORKSPACE,'writer-b-candidate');
  need(gitHead(candidateRoot)===auth.manifest.candidateSourceSha,
   'WRITER_B_NATIVE_CANDIDATE_DRIFT_STOP');
  // Original Writer B source/CAS/lease/rollback transaction reused exactly.
