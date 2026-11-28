@@ -2051,3 +2051,34 @@ import '../r17-writer-b/r17-b-windows-probe.test.mjs';
 // evidence and sanitized JSON/TXT regression suites on the exact PR HEAD.
 import '../writer-b/core-idle-window.test.mjs';
 import '../writer-b/report-rejection.test.mjs';
+
+ // #3767: same sampled WMI rows, separate diagnostic and promotion classifier.
+ // Synthetic rows only: no Windows API, process signal, lease or host access.
+ test('R3 raw gap is retained while the actual watchdog classification is recorded',async()=>{
+  const {classifyR3RunnerWmiRows}=await import('../tools/pc-process-inventory-readonly.mjs');
+  const {classifyRunnerExecutableProof}=await import('../tools/runner-watchdog.mjs');
+  const opts={canonicalize:p=>p};
+  const external={pid:101,name:'Runner.Listener.exe',executablePath:'',sessionId:0,
+   serviceAncestor:true,serviceObservationAvailable:true};
+  const active={pid:102,name:'Runner.Listener.exe',executablePath:'E:/ZGmini/automation/pc-control/runners/01/bin/Runner.Listener.exe'};
+  for(const [rows,expected,rawStatus] of [
+   [[external],'NO_CONTROLLER_RUNNER_PROCESS','STATE_UNKNOWN'],
+   [[external,active],'ACTIVE_RUNNER_PROCESS','STATE_UNKNOWN'],
+   [[{...external,serviceAncestor:false}],'UNVERIFIED','STATE_UNKNOWN'],
+   [[{...external,serviceObservationAvailable:false}],'UNVERIFIED','STATE_UNKNOWN'],
+   [[{...external,name:'Runner.Worker.exe'}],'UNVERIFIED','STATE_UNKNOWN'],
+   [[external,{...external,pid:103}],'UNVERIFIED','STATE_UNKNOWN'],
+   [[active],'ACTIVE_RUNNER_PROCESS','PASS'],
+   [[], 'NO_CONTROLLER_RUNNER_PROCESS','PASS']
+  ]){
+   const got=classifyR3RunnerWmiRows({rows},opts);
+   assert.equal(got.status,rawStatus);
+   assert.equal(got.watchdogPromotionProof,expected);
+   assert.equal(got.watchdogPromotionProof,classifyRunnerExecutableProof(rows,opts));
+   assert.equal(got.promotionApproved,false);
+   assert.equal(got.operationalWrites,0);
+  }
+  const malformed=classifyR3RunnerWmiRows({rows:[null]},opts);
+  assert.equal(malformed.watchdogPromotionProof,'UNVERIFIED');
+  assert.equal(malformed.status,'STATE_UNKNOWN');
+ });
