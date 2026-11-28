@@ -347,3 +347,6 @@ for(const [name,mutate,code] of [
  assert.equal(r.code,'PUBLIC_NATIVE_WRITER_B_'+code);assert.notEqual(r.state,'CANDIDATE_ONLY');
  assertNoNativeAuthority(x,r);
 });
+
+// Execute the real receiver snapshot regressions in the existing hosted source suite.
+import './ci-native-receiver-observe.test.mjs';
