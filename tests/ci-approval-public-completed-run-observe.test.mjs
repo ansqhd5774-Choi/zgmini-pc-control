@@ -192,7 +192,7 @@ test('Public CI observer is hosted and read-only; original Private B gate remain
 });
 
 import {createHash as nativeHash} from 'node:crypto';
-import {inspectPublicNativeACandidate} from '../ci-approval/public-native-a-candidate.mjs';
+import {inspectPublicNativeACandidate,inspectPublicNativeWriterBCandidate} from '../ci-approval/public-native-a-candidate.mjs';
 const nativeDigest=b=>nativeHash('sha256').update(b).digest('hex');
 const nativeBlob=b=>nativeHash('sha1').update(Buffer.from('blob '+b.length+'\0')).update(b).digest('hex');
 const nativeFile=(path,b)=>({type:'file',path,encoding:'base64',sha:nativeBlob(b),content:b.toString('base64')});
@@ -274,4 +274,76 @@ for(const [name,mutate,code] of [
 ])test('Public Native A rejects '+name,async()=>{
  const x=nativeFixture();mutate(x);const r=await inspectPublicNativeACandidate(x);
  assert.equal(r.code,code);assert.notEqual(r.state,'CANDIDATE_ONLY');assertNoNativeAuthority(x,r);
+});
+
+function writerFixture(){
+ const x=nativeFixture(),p=x.scope.policy;
+ const manifest=JSON.parse(readFileSync(new URL('../approvals/writer-updates/w05-r304-maintenance-window-20261119.json',import.meta.url)));
+ delete manifest.coreMaintenance;
+ const receiverPath='.github/workflows/ci-approved-writer-b-once.yml';
+ const receiver=nativeFile(receiverPath,readFileSync(new URL('../'+receiverPath,import.meta.url)));
+ const adapterPath='ci-approval/native-writer-b-execute.mjs';
+ const adapter=readFileSync(new URL('../'+adapterPath,import.meta.url));
+ const manifestPath='approvals/writer-updates/w05-r304-maintenance-window-20261119.json';
+ function bind(){
+  x.scope.approvalBytes=Buffer.from(JSON.stringify(manifest));
+  p.businessApprovalSha256=nativeDigest(x.scope.approvalBytes);
+  x.scope.requestBytes=Buffer.from(JSON.stringify({schema:'ZGMINI_PC_WRITER_SOURCE_B_REQUEST_V1',
+   requestId:'12345678-1234-4234-8234-123456789abc',chatId:'12345678-1234-4234-8234-123456789abd',
+   operation:'pc-writer-source-install',controlRepository:REPO,approvalManifestPath:manifestPath,
+   approvalManifestSha256:p.businessApprovalSha256}));
+  p.approvedRequestSha256=nativeDigest(x.scope.requestBytes);
+  x.proof.policy=structuredClone(p);
+  x.proof.nativePolicySha256=nativeDigest(Buffer.from(JSON.stringify(p)));
+  const bytes=Buffer.from(JSON.stringify({schema:'ZGMINI_PC_MAINTENANCE_RESULT_V1',
+   requestId:x.proof.installationRequestId,actualControllerSha:x.proof.actualControllerSha,
+   targetControllerSha:x.proof.actualControllerSha,status:'SUCCEEDED',protectedStateUnchanged:true,
+   ciNativeEffect:p.effect,ciNativePolicySha256:x.proof.nativePolicySha256}));
+  x.proof.installationReceiptSha256=nativeDigest(bytes);
+  x.ports.getJson=async()=>nativeFile(x.proof.installationReceiptPath,bytes);
+ }
+ Object.assign(p,{effect:'B_WRITER_SOURCE',nativeWriterBExecutionEnabled:true,
+  nativeWriterBControlSha:'a'.repeat(40),nativeWriterBAdapterSha256:nativeDigest(adapter),
+  receiverWorkflowPath:receiverPath,receiverWorkflowBlobSha:receiver.sha});
+ delete p.nativeAExecutionEnabled;delete p.nativeAAdapterSha256;delete p.nativeAOperation;
+ x.proof.effect=p.effect;
+ x.ports.readNativeScope=async effect=>{assert.equal(effect,'B_WRITER_SOURCE');return x.scope};
+ x.ports.readNativeInstalledProof=async effect=>{assert.equal(effect,'B_WRITER_SOURCE');return x.proof};
+ x.ports.getWorkflow=async(path,ref)=>{if(path===SOURCE_PATH){assert.equal(ref,p.sourceHeadSha);return x.source}
+  assert.equal(path,receiverPath);assert.equal(ref,'main');return receiver};
+ x.ports.getControlFile=async(path,ref)=>{
+  assert.equal(ref,p.nativeWriterBControlSha);
+  if(path===manifestPath)return nativeFile(path,x.scope.approvalBytes);
+  if(path===adapterPath)return nativeFile(path,adapter);
+  assert.equal(path,receiverPath);return receiver;
+ };
+ bind();return {...x,manifest,bind,writerReceiver:receiver};
+}
+test('Public Native Writer B exact evidence remains candidate only',async()=>{
+ const x=writerFixture(),r=await inspectPublicNativeWriterBCandidate(x);
+ assert.equal(r.state,'CANDIDATE_ONLY');assert.equal(r.code,'PUBLIC_NATIVE_WRITER_B_EXACT_EVIDENCE_MATCH');
+ assertNoNativeAuthority(x,r);
+});
+for(const [name,mutate,code] of [
+ ['A grant',x=>{x.scope.policy.effect='A_READONLY'},'SCOPE_DENIED'],
+ ['private grant',x=>{x.scope.policy.repositoryVisibility='private'},'SCOPE_DENIED'],
+ ['missing execution opt-in',x=>{delete x.scope.policy.nativeWriterBExecutionEnabled},'SCOPE_DENIED'],
+ ['missing control pin',x=>{delete x.scope.policy.nativeWriterBControlSha},'SCOPE_DENIED'],
+ ['approval drift',x=>{x.scope.approvalBytes=Buffer.from('{}')},'BYTES_DRIFT'],
+ ['extended maintenance',x=>{x.manifest.coreMaintenance='PAUSE_NEW_STARTS_DRAIN_360S_V1';x.bind()},'FIXED_OPERATION_DENIED'],
+ ['provider scope',x=>{x.manifest.allowProviderCalls=true;x.bind()},'FIXED_OPERATION_DENIED'],
+ ['DB scope',x=>{x.manifest.allowDbChanges=true;x.bind()},'FIXED_OPERATION_DENIED'],
+ ['task change scope',x=>{x.manifest.allowTaskDefinitionChanges=true;x.bind()},'FIXED_OPERATION_DENIED'],
+ ['wrong proof effect',x=>{x.proof.effect='A_READONLY'},'INSTALLED_PROOF_MISMATCH'],
+ ['wrong installed SHA',x=>{x.proof.actualControllerSha='f'.repeat(40)},'INSTALLED_PROOF_MISMATCH'],
+ ['receipt drift',x=>{x.ports.getJson=async()=>nativeFile(x.proof.installationReceiptPath,Buffer.from('{}'))},'INSTALLATION_RECEIPT_UNVERIFIED'],
+ ['second source attempt',x=>{x.run.run_attempt=2},'SOURCE_RUN_MISMATCH'],
+ ['skipped source job',x=>{x.jobProof.jobs[0].conclusion='skipped'},'SOURCE_EVIDENCE_UNVERIFIED'],
+ ['receiver bytes drift',x=>{x.writerReceiver.content=Buffer.from('fake').toString('base64')},'RECEIVER_PIN_UNVERIFIED'],
+ ['missing immutable control reader',x=>{delete x.ports.getControlFile},'CONTROL_READ_PORT_UNAVAILABLE'],
+ ...['approvals/writer-updates/w05-r304-maintenance-window-20261119.json','ci-approval/native-writer-b-execute.mjs','.github/workflows/ci-approved-writer-b-once.yml'].map(path=>['immutable control drift '+path,x=>{const get=x.ports.getControlFile;x.ports.getControlFile=async(p,ref)=>p===path?nativeFile(p,Buffer.from('changed')):get(p,ref)},'CONTROL_BYTES_UNVERIFIED'])
+])test('Public Native Writer B rejects '+name,async()=>{
+ const x=writerFixture();mutate(x);const r=await inspectPublicNativeWriterBCandidate(x);
+ assert.equal(r.code,'PUBLIC_NATIVE_WRITER_B_'+code);assert.notEqual(r.state,'CANDIDATE_ONLY');
+ assertNoNativeAuthority(x,r);
 });
