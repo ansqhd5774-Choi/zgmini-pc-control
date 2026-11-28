@@ -39,7 +39,7 @@
     "fileHashesMatched": 7,
     "note": "Observed before candidate preparation. Live installed SHA, all seven runtime bytes, startup, ownership and lease must be independently rechecked by the existing handoff before execution."
   },
-  "approvalBasis": "DRAFT ONLY: explicit Owner review of this exact public CI single-effect grant remains required. PR 4340 source merge is not V2 deployment or approval of Controller effect PR 4341.",
+  "approvalBasis": "Owner user explicitly instructed completing the remaining prepared PR 4341/4342 work in this Codex session on 2026-11-28. This approves the exact Public CI V2 one-effect policy, existing independent 7-to-7 maintainer handoff and the single-file selective Controller update in PR 4341, followed by variable activation and actual unattended B verification. No historical 4069/4078 replay, data/provider/DB/D1/schedule changes or general Bot authority.",
   "backup": "BYTE_VERIFIED_EXISTING_SEVEN_RUNTIME_FILES_MANIFEST_AND_STARTUP",
   "rollback": "RESTORE_ONLY_WHILE_NEW_RECEIVER_NOT_STARTED_AND_PRIOR_RECEIVER_PROVEN_STOPPED; HOLD_FOR_RECOVERY_IF_RECEIVER_ORIGIN_UNVERIFIED",
   "effects": [
