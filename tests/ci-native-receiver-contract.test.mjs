@@ -192,5 +192,5 @@ test('Public Writer receiver requires independent public B policy and exact publ
   repository:{...f.sourceRun.repository,private:true}}};
  expect(cross,'CI_NATIVE_RECEIVER_SOURCE_RUN_UNVERIFIED');
  const other=structuredClone(f);other.policy.effect='A_READONLY';
- expect(other,'CI_NATIVE_RECEIVER_EVENT_ORIGIN_DENIED','REJECTED');
+ expect(other,'CI_NATIVE_RECEIVER_INSTALLED_POLICY_INVALID');
 });
