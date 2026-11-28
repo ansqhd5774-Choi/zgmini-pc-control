@@ -295,3 +295,32 @@ test('existing native Writer B workflow uploads the exact fixed receipt glob on 
  assert.match(wf,/zgmini-ci-native-writer-b-\$\{\{ github\.run_id \}\}-\*\.txt/);
  assert.match(wf,/if-no-files-found: error/);
 });
+
+test('denied native B receiver still emits a bounded preflight refusal without candidate execution',()=>{
+ const y=fs.readFileSync(new URL('../.github/workflows/ci-approved-writer-b-once.yml',import.meta.url),'utf8');
+ const between=(start,end)=>{
+  const a=y.indexOf(start),b=y.indexOf(end,a+start.length);
+  assert.ok(a>=0&&b>a,'native B step ordering preserved: '+start);
+  return y.slice(a,b);
+ };
+ const admission=between('- name: Independently verify CI receiver scope without PC execution',
+  '- name: Verify installed native Writer B grant');
+ const preflight=between('- name: Verify installed native Writer B grant',
+  '- name: Checkout only the independently approved Writer B candidate SHA');
+ const checkout=between('- name: Checkout only the independently approved Writer B candidate SHA',
+  '- name: Execute existing Writer B CAS lease and rollback transaction once');
+ const execute=between('- name: Execute existing Writer B CAS lease and rollback transaction once',
+  '- name: Upload bounded native Writer B result pair');
+ const upload=y.slice(y.indexOf('- name: Upload bounded native Writer B result pair'));
+ assert.match(admission,/id: native-writer-admission/);
+ assert.match(admission,/native-receiver-observe\.mjs/);
+ assert.match(preflight,/if: always\(\) && vars\.ZGMINI_CI_NATIVE_WRITER_B_EXEC_ENABLED == 'true'/);
+ assert.match(preflight,/native-writer-b-execute\.mjs --preflight/);
+ assert.doesNotMatch(preflight,/performWriterBInstall|--execute|writer-b-candidate/);
+ for(const step of [checkout,execute])
+  assert.match(step,/if: steps\.native-writer-admission\.outcome == 'success' && steps\.native-writer-preflight\.outcome == 'success'/);
+ assert.match(execute,/native-writer-b-execute\.mjs --execute/);
+ assert.match(upload,/if: always\(\) && vars\.ZGMINI_CI_NATIVE_WRITER_B_EXEC_ENABLED == 'true'/);
+ assert.match(upload,/if-no-files-found: error/);
+ assert.match(y,/vars\.ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED == 'true'/);
+});
