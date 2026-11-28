@@ -7,6 +7,7 @@ import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {changedFiles} from './c996-source-checks.mjs';
 import {assessPublicSourceCi} from './public-source-ci-guard.mjs';
+import {verifyPublicMergeCheckout} from './public-ci-merge-tree.mjs';
 
 export const ZIZMOR_VERSION='1.33.1';
 export const ZIZMOR_ZIP_SHA256='f02ebeedf651da468b4de19d31f0609050af74e11be41dc46d82e355cf44f68b';
@@ -62,6 +63,7 @@ export async function auditChangedActions(){
    ||!process.env.RUNNER_TEMP)throw Error('ZIZMOR_ISOLATED_PR_REQUIRED');
  const event=JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH,'utf8'));
  const release=selectZizmorRelease(process.env,event);
+ if(release.platform==='linux')verifyPublicMergeCheckout(event,process.env);
  const files=selectChangedActionFiles(await changedFiles());
  if(!files.length){console.log('ZIZMOR_NO_CHANGED_WORKFLOWS');return;}
  const folder=fs.mkdtempSync(path.join(process.env.RUNNER_TEMP,'zgmini-zizmor-'));

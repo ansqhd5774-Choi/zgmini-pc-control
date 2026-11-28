@@ -7,6 +7,7 @@ import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {changedFiles} from './c996-source-checks.mjs';
 import {assessPublicSourceCi} from './public-source-ci-guard.mjs';
+import {verifyPublicMergeCheckout} from './public-ci-merge-tree.mjs';
 
 export const OXLINT_VERSION='1.95.0';
 export const OXLINT_ARCHIVE_SHA256='8a0e8384ee8ff23892ff878dead150c8632fb447ca905e95aed2c5e6684ab921';
@@ -46,6 +47,7 @@ export async function runChangedLint(){
   ||!process.env.RUNNER_TEMP)throw Error('OXLINT_ISOLATED_PR_REQUIRED');
  const event=JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH,'utf8'));
  const release=selectOxlintRelease(process.env,event);
+ if(release.platform==='linux')verifyPublicMergeCheckout(event,process.env);
  const changed=await changedFiles();
  const files=selectSourceFiles(changed);
  if(files.length===0){console.log('OXLINT_NO_CHANGED_SOURCE');return;}
