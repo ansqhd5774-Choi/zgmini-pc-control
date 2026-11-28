@@ -9,7 +9,7 @@ import {preparePublicWriter4135PolicyPreview} from '../ci-approval/request-previ
 import {readNativeScope} from '../ci-approval/native-receiver-observe.mjs';
 import {readNativeInstalledProof,verifyNativeInstalledProof} from '../ci-approval/native-publisher-entry.mjs';
 import {POLICY_INSTALL as F,makeIndependentPolicyScope,makeIndependentPolicyProof,
- policyDigest as hash,verifyFirstScopeTransition,FIRST_SOURCE_HEAD} from '../ci-approval/native-policy-install.mjs';
+ policyDigest as hash,verifyFirstScopeTransition,FIRST_SOURCE_HEAD,FIRST_SCOPE_SHA256} from '../ci-approval/native-policy-install.mjs';
 const repo='ansqhd5774-Choi/zgmini-pc-control';
 const need=(v,c)=>{if(!v)throw Error(c)};
 const api=(route,method='GET',body)=>JSON.parse(execFileSync('gh',
@@ -125,7 +125,11 @@ try{
    actualControllerSha:p.installedControllerSha,approvalSha256:F.approvalSha256,
    requestSha256:F.requestSha256,controllerChanged:false,writerChanged:false,
    variablesEnabled:false,dispatched:false,hosts};
-  need(hosts.every(x=>x.scopeSha256===pack.scopeSha256),
+  need(hosts.every(x=>x.scopeSha256===pack.scopeSha256)&&
+   pack.migration?.beforeScopeSha256===FIRST_SCOPE_SHA256&&
+   pack.migration.afterScopeSha256===pack.scopeSha256&&
+   pack.migration.afterPolicySha256===receipt.nativePolicySha256&&
+   hosts.every(x=>x.previousScopeSha256===FIRST_SCOPE_SHA256&&x.backupVerified===true),
    'NATIVE_POLICY_PACKAGE_HOST_SCOPE_STOP');
   const receiptBytes=Buffer.from(JSON.stringify(receipt)+'\n');
   const installationRequestId='native-policy-'+randomUUID();
@@ -161,7 +165,8 @@ try{
   const existing=api('repos/'+repo+'/actions/variables?per_page=100').variables;
   const before=Object.fromEntries(Object.keys(variables).map(name=>[name,
    existing.find(x=>x.name===name)?.value??null]));
-  need(Object.entries(before).every(([name,value])=>value===null||value===variables[name]),
+  need(Object.entries(before).every(([name,value])=>value===null||value===variables[name]||
+   (name.startsWith('ZGMINI_CI_NATIVE_WRITER_B_')&&value==='false')),
    'NATIVE_POLICY_VARIABLE_PREIMAGE_DRIFT_STOP');
   write(dir,'activation-intent.json',JSON.stringify({before,desired:variables,requestId:F.requestId}));
   for(const [name,value] of Object.entries(variables)){
