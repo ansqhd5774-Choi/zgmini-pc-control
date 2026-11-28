@@ -21,12 +21,14 @@ permissions:
   contents: read
   actions: read
   issues: write
-concurrency:
-  group: ci-failure-issue-intake
-  queue: max
-  cancel-in-progress: false
 jobs:
   record-verified-failure:
+    # Only admitted failure writers share the queue. Other completion events
+    # remain visible as skipped runs but cannot reserve the writer lane.
+    concurrency:
+      group: ci-failure-issue-intake
+      queue: max
+      cancel-in-progress: false
     if: >-
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
       (github.event.repository.private == true || github.event.repository.private == false) &&
