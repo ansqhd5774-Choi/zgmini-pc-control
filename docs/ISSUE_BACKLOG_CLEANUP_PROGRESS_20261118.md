@@ -515,3 +515,10 @@
 - 최신 #4078 read-only adapter에서 승인·Supervisor owner 파일의 부모 디렉터리 심볼릭 링크 우회를 차단하도록 동일 `safeDir` 검사를 연결. [Actions #46085704726](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/46085704726) 정확 HEAD `completed/success`; 운영이 아닌 GitHub hosted `public-source-only` Job #140794671042에서 신규 경로 부정 시험 **2/2 PASS**, 관련 통합 테스트 그룹 **157/157 PASS, fail 0**. Windows `source-only`는 SKIPPED.
 - 승인 정본 #4069은 `EXACT_ONE_SUPERVISOR_TREE_STOP_WITH_WATCHDOG_AUTO_PROMOTION` 단회 stop만 승인. #4078 `S6_4078_BACKLOG_ONLY_REPLAY` 운영 효과·독립 Windows B/C Owner 포트의 별도 승인 및 원본 원장/lease CAS 입증 없음. #4313 현행 다른 A PASS는 원본 #4078 역사적 replay 영수증이 아님. #4078 OPEN/PR Draft 유지, 기존 원본 S6 재발행·Workflow/Task/Runner/DB/D1 변경·원본 Issue 부당 종결 0.
 - 이 기록은 이미 완료된 GitHub source-only 검증의 이슈 담당 원장 정합화다. 추가 진단/새 gate/중복 CI를 완료 조건으로 만들지 않고, 새로운 정확 승인과 정규 운영 권한이 생길 때에만 해당 운영 단계에 진입한다.
+
+
+## 2026-11-28 #4135 현행 R2 Core 중복 overlay 정합성
+
+- 현행 기능 저장소 `ansqhd5774-Choi/zgmini/main@c2b61c1f3317ca71e8aff28179b43f0fd4d7a1c7`의 `scripts/pc-writer/local-cycle.mjs` Git blob `fbe255234059d8bdc49d4fc56abb4dfea9450442`를 #4135 승인 4파일 manifest와 직접 비교했다. 승인 후보의 두 번째 삽입 anchor `// Paid US full-market R2 reuses the same Core lock and previously` 앞에 현행 main의 기존 `US_BREADTH_PAID_R2_BACKFILL` 블록이 이미 존재하고 `planStoredPaidUsR2Backfill` 및 `collectPaidDaily`를 호출한다. 기존 승인 overlay를 이 main에 무검증 적용하면 유사 backfill 블록을 중복 삽입할 수 있는 **정적 구조 차이**가 있다.
+- 별도 현재 MarketParquet 제외 지침 및 등록된 승인·CAS를 우선한다. 과거 #4135는 167/167 ACTIVE로 실제 overlay 시작 전 중단돼 이 **중복 실행이 운영에서 발생했다는 증거는 아니다**. 원본 요청 재실행·옛 manifest 재적용 없이 [#4135 직접 기록](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4135#issuecomment-7230648044)에 정확 소스 비교와 해결 범위를 남김.
+- #4312 PR은 최신 source CI 검증 완료 후 Draft/HOLD를 보존하며 별도 운영 승인 부재 상태가 변하지 않았다. 이 회차 신규 병합·Issue 종료·PC 실행/원자료 공급자/DB·D1 변경 0.
