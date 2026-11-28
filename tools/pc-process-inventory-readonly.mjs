@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {classifyRunnerExecutableProof} from './runner-watchdog.mjs';
 import {parseOriginProof} from '../watchdog-b/activation-first-fail-readonly.mjs';
 import {fileURLToPath} from 'node:url';
 import {authenticate,validateSeat} from './pc-host-inventory-readonly.mjs';
@@ -127,7 +128,7 @@ export function classifyR3RunnerWmiRows(raw,{
  const base={schema:'ZGMINI_R3_STANDBY_RUNNER_WMI_A_V1',
   evidence:'SINGLE_INSTANT_WMI_NOT_PROMOTION_AUTHORIZATION',
   promotionApproved:false,operationalWrites:0,providerCalls:0,d1Writes:0};
- const unknown=(code)=>({...base,status:'STATE_UNKNOWN',code,
+ const unknown=(code)=>({...base,status:'STATE_UNKNOWN',code,watchdogPromotionProof:'UNVERIFIED',
   controllerListenerCount:null,controllerWorkerCount:null,unknownPathCount:null,
   unknownListenerCount:null,unknownWorkerCount:null,
   missingWmiPathCount:null,nonAbsoluteWmiPathCount:null,
@@ -181,13 +182,16 @@ export function classifyR3RunnerWmiRows(raw,{
    else workers++;
   }
  }
- if(unknownPaths)return {...base,status:'STATE_UNKNOWN',code:'STANDBY_WMI_EXECUTABLE_PATH_UNVERIFIED',
+ // Compare the same sampled rows with the actual Watchdog classifier, not
+ // a second WMI query or a duplicate service exception. Preserve raw R3 status.
+ const watchdogPromotionProof=classifyRunnerExecutableProof(raw.rows,{controllerRoot,canonicalize});
+ if(unknownPaths)return {...base,watchdogPromotionProof,status:'STATE_UNKNOWN',code:'STANDBY_WMI_EXECUTABLE_PATH_UNVERIFIED',
   controllerListenerCount:listeners,controllerWorkerCount:workers,unknownPathCount:unknownPaths,
   unknownListenerCount,unknownWorkerCount,missingWmiPathCount,
   nonAbsoluteWmiPathCount,canonicalizationFailedCount,
   unknownSession0Count,unknownServiceAncestorCount,
   unknownSession0ServiceAncestorCount,serviceObservationUnavailableCount};
- return {...base,status:'PASS',code:'STANDBY_WMI_EXECUTABLE_PATHS_CLASSIFIED',
+ return {...base,watchdogPromotionProof,status:'PASS',code:'STANDBY_WMI_EXECUTABLE_PATHS_CLASSIFIED',
   controllerListenerCount:listeners,controllerWorkerCount:workers,unknownPathCount:0,
   unknownListenerCount:0,unknownWorkerCount:0,missingWmiPathCount:0,
   nonAbsoluteWmiPathCount:0,canonicalizationFailedCount:0,
@@ -200,7 +204,7 @@ export function inspectR3RunnerWmiReadonly({
  canonicalize=fs.realpathSync.native
 }={}){
  const unknown=(code)=>({schema:'ZGMINI_R3_STANDBY_RUNNER_WMI_A_V1',
-  status:'STATE_UNKNOWN',code,promotionApproved:false,
+  status:'STATE_UNKNOWN',code,promotionApproved:false,watchdogPromotionProof:'UNVERIFIED',
   evidence:'SINGLE_INSTANT_WMI_NOT_PROMOTION_AUTHORIZATION',
   controllerListenerCount:null,controllerWorkerCount:null,unknownPathCount:null,
   unknownListenerCount:null,unknownWorkerCount:null,missingWmiPathCount:null,
@@ -222,7 +226,7 @@ export function inspectR3RunnerWmiReadonly({
   "$svc=@();$serviceObservationAvailable=$false",
   "try{$svc=@(Get-CimInstance -ClassName Win32_Service -Filter \"Name LIKE 'actions.runner.%'\" -ErrorAction Stop | Where-Object {$_.State -eq 'Running' -and [int]$_.ProcessId -gt 0});$serviceObservationAvailable=$true}catch{}",
   "$svcByPid=@{};foreach($sv in $svc){if([string]$sv.Name -match '(?i)^actions\\.runner\\.'){$svcByPid[[int]$sv.ProcessId]=$true}}",
-  "$rows=@(foreach($p in $all | Where-Object {$_.Name -in @('Runner.Listener.exe','Runner.Worker.exe')}){$seen=@{};$parent=[int]$p.ParentProcessId;$serviceAncestor=$false;for($depth=0;$depth -lt 8;$depth++){if($parent -le 0 -or $seen.ContainsKey($parent)){break};$seen[$parent]=$true;if($svcByPid.ContainsKey($parent)){$serviceAncestor=$true;break};if(!$byPid.ContainsKey($parent)){break};$next=[int]$byPid[$parent].ParentProcessId;if($next -eq $parent){break};$parent=$next};$session=if($null -eq $p.SessionId){-1}else{[int]$p.SessionId};[pscustomobject]@{pid=[int]$p.ProcessId;name=[string]$p.Name;executablePath=[string]$p.ExecutablePath;sessionId=$session;serviceAncestor=$serviceAncestor;serviceObservationAvailable=$serviceObservationAvailable}})",
+  "$rows=@(foreach($p in $all | Where-Object {$_.Name -in @('Runner.Listener.exe','Runner.Worker.exe')}){$seen=@{};$parent=[int]$p.ParentProcessId;$serviceAncestor=$svcByPid.ContainsKey([int]$p.ProcessId);for($depth=0;$depth -lt 8 -and !$serviceAncestor;$depth++){if($parent -le 0 -or $seen.ContainsKey($parent)){break};$seen[$parent]=$true;if($svcByPid.ContainsKey($parent)){$serviceAncestor=$true;break};if(!$byPid.ContainsKey($parent)){break};$next=[int]$byPid[$parent].ParentProcessId;if($next -eq $parent){break};$parent=$next};$session=if($null -eq $p.SessionId){-1}else{[int]$p.SessionId};[pscustomobject]@{pid=[int]$p.ProcessId;name=[string]$p.Name;executablePath=[string]$p.ExecutablePath;sessionId=$session;serviceAncestor=$serviceAncestor;serviceObservationAvailable=$serviceObservationAvailable}})",
   "[pscustomobject]@{rows=$rows}|ConvertTo-Json -Compress -Depth 4"
  ].join(';');
  let result;
@@ -3853,6 +3857,7 @@ export function toText(r){
    'orphanRecoveryAuthorized=false']:[]),
   ...(r.standbyRunnerWmi?[
    'standbyRunnerWmi='+r.standbyRunnerWmi.code,
+   'wmiWatchdogPromotionProof='+(r.standbyRunnerWmi.watchdogPromotionProof??'UNVERIFIED'),
    'wmiControllerListenerCount='+(r.standbyRunnerWmi.controllerListenerCount??'UNKNOWN'),
    'wmiControllerWorkerCount='+(r.standbyRunnerWmi.controllerWorkerCount??'UNKNOWN'),
    'wmiUnknownPathCount='+(r.standbyRunnerWmi.unknownPathCount??'UNKNOWN'),
