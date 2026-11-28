@@ -1,0 +1,54 @@
+# Temporary source-only Windows 5.1 validation of Draft #4387 for #4135.
+# Never merge this workflow. No self-hosted PC, credentials, variables or Writer effects.
+name: "#4135 Native Writer B Windows 5.1 source validation"
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - '.github/workflows/native-writer-b-win51-validation-4135.yml'
+permissions:
+  contents: read
+jobs:
+  windows-hosted-source-only:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == false &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login == 'ansqhd5774-Choi'
+    runs-on: windows-2022
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 7d30a968efa2672355cbf5fd4067cbef6d16d7ba
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify exact immutable checkout and Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $sha=(& git rev-parse HEAD).Trim()
+          if($sha -cne '7d30a968efa2672355cbf5fd4067cbef6d16d7ba'){throw 'NATIVE_POLICY_CHECKOUT_SHA_STOP'}
+          if($PSVersionTable.PSEdition -cne 'Desktop' -or $PSVersionTable.PSVersion.Major -ne 5){throw 'NATIVE_POLICY_WINDOWS51_REQUIRED_STOP'}
+          Write-Output 'EXACT_SOURCE_SHA_VERIFIED'
+          Write-Output ('WINDOWS_POWERSHELL_VERSION='+$PSVersionTable.PSVersion.ToString())
+      - name: Parse approved Owner script without executing it
+        shell: powershell
+        run: |
+          $tokens=$null
+          $parseErrors=$null
+          $path='tools/operator-packets/NATIVE_WRITER_B_POLICY_INSTALL_ONCE.ps1'
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path -LiteralPath $path).Path,[ref]$tokens,[ref]$parseErrors)
+          if($parseErrors.Count -ne 0){
+            $parseErrors|ForEach-Object {Write-Output ('PARSER_ERROR='+$_.ErrorId)}
+            throw 'NATIVE_POLICY_WINDOWS51_PARSE_STOP'
+          }
+          Write-Output 'WINDOWS51_PARSE_ZERO_ERRORS'
+      - name: Run existing isolated Windows TEMP mutex and intent tests
+        shell: cmd
+        run: |
+          node --test --test-concurrency=1 tests/ci-native-policy-install.test.mjs
