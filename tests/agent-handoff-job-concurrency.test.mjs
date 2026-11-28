@@ -116,7 +116,8 @@ test('009 admits only relevant events and serializes actual issue writers withou
  const yaml=read('agent-handoff.yml');
  assert.doesNotMatch(yaml,/^concurrency:/m);
  for(const job of ['route-sanitized-incident','record-verified-return','record-work-progress']){
-   assert.ok(yaml.includes('  '+job+':\n    concurrency:\n      group: agent-handoff-${{ github.event.issue.number }}\n      cancel-in-progress: false\n      queue: max'));
+   const section=yaml.slice(yaml.indexOf('  '+job+':'),yaml.indexOf('  '+job+':')+750);
+   assert.match(section,/concurrency:\s*\n\s*group: agent-handoff-\$\{\{ github.event.issue.number \}\}\s*\n\s*cancel-in-progress: false\s*\n\s*queue: max/);
  }
  assert.equal((yaml.match(/^      queue: max$/gm)||[]).length,5);
  assert.match(yaml,/github\.event\.action == 'opened'/);
@@ -138,7 +139,13 @@ test('direct intake selection requires a successful original job, not merely a c
  assert.match(selection,/github\.actor == 'ansqhd5774-Choi'/);
  assert.match(selection,/vars\.ZGMINI_AGENT_HANDOFF_ENABLED == 'true'/);
  assert.match(selection,/group: zgmini-handoff-candidate-selector\s*\n\s*cancel-in-progress: false\s*\n\s*queue: max/);
- assert.match(board,/needs: verify-and-select-after-intake/);
+ assert.match(board,/needs: \[route-sanitized-incident, record-verified-return, record-work-progress, verify-and-select-after-intake\]/);
+ assert.match(board,/!cancelled\(\) && !failure\(\)/);
+ assert.match(board,/needs\.verify-and-select-after-intake\.result == 'skipped'/);
+ for(const job of ['route-sanitized-incident','record-verified-return','record-work-progress']){
+   assert.ok(selection.includes("needs."+job+".outputs.selection_reused != 'true'"));
+   assert.ok(board.includes("needs."+job+".outputs.selection_reused == 'true'"));
+ }
  assert.match(board,/needs\.verify-and-select-after-intake\.result == 'success'/);
  assert.match(board,/permissions:\s*\n\s*contents: read\s*\n\s*issues: read\s*\n\s*pull-requests: read/);
  assert.doesNotMatch(board,/issues: write|contents: write|always\(\)|continue-on-error/);
@@ -195,4 +202,15 @@ test('no-op proof never blocks the original intake or bypasses a required select
   assert.ok(after.includes("needs."+job+".result == 'success'"));
   assert.match(after,/vars\.ZGMINI_AGENT_HANDOFF_ENABLED == 'true'/);
  }
+});
+
+
+test('direct intake keeps all three optional proofs read-only and falls back on failure',()=>{
+ const yaml=read('agent-handoff.yml');
+ const original=yaml.slice(0,yaml.indexOf('  # Continue only after'));
+ assert.equal((original.match(/id: selection-noop/g)||[]).length,3);
+ assert.equal((original.match(/continue-on-error: true/g)||[]).length,3);
+ assert.equal((original.match(/run: node agent-handoff\/queue-dispatcher\.mjs --verify-noop/g)||[]).length,3);
+ assert.equal((original.match(/steps\.selection-noop\.outcome == 'success' && steps\.selection-noop\.outputs\.reusable == 'true'/g)||[]).length,3);
+ assert.equal((original.match(/if: github\.ref == 'refs\/heads\/main'/g)||[]).length,3);
 });

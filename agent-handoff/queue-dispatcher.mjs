@@ -130,6 +130,20 @@ const NOOP_REFS=new Map([
   [HANDOFF_REPOSITORY+'/.github/workflows/agent-handoff-writer-b-failure-intake.yml@refs/heads/main','enqueue-verified-writer-b-failures']
 ]);
 export function validateNoopTrigger(event,env){
+  if(env.GITHUB_WORKFLOW_REF===HANDOFF_REPOSITORY+'/.github/workflows/agent-handoff.yml@refs/heads/main'){
+    const job=env.GITHUB_JOB;
+    if(!['route-sanitized-incident','record-verified-return','record-work-progress'].includes(job))
+      throw Error('HANDOFF_SELECTOR_NOOP_SCOPE_STOP');
+    validateDirectIntakeFollowup(event,env,job);
+    const body=event.comment?.body;
+    const matches=job==='route-sanitized-incident' ? env.GITHUB_EVENT_NAME==='issues' :
+      env.GITHUB_EVENT_NAME==='issue_comment' && typeof body==='string' &&
+      (job==='record-verified-return' ?
+        (body.includes('ZGMINI_AGENT_HANDOFF_RESULT_V1')||body.includes('ZGMINI_AGENT_HANDOFF_DIAGNOSIS_V1')) :
+        (event.issue.labels.some(x=>x?.name==='handoff-agent-pending')&&body.includes('ZGMINI_HANDOFF_WORK_UPDATE_V1')));
+    if(!matches)throw Error('HANDOFF_SELECTOR_NOOP_SCOPE_STOP');
+    return;
+  }
   const job=NOOP_REFS.get(env.GITHUB_WORKFLOW_REF);
   if(!job||env.GITHUB_EVENT_NAME!=='workflow_run')throw Error('HANDOFF_SELECTOR_NOOP_SCOPE_STOP');
   validateFailureIntakeFollowup(event,env,job);

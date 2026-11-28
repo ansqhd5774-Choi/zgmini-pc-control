@@ -421,3 +421,27 @@ test('no-op proof only runs in the exact normal producer Job, never historical m
  assert.doesNotThrow(()=>validateNoopTrigger(writer,writerEnv));
  assert.throws(()=>validateNoopTrigger(event,writerEnv));
 });
+
+
+test('direct intake no-op proof is scoped to exact main workflow, job and event',()=>{
+ const repo=HANDOFF_REPOSITORY,repository={full_name:repo,private:true};
+ const issue={labels:[{name:'agent-handoff'},{name:'handoff-agent-pending'}]};
+ const env={GITHUB_REPOSITORY:repo,GITHUB_EVENT_PATH:'event.json',GITHUB_REF:'refs/heads/main',GITHUB_ACTOR:owner,GITHUB_EVENT_NAME:'issues',GITHUB_JOB:'route-sanitized-incident',GITHUB_WORKFLOW_REF:repo+'/.github/workflows/agent-handoff.yml@refs/heads/main'};
+ const route={repository,issue,action:'opened'};
+ assert.doesNotThrow(()=>validateNoopTrigger(route,env));
+ assert.doesNotThrow(()=>validateNoopTrigger({...route,action:'labeled',label:{name:'agent-handoff'}},env));
+ assert.throws(()=>validateNoopTrigger({...route,action:'labeled',label:{name:'other'}},env));
+ assert.throws(()=>validateNoopTrigger(route,{...env,GITHUB_JOB:'record-work-progress'}));
+ assert.throws(()=>validateNoopTrigger(route,{...env,GITHUB_JOB:'verify-and-select-after-intake'}));
+ assert.throws(()=>validateNoopTrigger(route,{...env,GITHUB_REF:'refs/heads/other'}));
+ assert.throws(()=>validateNoopTrigger({...route,repository:{...repository,private:false}},env));
+ for(const [job,marker] of [['record-verified-return','ZGMINI_AGENT_HANDOFF_RESULT_V1'],['record-verified-return','ZGMINI_AGENT_HANDOFF_DIAGNOSIS_V1'],['record-work-progress','ZGMINI_HANDOFF_WORK_UPDATE_V1']]){
+   const event={repository,issue,action:'created',comment:{body:marker}};
+   const e={...env,GITHUB_EVENT_NAME:'issue_comment',GITHUB_JOB:job};
+   assert.doesNotThrow(()=>validateNoopTrigger(event,e));
+   assert.throws(()=>validateNoopTrigger(event,{...e,GITHUB_JOB:'route-sanitized-incident'}));
+   assert.throws(()=>validateNoopTrigger(event,{...e,GITHUB_JOB:job==='record-work-progress'?'record-verified-return':'record-work-progress'}));
+   assert.throws(()=>validateNoopTrigger({...event,issue:{...issue,pull_request:{}}},e));
+   assert.throws(()=>validateNoopTrigger(event,{...e,GITHUB_ACTOR:'other'}));
+ }
+});
