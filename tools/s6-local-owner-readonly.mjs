@@ -26,6 +26,13 @@ const PHASES=new Set(['CLAIMED','INSTALL_LEASE_ACQUIRE_ATTEMPT',
  'OWNED_LEASE_RELEASED','WATCHDOG_RELEASE_OBSERVED','FAST_PROMOTION_OBSERVED',
  'WATCHDOG_RELEASE_OUTCOME_UNVERIFIED','BACKLOG_RECONCILE_ATTEMPT',
  'BACKLOG_RECONCILED','PROMOTED_READBACK_VERIFIED','RECOVERY_REQUIRED']);
+// Only adapter-defined reason codes are allowed through the local projection.
+const LOCAL_SAMPLE_REFUSALS=new Set([
+ 'S6_WINDOWS_OPERATOR_REQUIRED','S6_ROOT_INVALID','S6_ORIGINAL_CLAIM_UNVERIFIED',
+ 'S6_APPROVAL_SOURCE_CAS_DRIFT','S6_APPROVAL_SCOPE_INVALID',
+ 'S6_LOCAL_CROSS_FILE_SNAPSHOT_CHANGED','S6_LOCAL_OWNER_OR_APPROVAL_CHANGED',
+ 'S6_4078_LOCAL_SOURCE_OR_CAS_UNVERIFIED'
+]);
 const CLASSIFICATIONS=new Set(['UNVERIFIED','ACTIVE_RUNNER_PROCESS','NO_CONTROLLER_RUNNER_PROCESS']);
 const sha=x=>createHash('sha256').update(x).digest('hex');
 const need=(ok,code)=>{if(!ok)throw Object.assign(new Error(code),{code});};
@@ -38,35 +45,38 @@ const base=()=>({schema:'ZGMINI_S6_LOCAL_OWNER_READONLY_V1',
 // Only fixed enums/booleans leave this projection, never original bytes,
 // arbitrary journal strings, owner IDs, nonces, PIDs, paths or raw hashes.
 export function projectLocalS6(sample,projectBacklog){
- const unknown={status:'STATE_UNKNOWN',journalPhase:null,failedAt:null,
+ const unknown=code=>({status:'STATE_UNKNOWN',code,journalPhase:null,failedAt:null,
   originalFailureMatches:null,leaseReleaseAcknowledged:null,
   originalOwnerMatchesCurrent:null,pauseWindowContainsIssueOpenedAt:null,
-  replayLedgerStatus:'UNVERIFIED'};
+  replayLedgerStatus:'UNVERIFIED'});
  try{
   if(sample?.status!=='READ_ONLY_OBSERVED'||
-    sample?.code!=='S6_4078_LOCAL_BYTES_SAMPLED')return unknown;
+    sample?.code!=='S6_4078_LOCAL_BYTES_SAMPLED')return unknown(
+     sample?.status==='STATE_UNKNOWN'&&LOCAL_SAMPLE_REFUSALS.has(sample.code)?
+      sample.code:'S6_LOCAL_SAMPLE_UNVERIFIED');
   const l=sample.localReadback;
   if(typeof l?.journalBefore!=='string'||typeof l?.backlogBefore!=='string'||
      l.journalBefore!==l.journalAfter||l.backlogBefore!==l.backlogAfter||
      sha(l.journalBefore)!==l.journalSha256||sha(l.backlogBefore)!==l.backlogSha256)
-   return unknown;
+   return unknown('S6_LOCAL_SAMPLE_BYTES_UNVERIFIED');
   const j=JSON.parse(l.journalBefore),b=JSON.parse(l.backlogBefore);
   if(j?.schema!=='ZGMINI_S6_ONCE_JOURNAL_V1'||j.requestId!==REQUEST||
      !phase(j.phase)||b?.schema!=='ZGMINI_PC_BACKLOG_V1'||b.requestId!==REQUEST||
-     typeof projectBacklog!=='function')return unknown;
+     typeof projectBacklog!=='function')return unknown('S6_LOCAL_SAMPLE_IDENTITY_UNVERIFIED');
   // Reuse the current Controller's bounded legacy/window and replay contract.
   // Missing historical replays is different from a malformed replay object.
   const observed=projectBacklog(b);
   const replay=observed?.replayLedgerStatus;
   if(!['NOT_RECORDED','POSTING','DONE','SKIPPED_RESULT_PRESENT',
-    'REJECTED_INVALID_ORIGINAL','WINDOW_NOT_CLOSED','UNVERIFIED'].includes(replay))return unknown;
-  return {status:'READ_ONLY_OBSERVED',journalPhase:j.phase,failedAt:phase(j.failedAt),
+    'REJECTED_INVALID_ORIGINAL','WINDOW_NOT_CLOSED','UNVERIFIED'].includes(replay))
+   return unknown('S6_LOCAL_BACKLOG_PROJECTION_UNVERIFIED');
+  return {status:'READ_ONLY_OBSERVED',code:'S6_LOCAL_SAMPLE_OBSERVED',journalPhase:j.phase,failedAt:phase(j.failedAt),
    originalFailureMatches:j.code==='S6_PORT_PROMOTION_UNVERIFIED',
    leaseReleaseAcknowledged:bool(j.leaseReleaseAcknowledged),
    originalOwnerMatchesCurrent:bool(sample.originalOwnerMatchesCurrent),
    pauseWindowContainsIssueOpenedAt:bool(observed.pauseWindowContainsIssueOpenedAt),
    replayLedgerStatus:replay};
- }catch{return unknown;}
+ }catch{return unknown('S6_LOCAL_SAMPLE_PARSE_OR_PROJECTION_UNVERIFIED');}
 }
 
 export function projectWmiObservation(value,installedSourceMatch){
