@@ -1,0 +1,14 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-46092679070-1-seat-3",
+  "requestId": "pc-4069-journal-66b8a66c-20261128-01",
+  "operation": "controller-s6-4069-journal-readonly",
+  "seat": 3,
+  "status": "PASS",
+  "code": "PUBLIC_RESULT_CODE_REDACTED",
+  "actualExecutionSha": "66b8a66c6112441576917e0ac9fbe4d39cbd5eea",
+  "reportTransfer": {
+    "status": "SUMMARY_ONLY",
+    "code": "PUBLIC_REPOSITORY_REDACTED"
+  }
+}
