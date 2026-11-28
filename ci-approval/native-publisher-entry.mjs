@@ -24,16 +24,17 @@ const digest=b=>createHash('sha256').update(b).digest('hex');
 const fail=code=>{throw Error(code)};
 const out=(state,code,extra={})=>Object.freeze({state,code,dispatched:false,
  executed:false,pcOperationalWrites:0,...extra});
-const scoped=(pathValue,root)=>{
+const scoped=(pathValue,root,{io=fs,singleLink=false}={})=>{
  if(typeof root!=='string'||!path.isAbsolute(root)||root.includes('\0'))fail('CI_NATIVE_PROOF_ROOT_DENIED');
  for(let cur=path.resolve(root);;){
-  const st=fs.lstatSync(cur);
+  const st=io.lstatSync(cur);
   if(!st.isDirectory()||st.isSymbolicLink())fail('CI_NATIVE_PROOF_ROOT_UNTRUSTED');
   const parent=path.dirname(cur);if(parent===cur)break;cur=parent;
  }
  const full=path.join(path.resolve(root),pathValue);
- const s=fs.lstatSync(full);
- if(!s.isFile()||s.isSymbolicLink()||s.size<2||s.size>65536)
+ const s=io.lstatSync(full);
+ if(!s.isFile()||s.isSymbolicLink()||s.size<2||s.size>65536||
+    (singleLink&&s.nlink!==1))
   fail('CI_NATIVE_PROOF_FILE_UNVERIFIED');
  return full;
 };
@@ -52,10 +53,24 @@ function validateNativeInstalledProof(effect,v){
     v.policy.installedControllerSha!==v.actualControllerSha)
   fail('CI_NATIVE_PROOF_CONTROLLER_PIN_MISMATCH');
 }
-export function readNativeInstalledProof(effect,{root='E:\\ZGmini\\data\\pc-writer\\ci-native'}={}){
+export function readNativeInstalledProof(effect,{root='E:\\ZGmini\\data\\pc-writer\\ci-native',io=fs}={}){
  const file=INSTALLED[effect];
  if(!file)fail('CI_NATIVE_PROOF_EFFECT_DENIED');
- const raw=fs.readFileSync(scoped(file,root),'utf8');
+ const guarded=effect==='B_WRITER_SOURCE';
+ const filename=scoped(file,root,{io,singleLink:guarded});
+ let raw;
+ if(guarded){
+  try{
+   const before=io.lstatSync(filename),a=io.readFileSync(filename),
+    b=io.readFileSync(filename),after=io.lstatSync(filename);
+   if(!Buffer.isBuffer(a)||!Buffer.isBuffer(b)||!a.equals(b)||
+      a.length!==before.size||before.nlink!==1||after.nlink!==1||
+      after.size!==before.size||after.ino!==before.ino||
+      after.dev!==before.dev||after.mtimeMs!==before.mtimeMs)
+    fail('CI_NATIVE_PROOF_FILE_UNVERIFIED');
+   raw=a.toString('utf8');
+  }catch{fail('CI_NATIVE_PROOF_FILE_UNVERIFIED');}
+ }else raw=io.readFileSync(filename,'utf8');
  let v;try{v=JSON.parse(raw)}catch{fail('CI_NATIVE_PROOF_INVALID')}
  validateNativeInstalledProof(effect,v);
  return Object.freeze(v);
