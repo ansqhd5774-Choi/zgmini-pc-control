@@ -124,3 +124,104 @@ test('Windows transition installer keeps elevated gate, exact preimage, protecte
  assert.match(s,/NATIVE_POLICY_TRANSITION_BACKUP_READBACK_STOP/);
  assert.doesNotMatch(s,/Remove-Item|Set-ExecutionPolicy|Stop-Process/);
 });
+
+test('post-swap Owner failure is fail-closed and only compensates verified preimages',()=>{
+ const s=fs.readFileSync(new URL('../tools/operator-packets/NATIVE_WRITER_B_POLICY_INSTALL_ONCE.ps1',import.meta.url),'utf8');
+ const swapped=s.indexOf('$transitionSwapped=$true');
+ const committed=s.indexOf('$transitionCommitted=$true');
+ const catchFinal=s.lastIndexOf('}catch{');
+ const compensator=s.indexOf('function Restore-VerifiedTransitionPreimage');
+ assert.ok(compensator>0&&swapped>compensator&&committed>swapped&&catchFinal>committed);
+ const body=s.slice(compensator,s.indexOf('function Verify-TransitionPreimage',compensator));
+ for(const needle of [
+  "Test-Path -LiteralPath $OutputFile",
+  "Exact-Acl $root $scopeAcl",
+  "Exact-Acl $backup $scopeAcl",
+  "NATIVE_POLICY_TRANSITION_NEW_STATE_DRIFT_STOP",
+  "NATIVE_POLICY_TRANSITION_BACKUP_DRIFT_STOP",
+  "NATIVE_POLICY_TRANSITION_SCOPE_CAS_STOP",
+  "NATIVE_POLICY_TRANSITION_BACKUP_OBSERVATION_DRIFT_STOP",
+  "NATIVE_POLICY_RESERVED_PUBLISHER_CLAIM_STOP",
+  "[IO.Directory]::Move($root,$quarantine)",
+  "[IO.Directory]::Move($backup,$root)"
+ ])assert.ok(body.includes(needle),'missing protected rollback condition: '+needle);
+ assert.ok(body.indexOf('[IO.Directory]::Move($root,$quarantine)')<
+  body.indexOf('[IO.Directory]::Move($backup,$root)'));
+ assert.match(s.slice(catchFinal),/if\(\$transitionSwapped -and -not \$transitionCommitted\)/);
+ assert.match(s.slice(catchFinal),/Restore-VerifiedTransitionPreimage/);
+ assert.match(s.slice(catchFinal),/NATIVE_POLICY_TRANSITION_RECOVERY_REQUIRED/);
+ assert.doesNotMatch(body,/Remove-Item|Set-ExecutionPolicy|Stop-Process/);
+});
+
+test('Windows PowerShell 5.1 parses the protected transition and preserves isolated rollback',
+ {skip:process.platform!=='win32'},t=>{
+ const file=new URL('../tools/operator-packets/NATIVE_WRITER_B_POLICY_INSTALL_ONCE.ps1',import.meta.url);
+ const original=fs.readFileSync(file,'utf8');
+ const start=original.indexOf('function Restore-VerifiedTransitionPreimage');
+ const end=original.indexOf('function Verify-TransitionPreimage',start);
+ assert.ok(start>=0&&end>start);
+ const temp=fs.mkdtempSync(path.join(os.tmpdir(),'native-policy-rollback-'));
+ t.after(()=>fs.rmSync(temp,{recursive:true,force:true}));
+ const literal=temp.replace(/'/g,"''");
+ const target=decodeURIComponent(file.pathname.slice(1)).replace(/'/g,"''");
+ const helper=original.slice(start,end);
+ const code=[
+  "$ErrorActionPreference='Stop'",
+  "$parseTokens=$null;$parseErrors=$null",
+  "[void][System.Management.Automation.Language.Parser]::ParseFile('"+target+"',[ref]$parseTokens,[ref]$parseErrors)",
+  "if($parseErrors.Count -gt 0){throw 'NATIVE_POLICY_PARSE_FAILED'}",
+  "function Stop-N([string]$code){throw $code}",
+  "function Plain-Path([string]$p){if(-not (Test-Path -LiteralPath $p -PathType Container)){throw 'PATH_MISSING'}}",
+  "function Exact-Acl([string]$p,$expected){if(-not (Test-Path -LiteralPath $p)){throw 'ACL_PATH_MISSING'};return 'fixture'}",
+  "function New-PolicyFileAcl {return 'fixture'}",
+  "function New-Acl([string]$rights){return 'fixture'}",
+  "function Hash-Bytes([byte[]]$b){$text=[Text.Encoding]::UTF8.GetString($b);if($text -ceq 'OLD'){return ('a'*64)};if($text -ceq 'NEW'){return ('b'*64)};throw 'HASH_DRIFT'}",
+  helper,
+  "$homeRoot='"+literal+"'",
+  "$root=Join-Path $homeRoot 'active'",
+  "$backup=$root+'.backup-'+('a'*64)",
+  "$receiptRoot=Join-Path $homeRoot 'receipts'",
+  "$OutputFile=Join-Path $homeRoot 'result.json'",
+  "$ScopeSha256='b'*64",
+  "$TransitionFromScopeSha256='a'*64",
+  "$hostName='DESKTOP-N62L0NG'",
+  "$scopeAcl='fixture'",
+  "function Make-Fixture {",
+  "  if(Test-Path $root){[IO.Directory]::Delete($root,$true)}",
+  "  if(Test-Path $backup){[IO.Directory]::Delete($backup,$true)}",
+  "  $quarantine=$root+'.failed-'+$ScopeSha256",
+  "  if(Test-Path $quarantine){[IO.Directory]::Delete($quarantine,$true)}",
+  "  [void][IO.Directory]::CreateDirectory($root)",
+  "  [void][IO.Directory]::CreateDirectory($backup)",
+  "  [void][IO.Directory]::CreateDirectory($receiptRoot)",
+  "  [IO.File]::WriteAllText((Join-Path $root 'ci-native-writer-b-approved.json'),'NEW')",
+  "  [IO.File]::WriteAllText((Join-Path $backup 'ci-native-writer-b-approved.json'),'OLD')",
+  "  $state=@{host=$hostName;status='SCOPE_INSTALLED_VERIFIED';scopeSha256=$TransitionFromScopeSha256;aclVerified=$true;reservedClaimAbsent=$true}|ConvertTo-Json -Compress",
+  "  [IO.File]::WriteAllText((Join-Path $backup 'installation-observation.json'),$state)",
+  "}",
+  "Make-Fixture",
+  "[IO.File]::WriteAllText($OutputFile,'partial result')",
+  "try{Restore-VerifiedTransitionPreimage;throw 'ACCEPTED_PARTIAL_RESULT'}catch{if($_.Exception.Message -notmatch 'RESULT_EXISTS_STOP'){throw}}",
+  "if((Test-Path $backup) -ne $true -or (Test-Path $root) -ne $true){throw 'PARTIAL_REPORT_MUTATED_ROOTS'}",
+  "[IO.File]::Delete($OutputFile)",
+  "[IO.File]::WriteAllText((Join-Path $root 'ci-native-writer-b-approved.json'),'DRIFT')",
+  "try{Restore-VerifiedTransitionPreimage;throw 'ACCEPTED_DRIFT'}catch{if($_.Exception.Message -notmatch 'HASH_DRIFT'){throw}}",
+  "if((Test-Path $backup) -ne $true -or (Test-Path $root) -ne $true){throw 'DRIFT_MUTATED_ROOTS'}",
+  "Make-Fixture",
+  "$claim=Join-Path $receiptRoot 'native-287c32ba0ae695f2b17176b48bdbf1828797d04e53f5d6d346ae4f66c7b818b4.json'",
+  "[IO.File]::WriteAllText($claim,'claimed')",
+  "try{Restore-VerifiedTransitionPreimage;throw 'ACCEPTED_CLAIM'}catch{if($_.Exception.Message -notmatch 'PUBLISHER_CLAIM_STOP'){throw}}",
+  "if((Test-Path $backup) -ne $true -or (Test-Path $root) -ne $true){throw 'CLAIM_MUTATED_ROOTS'}",
+  "[IO.File]::Delete($claim)",
+  "Restore-VerifiedTransitionPreimage",
+  "if([IO.File]::ReadAllText((Join-Path $root 'ci-native-writer-b-approved.json')) -cne 'OLD'){throw 'BACKUP_NOT_RESTORED'}",
+  "if([IO.File]::ReadAllText((Join-Path ($root+'.failed-'+$ScopeSha256) 'ci-native-writer-b-approved.json')) -cne 'NEW'){throw 'NEW_TREE_LOST'}",
+  "if(Test-Path $backup){throw 'BACKUP_RENAME_NOT_COMPLETED'}",
+  "Write-Output 'ISOLATED_ROLLBACK_PASS'"
+ ].join(';');
+ const result=spawnSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',code],
+  {encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:65536});
+ assert.equal(result.error,undefined);
+ assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
+ assert.match(result.stdout,/ISOLATED_ROLLBACK_PASS/);
+});
