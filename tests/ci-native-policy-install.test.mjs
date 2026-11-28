@@ -135,10 +135,68 @@ test('transition stages observation before the first rename and covers post-swap
  const move=s.indexOf('[IO.Directory]::Move($root,$backup)',intent);
  const swap=s.indexOf('[IO.Directory]::Move($staging,$root)',move);
  const output=s.indexOf('Write-Once $OutputFile $reportBytes',swap);
- const recovery=s.indexOf('Verify-TransitionPreimage $backup',s.indexOf('}catch{',output));
- const quarantine=s.indexOf('[IO.Directory]::Move($root,$failed)',recovery);
- const restore=s.indexOf('[IO.Directory]::Move($backup,$root)',quarantine);
- assert.ok(stage>=0&&verify>stage&&intent>verify&&move>intent&&swap>move&&output>swap&&recovery>output&&quarantine>recovery&&restore>quarantine);
+ const recovery=s.indexOf('Restore-VerifiedTransitionPreimage',s.indexOf('}catch{',output));
+ const helper=s.slice(s.indexOf(' function Restore-VerifiedTransitionPreimage {'),s.indexOf(' Verify-NewScope $staging'));
+ const guard=helper.indexOf('Test-Path -LiteralPath $OutputFile');
+ const claim=helper.indexOf('Verify-TransitionClaimAbsent');
+ const quarantine=helper.indexOf('[IO.Directory]::Move($root,$failed)');
+ const restore=helper.indexOf('[IO.Directory]::Move($backup,$root)');
+ assert.ok(stage>=0&&verify>stage&&intent>verify&&move>intent&&swap>move&&output>swap&&recovery>output);
+ assert.ok(guard>=0&&claim>guard&&quarantine>claim&&restore>quarantine);
+ assert.equal((helper.match(/Test-Path -LiteralPath \$OutputFile/g)||[]).length,2);
+ assert.equal((helper.match(/Verify-TransitionClaimAbsent/g)||[]).length,2);
  assert.match(s,/NATIVE_POLICY_TRANSITION_RECOVERY_REQUIRED_STOP/);
  assert.match(s,/NATIVE_POLICY_TRANSITION_RESTORED_STOP/);
+});
+
+test('Windows parser and TEMP rollback guard refuse surviving output and claims', {skip:process.platform!=='win32'},t=>{
+ const file=new URL('../tools/operator-packets/NATIVE_WRITER_B_POLICY_INSTALL_ONCE.ps1',import.meta.url);
+ const s=fs.readFileSync(file,'utf8');
+ const start=s.indexOf(' function Restore-VerifiedTransitionPreimage {');
+ const end=s.indexOf(' Verify-NewScope $staging',start);
+ assert.ok(start>=0&&end>start);
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'native-policy-restore-'));
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const literal=v=>v.replace(/'/g,"''");
+ const target=literal(decodeURIComponent(file.pathname.slice(1)));
+ const code=[
+  "$ErrorActionPreference='Stop'",
+  "$tokens=$null;$errors=$null",
+  "[void][System.Management.Automation.Language.Parser]::ParseFile('"+target+"',[ref]$tokens,[ref]$errors)",
+  "if($errors.Count -gt 0){throw 'INSTALLER_PARSE_FAILED'}",
+  "$base='"+literal(dir)+"'",
+  "$root=Join-Path $base 'active'",
+  "$backup=Join-Path $base 'backup'",
+  "$failed=Join-Path $base 'failed'",
+  "$OutputFile=Join-Path $base 'result.json'",
+  "$claim=Join-Path $base 'claim'",
+  "function Stop-N([string]$code){throw $code}",
+  "function Verify-TransitionClaimAbsent {if(Test-Path -LiteralPath $claim){throw 'CLAIM_EXISTS'}}",
+  "function Verify-TransitionPreimage([string]$dir){if([IO.File]::ReadAllText((Join-Path $dir 'scope')) -cne 'OLD'){throw 'OLD_DRIFT'}}",
+  "function Verify-NewScope([string]$dir){if([IO.File]::ReadAllText((Join-Path $dir 'scope')) -cne 'NEW'){throw 'NEW_DRIFT'}}",
+  s.slice(start,end),
+  "[void][IO.Directory]::CreateDirectory($root)",
+  "[void][IO.Directory]::CreateDirectory($backup)",
+  "[IO.File]::WriteAllText((Join-Path $root 'scope'),'NEW')",
+  "[IO.File]::WriteAllText((Join-Path $backup 'scope'),'OLD')",
+  "function Check-Unchanged {if([IO.File]::ReadAllText((Join-Path $root 'scope')) -cne 'NEW' -or [IO.File]::ReadAllText((Join-Path $backup 'scope')) -cne 'OLD' -or (Test-Path $failed)){throw 'UNEXPECTED_MOVE'}}",
+  "[IO.File]::WriteAllText($OutputFile,'{\"status\":\"SCOPE_INSTALLED_VERIFIED\"}')",
+  "try{Restore-VerifiedTransitionPreimage;throw 'ACCEPTED_OUTPUT'}catch{if($_.Exception.Message -cne 'NATIVE_POLICY_TRANSITION_RESULT_EXISTS_STOP'){throw}}",
+  "Check-Unchanged",
+  "[IO.File]::Delete($OutputFile)",
+  "[IO.File]::WriteAllText($claim,'claimed')",
+  "try{Restore-VerifiedTransitionPreimage;throw 'ACCEPTED_CLAIM'}catch{if($_.Exception.Message -cne 'CLAIM_EXISTS'){throw}}",
+  "Check-Unchanged",
+  "[IO.File]::Delete($claim)",
+  "Restore-VerifiedTransitionPreimage",
+  "if([IO.File]::ReadAllText((Join-Path $root 'scope')) -cne 'OLD' -or [IO.File]::ReadAllText((Join-Path $failed 'scope')) -cne 'NEW' -or (Test-Path $backup)){throw 'RESTORE_FAILED'}",
+  "Write-Output 'TEMP_RESTORE_PASS'"
+ ].join('\n');
+ // The fixture runs only extracted compensation code in a newly created TEMP
+ // directory; ACL/claim/byte readers are fixture ports, not live host proof.
+ const result=spawnSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',code],
+  {encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:65536});
+ assert.equal(result.error,undefined);
+ assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
+ assert.match(result.stdout,/TEMP_RESTORE_PASS/);
 });
