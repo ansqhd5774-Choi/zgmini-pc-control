@@ -103,7 +103,8 @@ public static class ZgminiTempOnlyCtrl {
 Add-Type -TypeDefinition $source -ErrorAction Stop
 [void][ZgminiTempOnlyCtrl]::FreeConsole()
 if(-not [ZgminiTempOnlyCtrl]::AttachConsole($target)){
- Write-Output '{"status":"BLOCKED","code":"TEMP_CONSOLE_ATTACH_FAILED"}'
+ $attachError=[Runtime.InteropServices.Marshal]::GetLastWin32Error()
+ Write-Output (@{status='BLOCKED';code='TEMP_CONSOLE_ATTACH_FAILED';win32Error=$attachError} | ConvertTo-Json -Compress)
  exit 0
 }
 try{
@@ -141,7 +142,8 @@ function sendTestSignal(targetPid,control){
   ;
  // No shell, PID search, arbitrary command, or target override.
  const response=JSON.parse(runFixedPowerShell(command));
- assert.equal(response.status,'SENT',response.code);
+ assert.equal(response.status,'SENT',response.code+
+  (Number.isInteger(response.win32Error)?' win32Error='+response.win32Error:''));
  return response;
 }
 async function withTwoTempConsoles(fn){
