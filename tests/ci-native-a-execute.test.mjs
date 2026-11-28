@@ -4,6 +4,8 @@ import {createHash} from 'node:crypto';
 import fs from 'node:fs';
 import {inspectNativeAExecution,runNativeAReadOnly} from '../ci-approval/native-a-execute.mjs';
 const hash=b=>createHash('sha256').update(b).digest('hex');
+const effectKey=p=>hash(Buffer.from(JSON.stringify([p.effect,
+ p.businessApprovalSha256,p.approvedRequestSha256])));
 const policyBytes=fs.readFileSync(new URL('../config/operations.json',import.meta.url));
 const FILES=['config/operations.json','controller/common.mjs','controller/engine.mjs',
  'controller/entry.mjs','controller/fear-greed-archive-readonly.mjs',
@@ -23,7 +25,8 @@ function make(operation='runner-smoke'){
  const files=Object.fromEntries(FILES.map(p=>[p,p==='config/operations.json'?policyBytes:Buffer.from('trusted source '+p)]));
  const host={controllerSourceSha:'c'.repeat(40),dataRoot:'E:\\ZGmini\\data',
   controllerFiles:Object.fromEntries(Object.entries(files).map(([p,bytes])=>[p,hash(bytes)]))};
- const observation={state:'CONTRACT_MATCH_ONLY',code:'CI_NATIVE_RECEIVER_INDEPENDENT_EVIDENCE_MATCH'};
+ const observation={state:'CONTRACT_MATCH_ONLY',code:'CI_NATIVE_RECEIVER_INDEPENDENT_EVIDENCE_MATCH',
+  effectKey:effectKey(scope.policy)};
  const env={RUNNER_NAME:'zgmini-pc-01',GITHUB_RUN_ID:'110004',GITHUB_RUN_ATTEMPT:'1',
   GITHUB_REPOSITORY:'ansqhd5774-Choi/zgmini-pc-control',GITHUB_EVENT_NAME:'workflow_dispatch'};
  return {observation,scope,host,controllerPolicyBytes:policyBytes,adapterBytes,
@@ -93,6 +96,7 @@ test('Controller policy may not be mutation enabled',()=>{
  const changed=Buffer.from(JSON.stringify(policy));
  x.scope.approvalBytes=changed;x.controllerPolicyBytes=changed;
  x.scope.policy.businessApprovalSha256=hash(changed);
+ x.observation.effectKey=effectKey(x.scope.policy);
  x.host.controllerFiles['config/operations.json']=hash(changed);
  x.readInstalledFile=k=>k==='config/operations.json'?changed:x.files[k];
  assert.equal(inspectNativeAExecution(x).code,'CI_NATIVE_A_EFFECT_SCOPE_DENIED');
@@ -163,4 +167,19 @@ for(const [reason,change] of [
  assert.equal(r.state,'BLOCKED');
  assert.equal(r.code,'CI_NATIVE_A_PASS_PROVENANCE_UNVERIFIED');
  assert.equal(r.sanitized,undefined);
+});
+
+// Real readNativeScope has no scope.effectKey; the receiver proof itself must
+// bind the exact approval and request. No engine call on missing/mismatched key.
+for(const [name,mutate] of [
+ ['missing observation key',x=>{delete x.observation.effectKey}],
+ ['different request effect',x=>{x.observation.effectKey=effectKey({...x.scope.policy,approvedRequestSha256:'e'.repeat(64)})}],
+ ['different approval effect',x=>{x.observation.effectKey=effectKey({...x.scope.policy,businessApprovalSha256:'e'.repeat(64)})}],
+ ['forged matching optional scope field',x=>{x.observation.effectKey='e'.repeat(64);x.scope.effectKey=x.observation.effectKey}],
+ ['mismatched optional scope field',x=>{x.scope.effectKey='e'.repeat(64)}]
+])test('native A binds receiver proof: '+name,async()=>{
+ const x=make();assert.equal(Object.hasOwn(x.scope,'effectKey'),false);mutate(x);
+ let calls=0;const r=await runNativeAReadOnly({...x,executeJob:async()=>{calls++;}});
+ assert.equal(r.code,'CI_NATIVE_A_RECEIVER_EFFECT_KEY_MISMATCH');
+ assert.equal(r.canExecute,false);assert.equal(calls,0);
 });
