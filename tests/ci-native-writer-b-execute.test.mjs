@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {readInstalledControllerSha} from '../ci-approval/native-writer-b-execute.mjs';
+import {readInstalledControllerSha,recordNativeWriterBFailure} from '../ci-approval/native-writer-b-execute.mjs';
 import {authorizeWriterBNative,assertAuthenticatedWriterBIssue,
  validateWriterBRequestManifest,ISSUE_LABEL}
  from '../writer-b/contract.mjs';
@@ -222,4 +222,76 @@ test('Public Writer B reads the actual fixed host.json bytes, refusing absence a
  fs.symlinkSync(path.join(root,'real.json'),file);
  assert.throws(()=>readInstalledControllerSha({root}),
   {code:'WRITER_B_NATIVE_INSTALLED_CONTROLLER_UNVERIFIED_STOP'});
+});
+
+test('native B preflight error creates bounded, sanitized, create-only artifact pair',t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-native-b-failure-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const env={RUNNER_TEMP:root,GITHUB_RUN_ID:'12345678',GITHUB_RUN_ATTEMPT:'1'};
+ const error=Object.assign(new Error('SECRET_TOKEN_OR_PATH_CANARY'),{
+  code:'WRITER_B_NATIVE_INSTALLED_CONTROLLER_UNVERIFIED_STOP'
+ });
+ const result=recordNativeWriterBFailure({env,mode:'--preflight',error});
+ assert.deepEqual(result,{recorded:true,code:error.code});
+ const base=path.join(root,'zgmini-ci-native-writer-b-12345678-setup-preflight');
+ const json=fs.readFileSync(base+'.json','utf8');
+ const txt=fs.readFileSync(base+'.txt','utf8');
+ const record=JSON.parse(json);
+ assert.equal(record.schema,'ZGMINI_CI_NATIVE_WRITER_B_FAILURE_V1');
+ assert.equal(record.status,'WRITER_B_SETUP_STOP');
+ assert.equal(record.installEffect,'NOT_STARTED');
+ assert.equal(record.code,error.code);
+ assert.equal(record.requestId,null);
+ assert.match(txt,/RETRY=READ_ONLY_RECONCILE_NO_REEXECUTE/);
+ assert.doesNotMatch(json+txt,/SECRET_TOKEN_OR_PATH_CANARY|native.*policy.*bytes/i);
+ assert.equal(fs.readdirSync(root).length,2);
+ assert.equal(recordNativeWriterBFailure({env,mode:'--preflight',error}).recorded,false);
+ assert.equal(fs.readFileSync(base+'.json','utf8'),json);
+ assert.equal(fs.readFileSync(base+'.txt','utf8'),txt);
+});
+test('execute-stage B failure reports state UNKNOWN rather than false restored or no-effect',t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-native-b-outcome-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const env={RUNNER_TEMP:root,GITHUB_RUN_ID:'945',GITHUB_RUN_ATTEMPT:'1'};
+ const r=recordNativeWriterBFailure({
+  env,mode:'--execute',error:new Error('RAW_PRIVATE_WRITER_SOURCE_CANARY')
+ });
+ assert.deepEqual(r,{recorded:true,code:'WRITER_B_NATIVE_SETUP_UNVERIFIED_STOP'});
+ const basename='zgmini-ci-native-writer-b-945-setup-execute';
+ const receipt=JSON.parse(fs.readFileSync(path.join(root,basename+'.json'),'utf8'));
+ const txt=fs.readFileSync(path.join(root,basename+'.txt'),'utf8');
+ assert.equal(receipt.status,'WRITER_B_STATE_UNKNOWN');
+ assert.equal(receipt.installEffect,'UNVERIFIED');
+ assert.equal(receipt.retry,'READ_ONLY_RECONCILE_NO_REEXECUTE');
+ assert.doesNotMatch(JSON.stringify(receipt)+txt,/RAW_PRIVATE_WRITER_SOURCE_CANARY|WRITER_B_INSTALLED_VERIFIED/);
+});
+test('native failure reporter never trusts caller paths, invalid run or retries',t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-native-b-no-retry-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const base={RUNNER_TEMP:root,GITHUB_RUN_ID:'55',GITHUB_RUN_ATTEMPT:'1'};
+ for(const [mode,env] of [
+  ['--preflight',{...base,GITHUB_RUN_ID:'not-numeric'}],
+  ['--execute',{...base,GITHUB_RUN_ATTEMPT:'2'}],
+  ['--bad',base],
+  ['--preflight',{...base,RUNNER_TEMP:path.join(root,'missing')}]
+ ]){
+  const out=recordNativeWriterBFailure({env,mode,error:{code:'BAD_SOURCE_PATH'}});
+  assert.equal(out.recorded,false);
+  assert.equal(out.code,'WRITER_B_NATIVE_SETUP_UNVERIFIED_STOP');
+ }
+ assert.equal(fs.readdirSync(root).length,0);
+ const real=path.join(root,'actual');fs.mkdirSync(real);
+ const alias=path.join(root,'link');fs.symlinkSync(real,alias,'dir');
+ const refused=recordNativeWriterBFailure({
+  env:{...base,RUNNER_TEMP:alias},mode:'--preflight',error:{code:'WRITER_B_NATIVE_TOKEN_STOP'}
+ });
+ assert.equal(refused.recorded,false);
+ assert.equal(fs.readdirSync(real).length,0);
+});
+test('existing native Writer B workflow uploads the exact fixed receipt glob on failure',()=>{
+ const wf=fs.readFileSync(new URL('../.github/workflows/ci-approved-writer-b-once.yml',import.meta.url),'utf8');
+ assert.match(wf,/if: always\(\) && vars\.ZGMINI_CI_NATIVE_WRITER_B_EXEC_ENABLED == 'true'/);
+ assert.match(wf,/zgmini-ci-native-writer-b-\$\{\{ github\.run_id \}\}-\*\.json/);
+ assert.match(wf,/zgmini-ci-native-writer-b-\$\{\{ github\.run_id \}\}-\*\.txt/);
+ assert.match(wf,/if-no-files-found: error/);
 });
