@@ -188,7 +188,8 @@ test('Public Writer receiver requires independent public B policy and exact publ
  assert.equal(r.state,'CONTRACT_MATCH_ONLY');assert.equal(r.canExecute,false);
  const missing=structuredClone(f);delete missing.policy.nativeWriterBExecutionEnabled;
  expect(missing,'CI_NATIVE_RECEIVER_EVENT_ORIGIN_DENIED','REJECTED');
- const cross=structuredClone(f);cross.sourceRun.repository.private=true;
+ const cross={...f,sourceRun:{...f.sourceRun,
+  repository:{...f.sourceRun.repository,private:true}}};
  expect(cross,'CI_NATIVE_RECEIVER_SOURCE_RUN_UNVERIFIED');
  const other=structuredClone(f);other.policy.effect='A_READONLY';
  expect(other,'CI_NATIVE_RECEIVER_EVENT_ORIGIN_DENIED','REJECTED');
