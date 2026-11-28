@@ -1081,3 +1081,11 @@
 - P1/P2: #4283 2파일은 #4299에서 이미 소비되었고 후속 d3764580 설치본 검사 PASS. 재발행 금지. #4321/#4322의 66b8a66c 3파일 효과는 #4069 총괄의 기존 독립 Windows Owner 적용 경로로 준비된 후보로 확인; 중복 적용하지 않는다. Public B V2 정책 설치와 현재 workflow identity 독립 readback은 미확인. 별도 미소진 효과를 확보하기 전 신규 P2 POST 없음.
 - 이번 변경은 R3/원장 정합화에 한정. source 변경·신규 CI Run·운영 실행·설정 변경 0. P0 완료, P1/P5 부분, P2/P3/P4/P6 미완료, 실제 무인 종단 0/3.
 - 다음: 기존 native A/Writer dispatcher 및 독립 설치 승인 증거를 보존하는 Public 전용 후보를 비운영 source-only로 설계/검증하고 정확한 보안 효과 경계를 분리한다. 현재 독립 V2 정책 readback 경로의 권한과 실행 대상도 확인한다. 기존 Private 보호 제거, 현재 다른 담당자의 B 효과 선점, 반복 진단은 금지.
+
+## 44. 마흔 번째 실행 기록 — Native A 수신 effectKey 실제 입력 연결 결함 수정 (2026-11-28 KST)
+
+- P3 Public native A 설계의 기존 실행기 재사용 분석에서 `readNativeScope()`가 policy/approvalBytes/requestBytes만 반환하므로, 기존 `inspectNativeAExecution()`의 `scope.effectKey!==undefined` 조건이 실제 입력에서 receiver effect identity 검사를 건너뛰는 코드 결함을 확인했다. 운영에서 이 결함이 실제 오실행을 일으켰다는 증거는 없다.
+- 최신 main `a561b739a45ec17ee887c1e7c29305d2ebc00343`에서 별도 작업 브랜치 `codex/pc-automation-process-improvement-20261119-public-native-a-effect-binding-20261128` 생성. 기존 receiver/dispatcher와 동일한 [effect, businessApprovalSha256, approvedRequestSha256] 해시로 기대 effectKey를 도출하고 누락/불일치 및 상충 optional scope key를 거부. 기존 승인 원문·설치 hash·engine 검증은 유지.
+- [Draft PR #4325](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4325), exact HEAD `8c5323bd7d68da6e2e6ac60e0b5edd16ed6f66fa`, 3파일 (+32/-3) 변경. 누락, 다른 요청/승인, forged optional scope field, 불일치 optional scope field의 5개 회귀 추가. 기존 hosted source suite에서 해당 시험을 import하므로 Workflow blob/권한은 변경하지 않는다.
+- [Run 46090349868](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/46090349868) public-source-only Job 140809551195: 최초 조회 in_progress, private source-only skipped. C996/Secret Scan skipped. 최종 CI와 원본 로그는 종료 후 exact HEAD로 판정. 아직 merge/install/운영 실행 0. Adapter SHA가 변경되므로 설치 정책의 기존 pin은 배포 전 정확히 재검토한다.
+- 다음: #4325 최종 CI 확인 후 승인 범위의 소스 통합 여부 판단. 이후 Public용 독립 source-run/installed grant의 기존 수신·발행 연계 후보를 검증한다. Private gate·운영 권한·설정·DB/D1·예약 변경 없음. 무인 종단 0/3, P0 완료(1/7) 유지.
