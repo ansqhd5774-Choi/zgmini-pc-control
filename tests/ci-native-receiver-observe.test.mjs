@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {readNativeScope,observeNativeReceiver} from '../ci-approval/native-receiver-observe.mjs';
+import {observeNativeAWithScope} from '../ci-approval/native-a-execute.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const file=p=>fs.readFileSync(new URL('../'+p,import.meta.url));
@@ -174,4 +175,35 @@ test('event-bound receiver cannot accept a different completed CI Run',async()=>
  const r=await observeNativeReceiver(x);
  assert.notEqual(r.state,'CONTRACT_MATCH_ONLY');
  assert.equal(x.reads[0],'actions/runs/223/attempts/1');
+});
+
+test('native A engine admission retains exactly the scope authenticated by the receiver',async()=>{
+ const x=make('A_READONLY');
+ const first=await x.ports.readNativeScope();
+ first.policy.nativeAExecutionEnabled=false;
+ const later={...first,policy:{...first.policy,nativeAExecutionEnabled:true,
+  installedControllerSha:'d'.repeat(40),policyRevision:'e'.repeat(40)}};
+ // The second snapshot would have the same stable request/approval hash.
+ let reads=0;
+ x.ports.readNativeScope=async()=>++reads===1?first:later;
+ const {observation,scope}=await observeNativeAWithScope(x);
+ assert.equal(observation.state,'CONTRACT_MATCH_ONLY');
+ assert.equal(reads,1);
+ assert.equal(scope,first);
+ assert.equal(scope.policy.nativeAExecutionEnabled,false);
+ assert.notEqual(scope.policy.policyRevision,later.policy.policyRevision);
+});
+test('native A snapshot never loads installed scope on forged event',async()=>{
+ const x=make('A_READONLY');x.event.sender.id=123;
+ let reads=0;x.ports.readNativeScope=async()=>{reads++;throw Error('unexpected')};
+ const {observation,scope}=await observeNativeAWithScope(x);
+ assert.equal(observation.code,'CI_NATIVE_RECEIVER_EVENT_DENIED');
+ assert.equal(scope,undefined);assert.equal(reads,0);assert.equal(x.reads.length,0);
+});
+test('native A snapshot preserves missing scope refusal without second read',async()=>{
+ const x=make('A_READONLY');let reads=0;
+ x.ports.readNativeScope=async()=>{reads++;throw Error('missing')};
+ const {observation,scope}=await observeNativeAWithScope(x);
+ assert.equal(observation.code,'CI_NATIVE_RECEIVER_LOCAL_SCOPE_UNAVAILABLE');
+ assert.equal(scope,undefined);assert.equal(reads,1);assert.equal(x.reads.length,0);
 });
