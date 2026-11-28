@@ -56,7 +56,8 @@ test('fixed B approval is narrowly valid and rejects any enlarged effect',()=>{
 });
 test('fixed entry source, manifest and workflow pin same SHA, no D1 writes',()=>{
  const script=fs.readFileSync(path.join(folder,'er1-nov30-actual-pilot-entry.mjs'),'utf8');
- const workflow=fs.readFileSync(path.join(folder,'.github/workflows/pc-er1-nov30-actual-pilot.yml'),'utf8');
+ assert.equal(fs.existsSync(path.join(folder,'.github/workflows/pc-er1-nov30-actual-pilot.yml')),false);
+ const workflow=fs.readFileSync(path.join(folder,'tests/fixtures/retired-workflows/pc-er1-nov30-actual-pilot.yml'),'utf8');
  assert.equal(approval.sourceSha,fixed);
  assert.equal(approval.sourceFileSha256,'4f267ae1344a999816be1d9385d8cb5dc0620ab0ec3bb65253e3eaf4e30b7720');
  assert.ok(script.includes(fixed));

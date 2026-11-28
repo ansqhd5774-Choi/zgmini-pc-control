@@ -31,6 +31,7 @@ import '../inflation19-gas-refresh-b/gas-refresh.test.mjs';
 import '../inflation19-gas-refresh-b/receiver.test.mjs';
 import './er1-nov30-batch20-one-shot-entry.test.mjs';
 import './er1-nov30-batch20-recovery-entry.test.mjs';
+import './er1-nov30-actual-pilot-entry.test.mjs';
 
 const repo='ansqhd5774-Choi/zgmini-pc-control', id=1442936296;
 const owner='ansqhd5774-Choi', ownerId=327938088;
