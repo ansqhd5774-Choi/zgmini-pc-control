@@ -1073,3 +1073,11 @@
 - Controller B [Run 46065042920](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/46065042920) 두 job skipped 직접 확인. 현재 main의 CI Controller B workflow blob `887cd36ee5ad438e634897f937b1a7c8958962e1` 확인. #4143 격리 PC 원본 결과 `results/pc-process-inventory-45903559854-1-handoff.json`에는 scope/receipt root 미구성, A/Writer B opt-in UNSET_OR_INVALID, 독립 설치 proof 미검증이 기록되어 있다. 이는 11/27 관측이지 현재 상태의 새 실측이 아니다.
 - 다음 첫 실행: P1과 P2의 정확 V2 정책/미소진 효과 및 P3/P4의 독립 trust root 설치 승인·원본 proof의 최신 증거를 비교해 실제 필요한 범위만 확인한다. 기존 Controller 설치/감사, #4078 replay, Writer B 원본 재실행은 하지 않는다. 새 승인 없는 정책/변수 변경 금지. 현재 main SHA 관측 `c36c51428d9d4ff78528187783a5b88d6c45f5f9`.
 - 이번 실적: 기존 관리 원장 정합화 1건; 신규 결함 수정·회귀 실행·PR·운영 효과 0건. 무인 CI 종단 0/3 유지. 소스/설치/CI/영수증을 분리한다.
+
+## 43. 서른아홉 번째 실행 기록 — Public native 발행·수신의 저장소 가시성 차단 확인 (2026-11-28 KST)
+
+- 제42절의 복구 증거 및 #4309 형식 원인 처리는 이미 기록되어 재작성하지 않았다. R3의 후속 실행 지시를 [커밋 4473f736](https://github.com/ansqhd5774-Choi/zgmini-pc-control/commit/4473f736775e761070126ffd1c34364f06af9d0f)로 정정하고 원격 blob readback 일치 확인.
+- P3/P4 실제 소스 차단: `ci-native-auto-publish.yml` 두 발행 Job의 private=true, `ci-approved-a-once.yml` / `ci-approved-writer-b-once.yml` 수신 Job의 private=true, `native-publisher-entry.mjs` / `native-receiver-observe.mjs`의 private===true가 모두 존재한다. 현 Public에서는 root/opt-in만 설정해도 진입 불가. 기존 Owner-only pc-job/Writer 경로는 유지. 과거 #4143 root/opt-in 미설정과 현재 소스의 가시성 차단은 별개의 조건이다.
+- P1/P2: #4283 2파일은 #4299에서 이미 소비되었고 후속 d3764580 설치본 검사 PASS. 재발행 금지. #4321/#4322의 66b8a66c 3파일 효과는 #4069 총괄의 기존 독립 Windows Owner 적용 경로로 준비된 후보로 확인; 중복 적용하지 않는다. Public B V2 정책 설치와 현재 workflow identity 독립 readback은 미확인. 별도 미소진 효과를 확보하기 전 신규 P2 POST 없음.
+- 이번 변경은 R3/원장 정합화에 한정. source 변경·신규 CI Run·운영 실행·설정 변경 0. P0 완료, P1/P5 부분, P2/P3/P4/P6 미완료, 실제 무인 종단 0/3.
+- 다음: 기존 native A/Writer dispatcher 및 독립 설치 승인 증거를 보존하는 Public 전용 후보를 비운영 source-only로 설계/검증하고 정확한 보안 효과 경계를 분리한다. 현재 독립 V2 정책 readback 경로의 권한과 실행 대상도 확인한다. 기존 Private 보호 제거, 현재 다른 담당자의 B 효과 선점, 반복 진단은 금지.
