@@ -290,7 +290,66 @@ function issueIsTrusted(issue,{allowedActors,title,label}){
     &&Array.isArray(labels)&&labels.some(item=>item?.name===label);
 }
 
-function commentMarker(id){return `<!-- zgmini-pc-maintenance-result:${id} -->`;}
+function commentMarker(id,revision=0){return `<!-- zgmini-pc-maintenance-result:${id}${revision?':continuation-1':''} -->`;}
+const receiptSuffix=entry=>entry?.continuation?.revision===1?'-continuation-1':'';
+// An exact Owner-approved continuation of a proven PRE_INSTALL rejection.
+// Unknown outcomes, journals, staging and active leases never qualify.
+export async function authorizePreinstallContinuation({priorBytes,installed,state,getJson}={}){
+ if(!Buffer.isBuffer(priorBytes)||typeof getJson!=='function')return null;
+ let prior;try{prior=JSON.parse(priorBytes);}catch{return null;}
+ if(prior.status!=='BLOCKED'||prior.actor!==CI_CONTROLLER_ACTOR||prior.continuation||
+  prior.result?.lastPass!=='PRE_INSTALL_REJECTED'||prior.result?.code!=='CI_ISSUE_ORIGIN_DENIED'||
+  state?.ledger!==null||state.installLock?.held!==false||
+  state.ledgerReadbackCode||state.lockReadbackCode||state.installedReadbackCode||state.artifactReadbackCode||
+  state.artifacts?.status!=='OBSERVED'||state.artifacts.backlog?.file!=='ABSENT'||
+  state.artifacts.lease?.directory!=='ABSENT'||
+  !Object.values(state.artifacts.artifacts??{}).length||
+  Object.values(state.artifacts.artifacts).some(x=>x!=='ABSENT')||
+  state.actualControllerSha!==prior.result.actualControllerSha)return null;
+ const source=installed?.sourceSha;
+ if(!isSha(source))return null;
+ const file=`approvals/maintenance-handoffs/${source}.json`;
+ const read=async ref=>{
+  const f=await getJson(`contents/${file}?ref=${ref}`);
+  if(f?.type!=='file'||f.path!==file||f.encoding!=='base64'||typeof f.content!=='string'||f.content.length>180000)throw Error('UNVERIFIED');
+  const b=Buffer.from(f.content,'base64');
+  if(crypto.createHash('sha1').update(Buffer.from('blob '+b.length+'\0')).update(b).digest('hex')!==f.sha)throw Error('UNVERIFIED');
+  return b;
+ };
+ try{
+  const bytes=await read('main'),a=JSON.parse(bytes),c=a.preinstallContinuation;
+  if(a.approved!==true||a.schema!=='ZGMINI_MAINTENANCE_HANDOFF_V2'||a.targetSha!==source||
+   JSON.stringify(a.ciControllerBPolicy)!==JSON.stringify(installed.ciControllerBPolicy)||
+   c?.schema!=='ZGMINI_PREINSTALL_CONTINUATION_V1'||c.revision!==1||
+   c.requestId!==prior.requestId||c.issueNumber!==prior.issueNumber||c.bodyDigest!==prior.bodyDigest||
+   c.priorLedgerSha256!==sha256(priorBytes)||c.baselineSha!==state.actualControllerSha)return null;
+  const match=a.publisherApprovalRef?.match(/^https:\/\/github\.com\/ansqhd5774-Choi\/zgmini-pc-control\/pull\/([1-9][0-9]*)$/);
+  if(!match)return null;
+  const pr=await getJson('pulls/'+match[1]);
+  const owner=x=>x?.id===327938088&&x.login==='ansqhd5774-Choi'&&x.type==='User';
+  if(pr?.merged!==true||!owner(pr.user)||!owner(pr.merged_by)||!isSha(pr.merge_commit_sha)||
+   pr.base?.ref!=='main'||pr.base.repo?.full_name!==CONTROL_REPOSITORY||
+   pr.head?.repo?.full_name!==CONTROL_REPOSITORY||!(await read(pr.merge_commit_sha)).equals(bytes))return null;
+  return Object.freeze({revision:1,priorLedgerSha256:c.priorLedgerSha256,
+   approvalManifestSha256:sha256(bytes),approvalPrNumber:Number(match[1])});
+ }catch{return null;}
+}
+export function claimPreinstallContinuation(requestsDir,priorBytes,grant,at){
+ const prior=JSON.parse(priorBytes),key=sha256(prior.requestId),file=path.join(requestsDir,key+'.json');
+ if(grant?.revision!==1||sha256(priorBytes)!==grant.priorLedgerSha256||
+  !fs.readFileSync(file).equals(priorBytes))throw coded('PREINSTALL_CONTINUATION_CAS_CHANGED');
+ const archive=path.join(requestsDir,key+'.before-continuation-1.json');
+ fs.writeFileSync(archive,priorBytes,{flag:'wx',mode:0o600});
+ if(!fs.readFileSync(archive).equals(priorBytes)||!fs.readFileSync(file).equals(priorBytes))
+  throw coded('PREINSTALL_CONTINUATION_CAS_CHANGED');
+ fs.writeFileSync(path.join(requestsDir,'continuation-'+key+'-1.json'),
+  JSON.stringify({...grant,requestId:prior.requestId,at})+'\n',{flag:'wx',mode:0o600});
+ const next={...prior,status:'RUNNING',result:null,continuation:{...grant,at},
+  reportUploadStatus:'REPORT_UPLOAD_PENDING',commentPosted:false,deliveryCommentPosted:false,
+  commentUploadStatus:'REPORT_UPLOAD_PENDING'};
+ atomicReplace(file,JSON.stringify(next,null,2)+'\n');
+ return {created:true,entry:next};
+}
 export function failedUpdaterResult(request,error,status){
  let output=null;try{output=parseJsonOutput(error?.stdout,'UPDATE_OUTPUT_INVALID');}catch{}
  const exact=output?.status==='AUTOMATION_BLOCKED'&&/^[A-Z][A-Z0-9_]{0,79}$/.test(output?.code??'');
@@ -399,8 +458,9 @@ export function attachApprovedNativeBReceipt(result,validated,actor){
  return {...result,ciNativeEffect:pin.effect,
   ciNativePolicySha256:pin.nativePolicySha256};
 }
-function resultComment(result,uploadStatus=null){
-  return [commentMarker(result.requestId),
+function resultComment(result,uploadStatus=null,revision=0){
+  const suffix=revision===1?'-continuation-1':'';
+  return [commentMarker(result.requestId,revision),
     "ZGMINI PC maintenance result (out-of-band)",
     `REQUEST_ID: ${result.requestId}`,
     `STATUS: ${result.status}`,
@@ -421,8 +481,8 @@ function resultComment(result,uploadStatus=null){
     ...(result.sourceInventory?.filter(row=>row.state!=='OLD').map(row=>
       `R54_SOURCE_DRIFT: ${row.path} ${row.state} ${row.actual??'MISSING'}`)??[]),
     ...(uploadStatus?[`REPORT_UPLOAD: ${uploadStatus}`,
-      `RESULT_JSON: results/maintenance-${result.requestId}.json`,
-      `RESULT_TXT: results/maintenance-${result.requestId}.txt`]:[])].join("\n");
+      `RESULT_JSON: results/maintenance-${result.requestId}${suffix}.json`,
+      `RESULT_TXT: results/maintenance-${result.requestId}${suffix}.txt`]:[])].join("\n");
 }
 
 /**
@@ -569,12 +629,13 @@ export function createMaintenanceAgent({
     return error?.code==="HTTP_404"||error?.status===404
       ||/\bHTTP 404\b/.test(String(error?.stderr??""));
   }
-  async function uploadOneResult(requestId,extension,contents){
+  async function uploadOneResult(requestId,extension,contents,revision=0){
     if(!REQUEST_ID.test(requestId)||!["json","txt"].includes(extension)
       ||Buffer.byteLength(contents)>MAX_RESULT_BYTES){
       throw coded("REPORT_UPLOAD_INPUT_INVALID");
     }
-    const resource=`repos/${repo}/contents/results/maintenance-${requestId}.${extension}`;
+    if(![0,1].includes(revision))throw coded('REPORT_UPLOAD_INPUT_INVALID');
+    const resource=`repos/${repo}/contents/results/maintenance-${requestId}${revision?'-continuation-1':''}.${extension}`;
     let exists=false;
     try{
       const current=parseJsonOutput(await github(["api",resource+"?ref=main"]),
@@ -646,8 +707,9 @@ export function createMaintenanceAgent({
         safeResult={...safeResult,ciNativeEffect:native.ciNativeEffect,
           ciNativePolicySha256:native.ciNativePolicySha256};
       }
-      await uploadOneResult(entry.requestId,"json",JSON.stringify(safeResult,null,2)+"\n");
-      await uploadOneResult(entry.requestId,"txt",resultComment(safeResult)+"\r\n");
+      const revision=entry.continuation?.revision===1?1:0;
+      await uploadOneResult(entry.requestId,"json",JSON.stringify(safeResult,null,2)+"\n",revision);
+      await uploadOneResult(entry.requestId,"txt",resultComment(safeResult,null,revision)+"\r\n",revision);
       status="VERIFIED";code="REPORT_UPLOAD_VERIFIED";
     }catch(error){
       code=safeCode(error?.code??error?.message);
@@ -709,7 +771,7 @@ export function createMaintenanceAgent({
     if(other?.schema!=="ZGMINI_PC_MAINTENANCE_EFFECT_V1"||
        other.key!==key||!REQUEST_ID.test(other.requestId??"")||
        !Number.isSafeInteger(other.issueNumber)||other.issueNumber<=0||
-       !allowedActors.includes(other.actor))
+       !(allowedActors.includes(other.actor)||other.actor===CI_CONTROLLER_ACTOR))
       throw coded("MAINTENANCE_EFFECT_CLAIM_INVALID");
     if(other.requestId===request.requestId&&
        other.issueNumber===issue.number&&other.actor===issue.author.login)
@@ -757,16 +819,16 @@ export function createMaintenanceAgent({
     persistLedger(updated);
     return updated;
   }
-  async function ensureComment(issueNumber,result,uploadStatus){
+  async function ensureComment(issueNumber,result,uploadStatus,revision=0){
     // A timed-out gh comment may already be present. Always re-read first.
     const fresh=await issueDetails(issueNumber);
-    const marker=commentMarker(result.requestId);
+    const marker=commentMarker(result.requestId,revision);
     if((fresh.comments??[]).some(c=>typeof c?.body==="string"&&c.body.includes(marker)
       &&allowedActors.some(actor=>actor.toLowerCase()===String(c?.author?.login??"").toLowerCase())))
       return "ALREADY_POSTED";
     try{
       await github(["issue","comment",String(issueNumber),"--repo",repo,
-        "--body",resultComment(result,uploadStatus)]);
+        "--body",resultComment(result,uploadStatus,revision)]);
       return "POSTED";
     }catch{
       // The next poll will re-check the marker, never immediately retry.
@@ -776,7 +838,7 @@ export function createMaintenanceAgent({
   async function commentOnceAndRecord(entry){
     if(entry.commentPosted===true||!entry.result)return;
     const posted=await ensureComment(entry.issueNumber,entry.result,
-      entry.reportUploadStatus??"REPORT_UPLOAD_PENDING");
+      entry.reportUploadStatus??"REPORT_UPLOAD_PENDING",entry.continuation?.revision===1?1:0);
     if(posted==="POSTED"||posted==="ALREADY_POSTED"){
       persistLedger({...entry,commentPosted:true,
         commentUploadStatus:entry.reportUploadStatus??"REPORT_UPLOAD_PENDING"});
@@ -785,15 +847,16 @@ export function createMaintenanceAgent({
   async function uploadCompletionCommentOnce(entry){
     if(entry.reportUploadStatus!=="VERIFIED"||entry.commentUploadStatus!=="REPORT_UPLOAD_PENDING"
       ||entry.deliveryCommentPosted===true||entry.commentPosted!==true)return;
-    const marker=`<!-- zgmini-pc-maintenance-upload:${entry.requestId} -->`;
+    const suffix=receiptSuffix(entry);
+    const marker=`<!-- zgmini-pc-maintenance-upload:${entry.requestId}${suffix} -->`;
     const fresh=await issueDetails(entry.issueNumber);
     const present=(fresh.comments??[]).some(c=>typeof c?.body==="string"
       &&c.body.includes(marker)
       &&allowedActors.some(actor=>actor.toLowerCase()===String(c?.author?.login??"").toLowerCase()));
     if(!present){
       const body=[marker,"REPORT_UPLOAD_VERIFIED",
-        `RESULT_JSON: results/maintenance-${entry.requestId}.json`,
-        `RESULT_TXT: results/maintenance-${entry.requestId}.txt`].join("\n");
+        `RESULT_JSON: results/maintenance-${entry.requestId}${suffix}.json`,
+        `RESULT_TXT: results/maintenance-${entry.requestId}${suffix}.txt`].join("\n");
       try{await github(["issue","comment",String(entry.issueNumber),"--repo",repo,
         "--body",body]);}
       catch{return;}
@@ -1191,6 +1254,7 @@ export function createMaintenanceAgent({
     if(!REQUEST_ID.test(request.requestId)){
       return {status:"BLOCKED",code:"INVALID_REQUEST_ID",issueNumber:issue.number};
     }
+    let continuation=null,priorBytes=null;
     const bodyDigest=sha256(issue.body),fingerprint=sha256(JSON.stringify(request));
     const prior=loadLedger(request.requestId);
     if(prior){
@@ -1198,6 +1262,15 @@ export function createMaintenanceAgent({
         ||prior.fingerprint!==fingerprint||prior.actor!==issue.author.login){
         return {status:"BLOCKED",code:"REQUEST_ID_REUSE_CONFLICT",issueNumber:issue.number};
       }
+      if(ciCandidate&&request.operation==='controller-update'&&prior.status==='BLOCKED'&&
+         prior.result?.lastPass==='PRE_INSTALL_REJECTED'&&prior.result?.code==='CI_ISSUE_ORIGIN_DENIED'){
+       priorBytes=fs.readFileSync(ledgerPath(request.requestId));
+       continuation=await authorizePreinstallContinuation({priorBytes,
+        installed:JSON.parse(fs.readFileSync(path.join(root,'MAINTENANCE_INSTALL.json'),'utf8')),
+        state:await updaterStatus(request.requestId),
+        getJson:route=>githubJson(['api',`repos/${repo}/${route}`],'CONTINUATION_APPROVAL_READ_FAILED')});
+      }
+      if(!continuation){
       const settled=prior.status==="RUNNING"?await reconcileRunning(prior,request):prior;
       if(TERMINAL.has(settled.status)&&settled.result){
         const delivered=await deliverReports(settled,request.operation);
@@ -1207,6 +1280,7 @@ export function createMaintenanceAgent({
       return {status:settled.status,code:"DUPLICATE_REQUEST_SUPPRESSED",
         reportUploadStatus:loadLedger(request.requestId).reportUploadStatus,
         requestId:request.requestId};
+      }
     }
 
     let approvedBytes,approved;
@@ -1275,7 +1349,8 @@ export function createMaintenanceAgent({
       manifestRawBase64:approvedBytes.toString("base64"),
       issueNumber:issue.number,actor:issue.author.login};
     writeOnce(packageFile,JSON.stringify(packageData,null,2)+"\n");
-    const held=claim(request,issue,fingerprint,bodyDigest);
+    const held=continuation?claimPreinstallContinuation(requestsDir,priorBytes,continuation,now()):
+      claim(request,issue,fingerprint,bodyDigest);
     if(!held.created)return {status:"RUNNING",code:"DUPLICATE_REQUEST_SUPPRESSED"};
     held.entry=await acknowledgeAcceptedRequest(held.entry);
     let result;
