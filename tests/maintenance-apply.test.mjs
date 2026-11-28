@@ -1552,6 +1552,7 @@ test('shared Controller/S6 backlog recovers the exact original Issue once and pr
   labels:[{name:'pc-job'}]};
  let posts=0,comments=0;
  const callGithub=(route,method='GET',input)=>{
+  if(method==='GET'&&route==='')return {id:1442936296,full_name:'ansqhd5774-Choi/zgmini-pc-control',owner:{id:327938088,login:'ansqhd5774-Choi'},private:true};
   if(method==='GET'&&route.startsWith('issues?'))return [original];
   if(method==='GET'&&route.startsWith('issues/77/comments?'))return [];
   if(method==='POST'&&route==='issues'){
@@ -1594,6 +1595,7 @@ test('S6 uncertain GitHub Issue POST remains durable POSTING and never retries',
    sourceRepository:'ansqhd5774-Choi/zgmini',sourceBranch:'main',sourceSha:'f'.repeat(40)})};
  let posts=0;
  const callGithub=(route,method='GET')=>{
+  if(method==='GET'&&route==='')return {id:1442936296,full_name:'ansqhd5774-Choi/zgmini-pc-control',owner:{id:327938088,login:'ansqhd5774-Choi'},private:true};
   if(method==='GET'&&route.startsWith('issues?'))return [original];
   if(method==='GET'&&route.startsWith('issues/78/comments?'))return [];
   if(method==='POST'&&route==='issues'){posts++;throw Error('HTTP_TIMEOUT_UNCERTAIN');}
