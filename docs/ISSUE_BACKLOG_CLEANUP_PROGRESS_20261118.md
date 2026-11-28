@@ -568,3 +568,9 @@
 - #4078 open/reopened: #4312 source 병합 유지, backlog replay 효과 승인·독립 인증 포트 및 실제 원장 CAS/결과 미확인. #3767 open: #4317 source 병합 및 #4319 source-only 읽기 경로는 실제 승격 WMI 증거 아님. #4135 open: 비-MarketParquet 전체시장 적법 원자료·새 효과 승인/정규 설치 미확보. 원본 요청 재실행 0.
 - 두 저장소 검색 반환: pc-control OPEN 7건(3개 운영 추적+4개 영속 원장), zgmini OPEN 0건; 양쪽 OPEN PR 0건. 검색 결과 범위 한정. 담당 루트 브랜치 main 대비 ahead 36/behind 3754(쓰기 전), 이력 재작성 없음. 신규 직접 소스 수정/테스트 실행/병합/종결/운영 변경 0, 타 담당 완료 증거는 신규 실적 미집계.
 - 다음 실행: 기존 독립 Owner 로컬 읽기 경로 #4319의 실제 고정 소스 및 Windows 인증으로 journal/WMI 결과를 회수할 수 있는지 확인; #4069의 기존 3파일 후보 설치는 정확 승인·CI/정규 B 포트 확인 후에만 진행. #4078 별도 replay 승인 없이 POST 금지. #4135 적법 입력 확보 전 기존 공급처 재사용/재설치 금지.
+
+
+## 2026-11-28 #4323 공통 S6 원장 projection 재사용
+
+- PR #4323 HEAD `fd5bb716069432c0b75f033d239a80378e805bbf`, [Run 46089786773](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/46089786773) public-source-only SUCCESS, 159/159 PASS, Windows skipped. squash `a561b739a45ec17ee887c1e7c29305d2ebc00343`, main source blob 일치. 기존 local projection의 legacy window/replays 부재/상한 불일치 수정, #4318 공통 함수 재사용 및 source closure pin. 운영 변경 없음.
+- 병행 #4321 승인 및 #4322 exact Owner B operator/public A successor pin 병합 확인. [#4069 원장](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4069#issuecomment-7231192690): `66b8a66c6112441576917e0ac9fbe4d39cbd5eea` 실제 설치 및 readback 미완료. 중복 설치/원본 재접수 없음. 다음은 정확 승인 독립 Owner 실행 이후 고유 #4069 A job 및 JSON/TXT 결과 대조. #4078/#3767/#4135 운영 미완료.
