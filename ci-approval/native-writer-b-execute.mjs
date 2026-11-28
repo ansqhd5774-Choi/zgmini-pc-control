@@ -32,18 +32,22 @@ export function readInstalledControllerSha({
  if(typeof root!=='string'||!path.isAbsolute(root)||root.includes('\0'))stop();
  const resolved=path.resolve(root);
  for(let cursor=resolved;;){
-  const st=io.lstatSync(cursor);
+  let st;
+  try{st=io.lstatSync(cursor);}catch{stop();}
   if(!st.isDirectory()||st.isSymbolicLink())stop();
   const parent=path.dirname(cursor);
   if(parent===cursor)break;
   cursor=parent;
  }
  const filename=path.join(resolved,'host.json');
- const before=io.lstatSync(filename);
- if(!before.isFile()||before.isSymbolicLink()||
-  before.size<2||before.size>65536||before.nlink!==1)stop();
- const a=io.readFileSync(filename),b=io.readFileSync(filename);
- const after=io.lstatSync(filename);
+ let before,after,a,b;
+ try{
+  before=io.lstatSync(filename);
+  if(!before.isFile()||before.isSymbolicLink()||
+   before.size<2||before.size>65536||before.nlink!==1)stop();
+  a=io.readFileSync(filename);b=io.readFileSync(filename);
+  after=io.lstatSync(filename);
+ }catch{stop();}
  if(!Buffer.isBuffer(a)||!Buffer.isBuffer(b)||!a.equals(b)||
   a.length!==before.size||after.size!==before.size||
   after.mtimeMs!==before.mtimeMs||after.ino!==before.ino)stop();
