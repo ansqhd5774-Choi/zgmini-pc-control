@@ -3,6 +3,7 @@
 // Retain the original requestId; the existing submission/claim contract owns IO.
 import {createHash} from 'node:crypto';
 import {inspectPinnedManifestScope} from './pinned-manifest-scope.mjs';
+import {verifyNativeInstalledProof} from './native-publisher-entry.mjs';
 import {ISSUE_TITLE,ISSUE_LABEL,EXTENDED_DRAIN_LABEL,DRAIN_1200_LABEL} from '../writer-b/contract.mjs';
 const repo='ansqhd5774-Choi/zgmini-pc-control';
 const out=(state,reason,extra={})=>Object.freeze({mode:'SHADOW_ONLY',state,reason,canPublish:false,canExecute:false,...extra});
@@ -139,4 +140,121 @@ export function preparePublicWriter4135PolicyPreview({requestInput,sourceHeadSha
     body:request.preview.body,bodySha256:request.bodySha256,
     proposedPolicy,proposedPolicySha256:digest(JSON.stringify(proposedPolicy))});
  }catch{return out('INVALID','PUBLIC_WRITER_POLICY_PREVIEW_INVALID')}
+}
+
+
+// Prepare *only* the two fixed local files required by the already existing
+// Native Writer B readers. No local IO, policy installation, variable change,
+// dispatch, or authority. Must be called by a trusted Owner adapter with an
+// authenticated GitHub Contents read from the actual B maintenance receipt.
+// The caller must still apply separate per-host CAS/ACL, backup/rollback and
+// independent durable one-shot claim checks. Never log or publish file bytes.
+export async function preparePublicWriter4135LocalBundleCandidate({
+ preview,approvedManifestBytes,installationRequestId,getJson
+}={}){
+ const reject=reason=>out('REJECTED',reason,{canInstall:false,operationalWrites:0});
+ const missing=reason=>out('EVIDENCE_MISSING',reason,{canInstall:false,operationalWrites:0});
+ const fixed=PUBLIC_WRITER_4135,p=preview?.proposedPolicy;
+ const pin=(v,n)=>typeof v==='string'&&v.length===n&&
+  new RegExp('^[a-f0-9]{'+n+'}$').test(v);
+ if(preview?.state!=='PUBLIC_WRITER_POLICY_PREVIEW_ONLY'||
+   preview.mode!=='SHADOW_ONLY'||preview.canInstall!==false||
+   preview.operationalWrites!==0||
+   p?.schema!=='ZGMINI_CI_NATIVE_DISPATCH_V1'||p.enabled!==true||
+   p.effect!=='B_WRITER_SOURCE'||p.repositoryVisibility!=='public'||
+   p.sourceRunMode!=='EVENT_COMPLETION_V1'||p.sourceAttempt!==1||
+   Object.hasOwn(p,'sourceRunId')||p.nativeWriterBExecutionEnabled!==true||
+   p.sourceWorkflowId!==fixed.sourceWorkflowId||
+   p.sourceWorkflowPath!==fixed.sourceWorkflowPath||
+   p.receiverWorkflowPath!==fixed.receiverWorkflowPath||
+   p.nativeWriterBControlSha!==p.policyRevision||
+   !pin(p.installedControllerSha,40)||!pin(p.policyRevision,40)||
+   p.businessApprovalSha256!==fixed.manifestSha256||
+   !pin(p.approvedRequestSha256,64)||
+   preview.proposedPolicySha256!==digest(JSON.stringify(p)))
+  return reject('PUBLIC_WRITER_LOCAL_PREVIEW_SCOPE_DENIED');
+ let requestBytes,request;
+ try{
+  requestBytes=Buffer.from(preview.body,'utf8');
+  request=JSON.parse(requestBytes.toString('utf8'));
+ }catch{return reject('PUBLIC_WRITER_LOCAL_REQUEST_INVALID');}
+ if(request?.schema!=='ZGMINI_PC_WRITER_SOURCE_B_REQUEST_V1'||
+   request.requestId!==preview.requestId||
+   request.requestId===fixed.originalRequestId||
+   request.operation!=='pc-writer-source-install'||
+   request.controlRepository!==repo||
+   request.approvalManifestPath!==fixed.manifestPath||
+   request.approvalManifestSha256!==fixed.manifestSha256||
+   digest(requestBytes)!==p.approvedRequestSha256||
+   requestBytes.length<2||requestBytes.length>32768)
+  return reject('PUBLIC_WRITER_LOCAL_REQUEST_MISMATCH');
+ if(!Buffer.isBuffer(approvedManifestBytes)||
+   approvedManifestBytes.length<2||approvedManifestBytes.length>65536||
+   digest(approvedManifestBytes)!==fixed.manifestSha256)
+  return reject('PUBLIC_WRITER_LOCAL_APPROVAL_BYTES_MISMATCH');
+ if(!/^pc-update-[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(
+   installationRequestId??'')||typeof getJson!=='function')
+  return missing('PUBLIC_WRITER_LOCAL_INSTALL_RECEIPT_PORT_REQUIRED');
+ const receiptPath='results/maintenance-'+installationRequestId+'.json';
+ const route='contents/'+receiptPath+'?ref=main';
+ let receiptBytes,receipt,file;
+ try{
+  file=await getJson(route);
+  const raw=file?.content;
+  if(file?.type!=='file'||file.path!==receiptPath||
+     file.encoding!=='base64'||typeof raw!=='string'||
+     raw.length<4||raw.length>Math.ceil(65536/3)*4+4||
+     !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(raw))
+   throw Error('RECEIPT_FORMAT');
+  receiptBytes=Buffer.from(raw,'base64');
+  if(receiptBytes.length<2||receiptBytes.length>65536||
+     receiptBytes.toString('base64')!==raw)throw Error('RECEIPT_SIZE');
+  receipt=JSON.parse(receiptBytes.toString('utf8'));
+ }catch{return missing('PUBLIC_WRITER_LOCAL_INSTALLED_RECEIPT_UNVERIFIED');}
+ // A Controller B receipt without the independently approved native effect
+ // (including #4356) must not grant anything, even if Controller SHA matches.
+ if(receipt?.requestId!==installationRequestId||
+   receipt.ciNativeEffect!=='B_WRITER_SOURCE'||
+   receipt.ciNativePolicySha256!==preview.proposedPolicySha256||
+   receipt.status!=='SUCCEEDED'||receipt.protectedStateUnchanged!==true||
+   receipt.actualControllerSha!==p.installedControllerSha||
+   receipt.targetControllerSha!==p.installedControllerSha)
+  return reject('PUBLIC_WRITER_LOCAL_INSTALL_EFFECT_UNVERIFIED');
+ const proof={
+  schema:'ZGMINI_CI_NATIVE_B_INSTALLED_PROOF_V1',
+  effect:'B_WRITER_SOURCE',policy:p,
+  nativePolicySha256:preview.proposedPolicySha256,
+  installationRequestId,installationReceiptPath:receiptPath,
+  installationReceiptSha256:digest(receiptBytes),
+  actualControllerSha:p.installedControllerSha
+ };
+ try{
+  // Reuse the exact production publisher verifier; the only supplied
+  // Contents response is bound to the fixed independently verified path.
+  const checked=await verifyNativeInstalledProof('B_WRITER_SOURCE',proof,{
+   getJson:async actualRoute=>{
+    if(actualRoute!==route)throw Error('RECEIPT_ROUTE');
+    return file;
+   }
+  });
+  if(JSON.stringify(checked)!==JSON.stringify(p))
+   throw Error('POLICY_MISMATCH');
+ }catch{return reject('PUBLIC_WRITER_LOCAL_INSTALLED_PROOF_UNVERIFIED');}
+ const scope={
+  schema:'ZGMINI_CI_NATIVE_READONLY_SCOPE_V1',policy:p,
+  approvalBytesBase64:approvedManifestBytes.toString('base64'),
+  requestBytesBase64:requestBytes.toString('base64')
+ };
+ const scopeBytes=Buffer.from(JSON.stringify(scope)+'\n');
+ const proofBytes=Buffer.from(JSON.stringify(proof)+'\n');
+ return out('PUBLIC_WRITER_LOCAL_BUNDLE_CANDIDATE_ONLY',
+  'INDEPENDENT_HOST_CAS_ACL_INSTALL_AND_READBACK_REQUIRED',{
+   canInstall:false,operationalWrites:0,
+   nativePolicySha256:proof.nativePolicySha256,
+   installationReceiptSha256:proof.installationReceiptSha256,
+   scopeFile:Object.freeze({name:'ci-native-writer-b-approved.json',
+    sha256:digest(scopeBytes),bytes:scopeBytes}),
+   proofFile:Object.freeze({name:'ci-native-writer-b-installed-proof.json',
+    sha256:digest(proofBytes),bytes:proofBytes})
+  });
 }
