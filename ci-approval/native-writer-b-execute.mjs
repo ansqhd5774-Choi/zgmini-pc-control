@@ -21,6 +21,39 @@ const HASH=/^[a-f0-9]{40}$/;
 const SAFE_CODE=/^WRITER_B_[A-Z0-9_]{1,100}$/;
 const FILE=/^approvals\/writer-updates\/[a-z0-9][a-z0-9._-]{0,95}\.json$/;
 
+// The installed Controller identity comes from fixed operating-host metadata,
+// never an event input, the PR checkout, or the native policy itself.
+// Public Writer B re-reads this on both preflight and execution admissions.
+const INSTALLED_CONTROLLER_ROOT='E:\\ZGmini\\automation\\pc-control';
+export function readInstalledControllerSha({
+ root=INSTALLED_CONTROLLER_ROOT,io=fs
+}={}){
+ const stop=()=>fail('WRITER_B_NATIVE_INSTALLED_CONTROLLER_UNVERIFIED_STOP');
+ if(typeof root!=='string'||!path.isAbsolute(root)||root.includes('\0'))stop();
+ const resolved=path.resolve(root);
+ for(let cursor=resolved;;){
+  const st=io.lstatSync(cursor);
+  if(!st.isDirectory()||st.isSymbolicLink())stop();
+  const parent=path.dirname(cursor);
+  if(parent===cursor)break;
+  cursor=parent;
+ }
+ const filename=path.join(resolved,'host.json');
+ const before=io.lstatSync(filename);
+ if(!before.isFile()||before.isSymbolicLink()||
+  before.size<2||before.size>65536||before.nlink!==1)stop();
+ const a=io.readFileSync(filename),b=io.readFileSync(filename);
+ const after=io.lstatSync(filename);
+ if(!Buffer.isBuffer(a)||!Buffer.isBuffer(b)||!a.equals(b)||
+  a.length!==before.size||after.size!==before.size||
+  after.mtimeMs!==before.mtimeMs||after.ino!==before.ino)stop();
+ let metadata;
+ try{metadata=JSON.parse(a.toString('utf8'));}catch{stop();}
+ if(!metadata||typeof metadata!=='object'||Array.isArray(metadata)||
+  !HASH.test(metadata.controllerSourceSha??''))stop();
+ return metadata.controllerSourceSha;
+}
+
 function safeApprovedManifest(root,relative){
  need(typeof root==='string'&&path.isAbsolute(root)&&
   FILE.test(relative??''),'WRITER_B_NATIVE_APPROVAL_PATH_STOP');
@@ -85,8 +118,11 @@ async function prepare(env){
  });
  const controlRoot=env.GITHUB_WORKSPACE;
  const controlHead=gitHead(controlRoot);
+ // The private legacy receiver keeps its existing admission contract.
+ const installedControllerSha=scope.policy?.repositoryVisibility==='public'
+  ?readInstalledControllerSha():undefined;
  const auth=authorizeWriterBNative({observation,scope,env,controlHead,
-  adapterBytes:fs.readFileSync(SELF)});
+  installedControllerSha,adapterBytes:fs.readFileSync(SELF)});
  const reviewed=safeApprovedManifest(controlRoot,auth.manifestPath);
  need(reviewed.equals(scope.approvalBytes),'WRITER_B_NATIVE_CHECKOUT_APPROVAL_DRIFT_STOP');
  return {auth,controlRoot};
