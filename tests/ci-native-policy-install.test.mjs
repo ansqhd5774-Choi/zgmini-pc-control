@@ -129,7 +129,7 @@ test('post-swap Owner failure is fail-closed and only compensates verified preim
  const s=fs.readFileSync(new URL('../tools/operator-packets/NATIVE_WRITER_B_POLICY_INSTALL_ONCE.ps1',import.meta.url),'utf8');
  const swapped=s.indexOf('$transitionSwapped=$true');
  const committed=s.indexOf('$transitionCommitted=$true');
- const catchFinal=s.lastIndexOf('}catch{');
+ const catchFinal=s.lastIndexOf("}catch{\n $code=[string]$_.Exception.Message");
  const compensator=s.indexOf('function Restore-VerifiedTransitionPreimage');
  assert.ok(compensator>0&&swapped>compensator&&committed>swapped&&catchFinal>committed);
  const body=s.slice(compensator,s.indexOf('function Verify-TransitionPreimage',compensator));
@@ -150,6 +150,8 @@ test('post-swap Owner failure is fail-closed and only compensates verified preim
  assert.match(s.slice(catchFinal),/if\(\$transitionSwapped -and -not \$transitionCommitted\)/);
  assert.match(s.slice(catchFinal),/Restore-VerifiedTransitionPreimage/);
  assert.match(s.slice(catchFinal),/NATIVE_POLICY_TRANSITION_RECOVERY_REQUIRED/);
+ assert.match(s.slice(catchFinal),/if\(\$code -notmatch '\^NATIVE_POLICY_\[A-Z_\]\+\$'\)/);
+ assert.equal((s.match(/^Set-StrictMode -Version Latest$/gm)||[]).length,1);
  assert.doesNotMatch(body,/Remove-Item|Set-ExecutionPolicy|Stop-Process/);
 });
 
