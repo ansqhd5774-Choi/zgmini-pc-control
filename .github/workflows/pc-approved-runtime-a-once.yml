@@ -7,11 +7,12 @@ on:
 permissions:
   contents: write
   issues: write
-concurrency:
-  group: zgmini-approved-runtime-a-${{ github.event.issue.number }}
-  cancel-in-progress: false
 jobs:
   read-approved-runtime:
+    # Reserve the existing lane only for admitted requests.
+    concurrency:
+      group: zgmini-approved-runtime-a-${{ github.event.issue.number }}
+      cancel-in-progress: false
     if: >-
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
       github.event.action == 'opened' &&
