@@ -309,3 +309,32 @@ test('public Writer publisher requires explicit independent effect policy and op
  assert.equal(accepted.state,'DISPATCH_ACCEPTED_NOT_EXECUTED');
  assert.equal(accepted.executed,false);assert.equal(x.readCount(),1);
 });
+
+test('Writer B independent installed proof is never accepted via hardlink or a torn double read',t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-native-b-proof-alias-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const policy=fixture('B_WRITER_SOURCE').policy;
+ policy.installedControllerSha='d'.repeat(40);
+ const proof={schema:'ZGMINI_CI_NATIVE_B_INSTALLED_PROOF_V1',
+  effect:'B_WRITER_SOURCE',policy,
+  nativePolicySha256:hash(Buffer.from(JSON.stringify(policy))),
+  installationRequestId:'pc-update-12345678-1234-4234-8234-123456789abc',
+  installationReceiptPath:'results/maintenance-pc-update-12345678-1234-4234-8234-123456789abc.json',
+  installationReceiptSha256:'e'.repeat(64),
+  actualControllerSha:policy.installedControllerSha};
+ const file=path.join(root,'ci-native-writer-b-installed-proof.json');
+ fs.writeFileSync(file,JSON.stringify(proof));
+ assert.equal(readNativeInstalledProof('B_WRITER_SOURCE',{root}).effect,'B_WRITER_SOURCE');
+ const alias=path.join(root,'untrusted-hardlink.json');fs.linkSync(file,alias);
+ assert.throws(()=>readNativeInstalledProof('B_WRITER_SOURCE',{root}),
+  /CI_NATIVE_PROOF_FILE_UNVERIFIED/);
+ fs.unlinkSync(alias);
+ const bytes=fs.readFileSync(file);let reads=0;
+ const io={lstatSync:p=>fs.lstatSync(p),readFileSync:()=>{
+  reads++;return reads===2?Buffer.concat([bytes,Buffer.from(' ')]):Buffer.from(bytes);
+ }};
+ assert.throws(()=>readNativeInstalledProof('B_WRITER_SOURCE',{root,io}),
+  /CI_NATIVE_PROOF_FILE_UNVERIFIED/);
+ assert.equal(reads,2);
+ assert.deepEqual(readNativeInstalledProof('B_WRITER_SOURCE',{root}).policy,policy);
+});

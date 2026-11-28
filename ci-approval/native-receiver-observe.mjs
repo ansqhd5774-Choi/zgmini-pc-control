@@ -26,28 +26,44 @@ function decode(base64,limit){
   throw Error('CI_NATIVE_SCOPE_BYTES_INVALID');
  return bytes;
 }
-function inspectFilePath(root,filename){
+function inspectFilePath(root,filename,{io=fs,singleLink=false}={}){
  if(typeof root!=='string'||!path.isAbsolute(root)||root.includes('\0'))
   throw Error('CI_NATIVE_SCOPE_ROOT_INVALID');
  const resolved=path.resolve(root);
  // Do not allow a reparse-point/symlink substitution anywhere in the path.
  for(let cur=resolved;;){
-  const s=fs.lstatSync(cur);
+  const s=io.lstatSync(cur);
   if(!s.isDirectory()||s.isSymbolicLink())throw Error('CI_NATIVE_SCOPE_ROOT_UNVERIFIED');
   const parent=path.dirname(cur);if(parent===cur)break;cur=parent;
  }
  const file=path.join(resolved,filename);
- const s=fs.lstatSync(file);
- if(!s.isFile()||s.isSymbolicLink()||s.size<=0||s.size>131072)
+ const s=io.lstatSync(file);
+ if(!s.isFile()||s.isSymbolicLink()||s.size<=0||s.size>131072||
+    (singleLink&&s.nlink!==1))
   throw Error('CI_NATIVE_SCOPE_FILE_UNVERIFIED');
  return file;
 }
-export function readNativeScope(effect,{root='E:\\ZGmini\\data\\pc-writer\\ci-native'}={}){
+export function readNativeScope(effect,{root='E:\\ZGmini\\data\\pc-writer\\ci-native',io=fs}={}){
  const filename=EFFECTS[effect];
  if(!filename)throw Error('CI_NATIVE_SCOPE_EFFECT_DENIED');
- const file=inspectFilePath(root,filename);
+ const guarded=effect==='B_WRITER_SOURCE';
+ const file=inspectFilePath(root,filename,{io,singleLink:guarded});
  let scope;
- try{scope=JSON.parse(fs.readFileSync(file,'utf8'));}catch{throw Error('CI_NATIVE_SCOPE_FILE_UNVERIFIED')}
+ try{
+  // Writer B must not consume a hard-link alias or policy bytes changed
+  // between path check and JSON parsing. Native A behavior is unchanged.
+  if(guarded){
+   const before=io.lstatSync(file),first=io.readFileSync(file),
+    second=io.readFileSync(file),after=io.lstatSync(file);
+   if(!Buffer.isBuffer(first)||!Buffer.isBuffer(second)||
+      !first.equals(second)||first.length!==before.size||
+      before.nlink!==1||after.nlink!==1||after.size!==before.size||
+      after.ino!==before.ino||after.dev!==before.dev||
+      after.mtimeMs!==before.mtimeMs)
+    throw Error('CI_NATIVE_SCOPE_FILE_UNVERIFIED');
+   scope=JSON.parse(first.toString('utf8'));
+  }else scope=JSON.parse(io.readFileSync(file,'utf8'));
+ }catch{throw Error('CI_NATIVE_SCOPE_FILE_UNVERIFIED')}
  if(!scope||typeof scope!=='object'||Array.isArray(scope)||
    Object.keys(scope).sort().join('|')!=='approvalBytesBase64|policy|requestBytesBase64|schema'||
    scope.schema!=='ZGMINI_CI_NATIVE_READONLY_SCOPE_V1'||scope.policy?.effect!==effect)
