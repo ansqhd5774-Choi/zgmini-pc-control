@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -362,4 +363,44 @@ test('checkout selection binds the actual origin and exact separate approved che
   {...x,ownRoot:pinned,mode:'--execute',readHead:()=>env.GITHUB_SHA},
   {...x,env:{GITHUB_SHA:'c'.repeat(40)}}
  ])assert.throws(()=>selectNativeWriterControlRoot(bad),{code:'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP'});
+});
+
+test('real isolated Git checkouts keep the approved runtime after receipt publication',t=>{
+ const temp=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-native-writer-git-'));
+ t.after(()=>fs.rmSync(temp,{recursive:true,force:true}));
+ const source=path.join(temp,'source'),workspace=path.join(temp,'dispatch');
+ const git=(cwd,...args)=>execFileSync('git',['-C',cwd,...args],
+  {encoding:'utf8',stdio:['ignore','pipe','pipe'],windowsHide:true}).trim();
+ const commit=(cwd,message)=>git(cwd,'-c','user.name=Source fixture',
+  '-c','user.email=fixture@example.invalid','-c','commit.gpgsign=false','commit','-m',message);
+ fs.mkdirSync(source);
+ git(source,'init');
+ fs.writeFileSync(path.join(source,'runtime.mjs'),'export const fixture = 1;\n');
+ git(source,'add','runtime.mjs');commit(source,'reviewed runtime');
+ const pin=git(source,'rev-parse','HEAD');
+ fs.mkdirSync(path.join(source,'results'));
+ fs.writeFileSync(path.join(source,'results','native-policy-fixture.json'),'{}\n');
+ git(source,'add','results/native-policy-fixture.json');commit(source,'receipt publication');
+ const dispatch=git(source,'rev-parse','HEAD');
+ assert.notEqual(dispatch,pin);
+ git(temp,'clone','--no-hardlinks',source,workspace);
+ const pinned=path.join(workspace,'writer-b-control');
+ const policy={repositoryVisibility:'public',nativeWriterBControlMode:'PINNED_CHECKOUT_V1',
+  nativeWriterBControlSha:pin};
+ const env={GITHUB_SHA:dispatch};
+ const resolve={workspace,ownRoot:workspace,policy,env,mode:'--resolve-control'};
+ const execute={...resolve,ownRoot:pinned,mode:'--execute'};
+ assert.equal(selectNativeWriterControlRoot(resolve).dispatchControlHead,dispatch);
+ fs.mkdirSync(pinned);
+ assert.throws(()=>selectNativeWriterControlRoot(execute),{code:'WRITER_B_NATIVE_CHECKOUT_ROOT_STOP'});
+ fs.rmdirSync(pinned);
+ git(temp,'clone','--no-hardlinks',source,pinned);
+ git(pinned,'checkout','--detach',pin);
+ const selected=selectNativeWriterControlRoot(execute);
+ assert.equal(selected.controlHead,pin);
+ assert.equal(selected.dispatchControlHead,dispatch);
+ fs.mkdirSync(path.join(workspace,'writer-b-candidate'));
+ assert.equal(selectNativeWriterControlRoot(execute).controlHead,pin);
+ fs.appendFileSync(path.join(pinned,'runtime.mjs'),'// unexpected tracked change\n');
+ assert.throws(()=>selectNativeWriterControlRoot(execute),{code:'WRITER_B_NATIVE_CHECKOUT_DIRTY_STOP'});
 });
