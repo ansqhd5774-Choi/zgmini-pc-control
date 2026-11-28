@@ -522,3 +522,11 @@
 - 현행 기능 저장소 `ansqhd5774-Choi/zgmini/main@c2b61c1f3317ca71e8aff28179b43f0fd4d7a1c7`의 `scripts/pc-writer/local-cycle.mjs` Git blob `fbe255234059d8bdc49d4fc56abb4dfea9450442`를 #4135 승인 4파일 manifest와 직접 비교했다. 승인 후보의 두 번째 삽입 anchor `// Paid US full-market R2 reuses the same Core lock and previously` 앞에 현행 main의 기존 `US_BREADTH_PAID_R2_BACKFILL` 블록이 이미 존재하고 `planStoredPaidUsR2Backfill` 및 `collectPaidDaily`를 호출한다. 기존 승인 overlay를 이 main에 무검증 적용하면 유사 backfill 블록을 중복 삽입할 수 있는 **정적 구조 차이**가 있다.
 - 별도 현재 MarketParquet 제외 지침 및 등록된 승인·CAS를 우선한다. 과거 #4135는 167/167 ACTIVE로 실제 overlay 시작 전 중단돼 이 **중복 실행이 운영에서 발생했다는 증거는 아니다**. 원본 요청 재실행·옛 manifest 재적용 없이 [#4135 직접 기록](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4135#issuecomment-7230648044)에 정확 소스 비교와 해결 범위를 남김.
 - #4312 PR은 최신 source CI 검증 완료 후 Draft/HOLD를 보존하며 별도 운영 승인 부재 상태가 변하지 않았다. 이 회차 신규 병합·Issue 종료·PC 실행/원자료 공급자/DB·D1 변경 0.
+
+
+## 2026-11-28 #4135 Writer B 원본·후보 분리 검증 및 중복 위험 판정 정정
+
+- 이전 절의 현행 `zgmini/main` R2 backfill 존재 관측은 맞지만 이를 근거로 **정규 Writer B가 그 파일에 삽입을 중복 수행한다고 판단한 설명은 정정한다.** `writer-b/windows-adapter.mjs::readCandidate`는 승인 후보 checkout과 **PC 원본 바이트**를 각각 읽으며 `materializeApprovedWriterFile`은 운영 원본에만 `insertions`를 적용한다. 현재 기능 `main` 후보 파일에 직접 삽입하는 코드가 아니다.
+- `writer-b/insert-only-patch.mjs`의 필수 3중 고정 검증: `candidateSha256`→`beforeSha256`→`afterSha256`; 각각 `WRITER_B_INSERT_CANDIDATE_DRIFT_STOP`·`WRITER_B_INSERT_PREIMAGE_DRIFT_STOP`·`WRITER_B_INSERT_AFTER_SHA_STOP`으로 거부한다. `writer-b/insert-b-mode.test.mjs`에 3개 부정 fixture 존재. 기존 실제 운영 PC 원본이 승인 해시와 달라졌다면 정규 경로는 설치 전 차단한다. 현재 소스에서 실제 중복 설치 결함은 입증되지 않았다.
+- 승인 manifest의 후보 `f7ea89305df8471ffb1827d974fc2e0c223d0b09` `local-cycle.mjs`는 현행 `zgmini/main`과 동일 Git blob `fbe255234059d8bdc49d4fc56abb4dfea9450442`이며, `paidCurrentResult`가 있지만 승인 삽입문 `paidR2DailyStart`는 없다. 후보 파일을 PC 승인 원본이나 설치 영수증으로 혼동하지 않는다.
+- 실제 후속은 **MarketParquet 제외 지시와 별개 승인 효과 불일치, private-only Writer B 실행 조건, 인증된 PC Owner/원본 CAS/자연유휴 검증**이다. 원본 #4135의 설치 전 STOP 및 167/167 ACTIVE 원장을 유지하고 작업 완료를 소급하지 않는다. [#4135 정정 증거](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4135#issuecomment-7230667044). 승인 변경·신규 B/운영 설치·원장·DB·D1 변경 0.
