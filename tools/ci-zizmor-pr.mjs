@@ -6,10 +6,21 @@ import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {changedFiles} from './c996-source-checks.mjs';
+import {assessPublicSourceCi} from './public-source-ci-guard.mjs';
 
 export const ZIZMOR_VERSION='1.33.1';
 export const ZIZMOR_ZIP_SHA256='f02ebeedf651da468b4de19d31f0609050af74e11be41dc46d82e355cf44f68b';
 const URL='https://github.com/zizmorcore/zizmor/releases/download/v1.33.1/zizmor-x86_64-pc-windows-msvc.zip';
+export const ZIZMOR_LINUX_SHA256='3e6a301c7a820a2501915f5a9de8c0486da82bdec7965f068477538a98743d43';
+const LINUX_URL='https://github.com/zizmorcore/zizmor/releases/download/v1.33.1/zizmor-x86_64-unknown-linux-gnu.tar.gz';
+export function selectZizmorRelease(env,event,platform=process.platform,arch=process.arch){
+ if(env?.RUNNER_OS==='Windows'&&platform==='win32'&&arch==='x64')
+  return {url:URL,sha256:ZIZMOR_ZIP_SHA256,archive:'zizmor.zip',curl:'curl.exe',tar:'tar.exe',platform};
+ if(env?.RUNNER_OS==='Linux'&&env.RUNNER_ARCH==='X64'&&platform==='linux'&&arch==='x64'&&assessPublicSourceCi({event,env}).status==='PASS')
+  return {url:LINUX_URL,sha256:ZIZMOR_LINUX_SHA256,archive:'zizmor.tar.gz',curl:'curl',tar:'tar',platform};
+ throw Error('ZIZMOR_ISOLATED_PR_REQUIRED');
+}
+
 
 export function selectChangedActionFiles(paths,exists=fs.existsSync){
  if(!Array.isArray(paths))throw Error('ZIZMOR_CHANGED_SCOPE_UNVERIFIED');
@@ -47,20 +58,24 @@ function run(cmd,args){
 }
 export async function auditChangedActions(){
  if(process.env.GITHUB_REPOSITORY!=='ansqhd5774-Choi/zgmini-pc-control'
-   ||process.env.RUNNER_OS!=='Windows'
    ||process.env.GITHUB_EVENT_NAME!=='pull_request'
    ||!process.env.RUNNER_TEMP)throw Error('ZIZMOR_ISOLATED_PR_REQUIRED');
+ const event=JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH,'utf8'));
+ const release=selectZizmorRelease(process.env,event);
  const files=selectChangedActionFiles(await changedFiles());
  if(!files.length){console.log('ZIZMOR_NO_CHANGED_WORKFLOWS');return;}
  const folder=fs.mkdtempSync(path.join(process.env.RUNNER_TEMP,'zgmini-zizmor-'));
  try{
-   const archive=path.join(folder,'zizmor.zip');
-   run('curl.exe',['--fail','--location','--silent','--show-error',
-     '--max-time','90','--output',archive,URL]);
-   verifyZizmorArchive(fs.readFileSync(archive));
-   run('tar.exe',['-xf',archive,'-C',folder]);
-   const exe=path.join(folder,'zizmor.exe');
-   if(!fs.existsSync(exe))throw Error('ZIZMOR_BINARY_MISSING');
+   const archive=path.join(folder,release.archive);
+   run(release.curl,['--fail','--location','--silent','--show-error',
+     '--max-time','90','--output',archive,release.url]);
+   verifyZizmorArchive(fs.readFileSync(archive),release.sha256);
+   run(release.tar,['-xf',archive,'-C',folder]);
+   const binaries=fs.readdirSync(folder,{recursive:true})
+     .map(relative=>path.join(folder,relative))
+     .filter(file=>path.basename(file)===(release.platform==='win32'?'zizmor.exe':'zizmor')&&fs.lstatSync(file).isFile());
+   if(binaries.length!==1)throw Error('ZIZMOR_BINARY_MISSING');
+   const exe=binaries[0];
    // Only modified CI configuration; no token, API call, or source leakage.
    const audit=spawnSync(exe,['--offline','--strict-collection',
       '--min-severity=medium','--min-confidence=high','--color=never',...files],{
