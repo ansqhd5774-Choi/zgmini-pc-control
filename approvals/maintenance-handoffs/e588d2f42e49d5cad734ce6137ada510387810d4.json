@@ -1,0 +1,55 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "6290080d9215e7a4edc4a380cf77fc22661292dd",
+  "targetSha": "e588d2f42e49d5cad734ce6137ada510387810d4",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "publisherApprovalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4355",
+  "files": {
+    "tools/maintenance-contract.mjs": "527e71e20c8f12d4698a9b8aa04e9748b74bceaf615f24a775f4f904ca03aa74",
+    "tools/maintenance-apply.mjs": "cf0d9c82fa25c343c0d540b6c432c3e6d090c9924474851c22c277867d841096",
+    "tools/maintenance-agent.mjs": "0a80b485ddd9d1d78995a38759233b3c60b9273dc5ab37a0e5bf1e47fc350d34",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "8b46919994b8b2758be9fd83c35f6155b5625b17d6e3a922200fa5a7375bdc04",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "af31ab1f6a159aa1d8467d2585eb16750e8a1a293f9ecfb90b85c388d8640d70",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "e58528d27aa529d8dfea4f4fe8352a644590617ba9fda66630c21fc3a70244b4"
+  },
+  "runtimeChangedFiles": [
+    "tools/update.mjs"
+  ],
+  "ciControllerBPolicy": {
+    "schema": "ZGMINI_CI_CONTROLLER_B_INSTALLED_POLICY_V2",
+    "enabled": true,
+    "workflowId": 430972394,
+    "workflowBlobSha": "096ed86c8ce75bc5a3a71d638ea57606d6b1d820",
+    "workflowPath": ".github/workflows/ci-approval-controller-b.yml",
+    "repositoryVisibility": "public",
+    "installedSha": "66b8a66c6112441576917e0ac9fbe4d39cbd5eea",
+    "targetSha": "15c109dcc2e64a9d2d443f50efc7fe4ce06ff807",
+    "manifestSha256": "8891d9482fe20e86bcd9a128059b5140a829072a178975b20b9c22104383872a"
+  },
+  "preflightEvidence": {
+    "host": "PC",
+    "maintenanceManifestRawSha256": "e148512ecfc77f2a78faf3c5293e8c34986edb6745a97c643294c7e30f9f2112",
+    "fileHashesMatched": 7,
+    "note": "4345 rollback verified via approved operator, old journal and lease archived/preserved. Existing Controller 66b8a66c and six online seats are live baseline. Fresh candidate 15c109dc has identical runtime tree to prior rejected candidate but a separate exact approval and effect receipt."
+  },
+  "approvalBasis": "Owner user explicitly instructed completing the remaining prepared PR 4341/4342 work in this Codex session on 2026-11-28. This approves the exact Public CI V2 one-effect policy, existing independent 7-to-7 maintainer handoff and the single-file selective Controller update in PR 4341, followed by variable activation and actual unattended B verification. No historical 4069/4078 replay, data/provider/DB/D1/schedule changes or general Bot authority.",
+  "backup": "BYTE_VERIFIED_EXISTING_SEVEN_RUNTIME_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_WHILE_NEW_RECEIVER_NOT_STARTED_AND_PRIOR_RECEIVER_PROVEN_STOPPED; HOLD_FOR_RECOVERY_IF_RECEIVER_ORIGIN_UNVERIFIED",
+  "effects": [
+    "One updater runtime change rechecks transient Offline observations within unchanged 30-second deadline; Online/Idle/owner/protection remain mandatory",
+    "Exact Public V2 grant now pins approved fresh candidate PR 4354 and manifest 8891d948 only",
+    "Original request 4345 and its failure/rollback/Claim/journal remain immutable; no replay or receipt deletion",
+    "No data/DB/D1/Writer/schedule/visibility or general Bot authority changes"
+  ],
+  "preserve": [
+    "Public repository visibility",
+    "Core/Writer/data/DB/D1/schedules unchanged",
+    "Existing lease, backup, ancestry and exact CAS safeguards",
+    "No historical 4069/4078 replay or consumed approval reuse"
+  ]
+}
