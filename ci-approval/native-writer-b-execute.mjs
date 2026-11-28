@@ -116,18 +116,20 @@ async function getJson(route,token){
  return JSON.parse(body);
 }
 
-export function selectNativeWriterControlRoot({workspace,ownRoot,policy,mode,env,readHead=gitControlHead}){
+export function selectNativeWriterControlRoot({workspace,ownRoot,policy,mode,env,readHead}){
  need(typeof workspace==='string'&&path.isAbsolute(workspace)&&typeof ownRoot==='string'&&
   path.isAbsolute(ownRoot),'WRITER_B_NATIVE_CHECKOUT_MISSING_STOP');
  const origin=path.resolve(workspace),actual=path.resolve(ownRoot);
- const dispatchControlHead=readHead(origin);
- need(dispatchControlHead===env.GITHUB_SHA,'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP');
  const pinned=policy?.repositoryVisibility==='public'&&policy.nativeWriterBControlMode==='PINNED_CHECKOUT_V1';
+ // Existing Private/legacy contracts keep the original HEAD check.
+ const read=readHead??(pinned?gitControlHead:gitHead);
+ const dispatchControlHead=read(origin);
+ need(dispatchControlHead===env.GITHUB_SHA,'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP');
  need(policy?.nativeWriterBControlMode===undefined||pinned,'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP');
  const expected=mode==='--resolve-control'||!pinned?origin:path.join(origin,'writer-b-control');
  const comparable=v=>process.platform==='win32'?v.toLowerCase():v;
  need(comparable(actual)===comparable(expected),'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP');
- const controlHead=readHead(actual);
+ const controlHead=read(actual);
  if(mode==='--resolve-control'){
   need(pinned&&HASH.test(policy.nativeWriterBControlSha??''),'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP');
  }else need(controlHead===policy.nativeWriterBControlSha,'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP');
