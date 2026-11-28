@@ -1169,3 +1169,9 @@
 - Public 발행 소스는 installPlan 자동 승인 staging도 명시 거부(CI_PUBLIC_APPROVAL_STAGING_NOT_AUTHORIZED); 기존 승인된 정확 효과 발행과 자동 신규 승인 생성은 별개다. 신규 policy-only 전환 또는 운영용 설치기 임의 복제/격리 PC 신규 설치 금지. 기존 정규 계약의 host 적합성과 별도 정확 효과 승인에 따라 판단.
 - 실제 신규 중앙 조정 댓글 [#68/7231749375](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-7231749375) 등록. 호스트별 독립 Owner의 local manifest/7파일/startup CAS 및 격리 영구 receipt root 상태 회수, 동일 미소진 정확 효과 연결을 요청했다. 댓글은 실제 타 대화 인수 또는 현장 실행이 아니다.
 - 다음: 기존 정규 독립 Windows 경로에서 호스트별 비민감 readback 확보 → 미소진 승인 효과와 정확 V2 설치 명세 연결 → 해당 host에 승인된 정규 적용 → 기존 변수 설정 및 단회 실제 CI 발행/수신 검증. 별도 Native A/Writer 계약은 유지. 신규 운영 변경·PC 요청·변수 변경 0. P0 1/7, 실제 무인 0/3. AUTOMATION_BLOCKED(두 호스트 실측/정규 실행 연결 및 정확 V2 효과 승인); 실제 발행기 실행 실패를 관측한 것은 아니다.
+
+## 54. Controller B 격리 영수증 저장소 기존 실증 재사용 (2026-11-28 KST)
+
+- 제53절 및 후속 보고의 Controller B receipt root 쓰기/영구 보존 미입증 판정을 정정한다. 동일 원장 제30절 이후에 이미 기록된 #3925/#3926 원본 Issue(모두 closed)와 Actions 두 Job 로그를 직접 재조회했다. #3925 Run 45846542819/job 140001583324: `PARTIAL/CI_RECEIPT_PROOF_WRITE_READBACK_VERIFIED`, writableVerified=true, operationalWrites=1. #3926 Run 45846758798/job 140002327690: `PASS/CI_RECEIPT_PROOF_CROSS_RUN_VERIFIED`, writableVerified=true, durableAcrossRunsVerified=true, operationalWrites=0. 두 기록의 recordSha256 `9634b116be57dea2686d3f0d0dcd7a97e0ec650219ed357cc52878b7c111a1ab` 일치. 양쪽 controllerBPublished=false. 실제 관측 2026-11-26T15:12Z(11-27 KST). 기존 고정 Controller B 격리 receipt root의 유효한 실증이며 신규 실행 아님. https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/45846758798
+- 이 증거는 Native A/Writer B의 다른 root, 현재 독립 V2 정책 또는 현재 변수 설정을 증명하지 않는다. 현재 root/환경 변경 증거 없이 동일 쓰기·교차 실행 시험 재요청 금지. 실제 발행 직전 정규 runtime 검사만 유지한다.
+- main a6568b0c27da28ec26f8ef66e6c4f5397c06e117, 발행 workflow 및 기존 정확 효과 승인 조건 불변. 제53절 중앙 조정의 영수증 시험 부분은 기존 실증 재사용으로 대체한다. 남은 필수 행동은 양 PC 독립 Owner의 현재 정책 설치 CAS 및 미소진 정확 V2 효과 승인 연결, 그 후 정규 설치/활성화 및 실제 발행 검증이다. P0 1/7, 무인 0/3, 신규 운영 변경 0. AUTOMATION_BLOCKED(실행 연결 및 정확 V2 효과 승인).
