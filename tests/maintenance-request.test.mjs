@@ -1,3 +1,4 @@
+import {readOwnerApprovedSubmissionScope} from '../ci-approval/public-owner-submission-scope.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {createHash} from 'node:crypto';
@@ -674,4 +675,30 @@ test('missing root, invalid effect key and corrupt receipt are not a new effect'
  assert.throws(()=>store.loadReceipt('../bad'),/EFFECT_KEY_INVALID/);
  fs.writeFileSync(path.join(root,key+'.json'),'broken');
  assert.throws(()=>store.loadReceipt(key));
+});
+
+async function ownerScopeForFixture(policy){
+ const source='9'.repeat(40),merge='8'.repeat(40),file='approvals/maintenance-handoffs/'+source+'.json';
+ const a={schema:'ZGMINI_MAINTENANCE_HANDOFF_V2',transition:'SEVEN_TO_SEVEN',approved:true,installedSha:'7'.repeat(40),targetSha:source,scope:'COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE',publisherApprovalRef:'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/99',ciControllerBPolicy:policy,files:Object.fromEntries(['maintenance-contract.mjs','maintenance-apply.mjs','maintenance-agent.mjs','maintenance-lock.mjs','update.mjs','maintenance-ancestry.vbs','source-bundle-register.mjs','bootstrap-maintenance.mjs','handoff-maintenance.mjs'].map(n=>['tools/'+n,'6'.repeat(64)]))};
+ const bytes=Buffer.from(JSON.stringify(a)),owner={id:327938088,login:OWNER,type:'User'};
+ const getJson=async route=>route==='pulls/99'?{number:99,merged:true,user:owner,merged_by:owner,merge_commit_sha:merge,base:{ref:'main',repo:{full_name:'ansqhd5774-Choi/zgmini-pc-control'}},head:{repo:{full_name:'ansqhd5774-Choi/zgmini-pc-control'}}}:{type:'file',path:file,encoding:'base64',content:bytes.toString('base64'),sha:createHash('sha1').update(Buffer.from('blob '+bytes.length+'\0')).update(bytes).digest('hex')};
+ return readOwnerApprovedSubmissionScope({getJson,handoffSourceSha:source});
+}
+test('role-separated publisher submits once with verified Owner scope and no local receiver',async()=>{
+ const {f,installed}=publicBPublisherFixture();let localReads=0;
+ f.ports.readIndependentInstalledCiPolicy=async()=>{localReads++;throw Error('isolated receiver absent');};
+ f.ports.readOwnerApprovedSubmissionScope=()=>ownerScopeForFixture(installed.ciControllerBPolicy);
+ const first=await submitExistingControllerApprovalFromCi(f.input,f.ports);
+ assert.equal(first.status,'REQUEST_READBACK_VERIFIED');assert.equal(localReads,0);assert.equal(f.posts,1);
+ assert.equal((await submitExistingControllerApprovalFromCi({...f.input,runId:900},f.ports)).status,'EXISTING_REQUEST_REUSED');assert.equal(f.posts,1);
+});
+test('a variable-shaped fake Owner scope cannot bypass a valid legacy grant',async()=>{
+ const {f,installed}=publicBPublisherFixture();f.ports.readIndependentInstalledCiPolicy=async()=>installed;
+ f.ports.readOwnerApprovedSubmissionScope=async()=>({schema:'ZGMINI_OWNER_CONTROLLER_B_SUBMISSION_SCOPE_V1',executionAuthorized:false});
+ await assert.rejects(submitExistingControllerApprovalFromCi(f.input,f.ports),/MAINTENANCE_CI_OWNER_SUBMISSION_SCOPE_UNVERIFIED/);assert.equal(f.posts,0);
+});
+test('Owner submission scope still rejects changed workflow and changed effect before POST',async()=>{
+ for(const kind of ['workflow','effect']){const {f,installed}=publicBPublisherFixture();f.ports.readOwnerApprovedSubmissionScope=()=>ownerScopeForFixture(installed.ciControllerBPolicy);
+ if(kind==='workflow')f.ports.readPublisherWorkflowIdentity=async()=>({workflowId:1,workflowBlobSha:'f'.repeat(40)});else f.input.targetSha='5'.repeat(40);
+ await assert.rejects(submitExistingControllerApprovalFromCi(f.input,f.ports),/MISMATCH/);assert.equal(f.posts,0);assert.equal(f.saved,null);}
 });
