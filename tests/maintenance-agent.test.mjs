@@ -2124,6 +2124,25 @@ test('S6 #4078 backlog recovery is source-only and never self-authorizes replay'
  assert.equal(admitted.status,'SOURCE_PREFLIGHT_ELIGIBLE');
  assert.equal(admitted.mutationAuthorized,false);
  assert.equal(admitted.operationalWrites,0);
+ const completed=structuredClone(e);
+ completed.s6Issue.state='closed';
+ completed.s6Issue.state_reason='completed';
+ assert.equal(inspectS64078(completed).code,'S6_CLOSED_RECOVERY_RECEIPT_UNVERIFIED');
+ // Exact public historical receipt fixture, not a current runtime observation.
+ completed.s6CompletionReadback={json:"{\n  \"schema\": \"ZGMINI_PC_RESULT_V1\",\n  \"jobId\": \"run-46092679070-1-seat-3\",\n  \"requestId\": \"pc-4069-journal-66b8a66c-20261128-01\",\n  \"operation\": \"controller-s6-4069-journal-readonly\",\n  \"seat\": 3,\n  \"status\": \"PASS\",\n  \"code\": \"PUBLIC_RESULT_CODE_REDACTED\",\n  \"actualExecutionSha\": \"66b8a66c6112441576917e0ac9fbe4d39cbd5eea\",\n  \"reportTransfer\": {\n    \"status\": \"SUMMARY_ONLY\",\n    \"code\": \"PUBLIC_REPOSITORY_REDACTED\"\n  }\n}\n",txt:"schema=ZGMINI_PC_RESULT_V1\r\njobId=run-46092679070-1-seat-3\r\nrequestId=pc-4069-journal-66b8a66c-20261128-01\r\noperation=controller-s6-4069-journal-readonly\r\nseat=3\r\nstatus=PASS\r\ncode=PUBLIC_RESULT_CODE_REDACTED\r\nactualExecutionSha=66b8a66c6112441576917e0ac9fbe4d39cbd5eea\r\nreportTransfer={\"status\":\"SUMMARY_ONLY\",\"code\":\"PUBLIC_REPOSITORY_REDACTED\"}\r\n"};
+ const closed=inspectS64078(completed);
+ assert.equal(closed.status,'SOURCE_PREFLIGHT_ELIGIBLE');
+ assert.equal(closed.mutationAuthorized,false);
+ assert.equal(closed.operationalWrites,0);
+ const cancelled=structuredClone(completed);
+ cancelled.s6Issue.state_reason='not_planned';
+ assert.equal(inspectS64078(cancelled).code,'S6_CLOSED_RECOVERY_RECEIPT_UNVERIFIED');
+ const drift=structuredClone(completed);
+ drift.s6CompletionReadback.txt+=' ';
+ assert.equal(inspectS64078(drift).code,'S6_CLOSED_RECOVERY_RECEIPT_UNVERIFIED');
+ const duplicate=structuredClone(completed);
+ duplicate.existingPcJobRuns=1;
+ assert.equal(inspectS64078(duplicate).code,'BACKLOG_4078_DUPLICATE_OR_SEARCH_UNKNOWN');
  const replay=structuredClone(e);
  replay.backlog.replays['4078']={status:'POSTING'};
  const refused=inspectS64078(replay);

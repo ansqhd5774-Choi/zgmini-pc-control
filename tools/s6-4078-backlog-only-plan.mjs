@@ -10,9 +10,24 @@ export const FIXED=Object.freeze({
  s6BodySha256:'cc4e478d06f00c9b7dd8a80f81108e70c50ebae2559a0d188dd515e493bef6f9'
 });
 const sha=b=>createHash('sha256').update(b).digest('hex');
+// A completed predecessor is not a successful original S6 promotion, nor
+// authority to replay. Bind this specific closed recovery to the historical
+// #4332 public receipt pair; current raw journal/lease/backlog CAS still apply.
+const completedRecovery=Object.freeze({
+ jsonBlob:'14d5602b47b0d68df1cb01bb8688fbabd76f7d91',
+ txtBlob:'0a4f725d61cf69eed26ff63f35218f93d11f8e11'
+});
+const gitBlobSha=raw=>createHash('sha1').update('blob '+Buffer.byteLength(raw)+'\0').update(raw).digest('hex');
+function verifiedCompletedPredecessor(e){
+ const receipt=e?.s6CompletionReadback;
+ return e?.s6Issue?.state==='closed'&&e.s6Issue.state_reason==='completed'&&
+  typeof receipt?.json==='string'&&typeof receipt?.txt==='string'&&
+  gitBlobSha(receipt.json)===completedRecovery.jsonBlob&&
+  gitBlobSha(receipt.txt)===completedRecovery.txtBlob;
+}
 const blocked=code=>({status:'BLOCKED',code,mutationAuthorized:false,operationalWrites:0});
 export function inspectS64078BacklogOnly(e){
- if(e?.s6Issue?.number!==FIXED.s6Issue||e.s6Issue.state!=='open'||
+ if(e?.s6Issue?.number!==FIXED.s6Issue||!['open','closed'].includes(e.s6Issue.state)||
     e.s6Issue.user?.login!=='ansqhd5774-Choi')
   return blocked('S6_ORIGINAL_ISSUE_UNVERIFIED');
  if(typeof e.s6Issue.body!=='string'||sha(e.s6Issue.body)!==FIXED.s6BodySha256)
@@ -21,6 +36,8 @@ export function inspectS64078BacklogOnly(e){
  if(s6.schema!=='ZGMINI_PC_MAINTENANCE_REQUEST_V1'||
     s6.requestId!==FIXED.s6RequestId||s6.operation!=='controller-s6-failover-once')
   return blocked('S6_ORIGINAL_SCOPE_DRIFT');
+ if(e.s6Issue.state==='closed'&&!verifiedCompletedPredecessor(e))
+  return blocked('S6_CLOSED_RECOVERY_RECEIPT_UNVERIFIED');
  const original=e?.originalIssue;
  if(original?.number!==FIXED.originalIssue||original.state!=='open'||
    original.user?.login!=='ansqhd5774-Choi'||

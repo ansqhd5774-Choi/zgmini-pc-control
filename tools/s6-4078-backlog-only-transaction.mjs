@@ -54,7 +54,9 @@ export async function executeApprovedS64078Replay(ports={}){
   if(freshPlan.backlogSha256!==before.localReadback.backlogSha256||
      freshPlan.journalSha256!==before.localReadback.journalSha256||
      fresh.originalIssue.body!==before.originalIssue.body||
-     fresh.s6Issue.body!==before.s6Issue.body)
+     fresh.s6Issue.body!==before.s6Issue.body||
+     fresh.s6Issue.state!==before.s6Issue.state||
+     fresh.s6Issue.state_reason!==before.s6Issue.state_reason)
    throw Error('S6_4078_EVIDENCE_CHANGED');
   const freshApproval=await ports.verifyIndependentAuthority(fresh,freshPlan);
   if(!exactApproval(freshApproval)||
