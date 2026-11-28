@@ -2104,6 +2104,7 @@ import '../writer-b/report-rejection.test.mjs';
   };
   const r=project(sample());
   assert.equal(r.status,'READ_ONLY_OBSERVED');
+  assert.equal(r.code,'S6_LOCAL_SAMPLE_OBSERVED');
   assert.equal(r.journalPhase,'RECOVERY_REQUIRED');
   assert.equal(r.originalFailureMatches,true);
   assert.equal(r.pauseWindowContainsIssueOpenedAt,true);
@@ -2125,6 +2126,29 @@ import '../writer-b/report-rejection.test.mjs';
   assert.equal(project(sample({}, {}, {windows:[{pausedAt:'invalid'}]})).replayLedgerStatus,'UNVERIFIED');
   const drift=sample();drift.localReadback.journalAfter+=' ';
   assert.equal(project(drift).status,'STATE_UNKNOWN');
+  assert.equal(project(drift).code,'S6_LOCAL_SAMPLE_BYTES_UNVERIFIED');
+  assert.equal(project(sample({requestId:'wrong'})).code,'S6_LOCAL_SAMPLE_IDENTITY_UNVERIFIED');
+  for(const code of ['S6_WINDOWS_OPERATOR_REQUIRED','S6_ROOT_INVALID',
+   'S6_ORIGINAL_CLAIM_UNVERIFIED','S6_APPROVAL_SOURCE_CAS_DRIFT',
+   'S6_APPROVAL_SCOPE_INVALID','S6_LOCAL_CROSS_FILE_SNAPSHOT_CHANGED',
+   'S6_LOCAL_OWNER_OR_APPROVAL_CHANGED','S6_4078_LOCAL_SOURCE_OR_CAS_UNVERIFIED']){
+   const refused=project({status:'STATE_UNKNOWN',code,localReadback:'PRIVATE_FIXTURE'});
+   assert.equal(refused.status,'STATE_UNKNOWN');
+   assert.equal(refused.code,code);
+   assert.equal(refused.journalPhase,null);
+   assert.equal(refused.replayLedgerStatus,'UNVERIFIED');
+   assert.doesNotMatch(JSON.stringify(refused),/PRIVATE_FIXTURE/);
+  }
+  for(const code of ['PRIVATE_FIXTURE','S6_SECRET_PRIVATE_FIXTURE',null]){
+   const refused=project({status:'STATE_UNKNOWN',code});
+   assert.equal(refused.code,'S6_LOCAL_SAMPLE_UNVERIFIED');
+   assert.doesNotMatch(JSON.stringify(refused),/PRIVATE_FIXTURE/);
+  }
+  const bogus=projectLocalS6(sample(),()=>({replayLedgerStatus:'PRIVATE_FIXTURE'}));
+  assert.equal(bogus.code,'S6_LOCAL_BACKLOG_PROJECTION_UNVERIFIED');
+  const thrown=projectLocalS6(sample(),()=>{throw Error('PRIVATE_FIXTURE')});
+  assert.equal(thrown.code,'S6_LOCAL_SAMPLE_PARSE_OR_PROJECTION_UNVERIFIED');
+  assert.doesNotMatch(JSON.stringify([bogus,thrown]),/PRIVATE_FIXTURE/);
   assert.deepEqual(projectWmiObservation('ACTIVE_RUNNER_PROCESS',true),{
    referenceClassification:'ACTIVE_RUNNER_PROCESS',installedSourceMatch:true,
    historicalPromotionVerified:false,liveWatchdogExecutionVerified:false});
