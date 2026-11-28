@@ -194,3 +194,13 @@ test('Public Writer receiver requires independent public B policy and exact publ
  const other=structuredClone(f);other.policy.effect='A_READONLY';
  expect(other,'CI_NATIVE_RECEIVER_INSTALLED_POLICY_INVALID');
 });
+
+test('Public repository never inherits native A authority from a Writer B policy shape',()=>{
+ const a=fixture('A_READONLY');
+ Object.assign(a.policy,{repositoryVisibility:'public',effect:'A_READONLY',
+  nativeWriterBExecutionEnabled:true,nativeWriterBControlSha:'d'.repeat(40),
+  nativeWriterBAdapterSha256:'e'.repeat(64),installedControllerSha:'f'.repeat(40)});
+ a.event.repository={...repo,private:false};
+ a.sourceRun.repository={...repo,private:false};
+ expect(a,'CI_NATIVE_RECEIVER_EVENT_ORIGIN_DENIED','REJECTED');
+});
