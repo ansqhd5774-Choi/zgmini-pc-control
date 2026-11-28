@@ -181,6 +181,13 @@ async function verifyControllerBIdentity({issueNumber,requestBytes,runId,attempt
 return {controllerBReceiptMarker,verifyControllerBIdentity};
 })();
 export const {controllerBReceiptMarker,verifyControllerBIdentity}=ciWorkload;
+// Fixed machine-consumed log endpoint shared by the receiver and updater.
+// ANSI bytes stay in a child-process pipe, never in terminal/public output.
+export function controllerBJobLogArgs(jobId){
+ if(!Number.isSafeInteger(jobId)||jobId<=0)throw Error('CI_RECEIPT_JOB_ID_INVALID');
+ return Object.freeze(['api',`repos/${CONTROL_REPOSITORY}/actions/jobs/${jobId}/logs`,
+  '--allow-escape-sequences']);
+}
 const ciAuthorizations=new WeakMap();
 // Only authenticated REST issue bytes and the original workflow receipt can
 // mint this in-process capability. A package cannot serialize/replay it.

@@ -11,7 +11,7 @@ import {TextDecoder} from 'node:util';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {applyApprovedUpdate,maintenanceCliFailureReport,runApprovedS6FailoverOnce} from './maintenance-apply.mjs';
 import {validateUpdateRequest,validateMaintenanceRequest,
- authenticateControllerBIssue,CI_CONTROLLER_ACTOR,installedControllerBPolicy,
+ authenticateControllerBIssue,CI_CONTROLLER_ACTOR,installedControllerBPolicy,controllerBJobLogArgs,
 validateControllerConfigTransition,controllerAdmissionForPurpose,
   readAllMaintenancePages,validateInfrastructureDelta,
   validateControllerOnlyInstallDelta,validateControllerSelectivePin,
@@ -2077,7 +2077,7 @@ export async function loadAuthenticatedApprovedPackage(requestId,file,{recovery=
   {code:'CI_INSTALLED_POLICY_UNVERIFIED'});}
  need(policy!==null,'CI_IDENTITY_POLICY_NOT_CONFIGURED');
  const proof=await authenticateControllerBIssue(envelope.actual,{policy,recovery,getJson:github,
-  readJobLogs:jobId=>execFileSync(gh,['api',`repos/${controlRepository}/actions/jobs/${jobId}/logs`],
+  readJobLogs:jobId=>execFileSync(gh,controllerBJobLogArgs(jobId),
    {encoding:'utf8',windowsHide:true,timeout:60000,maxBuffer:16000000})});
  need(proof.state==='CI_WORKLOAD_IDENTITY_VERIFIED_ONLY',proof.code);
  // Re-read the approved main bytes independently for CI, never trust the local

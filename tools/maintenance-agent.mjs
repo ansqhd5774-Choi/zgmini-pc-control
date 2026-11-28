@@ -9,7 +9,7 @@ import path from "node:path";
 import {fileURLToPath,pathToFileURL} from "node:url";
 
 import {validateMaintenanceRequest,validateUpdateRequest,
-  authenticateControllerBIssue,CI_CONTROLLER_ACTOR,installedControllerBPolicy,
+  authenticateControllerBIssue,CI_CONTROLLER_ACTOR,installedControllerBPolicy,controllerBJobLogArgs,
   validateR6HostIssueEnvelope,validateR6HostRegistrationRequest,
   validateR54BIssueEnvelope,validateR54BManifestRequest,
   R54_B_ISSUE_TITLE,R54_B_OPERATION,R54_B_SOURCE_FILES,
@@ -1157,7 +1157,7 @@ export function createMaintenanceAgent({
         getJson:route=>githubJson(["api",`repos/${repo}/${route}`],"CI_IDENTITY_READ_FAILED"),
         // Machine-only pipe: gh otherwise refuses Actions logs containing ANSI.
         // Never render these raw bytes; the verifier extracts the exact receipt.
-        readJobLogs:async jobId=>(await github(["api",`repos/${repo}/actions/jobs/${jobId}/logs`,"--allow-escape-sequences"])).stdout,
+        readJobLogs:async jobId=>(await github(controllerBJobLogArgs(jobId))).stdout,
       });
       if(checked.state!=='CI_WORKLOAD_IDENTITY_VERIFIED_ONLY')
         return {status:checked.state==='QUEUED'?'QUEUED':checked.state==='EVIDENCE_MISSING'?'STATE_UNKNOWN':'BLOCKED',
