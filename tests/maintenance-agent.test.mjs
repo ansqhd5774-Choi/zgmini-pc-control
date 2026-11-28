@@ -7,7 +7,105 @@ import {test} from "node:test";
 import {execFileSync} from "node:child_process";
 import {requireHandoffApproval,handoffFilePlan,nextRuntimeFiles} from "../tools/handoff-maintenance.mjs";
 
-import {createMaintenanceAgent,failedUpdaterResult,normalizedResult,attachApprovedNativeBReceipt,parseS6NonzeroRecoveryReport} from "../tools/maintenance-agent.mjs";
+import {createMaintenanceAgent,failedUpdaterResult,normalizedResult,attachApprovedNativeBReceipt,parseS6NonzeroRecoveryReport,authorizePreinstallContinuation,claimPreinstallContinuation} from "../tools/maintenance-agent.mjs";
+
+function continuationCase(priorBytes,installed){
+ const prior=JSON.parse(priorBytes),file=`approvals/maintenance-handoffs/${installed.sourceSha}.json`;
+ const state={ledger:null,installLock:{held:false},actualControllerSha:prior.result.actualControllerSha,
+  artifacts:{status:'OBSERVED',artifacts:{backupRoot:'ABSENT',stageRoot:'ABSENT'},
+   backlog:{file:'ABSENT'},lease:{directory:'ABSENT'}}};
+ const a={schema:'ZGMINI_MAINTENANCE_HANDOFF_V2',approved:true,targetSha:installed.sourceSha,
+  ciControllerBPolicy:installed.ciControllerBPolicy,publisherApprovalRef:`https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/99`,
+  preinstallContinuation:{schema:'ZGMINI_PREINSTALL_CONTINUATION_V1',revision:1,
+   requestId:prior.requestId,issueNumber:prior.issueNumber,bodyDigest:prior.bodyDigest,
+   priorLedgerSha256:crypto.createHash('sha256').update(priorBytes).digest('hex'),
+   baselineSha:state.actualControllerSha}};
+ const owner={id:327938088,login:'ansqhd5774-Choi',type:'User'},merge='d'.repeat(40);
+ const pr={merged:true,user:owner,merged_by:owner,merge_commit_sha:merge,
+  base:{ref:'main',repo:{full_name:'ansqhd5774-Choi/zgmini-pc-control'}},
+  head:{repo:{full_name:'ansqhd5774-Choi/zgmini-pc-control'}}};
+ let history=null;
+ const getJson=async route=>{
+  if(route==='pulls/99')return pr;
+  assert.ok(route===`contents/${file}?ref=main`||route===`contents/${file}?ref=${merge}`);
+  const b=Buffer.from(JSON.stringify(route.endsWith('ref=main')?a:history??a));
+  return {type:'file',path:file,encoding:'base64',content:b.toString('base64'),
+   sha:crypto.createHash('sha1').update(Buffer.from('blob '+b.length+'\0')).update(b).digest('hex')};
+ };
+ return {a,pr,state,getJson,setHistory:x=>history=x};
+}
+
+function continuationPrior(){return Buffer.from(JSON.stringify({schema:'ZGMINI_PC_MAINTENANCE_LEDGER_V1',
+ requestId:'pc-11223344-5566-4788-9aab-ccddeeff0011',issueNumber:72,bodyDigest:'a'.repeat(64),fingerprint:'b'.repeat(64),
+ actor:'github-actions[bot]',status:'BLOCKED',result:{code:'CI_ISSUE_ORIGIN_DENIED',lastPass:'PRE_INSTALL_REJECTED',actualControllerSha:'a'.repeat(40)}}));}
+
+test('preinstall continuation requires exact Owner merge, original bytes and absent operating artifacts',async()=>{
+ const priorBytes=continuationPrior(),installed={sourceSha:'c'.repeat(40),ciControllerBPolicy:{exact:true}};
+ const f=continuationCase(priorBytes,installed);
+ const grant=await authorizePreinstallContinuation({priorBytes,installed,state:f.state,getJson:f.getJson});
+ assert.equal(grant.revision,1);assert.equal(grant.approvalPrNumber,99);
+});
+
+test('preinstall continuation never admits UNKNOWN, changed baseline, artifacts, lease or approval drift',async()=>{
+ const installed={sourceSha:'c'.repeat(40),ciControllerBPolicy:{exact:true}};
+ for(const mutate of [
+  x=>x.prior.status='UNKNOWN',x=>x.prior.continuation={revision:1},
+  x=>x.prior.result.lastPass='STAGED',x=>x.f.state.ledger={status:'RUNNING'},
+  x=>x.f.state.installLock.held=true,x=>x.f.state.artifacts.artifacts.stageRoot='PRESENT',
+  x=>x.f.state.artifacts.backlog.file='PRESENT',x=>x.f.state.actualControllerSha='e'.repeat(40),
+  x=>x.f.pr.merged=false,x=>x.f.pr.merged_by={id:41898282,login:'github-actions[bot]',type:'Bot'},
+  x=>x.f.a.preinstallContinuation.priorLedgerSha256='0'.repeat(64),
+  x=>{x.f.setHistory(structuredClone(x.f.a));x.f.a.preinstallContinuation.revision=2;}
+ ]){
+  const prior=JSON.parse(continuationPrior()),bytes=Buffer.from(JSON.stringify(prior)),f=continuationCase(bytes,installed);
+  mutate({prior,f});
+  assert.equal(await authorizePreinstallContinuation({priorBytes:Buffer.from(JSON.stringify(prior)),installed,state:f.state,getJson:f.getJson}),null);
+ }
+});
+
+test('preinstall continuation archives exact old ledger and consumes once, without deleting effect claims',t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-continuation-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const b=continuationPrior(),prior=JSON.parse(b),key=crypto.createHash('sha256').update(prior.requestId).digest('hex');
+ fs.writeFileSync(path.join(dir,key+'.json'),b);fs.writeFileSync(path.join(dir,'effect-original.json'),'preserve');
+ const grant={revision:1,priorLedgerSha256:crypto.createHash('sha256').update(b).digest('hex'),approvalManifestSha256:'f'.repeat(64)};
+ const next=claimPreinstallContinuation(dir,b,grant,'2026-11-28T00:00:00Z');
+ assert.equal(next.entry.status,'RUNNING');assert.deepEqual(fs.readFileSync(path.join(dir,key+'.before-continuation-1.json')),b);
+ assert.equal(fs.readFileSync(path.join(dir,'effect-original.json'),'utf8'),'preserve');
+ assert.throws(()=>claimPreinstallContinuation(dir,b,grant,'later'),/CAS_CHANGED/);
+});
+
+test('Owner-approved preinstall continuation applies original CI request once and retains both result revisions',async t=>{
+ const p=publicBAuthFixture();let evidence;
+ const artifacts={status:'OBSERVED',artifacts:{backupRoot:'ABSENT',stageRoot:'ABSENT'},backlog:{file:'ABSENT'},lease:{directory:'ABSENT'}};
+ const f=fixture(t,{privateRepo:false,actor:'app/github-actions',requestPatch:{chatId:'chat-ci-765-1'},
+  manifestPatch:{controllerOnlyInstall:true,selectiveSource:{schema:'ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1',branch:'codex/ci-public-effect-review',mainSha:'e'.repeat(40),customPaths:[]}},
+  statusFaults:{artifacts},installedCiPolicy:(_issue,raw)=>({...p.installed,ciControllerBPolicy:{...p.installed.ciControllerBPolicy,manifestSha256:digest(raw)}}),
+  continuationProof:route=>evidence.getJson(route),
+  publicCiProof:{actual:p.actual,getJson:p.proof.getJson,readJobLogs:(_id,issue)=>
+   '2026-11-28T00:00:00Z '+controllerBReceiptMarker(issue.number,Buffer.from(issue.body))+'\n'}});
+ const prior={...JSON.parse(continuationPrior()),requestId:f.request.requestId,targetControllerSha:TARGET,
+  bodyDigest:digest(f.issue.body),fingerprint:digest(JSON.stringify(f.request)),
+  reportUploadStatus:'VERIFIED',commentPosted:true,actor:CI_CONTROLLER_ACTOR,
+  result:normalizedResult(f.request,{status:'BLOCKED',lastPass:'PRE_INSTALL_REJECTED',firstFail:'CI_ISSUE_ORIGIN_DENIED',actualControllerSha:INSTALLED},'CI_ISSUE_ORIGIN_DENIED')};
+ const bytes=Buffer.from(JSON.stringify(prior)),key=digest(f.request.requestId);
+ fs.writeFileSync(path.join(f.root,'requests',key+'.json'),bytes);
+ const normalized=validateUpdateRequest(f.request,f.rawManifest,{actor:ACTOR,installedSha:INSTALLED}).manifest;
+ const effectKey=digest(JSON.stringify({operation:'controller-update',installedSha:INSTALLED,targetSha:TARGET,manifest:normalized}));
+ fs.writeFileSync(path.join(f.root,'requests','effect-'+effectKey+'.json'),JSON.stringify({schema:'ZGMINI_PC_MAINTENANCE_EFFECT_V1',key:effectKey,requestId:f.request.requestId,issueNumber:f.issue.number,actor:CI_CONTROLLER_ACTOR}));
+ const installed=JSON.parse(fs.readFileSync(path.join(f.root,'MAINTENANCE_INSTALL.json')));
+ evidence=continuationCase(bytes,installed);
+ const original=`repos/${REPO}/contents/results/maintenance-${f.request.requestId}.json`;
+ f.remote.set(original,Buffer.from('original blocked report'));
+ f.issue.comments.push({author:{login:ACTOR},body:`<!-- zgmini-pc-maintenance-result:${f.request.requestId} --> old BLOCKED`});
+ const observed=await f.agent.pollOnce();
+ assert.equal(observed[0]?.status,'SUCCEEDED',JSON.stringify(observed));assert.equal(f.stats.applies,1);
+ assert.equal(f.agent.loadLedger(f.request.requestId).continuation.revision,1);
+ assert.deepEqual(fs.readFileSync(path.join(f.root,'requests',key+'.before-continuation-1.json')),bytes);
+ assert.equal(f.remote.get(original).toString(),'original blocked report');
+ assert.ok(f.remote.has(`repos/${REPO}/contents/results/maintenance-${f.request.requestId}-continuation-1.json`));
+ assert.ok(f.issue.comments.some(c=>c.body.includes(`result:${f.request.requestId}:continuation-1`)));
+ await f.agent.pollOnce();assert.equal(f.stats.applies,1);
+});
 import {prepareMaintenanceIssue,submitExistingControllerApprovalFromCi} from '../tools/maintenance-request.mjs';
 import {readIndependentlyInstalledControllerBPublisherPolicy,readAuthenticatedControllerBPublisherWorkflow,readAuthenticatedPublicBPublisherSourceAncestry,observeCompletedRun,observePublishedControllerApprovals,observeLateOwnerMergedControllerApproval,publishExistingControllerApprovals,publishLateOwnerMergedControllerApproval,publishConfiguredControllerApproval} from '../ci-approval/completed-run-intake.mjs';
 
@@ -66,7 +164,7 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
   extraIssueSummaries=[],extraIssueDetails=[],progressError=null,
   s6RawManifest=null,s6Status=null,s6ApplyResult=null,s6ApplyError=null,
   s6ApplyRaw=null,publicMetadataPatch={},requestPatch={},
-  publicCiProof=null,installedCiPolicy=null}={}){
+  publicCiProof=null,installedCiPolicy=null,continuationProof=null}={}){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),"zgmini-maintainer-agent-test-"));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const leaseRoot=path.join(root,"leases");fs.mkdirSync(leaseRoot);
@@ -104,6 +202,8 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
         return {stdout:JSON.stringify(extraIssueDetails.find(row=>row.number===number)??issue)};
       }
       if(args[0]==="api"){
+        if(continuationProof&&(args[1].includes('/contents/approvals/maintenance-handoffs/')||args[1].endsWith('/pulls/99')))
+          return {stdout:JSON.stringify(await continuationProof(args[1].slice(`repos/${REPO}/`.length)))};
         if(publicCiProof&&args[1]===`repos/${REPO}/issues/${issue.number}`){
           return {stdout:JSON.stringify({...publicCiProof.actual,number:issue.number,
             body:issue.body})};
