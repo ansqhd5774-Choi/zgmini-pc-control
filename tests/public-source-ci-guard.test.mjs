@@ -150,3 +150,50 @@ test('CI failure intake keeps its writer queue inside the admitted job',()=>{
  assert.equal(yml.split('\n').filter(line=>line==='concurrency:').length,0);
  assert.ok(yml.includes('    concurrency:\n      group: ci-failure-issue-intake\n      queue: max\n      cancel-in-progress: false'));
 });
+
+// Keep existing private read-only admission and resource groups intact; unrelated
+// issue events must not occupy or replace the pending diagnostic job.
+test('Inflation read-only workflows serialize only admitted diagnostic jobs',()=>{
+ const cases=[
+  [
+    "pc-inflation19-public-diff-readonly-once.yml",
+    "compare",
+    "zgmini-inflation19-pc-public-diff-readonly",
+    "pc-inflation19-pc-public-diff-readonly-once"
+  ],
+  [
+    "pc-inflation19-public-preview-readonly-once.yml",
+    "inflation19_preview",
+    "zgmini-inflation19-public-preview-readonly",
+    "pc-inflation19-public-preview-readonly-once"
+  ],
+  [
+    "pc-inflation19-public-runtime-readonly-once.yml",
+    "verify",
+    "zgmini-inflation19-public-runtime-readonly",
+    "pc-inflation19-public-runtime-readonly-once"
+  ],
+  [
+    "pc-inflation19-writer-source-a.yml",
+    "read-only-source-identity",
+    "inflation19-writer-source-a-single-lane",
+    "pc-inflation19-writer-source-inventory-a"
+  ],
+  [
+    "pc-inflation-19-inventory-b-once.yml",
+    "inflation19",
+    "zgmini-inflation19-private-inventory",
+    "pc-inflation-19-inventory-readonly-once"
+  ]
+];
+ for(const [name,job,group,title] of cases){
+  const yml=fs.readFileSync(new URL('../.github/workflows/'+name,import.meta.url),'utf8').replace(/\r\n/g,'\n');
+  assert.equal(yml.split('\n').filter(line=>line==='concurrency:').length,0,name);
+  assert.ok(yml.includes('  '+job+':\n    # Reserve the existing single lane only for admitted read-only requests.\n    concurrency:\n      group: '+group+'\n      cancel-in-progress: false\n    if: >-'),name);
+  assert.ok(yml.includes("github.event.repository.private == true"),name);
+  assert.ok(yml.includes("github.actor == 'ansqhd5774-Choi'"),name);
+  assert.ok(yml.includes("github.event.issue.title == '"+title+"'"),name);
+  assert.ok(yml.includes('runs-on: [self-hosted, Windows, X64, zgmini-pc-control]'),name);
+  assert.equal(yml.includes('workflow_dispatch:'),false,name);
+ }
+});
