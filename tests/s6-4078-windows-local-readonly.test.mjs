@@ -117,3 +117,20 @@ test('journal mutation while reading backlog cannot pass as one S6 snapshot',t=>
  assert.equal(r.mutationAuthorized,false);
  assert.equal(r.operationalWrites,0);
 });
+
+for(const [name,select] of [
+ ['approval directory',f=>path.dirname(f.approval)],
+ ['supervisor owner directory',f=>path.dirname(f.owner)]
+]){
+ test('redirected '+name+' cannot bypass local S6 path protection',t=>{
+  const f=fixture(t);
+  const dir=select(f),renamed=dir+'-original';
+  fs.renameSync(dir,renamed);
+  fs.symlinkSync(renamed,dir,'dir');
+  const r=read(f.paths);
+  assert.equal(r.status,'STATE_UNKNOWN');
+  assert.equal(r.code,'S6_4078_LOCAL_SOURCE_OR_CAS_UNVERIFIED');
+  assert.equal(r.mutationAuthorized,false);
+  assert.equal(r.operationalWrites,0);
+ });
+}
