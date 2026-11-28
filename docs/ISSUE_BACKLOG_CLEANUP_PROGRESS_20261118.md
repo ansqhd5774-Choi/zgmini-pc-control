@@ -625,3 +625,25 @@
 ## 2026-11-28 — #4334 공통 Public A replay 후속 소스 후보
 
 - [Draft PR #4334](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4334): 3파일, 공통/R6 Public A 정확 제목·등록 grade A·원본 bytes·완전 범위 조회 한계·durable POSTING·exact Issue readback·ACK 유실 단회 대조 구현. Private 기존 marker 보존. 기존 정책/Workflow/승인 변경 없음. 정확 HEAD 368e7a59f898bf36d1352eabef30832d3fd947a1 / [Run 46093484213](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/46093484213) completed/success, public-source-only Job 140819512209, 원본 로그 신규 fixture ok 160 및 통합 160/160 PASS, fail 0. Public fixture success/중복/grade B/잘못된 repo/조회 한계/ACK 유실/POST 불명/잘못된 readback 확인. Windows/private source-only skipped, 실제 Runtime 및 전체 history 조회 비용 미검증. Draft 유지: update.mjs는 #4322 포함 기존 immutable operator closure의 일부이므로 후속 source pin과 현재 설치 preimage 정합화 필요. 기존 #4069 완료 효과 유지; #4078 실제 재발행 및 운영 변경 0.
+
+
+## 2026-11-28 — #4334/#4335 통합 인계 후보 (NOT APPROVED / NOT INSTALLED)
+
+- #4334 merged 313914d5ee49dd65cc7af5febc8d4463ae87119c; #4335 merged 8c6bc16fe5160ddc78608c4392ac16125187a8e5. Exact #4335 HEAD b84a6dda99c8525f9544d47ecef90b6ad8f0a843 / Run 46094030208 / Job 140821194283, 161/161 PASS, Windows skipped.
+- 기존 #4263/#4299/#4307/#4330 설치 및 #4266/#4301/#4308/#4331 사후검사 PASS 확인, 4/4 승인 효과 소진. 역사 승인 재사용/재설치 금지.
+- 비교 기준: 과거 설치 확인 3bed26ecabde1ac9046e000b1b32d912fa1ab53b (PR #4251/#4252). 과거 manifest의 9개 SHA-256과 해당 Git 원문 직접 산출 9/9 일치; 현재 Windows 실측 아님. 고정 target 8c6bc16fe5160ddc78608c4392ac16125187a8e5의 Git 원문 해시 산출 완료. 별도 #4336 Native A 변경과 혼합하지 않음.
+- 비실행 후보이며 approved=true, 실행 가능한 승인 JSON, PC 요청을 생성하지 않는다. 현재 설치 원본과 7-file CAS, 기존 policy 및 독립 Windows 권한 검증 후 정확한 V2 효과 범위 확정. #4078 과거 replay 승인 아님.
+
+| 파일 | 과거 비교 SHA-256 | target SHA-256 | 변경 |
+|---|---|---|---|
+| tools/maintenance-contract.mjs | 19bf293ab2647996fafd2a8380d463a525f2ecc9801c20de8fc437e08a9ed70a | 6ded3471eaa5c5caa661595bdce95676a665d2a30b7122474cd6a293f99b4441 | 변경 |
+| tools/maintenance-apply.mjs | cf0d9c82fa25c343c0d540b6c432c3e6d090c9924474851c22c277867d841096 | cf0d9c82fa25c343c0d540b6c432c3e6d090c9924474851c22c277867d841096 | 동일 |
+| tools/maintenance-agent.mjs | 7c3f6318b07844aaba68cc6f24d5bc82a45d4cde9bd5291cd3e9948778c945c2 | 219e5f2b86d615a79106fa9309ed34e34768beb5885e00c7d0cd2a358d20405e | 변경 |
+| tools/maintenance-lock.mjs | d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd | d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd | 동일 |
+| tools/update.mjs | 3a48d18dd6e58650ed351b5a54e3a91aa616d2d9bd995909ca1f3c1659594 | 3460e387f31630239bc6ddb17f3d4b63fab59a1cfc21a7221a53fb30944a4004 | 변경 |
+| tools/maintenance-ancestry.vbs | 0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516 | 0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516 | 동일 |
+| tools/source-bundle-register.mjs | af31ab1f6a159aa1d8467d2585eb16750e8a1a293f9ecfb90b85c388d8640d70 | af31ab1f6a159aa1d8467d2585eb16750e8a1a293f9ecfb90b85c388d8640d70 | 동일 |
+| tools/bootstrap-maintenance.mjs | 6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac | 6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac | 동일 |
+| tools/handoff-maintenance.mjs | 23f3709ed0387cfb0132d9546f0fd6e2f10eabfad4212a67a170d5201a4a5de0 | e58528d27aa529d8dfea4f4fe8352a644590617ba9fda66630c21fc3a70244b4 | 변경 |
+
+운영 7파일 중 3개 변경, 인계 helper 1개 변경. 과거 기준 비교이므로 실제 설치 전 CAS 필수. 운영 효과 확대 자동 추정 금지. 운영 변경·재발행 0건.
