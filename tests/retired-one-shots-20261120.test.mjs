@@ -167,7 +167,7 @@ test('superseded ER1 fixed one-shot workflows are retired with exact history and
   const blob=createHash('sha1').update(Buffer.from('blob '+bytes.length+'\0')).update(bytes).digest('hex');
   assert.equal(blob,sha,name);
  }
- for(const name of ['pc-er1-dec31-html-publish-v3.yml','pc-er1-dec31-derived-score-v2.yml','pc-er1-nov30-full.yml','pc-er1-nov30-capture.yml','pc-er1-nov30-saved-actual-audit.yml','pc-er1-dec31-symbol-batch-a.yml','pc-job.yml'])
+ for(const name of ['pc-er1-nov30-full.yml','pc-er1-nov30-capture.yml','pc-er1-nov30-saved-actual-audit.yml','pc-er1-dec31-symbol-batch-a.yml','pc-job.yml'])
   assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
  for(const file of ['er1-dec31-html-publish-entry.mjs','er1-dec31-html-publish-v2-entry.mjs','er1-dec31-derived-score-v1-entry.mjs','er1-nov30-batch20-one-shot-entry.mjs','er1-nov30-batch20-recovery-entry.mjs','ER1_NOV30_BATCH20_B_APPROVAL.json','ER1_NOV30_BATCH20_RECOVERY_B_APPROVAL.json'])
   assert.equal(existsSync(path.join(root,file)),true,file);
@@ -208,4 +208,75 @@ test('consumed ER1 three-symbol pilot intake is retired with approval and succes
   assert.equal(existsSync(path.join(root,file)),true,file);
  for(const file of ['pc-er1-nov30-full.yml','pc-er1-nov30-capture.yml','pc-er1-nov30-saved-actual-audit.yml','pc-er1-nov-forecast-shadow.yml','pc-er1-nov-forecast-publish.yml','pc-job.yml'])
   assert.equal(existsSync(path.join(root,'.github/workflows',file)),true,file);
+});
+
+// #166 was a fixed three-symbol probe, #383 a fixed WTI/gas one-key D1 delta.
+// Neither historical receipt establishes current production freshness or full ER1 coverage.
+test('consumed December symbol probe and Inflation delta intakes are retired with exact evidence',()=>{
+ for(const [name,sha] of [
+  [
+    "pc-er1-dec31-symbol-probe.yml",
+    "1fe2227d2e39e9e5a0661b09fc5f1704f6811dac"
+  ],
+  [
+    "pc-inflation19-wti-gas-delta-d1-b-once.yml",
+    "29a837a745bf1ef5d2cc9e0bcad9ebf6a41878f5"
+  ]
+]){
+  assert.equal(existsSync(path.join(root,'.github/workflows',name)),false,name);
+  const bytes=readFileSync(path.join(root,'tests/fixtures/retired-workflows',name));
+  assert.equal(createHash('sha1').update(Buffer.from('blob '+bytes.length+'\0')).update(bytes).digest('hex'),sha,name);
+ }
+ for(const file of ['ER1_DEC31_SYMBOL_PROBE_B_APPROVAL.json','er1-dec31-symbol-probe-entry.mjs','infl19-d1-publish-candidate/INFLATION19_DELTA_B_CANDIDATE_APPROVAL.json','infl19-d1-publish-candidate/inflation19-delta-b-receiver.mjs','infl19-d1-publish-candidate/inflation19-delta-b-contract.mjs','infl19-d1-publish-candidate/inflation19-delta-b-contract.test.mjs'])
+  assert.equal(existsSync(path.join(root,file)),true,file);
+ for(const name of ['pc-er1-dec31-symbol-batch-a.yml','pc-inflation-19-inventory-b-once.yml','pc-job.yml','pc-publication-b.yml'])
+  assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
+});
+
+// #192/#194 consumed the fixed 38-event HTML and score publication approvals.
+// Their successor status for earlier failed intakes remains historical evidence.
+// Retain approval files, executable source and exact YAML; no future replay authority.
+test('consumed December HTML V3 and derived score V2 publication intakes are archived intact',()=>{
+ for(const [name,sha] of [
+  [
+    "pc-er1-dec31-html-publish-v3.yml",
+    "a7ab17d23a830d90eab9eaa2e68f57f871194309"
+  ],
+  [
+    "pc-er1-dec31-derived-score-v2.yml",
+    "f3a4e8ad0383696bf50a9d69c8152adea45d58a5"
+  ]
+]){
+  assert.equal(existsSync(path.join(root,'.github/workflows',name)),false,name);
+  const bytes=readFileSync(path.join(root,'tests/fixtures/retired-workflows',name));
+  assert.equal(createHash('sha1').update(Buffer.from('blob '+bytes.length+'\0')).update(bytes).digest('hex'),sha,name);
+ }
+ for(const [file,entry,pin,key] of [
+  ['ER1_DEC31_HTML_PUBLISH_V3_B_APPROVAL.json','er1-dec31-html-publish-v3-entry.mjs','044e085f6c51803e55ef26d8ba80e5632ef473cc','market-calendar:earnings-dec2026-display-html'],
+  ['ER1_DEC31_DERIVED_ER1_B_APPROVAL.json','er1-dec31-derived-score-v2-entry.mjs','85dcfe8e9e6f622ee8f8ddb8be563a72fbcfc44d','market-calendar:earnings-dec2026-er1-score-public']
+ ]){
+  const a=JSON.parse(readFileSync(path.join(root,file),'utf8'));
+  assert.equal(a.sourceSha,pin);assert.equal(a.outputKey,key);assert.equal(a.expectedEvents,38);
+  assert.equal(a.allowProviderCalls,false);assert.equal(a.allowFormulaChanges,false);assert.equal(a.allowSchedulerChanges,false);assert.equal(a.allowDedicatedD1OutputWrite,true);
+  assert.equal(existsSync(path.join(root,entry)),true,entry);
+ }
+ for(const name of ['pc-er1-dec31-symbol-batch-a.yml','pc-er1-nov30-full.yml','pc-er1-nov30-capture.yml','pc-publication-b.yml','pc-job.yml'])
+  assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
+});
+
+// #215 consumed a fixed two-key historical HTML publication approval.
+// Current production freshness, full Actual data and scores are independent.
+test('consumed November 3051-event HTML publication intake is archived with approval intact',()=>{
+ const name='pc-er1-nov30-html-publish.yml';
+ assert.equal(existsSync(path.join(root,'.github/workflows',name)),false,name);
+ const bytes=readFileSync(path.join(root,'tests/fixtures/retired-workflows',name));
+ assert.equal(createHash('sha1').update(Buffer.from('blob '+bytes.length+'\0')).update(bytes).digest('hex'),'a095bd4a953483e01d544a424c23dc9e9cd884fc');
+ const a=JSON.parse(readFileSync(path.join(root,'ER1_NOV30_HTML_PUBLISH_B_APPROVAL.json'),'utf8'));
+ assert.equal(a.sourceSha,'f8c7ba3f2ec407d01b9b2b57ce2c8e28b52dbac8');
+ assert.equal(a.expectedEvents,3051);assert.equal(a.expectedDates,30);
+ assert.deepEqual(a.outputKeys,['market-calendar:earnings-nov2026-h1-display-html','market-calendar:earnings-nov2026-h2-display-html']);
+ for(const k of ['allowProviderCalls','allowExistingFeedWrites','allowRawVendorPublic','allowFormulaChanges','allowSchedulerChanges','allowDirectDeployment'])assert.equal(a[k],false,k);
+ assert.equal(a.maxAutomaticRetries,0);
+ assert.equal(existsSync(path.join(root,'er1-nov30-html-publish-entry.mjs')),true);
+ for(const n of ['pc-er1-nov30-full.yml','pc-er1-nov30-capture.yml','pc-er1-nov30-saved-actual-audit.yml','pc-er1-nov-forecast-shadow.yml','pc-er1-nov-forecast-publish.yml','pc-publication-b.yml','pc-job.yml'])assert.equal(existsSync(path.join(root,'.github/workflows',n)),true,n);
 });

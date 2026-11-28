@@ -26,6 +26,7 @@ import './controller-s6-4069-public-a.test.mjs';
 import './report-recovery-3650-once.test.mjs';
 // Reuse existing lifecycle checks in Public hosted CI; no pinned YAML edits.
 import './retired-one-shots-20261120.test.mjs';
+import '../infl19-d1-publish-candidate/inflation19-delta-b-contract.test.mjs';
 import './ci-failure-issue.test.mjs';
 import '../inflation19-gas-refresh-b/gas-refresh.test.mjs';
 import '../inflation19-gas-refresh-b/receiver.test.mjs';
@@ -132,3 +133,20 @@ test('W06 V3 operator pins owner merged effect #4289 and reviewed source #4293',
 import './controller-s6-4069-b-approval.test.mjs';
 
 import './controller-s6-4069-owner-install.test.mjs';
+
+// All archived YAMLs are evidence, never GitHub event subscriptions.
+test('all archived workflow fixtures remain outside the live workflow directory',()=>{
+ const archive=new URL('./fixtures/retired-workflows/',import.meta.url);
+ const active=new URL('../.github/workflows/',import.meta.url);
+ const names=fs.readdirSync(archive).filter(name=>/\.ya?ml$/i.test(name));
+ assert.ok(names.length>0);
+ for(const name of names)assert.equal(fs.existsSync(new URL(name,active)),false,name);
+});
+
+// A completed-event subscription is necessary for failure intake; only
+// admitted failure jobs may reserve its serialized write lane.
+test('CI failure intake keeps its writer queue inside the admitted job',()=>{
+ const yml=fs.readFileSync(new URL('../.github/workflows/ci-failure-issue-intake.yml',import.meta.url),'utf8');
+ assert.equal(yml.split('\n').filter(line=>line==='concurrency:').length,0);
+ assert.ok(yml.includes('    concurrency:\n      group: ci-failure-issue-intake\n      queue: max\n      cancel-in-progress: false'));
+});
