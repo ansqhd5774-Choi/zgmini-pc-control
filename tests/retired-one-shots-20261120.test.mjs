@@ -136,3 +136,40 @@ test('terminal W04 fixed operator delivery workflows are retired without losing 
   'tests/w04-3516-operator-once.test.mjs'
  ])assert.equal(existsSync(path.join(root,source)),true,source);
 });
+
+// Historical December HTML V1/V2 (#187/#189) and score V1 (#193) were
+// superseded by #192 and #194. November pilot #369/#392/#394 was consumed;
+// #473/#474 full collection is independent and NOT proven complete here.
+test('superseded ER1 fixed one-shot workflows are retired with exact history and successors preserved',()=>{
+ for(const [name,sha] of [
+  [
+    "pc-er1-dec31-html-publish.yml",
+    "65fea870491d9e36c434524f2028f517bd63ce3c"
+  ],
+  [
+    "pc-er1-dec31-html-publish-v2.yml",
+    "606621d3607f942afb42b800d9865f2fb4323673"
+  ],
+  [
+    "pc-er1-dec31-derived-score-v1.yml",
+    "f68fc160321416346fb0ca48bb4bfd33f8008618"
+  ],
+  [
+    "pc-er1-nov30-batch20.yml",
+    "161737a1bcd2e2a9631e44d56268ee068b38531e"
+  ],
+  [
+    "pc-er1-nov30-batch20-recovery.yml",
+    "581495d72b0774a84e6dbd32a7c76fc6e7697d92"
+  ]
+]){
+  assert.equal(existsSync(path.join(root,'.github/workflows',name)),false,name);
+  const bytes=readFileSync(path.join(root,'tests/fixtures/retired-workflows',name));
+  const blob=createHash('sha1').update(Buffer.from('blob '+bytes.length+'\0')).update(bytes).digest('hex');
+  assert.equal(blob,sha,name);
+ }
+ for(const name of ['pc-er1-dec31-html-publish-v3.yml','pc-er1-dec31-derived-score-v2.yml','pc-er1-nov30-full.yml','pc-er1-nov30-capture.yml','pc-er1-nov30-saved-actual-audit.yml','pc-er1-dec31-symbol-batch-a.yml','pc-job.yml'])
+  assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
+ for(const file of ['er1-dec31-html-publish-entry.mjs','er1-dec31-html-publish-v2-entry.mjs','er1-dec31-derived-score-v1-entry.mjs','er1-nov30-batch20-one-shot-entry.mjs','er1-nov30-batch20-recovery-entry.mjs','ER1_NOV30_BATCH20_B_APPROVAL.json','ER1_NOV30_BATCH20_RECOVERY_B_APPROVAL.json'])
+  assert.equal(existsSync(path.join(root,file)),true,file);
+});

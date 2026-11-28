@@ -45,9 +45,10 @@ test('exact B approval: twenty selected, at most seventeen GET, no D1',()=>{
    /NOV30_BATCH20_APPROVAL_SCOPE_STOP/);
  }
 });
-test('workflow binds the same source commit and distinct #363 marker',()=>{
+test('retired workflow preserves the same source commit and distinct #363 marker',()=>{
+ assert.equal(fs.existsSync(path.join(folder,'.github/workflows/pc-er1-nov30-batch20-recovery.yml')),false);
  const workflow=fs.readFileSync(path.join(folder,
-  '.github/workflows/pc-er1-nov30-batch20-recovery.yml'),'utf8');
+  'tests/fixtures/retired-workflows/pc-er1-nov30-batch20-recovery.yml'),'utf8');
  const entry=fs.readFileSync(path.join(folder,'er1-nov30-batch20-recovery-entry.mjs'),'utf8');
  assert.ok(workflow.includes('ref: '+source));
  assert.ok(workflow.includes('ref: $'+'{{ github.sha }}'));
