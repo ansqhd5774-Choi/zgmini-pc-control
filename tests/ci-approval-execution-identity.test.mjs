@@ -2,7 +2,15 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {controllerBReceiptMarker,verifyControllerBIdentity,authenticateControllerBIssue,CI_CONTROLLER_ACTOR} from '../ci-approval/ci-execution-identity.mjs';
-import {validateMaintenanceRequest,validateUpdateRequest,manifestFingerprint,installedControllerBPolicy} from '../tools/maintenance-contract.mjs';
+import {validateMaintenanceRequest,validateUpdateRequest,manifestFingerprint,installedControllerBPolicy,controllerBJobLogArgs} from '../tools/maintenance-contract.mjs';
+
+test('receiver and updater share a fixed machine-only Actions log request',()=>{
+ const args=controllerBJobLogArgs(456);
+ assert.deepEqual(args,['api','repos/ansqhd5774-Choi/zgmini-pc-control/actions/jobs/456/logs','--allow-escape-sequences']);
+ assert.equal(Object.isFrozen(args),true);
+ for(const id of [0,-1,1.5,'456/other',NaN,Number.MAX_SAFE_INTEGER+1])
+  assert.throws(()=>controllerBJobLogArgs(id),/CI_RECEIPT_JOB_ID_INVALID/);
+});
 const repo='ansqhd5774-Choi/zgmini-pc-control',path='.github/workflows/ci-approval-controller-b.yml',head='a'.repeat(40);
 function fixture(){
  const requestBytes=Buffer.from('{"requestId":"fixture"}'),workflowBytes=Buffer.from('reviewed immutable workflow fixture\n');
