@@ -421,12 +421,7 @@ try{
    $code='NATIVE_POLICY_TRANSITION_RECOVERY_REQUIRED'
   }
  }
- if($code -notmatch '^NATIVE_POLICY_[A-Z_]+
- Write-Output ('status=STOPPED;code='+$code)
- # Never delete partial state or retry a rename/write automatically.
- exit 1
-}
-){$code='NATIVE_POLICY_STATE_UNKNOWN'}
+ if($code -notmatch '^NATIVE_POLICY_[A-Z_]+$'){$code='NATIVE_POLICY_STATE_UNKNOWN'}
  Write-Output ('status=STOPPED;code='+$code)
  # Never delete partial state or retry a rename/write automatically.
  exit 1
