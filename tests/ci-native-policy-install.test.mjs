@@ -121,6 +121,24 @@ test('Windows transition installer keeps elevated gate, exact preimage, protecte
  assert.match(s,/NATIVE_POLICY_RESERVED_PUBLISHER_CLAIM_STOP/);
  assert.match(s,/NATIVE_POLICY_RESERVED_WRITER_CLAIM_STOP/);
  assert.match(s,/\[IO.Directory\]::Move\(\$backup,\$root\)/);
- assert.match(s,/NATIVE_POLICY_TRANSITION_BACKUP_READBACK_STOP/);
+ assert.match(s,/Verify-TransitionPreimage \$backup/);
  assert.doesNotMatch(s,/Remove-Item|Set-ExecutionPolicy|Stop-Process/);
+});
+
+test('transition stages observation before the first rename and covers post-swap output errors',()=>{
+ const s=fs.readFileSync(new URL('../tools/operator-packets/NATIVE_WRITER_B_POLICY_INSTALL_ONCE.ps1',import.meta.url),'utf8');
+ assert.equal((s.match(/^param\(/gm)||[]).length,1);
+ assert.equal((s.match(/^Set-StrictMode/gm)||[]).length,1);
+ const stage=s.indexOf("Write-Once ([IO.Path]::Combine($staging,'installation-observation.json'))");
+ const verify=s.indexOf('Verify-NewScope $staging',stage);
+ const intent=s.indexOf('Write-Once $intentPath',verify);
+ const move=s.indexOf('[IO.Directory]::Move($root,$backup)',intent);
+ const swap=s.indexOf('[IO.Directory]::Move($staging,$root)',move);
+ const output=s.indexOf('Write-Once $OutputFile $reportBytes',swap);
+ const recovery=s.indexOf('Verify-TransitionPreimage $backup',s.indexOf('}catch{',output));
+ const quarantine=s.indexOf('[IO.Directory]::Move($root,$failed)',recovery);
+ const restore=s.indexOf('[IO.Directory]::Move($backup,$root)',quarantine);
+ assert.ok(stage>=0&&verify>stage&&intent>verify&&move>intent&&swap>move&&output>swap&&recovery>output&&quarantine>recovery&&restore>quarantine);
+ assert.match(s,/NATIVE_POLICY_TRANSITION_RECOVERY_REQUIRED_STOP/);
+ assert.match(s,/NATIVE_POLICY_TRANSITION_RESTORED_STOP/);
 });
