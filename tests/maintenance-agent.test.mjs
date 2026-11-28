@@ -2249,3 +2249,65 @@ test('Public common replay uses exact A title, verifies readback and never repos
  const late=runFixture('late-result');reconcileMaintenanceBacklog(late.args);
  assert.equal(late.posts(),0);assert.equal(late.ledger().status,'SKIPPED_RESULT_PRESENT');
 });
+
+
+test('Public replay ledger verifies exact recorded dispatch across rollback pause and continues independent A',async t=>{
+ const {reconcileMaintenanceBacklog}=await import('../tools/update.mjs');
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-public-two-pause-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const owner={id:327938088,login:'ansqhd5774-Choi'};
+ const repo={id:1442936296,full_name:'ansqhd5774-Choi/zgmini-pc-control',owner,private:false};
+ const requestId='pc-s6-pause-fixture-12345678';
+ const body=id=>JSON.stringify({schema:'ZGMINI_PC_JOB_V1',requestId:id,
+  chatId:'chat-fixture',operation:'core-status',sourceRepository:'ansqhd5774-Choi/zgmini',
+  sourceBranch:'main',sourceSha:'a'.repeat(40)});
+ const original={number:77,title:'pc-job',state:'open',user:owner,labels:[{name:'pc-job'}],
+  created_at:'2026-11-28T00:00:30Z',body:body('pc-original-fixture-12345678')};
+ const independent={...original,number:79,created_at:'2026-11-28T01:00:30Z',
+  body:body('pc-independent-fixture-12345678')};
+ for(const mode of ['normal','lost-ack','tampered-body','tampered-number','tampered-original','duplicate-link']){
+  const dir=path.join(root,mode);fs.mkdirSync(dir);
+  const backlogFile=path.join(dir,'backlog.json');
+  const first={pausedAt:'2026-11-28T00:00:00Z',resumedAt:'2026-11-28T00:01:00Z'};
+  const second={pausedAt:'2026-11-28T00:59:59Z',resumedAt:'2026-11-28T01:01:00Z'};
+  fs.writeFileSync(backlogFile,JSON.stringify({schema:'ZGMINI_PC_BACKLOG_V1',requestId,windows:[first],replays:{}}));
+  const rows=new Map([[77,structuredClone(original)]]);let posts=0,now=Date.parse('2026-11-28T01:00:00Z');
+  const callGithub=(route,method='GET',input)=>{
+   if(route==='')return repo;
+   if(route.startsWith('issues?'))return [...rows.values()];
+   if(method==='GET'&&/^issues\/\d+$/.test(route))return rows.get(Number(route.split('/')[1]));
+   if(method==='GET'&&/\/comments\?/.test(route))return [];
+   if(method==='POST'&&/\/comments$/.test(route))return {id:1};
+   if(route==='issues'&&method==='POST'){
+    const payload=JSON.parse(fs.readFileSync(input,'utf8'));
+    const number=posts++===0?78:80;
+    rows.set(number,{...original,...payload,labels:[{name:'pc-job'}],number,created_at:new Date(now).toISOString()});
+    if(mode==='lost-ack'&&number===78)throw Error('UNCERTAIN');
+    return {number};
+   }
+   throw Error('UNEXPECTED_FIXTURE_ROUTE '+route);
+  };
+  const args={backlogFile,requestId,approvedRoot:dir,callGithub,clock:()=>now,
+   readPublicPolicy:()=>({schema:'ZGMINI_PC_OPERATIONS_V1',controlRepository:repo.full_name,
+    sourceRepository:'ansqhd5774-Choi/zgmini',mutationsEnabled:false,maxAutomaticRetries:0,
+    operations:{'core-status':{grade:'A'}}})};
+  if(mode==='lost-ack')assert.throws(()=>reconcileMaintenanceBacklog(args),/BACKLOG_PUBLIC_REPLAY_OUTCOME_UNKNOWN/);
+  else reconcileMaintenanceBacklog(args);
+  const state=JSON.parse(fs.readFileSync(backlogFile,'utf8'));state.windows.push(second);
+  if(mode==='tampered-body')rows.get(78).body=body('pc-altered-fixture-12345678');
+  if(mode==='tampered-number')state.replays['77'].replayIssueNumber=79;
+  if(mode==='tampered-original')state.replays['77'].originalBodySha256='f'.repeat(64);
+  if(mode==='duplicate-link')state.replays['76']={...state.replays['77']};
+  fs.writeFileSync(backlogFile,JSON.stringify(state));
+  rows.set(79,structuredClone(independent));now=Date.parse('2026-11-28T01:02:00Z');
+  if(mode==='normal'||mode==='lost-ack'){
+   reconcileMaintenanceBacklog(args);reconcileMaintenanceBacklog(args);
+   const done=JSON.parse(fs.readFileSync(backlogFile,'utf8')).replays;
+   assert.equal(posts,2,mode);assert.equal(done['77'].replayIssueNumber,78);
+   assert.equal(done['79'].replayIssueNumber,80);assert.equal(done['78'],undefined);
+  }else{
+   assert.throws(()=>reconcileMaintenanceBacklog(args),/BACKLOG_PUBLIC_(RECORDED_REPLAY_UNVERIFIED|DUPLICATE_REQUEST_UNVERIFIED)/,mode);
+   assert.equal(posts,1,mode);
+  }
+ }
+});
