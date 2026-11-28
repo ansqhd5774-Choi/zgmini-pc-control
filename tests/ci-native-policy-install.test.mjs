@@ -226,3 +226,94 @@ test('Owner policy lease and interrupted recovery stay within the fixed unactiva
  assert.match(pack,/git\('rev-parse','HEAD'\)===controlHead/);
  assert.match(pack,/verifyPinnedDeployment\(preview.proposedPolicy/);
 });
+
+test('Windows TEMP recovery reads the durable intent without rerunning transition', {skip:process.platform!=='win32'},t=>{
+ const script=fs.readFileSync(new URL('../tools/operator-packets/NATIVE_WRITER_B_POLICY_INSTALL_ONCE.ps1',import.meta.url),'utf8');
+ const start=script.indexOf(' if($transition -and $RecoverIntent){');
+ const end=script.indexOf('\n if($transition){\n  $existingIntents=',start);
+ const helperStart=script.indexOf(' function Restore-VerifiedTransitionPreimage {');
+ const helperEnd=script.indexOf(' # End compensation helpers.',helperStart);
+ assert.ok(start>=0&&end>start&&helperStart>=0&&helperEnd>helperStart);
+ const base=fs.mkdtempSync(path.join(os.tmpdir(),'native-policy-intent-'));
+ t.after(()=>fs.rmSync(base,{recursive:true,force:true}));
+ const literal=v=>v.replace(/'/g,"''");
+ for(const state of ['before-rename','after-old-rename','after-new-rename','surviving-output','intent-drift']){
+  const dir=path.join(base,state),root=path.join(dir,'active'),old='a'.repeat(64),next='b'.repeat(64);
+  const stage=root+'.staging-12345678-1234-4234-8234-123456789abc';
+  const backup=root+'.backup-'+old,failed=stage+'.failed',intent=stage+'.intent.json';
+  const output=path.join(dir,'result.json');
+  fs.mkdirSync(dir);
+  const put=(p,bytes)=>{fs.mkdirSync(p);fs.writeFileSync(path.join(p,'scope'),bytes)};
+  if(state==='before-rename'||state==='intent-drift'){put(root,'OLD');put(stage,'NEW')}
+  else if(state==='after-old-rename'){put(backup,'OLD');put(stage,'NEW')}
+  else{put(root,'NEW');put(backup,'OLD')}
+  if(state==='surviving-output')fs.writeFileSync(output,'success');
+  fs.writeFileSync(intent,JSON.stringify({schema:'ZGMINI_NATIVE_POLICY_TRANSITION_INTENT_V1',
+   host:'fixture',requestId:'fixture-request',root,backup,staging:stage,failed,
+   outputFile:state==='intent-drift'?output+'.other':output,beforeScopeSha256:old,
+   afterScopeSha256:next,afterObservationSha256:'c'.repeat(64)}));
+  const code=[
+   "$ErrorActionPreference='Stop'",
+   "$transition=$true;$hostName='fixture';$request=@{requestId='fixture-request'}",
+   "$root='"+literal(root)+"'",
+   "$OutputFile='"+literal(output)+"'",
+   "$RecoverIntent='"+literal(intent)+"'",
+   "$TransitionFromScopeSha256='"+old+"';$ScopeSha256='"+next+"'",
+   "function Stop-N([string]$code){throw $code}",
+   "function Exact-Acl {return 'fixture'}",
+   "function New-PolicyFileAcl {return 'fixture'}",
+   "function Require-Unactivated {}",
+   "function Verify-TransitionClaimAbsent {}",
+   "function Verify-TransitionPreimage([string]$dir){if([IO.File]::ReadAllText((Join-Path $dir 'scope')) -cne 'OLD'){throw 'OLD_DRIFT'}}",
+   "function Verify-NewScope([string]$dir){if([IO.File]::ReadAllText((Join-Path $dir 'scope')) -cne 'NEW'){throw 'NEW_DRIFT'}}",
+   script.slice(helperStart,helperEnd),
+   script.slice(start,end)
+  ].join('\n');
+  const result=spawnSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',code],
+   {encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:65536});
+  assert.equal(result.error,undefined);
+  if(['surviving-output','intent-drift'].includes(state)){
+   assert.notEqual(result.status,0,state);
+   assert.match(result.stderr+result.stdout,state==='surviving-output'?/RESULT_EXISTS_STOP/:/INTENT_DRIFT_STOP/);
+   assert.equal(fs.readFileSync(path.join(root,'scope'),'utf8'),state==='surviving-output'?'NEW':'OLD');
+   assert.equal(fs.existsSync(backup),state==='surviving-output');
+  }else{
+   assert.equal(result.status,0,result.stderr+result.stdout);
+   assert.match(result.stdout,/TRANSITION_OLD_SCOPE_VERIFIED/);
+   assert.equal(fs.readFileSync(path.join(root,'scope'),'utf8'),'OLD');
+   assert.equal(fs.existsSync(backup),false);
+   assert.equal(fs.readFileSync(path.join(state==='after-new-rename'?failed:stage,'scope'),'utf8'),'NEW');
+  }
+  assert.equal(fs.existsSync(intent),true);
+ }
+});
+test('Windows elevated synthetic Owner mutex denies concurrent acquisition', {skip:process.platform!=='win32'},t=>{
+ const script=fs.readFileSync(new URL('../tools/operator-packets/NATIVE_WRITER_B_POLICY_INSTALL_ONCE.ps1',import.meta.url),'utf8');
+ const start=script.indexOf('function New-OwnerPolicyMutexSecurity {');
+ const end=script.indexOf('function Require-Unactivated {',start);
+ assert.ok(start>=0&&end>start);
+ const name='Global\\ZGMINI-NativeWriterB-4135-Test-'+process.pid+'-'+Date.now();
+ const child="$m=[Threading.Mutex]::OpenExisting('"+name+"');try{if($m.WaitOne(0)){$m.ReleaseMutex();exit 9};exit 0}finally{$m.Dispose()}";
+ const code=[
+  "$ErrorActionPreference='Stop'",
+  "$principal=[Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())",
+  "if(-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)){exit 77}",
+  script.slice(start,end),
+  "$security=New-OwnerPolicyMutexSecurity;$created=$false",
+  "$mutex=[Threading.Mutex]::new($false,'"+name+"',[ref]$created,$security)",
+  "try{",
+  "if(-not $created){throw 'FIXTURE_COLLISION'}",
+  "if($mutex.GetAccessControl().GetSecurityDescriptorSddlForm('Access,Owner') -cne $security.GetSecurityDescriptorSddlForm('Access,Owner')){throw 'ACL_MISMATCH'}",
+  "if(-not $mutex.WaitOne(0)){throw 'FIXTURE_LEASE_FAILED'}",
+  "try{& powershell.exe -NoProfile -NonInteractive -EncodedCommand '"+Buffer.from(child,'utf16le').toString('base64')+"'",
+  "if($LASTEXITCODE -ne 0){throw 'CONCURRENT_LEASE_ACQUIRED'}}finally{$mutex.ReleaseMutex()}",
+  "Write-Output 'MUTEX_ACL_CONTENTION_PASS'",
+  "}finally{$mutex.Dispose()}"
+ ].join('\n');
+ const result=spawnSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',code],
+  {encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:65536});
+ assert.equal(result.error,undefined);
+ if(result.status===77){t.skip('independent elevated Owner fixture required');return;}
+ assert.equal(result.status,0,result.stderr+result.stdout);
+ assert.match(result.stdout,/MUTEX_ACL_CONTENTION_PASS/);
+});
