@@ -128,7 +128,8 @@ export function preparePublicWriter4135PolicyPreview({requestInput,sourceHeadSha
    receiverWorkflowBlobSha:receiverWorkflow.blobSha,
    businessApprovalSha256:fixed.manifestSha256,approvedRequestSha256:request.bodySha256,
    policyRevision:controlHead,installedControllerSha,
-   nativeWriterBExecutionEnabled:true,nativeWriterBControlSha:controlHead,
+   nativeWriterBExecutionEnabled:true,nativeWriterBControlMode:'PINNED_CHECKOUT_V1',
+   nativeWriterBControlSha:controlHead,
    nativeWriterBAdapterSha256:digest(adapter.bytes)
   });
   // No installed-proof construction and no file/variable/dispatch IO here.
