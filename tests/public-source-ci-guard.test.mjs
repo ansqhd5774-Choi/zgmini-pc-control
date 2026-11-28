@@ -1,3 +1,4 @@
+import './ci-controller-b-host-state-readonly.test.mjs';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
