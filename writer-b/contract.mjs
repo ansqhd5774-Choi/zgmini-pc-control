@@ -223,7 +223,7 @@ export function authorizeWriterBIssue({event,env,manifestBytes}){
 const VERIFIED_NATIVE=new WeakSet();
 // A public Writer receiver cannot inherit a Private or Controller B grant.
 export function authorizeWriterBNative({
- observation,scope,env,controlHead,adapterBytes
+ observation,scope,env,controlHead,adapterBytes,installedControllerSha
 }={}){
  const p=scope?.policy;
  need(observation?.state==='CONTRACT_MATCH_ONLY'&&
@@ -241,7 +241,9 @@ export function authorizeWriterBNative({
  need((p.repositoryVisibility===undefined||p.repositoryVisibility==='private'||
     (p.repositoryVisibility==='public'&&
      env?.ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED==='true'&&
-     SHA40.test(p.installedControllerSha??'')))&&
+     SHA40.test(p.installedControllerSha??'')&&
+     SHA40.test(installedControllerSha??'')&&
+     installedControllerSha===p.installedControllerSha))&&
    env?.GITHUB_REPOSITORY===CONTROL_REPO&&
    env.GITHUB_EVENT_NAME==='workflow_dispatch'&&
    env.GITHUB_ACTOR==='github-actions[bot]'&&
