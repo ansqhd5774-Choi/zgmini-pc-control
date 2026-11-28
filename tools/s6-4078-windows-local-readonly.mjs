@@ -36,7 +36,11 @@ export function readS64078LocalBytes({
  };
  try{
   for(const dir of [
-   maintenanceRoot,path.join(maintenanceRoot,'ledger'),record
+   maintenanceRoot,path.join(maintenanceRoot,'ledger'),record,
+   sourceRoot,path.join(sourceRoot,'approvals'),
+   path.join(sourceRoot,'approvals','controller-s6'),
+   controllerRoot,path.join(controllerRoot,'leases'),
+   path.join(controllerRoot,'leases','supervisor')
   ])safeDir(dir);
   const claim=safeFile(path.join(record,'claim.json'),32768);
   const claimBody=JSON.parse(claim.toString('utf8'));
