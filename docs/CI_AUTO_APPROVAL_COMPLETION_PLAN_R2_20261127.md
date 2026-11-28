@@ -1094,3 +1094,10 @@
 - exact HEAD 8c5323bd의 [Run 46090349868](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/46090349868), public-source-only Job 140809551195 **SUCCESS**. 원본 로그의 신규 effect binding 5/5 (ok 27~31) 및 관련 suite **74/74 PASS, 0 FAIL**. Private Windows source-only/C996/Secret Scan은 SKIPPED로 구분.
 - main에 추가된 #4324 (adfd7f95)는 S6 journal/test 2파일이며 본 PR 3파일과 비중복임을 직접 확인. exact HEAD CI, mergeable 확인 후 #4325 squash merge `d9114b2156f6415930dc1f5e439bd5cb613622b2`. 실제 main의 변경 3개 blob 모두 일치, 기존 public source CI Workflow blob a8f49337 유지. #4324 포함 신규 통합 HEAD에서 별도 CI를 수행했다는 주장은 하지 않는다.
 - 기존 Public 저장소에서 native 실행 Workflow는 여전히 Private 전용 조건. 운영 자동 발행/실행/설치 0, 권한·정책 활성화·PC 변경 없음. Adapter hash pin 재검토 필요. P3의 선행 실행기 결함 수정 완료, P3 자체는 미완료. 다음: Public A의 독립 승인/영수증 인증 후보 연계, Writer B 독립 경계 병행. 전체 무인 종단 0/3 유지.
+
+## 45. 마흔한 번째 실행 기록 — Public Native A 독립 승인·CI 증거 연결 후보 (2026-11-28 KST)
+
+- 이전 #4325 effectKey 결함 수정의 운영 권한·설치 상태는 변경하지 않았다. 최신 main `d27a914ebd0c7e2b917dec17649e72811e9eede4` 기반 별도 브랜치에서 기존 Public source Run/Job/Step/Workflow 바이트 확인기를 순수 검증 함수로 재사용하고 기존 Native 독립 설치 영수증 검증기와 연결한 A급 source-only 후보를 구현했다.
+- [Draft PR #4327](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4327), exact HEAD `3127dcf0fbc095bd7bc9cc55cdd6601abe4deeb6`, 3파일 (+210/-12). Public 명시 scope, 실제 승인·요청 raw SHA, 기존 B 설치 proof/receipt와 정책 전체 일치, 정확 최초 Run 및 source/receiver workflow blob을 비교한다. Private/B/비승인 scope는 거부. 정합 결과도 CANDIDATE_ONLY이며 실제 실행 권한 없음. 기존 public observer event guard, Private admission, Workflow 및 pin 불변.
+- 기존 Hosted source-only test entry에서 20개 synthetic fixture(정상 1, 부정 19)를 검증하도록 연결했다. 테스트 독립 파일 생성 도중 connector 응답 단절 발생, 원격 404 확인 후 기존 테스트 파일에 추가함. [Run 46091102308](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/46091102308) 조회 시 in_progress. C996/Secret Scan skipped. 실제 설치 정책·운영 PC의 새 증거로 간주하지 않는다.
+- 이후 정확 HEAD 로그/CI 판정 → 소스 통합 판단 → 실제 독립 Public 승인 효과와 수신 연결 준비. 현재 Public Native A의 실행 진입점은 여전히 Private 전용이며 production caller 미연결이다. Writer B는 별도 효과·승인·설치 계약으로 진행. 신규 PC 요청/설치/변수/운영 권한/DB/D1/예약 변경 없음. 전체 무인 종단 0/3, P0 완료 1/7 유지.
