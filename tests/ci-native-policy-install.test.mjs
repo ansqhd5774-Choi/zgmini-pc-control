@@ -234,7 +234,10 @@ test('Windows TEMP recovery reads the durable intent without rerunning transitio
  const helperStart=script.indexOf(' function Restore-VerifiedTransitionPreimage {');
  const helperEnd=script.indexOf(' # End compensation helpers.',helperStart);
  assert.ok(start>=0&&end>start&&helperStart>=0&&helperEnd>helperStart);
- const base=fs.mkdtempSync(path.join(os.tmpdir(),'native-policy-intent-'));
+ // Win32 TEMP may use a DOS 8.3 short-name alias (RUNNER~1), whereas
+ // .NET Path.GetFullPath used by RecoverIntent expands it to the long path.
+ // Normalize the fixture to the same verified filesystem location first.
+ const base=fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(),'native-policy-intent-')));
  t.after(()=>fs.rmSync(base,{recursive:true,force:true}));
  const literal=v=>v.replace(/'/g,"''");
  for(const state of ['before-rename','after-old-rename','after-new-rename','surviving-output','intent-drift']){
