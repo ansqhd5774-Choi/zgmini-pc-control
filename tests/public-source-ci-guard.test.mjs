@@ -119,3 +119,5 @@ test('W06 V3 operator pins owner merged effect #4289 and reviewed source #4293',
 });
 
 import './controller-s6-4069-b-approval.test.mjs';
+
+import './controller-s6-4069-owner-install.test.mjs';

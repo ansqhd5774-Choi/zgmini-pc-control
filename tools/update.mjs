@@ -1251,12 +1251,21 @@ const PUBLIC_LINEAGE_OWNER_B=Object.freeze({
  selectiveBranch:'codex/controller-audit-4300-selective-20261128',
  paths:['controller/operations.mjs']
 });
+const PUBLIC_S6_4069_OWNER_B=Object.freeze({
+ installed:'d3764580fdb08ecddd5f9b1064051eec30f90492',
+ target:'66b8a66c6112441576917e0ac9fbe4d39cbd5eea',
+ approvalPr:4321,
+ approvalMerge:'c36c51428d9d4ff78528187783a5b88d6c45f5f9',
+ selectiveBranch:'codex/controller-s6-4069-selective-20261128',
+ paths:['config/operations.json','controller/operations.mjs','controller/s6-journal-readonly.mjs']
+});
 function approvedPublicOwnerEffect(data){
  const {issue,manifest}=data??{};
  const effect=issue?.targetControllerSha===PUBLIC_OWNER_B.target?
   PUBLIC_OWNER_B:issue?.targetControllerSha===PUBLIC_AUDIT_OWNER_B.target?
   PUBLIC_AUDIT_OWNER_B:issue?.targetControllerSha===PUBLIC_LINEAGE_OWNER_B.target?
-  PUBLIC_LINEAGE_OWNER_B:null;
+  PUBLIC_LINEAGE_OWNER_B:issue?.targetControllerSha===PUBLIC_S6_4069_OWNER_B.target?
+  PUBLIC_S6_4069_OWNER_B:null;
  need(effect!==null&&data?.actor==='ansqhd5774-Choi'&&
   issue?.operation==='controller-update'&&issue?.controlRepository===controlRepository&&
   manifest?.installedSha===effect.installed&&
