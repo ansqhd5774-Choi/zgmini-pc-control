@@ -39,20 +39,25 @@ const approval=()=>({authorized:true,effect:'S6_4078_BACKLOG_ONLY_REPLAY',
  approvalSourceSha:'a'.repeat(40)});
 function fixture(){
  const events=[];
- let n=0;
+ let n=0,marker;
  const ports={
   readEvidence:async()=>{events.push('read');return evidence();},
   verifyIndependentAuthority:async()=>{events.push('authority');return approval();},
   acquireExclusiveClaim:async()=>{events.push('claim');return {nonce:'12345678-1234-1234-1234-123456789abc'};},
   assertClaimOwned:async()=>{events.push('assert');},
-  writePostingCas:async()=>{events.push('posting');},
+  writePostingCas:async data=>{events.push('posting');marker=structuredClone(data.marker);
+   assert.equal(marker.status,'POSTING');assert.equal(marker.publicReplay,true);
+   assert.equal(marker.originalBodySha256,FIXED.originalBodySha256);
+   assert.ok(Number.isFinite(Date.parse(marker.postingAt)));},
   postExactOriginal:async data=>{events.push('post');assert.equal(data.title,'pc-job');
    assert.deepEqual(data.labels,['pc-job']);assert.equal(data.body,originalBody);n++;return {number:8000};},
   readPostedIssue:async()=>{events.push('read-posted');return {number:8000,
    title:'pc-job',
-   body:originalBody,state:'open',user:{login:'ansqhd5774-Choi'},
-   labels:[{name:'pc-job'}]};},
-  writeDoneCas:async data=>{events.push('done');assert.equal(data.expectedStatus,'POSTING');},
+   body:originalBody,state:'open',user:{login:'ansqhd5774-Choi',id:327938088},
+   created_at:marker.postingAt,labels:[{name:'pc-job'}]};},
+  writeDoneCas:async data=>{events.push('done');assert.equal(data.expectedStatus,'POSTING');
+   assert.deepEqual(data.expectedMarker,marker);
+   assert.deepEqual(data.doneMarker,{...marker,status:'DONE',replayIssueNumber:8000});},
   archiveClaim:async()=>{events.push('archive');}
  };
  return {events,ports,get posts(){return n;}};
@@ -131,7 +136,9 @@ test('replay Issue mismatch cannot commit DONE or archive claim',async()=>{
 test('replay Issue body and author must match exact original',async()=>{
  for(const mutate of [
   issue=>{issue.body+=' ';},issue=>{issue.user.login='github-actions[bot]';},
-  issue=>{issue.labels=[];},issue=>{issue.pull_request={url:'fake'};}
+  issue=>{issue.labels=[];},issue=>{issue.pull_request={url:'fake'};},
+  issue=>{issue.user.id=1;},issue=>{delete issue.created_at;},
+  issue=>{issue.created_at='2026-01-01T00:00:00Z';}
  ]){
   const f=fixture(),read=f.ports.readPostedIssue;
   f.ports.readPostedIssue=async(...args)=>{const issue=await read(...args);mutate(issue);return issue;};
@@ -140,4 +147,13 @@ test('replay Issue body and author must match exact original',async()=>{
   assert.equal(r.phase,'POSTED_ISSUE_READBACK_ATTEMPT');
   assert.ok(!f.events.includes('done'));
  }
+});
+
+// Source-only: a replay issue cannot predate its original Issue number.
+test('old issue number cannot be treated as a newly posted replay',async()=>{
+ const f=fixture();f.ports.postExactOriginal=async()=>({number:4077});
+ const r=await execute(f.ports);
+ assert.equal(r.status,'RECOVERY_REQUIRED');
+ assert.equal(r.phase,'GITHUB_POST_ATTEMPT');
+ assert.ok(!f.events.includes('done'));
 });

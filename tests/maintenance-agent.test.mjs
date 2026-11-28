@@ -2438,3 +2438,84 @@ test('Public replay ledger verifies exact recorded dispatch across rollback paus
   }
  }
 });
+
+
+// #4078: cross-contract regression using the dedicated coordinator's actual
+// DONE marker as input to the existing common later-pause reconciler.
+test('fixed 4078 dispatch is recognized by common Public replay reconciliation',async t=>{
+ const {reconcileMaintenanceBacklog}=await import('../tools/update.mjs');
+ const hash=s=>crypto.createHash('sha256').update(s).digest('hex');
+const originalBody=JSON.stringify({schema:'ZGMINI_PC_JOB_V1',
+ requestId:S64078_FIXED.originalRequestId,chatId:'chat-usbreadthr2-resource-window-20261127',
+ operation:'shared-resource-release-readonly',sourceRepository:'ansqhd5774-Choi/zgmini',
+ sourceBranch:'main',sourceSha:'7579dea082d0f7a671113e52e39cefc9be8c9a87'});
+const s6Body=JSON.stringify({schema:'ZGMINI_PC_MAINTENANCE_REQUEST_V1',
+ requestId:S64078_FIXED.s6RequestId,chatId:'chat-zgmini-s6-b3-20261127',
+ operation:'controller-s6-failover-once',controlRepository:'ansqhd5774-Choi/zgmini-pc-control',
+ targetControllerSha:'3c7d4cfefacf072fd35cb19706b352c64c5e4fd2',
+ approvalManifestSha256:'1fceeba061f7f8731811220b27cac245bd91d44e87d68935cd8475117f094141'});
+function evidence(){
+ const journal=JSON.stringify({schema:'ZGMINI_S6_ONCE_JOURNAL_V1',
+  requestId:S64078_FIXED.s6RequestId,phase:'RECOVERY_REQUIRED',
+  failedAt:'WATCHDOG_RELEASE_OUTCOME_UNVERIFIED',code:'S6_PORT_PROMOTION_UNVERIFIED'});
+ const backlog=JSON.stringify({schema:'ZGMINI_PC_BACKLOG_V1',requestId:S64078_FIXED.s6RequestId,
+  windows:[{pausedAt:'2026-11-26T19:12:00Z',resumedAt:'2026-11-26T19:16:00Z'}],replays:{}});
+ return {
+  s6Issue:{number:4069,state:'open',user:{login:'ansqhd5774-Choi'},body:s6Body},
+  originalIssue:{number:4078,state:'open',user:{login:'ansqhd5774-Choi'},
+   created_at:S64078_FIXED.originalCreatedAt,labels:[{name:'pc-job'}],body:originalBody},
+  localReadback:{journalBefore:journal,journalAfter:journal,journalSha256:hash(journal),
+   backlogBefore:backlog,backlogAfter:backlog,backlogSha256:hash(backlog)},
+  githubReadback:{originalIssueNumber:4078,originalRequestId:S64078_FIXED.originalRequestId,
+   searchComplete:true,pcJobRuns:[],resultPairs:[],replayIssues:[]},
+  workflowState:'active',runtimeState:'HEALTHY',sixRunnersOnline:true,
+  watchdogReady:true,protectedStateUnchanged:true,ownerAndLeaseCasVerified:true
+ };
+}
+const approval=()=>({authorized:true,effect:'S6_4078_BACKLOG_ONLY_REPLAY',
+ s6RequestId:S64078_FIXED.s6RequestId,originalIssueNumber:S64078_FIXED.originalIssue,
+ originalRequestId:S64078_FIXED.originalRequestId,originalBodySha256:S64078_FIXED.originalBodySha256,
+ independentWindowsOperator:true,originalClaimAndLeasePreserved:true,
+ approvalSourceSha:'a'.repeat(40)});
+
+ const owner={id:327938088,login:'ansqhd5774-Choi'};
+ const repo={id:1442936296,full_name:'ansqhd5774-Choi/zgmini-pc-control',owner,private:false};
+ const e=evidence();
+ const original={...e.originalIssue,title:'pc-job',user:owner};
+ let marker,posted,posts=0;
+ const result=await executeApprovedS64078Replay({
+  readEvidence:async()=>e,verifyIndependentAuthority:async()=>approval(),
+  acquireExclusiveClaim:async()=>({nonce:'12345678-1234-1234-1234-123456789abc'}),
+  assertClaimOwned:async()=>{},writePostingCas:async x=>{marker=x.marker;},
+  postExactOriginal:async x=>{posts++;posted={...original,number:8000,body:x.body,created_at:marker.postingAt};return {number:8000};},
+  readPostedIssue:async()=>posted,
+  writeDoneCas:async x=>{assert.deepEqual(x.expectedMarker,marker);marker=x.doneMarker;},
+  archiveClaim:async()=>{}
+ });
+ assert.equal(result.status,'DISPATCH_RECORDED');
+ assert.equal(result.operationalSuccess,false);
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-fixed-4078-ledger-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const file=path.join(root,'backlog.json');
+ const state=JSON.parse(e.localReadback.backlogBefore);
+ const at=Date.parse(posted.created_at);
+ state.windows.push({pausedAt:new Date(at-1000).toISOString(),resumedAt:new Date(at+1000).toISOString()});
+ state.replays['4078']=marker;
+ fs.writeFileSync(file,JSON.stringify(state));
+ const callGithub=(route,method='GET')=>{
+  if(method!=='GET')throw Error('UNEXPECTED_MUTATION');
+  if(route==='')return repo;
+  if(route.startsWith('issues?'))return [original,posted];
+  if(route==='issues/4078')return original;
+  if(route==='issues/8000')return posted;
+  if(route.includes('/comments?'))return [];
+  throw Error('UNEXPECTED_ROUTE '+route);
+ };
+ reconcileMaintenanceBacklog({backlogFile:file,requestId:S64078_FIXED.s6RequestId,
+  approvedRoot:root,callGithub,readPublicPolicy:()=>({schema:'ZGMINI_PC_OPERATIONS_V1',
+   controlRepository:repo.full_name,sourceRepository:'ansqhd5774-Choi/zgmini',
+   mutationsEnabled:false,maxAutomaticRetries:0,operations:{'shared-resource-release-readonly':{grade:'A'}}})});
+ const after=JSON.parse(fs.readFileSync(file,'utf8'));
+ assert.deepEqual(after.replays['4078'],marker);
+ assert.equal(after.replays['8000'],undefined);assert.equal(posts,1);
+});

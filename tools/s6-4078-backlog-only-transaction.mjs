@@ -66,7 +66,11 @@ export async function executeApprovedS64078Replay(ports={}){
   // Durable intent is written *before* any GitHub API POST. If this write's
   // return is uncertain, preserving the claim prevents a second attempt.
   phase='POSTING_ATTEMPT';
-  const marker={status:'POSTING',originalRequestId:FIXED.originalRequestId,
+  // Preserve the common Public replay ledger contract (#4334/#4335).
+  // A later pause must recognize exactly this dispatch, not treat it as
+  // another original. POSTING also retains evidence when POST ACK is lost.
+  const marker={status:'POSTING',publicReplay:true,postingAt:new Date().toISOString(),
+   originalRequestId:FIXED.originalRequestId,
    originalBodySha256:FIXED.originalBodySha256,
    originalIssueNumber:FIXED.originalIssue};
   await ports.writePostingCas({claim,
@@ -83,8 +87,7 @@ export async function executeApprovedS64078Replay(ports={}){
    body:fresh.originalIssue.body,labels:['pc-job'],
    originalIssueNumber:FIXED.originalIssue,
    originalRequestId:FIXED.originalRequestId});
-  if(!Number.isSafeInteger(posted?.number)||posted.number<=0||
-    posted.number===FIXED.originalIssue)
+  if(!Number.isSafeInteger(posted?.number)||posted.number<=FIXED.originalIssue)
    throw Error('S6_4078_REPLAY_ISSUE_UNVERIFIED');
   phase='REPLAY_ISSUE_CREATED';
   await ports.assertClaimOwned(claim);
@@ -96,6 +99,8 @@ export async function executeApprovedS64078Replay(ports={}){
   if(actual?.number!==posted.number||actual?.title!=='pc-job'||
      actual?.body!==fresh.originalIssue.body||
      actual?.state!=='open'||actual?.user?.login!=='ansqhd5774-Choi'||
+     actual?.user?.id!==327938088||!Number.isFinite(Date.parse(actual?.created_at))||
+     Date.parse(actual.created_at)<Date.parse(marker.postingAt)-2000||
      actual?.pull_request||
      !Array.isArray(actual.labels)||
      !actual.labels.some(label=>(typeof label==='string'?label:label?.name)==='pc-job'))
@@ -104,7 +109,8 @@ export async function executeApprovedS64078Replay(ports={}){
   phase='DONE_CAS_ATTEMPT';
   await ports.writeDoneCas({claim,originalIssueNumber:FIXED.originalIssue,
    originalRequestId:FIXED.originalRequestId,
-   expectedStatus:'POSTING',replayIssueNumber:posted.number});
+   expectedStatus:'POSTING',replayIssueNumber:posted.number,
+   expectedMarker:marker,doneMarker:{...marker,status:'DONE',replayIssueNumber:posted.number}});
   phase='DISPATCH_RECORDED';
   await ports.archiveClaim(claim);
   return {status:'DISPATCH_RECORDED',code:'S6_4078_REPLAY_ISSUE_POSTED',
