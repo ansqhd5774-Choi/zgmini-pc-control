@@ -1105,3 +1105,10 @@
 ### #4327 최종 CI 및 소스 통합
 - [Run 46091102308](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/46091102308), public-source-only Job 140811931943, exact HEAD 3127dcf0 **SUCCESS**. 원본 로그 신규 Public Native A 후보 20/20 (ok 75~94), 관련 suite 94/94 PASS. Private source-only/C996/Secret Scan SKIPPED. 최신 main 비교 ahead=3, behind=0 및 정확 3파일 확인 후 squash merge `7c9736b7e018fc9ba5226463384d4546108215c5`. main 3파일 blob 및 기존 workflow blob 4/4 일치.
 - 소스 후보 완료. 실제 독립 Public 설치 proof/영수증 및 실행 경로 연결 미입증, 현재 Private-only 수신·발행은 불변. 운영 적용·신규 요청·변수·권한 변경 0. 다음은 기존 독립 설치 승인 및 Public 결과 원본의 실제 공급 가능 여부 확인 후 보호된 정규 연결 준비, Writer B는 별도 효과 계약 적용. 전체 무인 종단 0/3 유지.
+
+## 46. 마흔두 번째 실행 기록 — Public Native Writer B 공통 인증 후보 (2026-11-28 KST)
+
+- P3/P4 실제 독립 설치 증거 공급 경로 확인: main의 `attachApprovedNativeBReceipt`는 Owner 승인 `ciNativeApproval` 및 SUCCEEDED/target/보호상태를 대조한 경우만 효과·정책 SHA를 정규 유지보수 결과에 붙인다. 현행 Public 전용 독립 Owner operator는 별도의 정확 과거 효과에 고정되어 있으며 그 경로의 일반 설치 성공을 native A/Writer 권한 설치 증거로 승격하지 않는다. 저장소 검색에서 native proof 파일은 reader/test만 발견; 실제 로컬 파일 부재를 단정하지 않는다. 현행 격리/운영 root 및 별도 승인 증거 미확인. 기존 Owner B 효과나 정책 보류 재사용/재실행 금지.
+- 최신 main `7c9736b7e018fc9ba5226463384d4546108215c5` 기반 별도 작업 브랜치 `codex/pc-automation-process-improvement-20261119-public-native-writer-b-candidate-20261128`. 기존 Public Native A evidence 함수의 공통 부분을 재사용하고 Writer B 별도 효과의 승인/요청/설치 영수증/CI 원본을 대조한다. 기존 Writer manifest 검증기 재사용; extended maintenance 및 범위 밖 provider/DB/Task 변경 거부. 불변 control SHA의 정확 manifest·adapter·receiver bytes를 비교. 후보 일치도 CANDIDATE_ONLY이며 installer seal이나 실행 권한 없음.
+- [Draft PR #4328](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4328), exact HEAD `04e9236799dd58c666cfd38d7dddb143eda5f8d0`, 2파일 (+136/-22), 신규 Writer B fixture 20개. 기존 A 회귀 포함, Workflow/Private admission/운영 정책 불변. [Run 46091623228](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/46091623228) 최초 in_progress, C996/Secret Scan skipped. 최종 CI/병합은 별도 검증.
+- 다음 필수 실행: 실제 독립 설치 승인·proof 공급 경로를 정확 효과에 한해 연결하며, 단순 shadow 추가로 운영 진전율을 올리지 않는다. Public 자동 발행·수신의 보안 활성화 및 정규 수신 경로의 승인과 증거가 필요. 현재 운영 요청/설치/변수 변경 0, P0 완료 1/7, 무인 종단 0/3.
