@@ -20,6 +20,12 @@ jobs:
     permissions:
       contents: read
     steps:
+      # Git for Windows otherwise normalizes checked-out LF bytes to CRLF.
+      # Both the approved manifest hash and exact source fixture boundaries
+      # require original Git bytes; change only this disposable hosted runner.
+      - name: Preserve Git blob bytes on hosted Windows checkout
+        shell: powershell
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: 7d30a968efa2672355cbf5fd4067cbef6d16d7ba
