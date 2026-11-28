@@ -152,6 +152,18 @@ export async function runNativeAReadOnly({observation,scope,host,controllerPolic
   })
  });
 }
+// Keep the exact installed scope read by the receiver for subsequent engine
+// admission. A second disk read could change source/adapter/Controller pins
+// without changing the stable business/request effect key.
+export async function observeNativeAWithScope({event,env,ports}={}){
+ let scope;
+ const observation=await observeNativeReceiver({effect:'A_READONLY',event,env,
+  ports:{getJson:ports?.getJson,readNativeScope:async effect=>{
+   scope=await ports.readNativeScope(effect);
+   return scope;
+  }}});
+ return {observation,scope};
+}
 async function main(){
  const env=process.env;
  let event;
@@ -176,11 +188,13 @@ async function main(){
   if(body.length>150000)throw Error('CI_NATIVE_A_GITHUB_RESPONSE_TOO_LARGE');
   return JSON.parse(body);
  };
- const observation=await observeNativeReceiver({effect:'A_READONLY',
+ const {observation,scope}=await observeNativeAWithScope({
   event,env,ports:{readNativeScope,getJson}});
- let scope,policyBytes,host,adapterBytes;
+ if(observation.state!=='CONTRACT_MATCH_ONLY'){
+  console.log(JSON.stringify(failed('CI_NATIVE_A_RECEIVER_ADMISSION_MISSING')));return 1;
+ }
+ let policyBytes,host,adapterBytes;
  try{
-  scope=readNativeScope('A_READONLY');
   policyBytes=fs.readFileSync(safeFile(ROOT,'config/operations.json'));
   host=JSON.parse(fs.readFileSync(safeFile(ROOT,'host.json'),'utf8'));
   adapterBytes=fs.readFileSync(fileURLToPath(import.meta.url));
