@@ -4,11 +4,14 @@ on:
     types: [opened, labeled]
   issue_comment:
     types: [created]
-permissions:
-  contents: read
-  issues: write
+permissions: {}
 jobs:
   route-sanitized-incident:
+    permissions:
+      contents: read
+      issues: write
+    outputs:
+      selection_reused: ${{ steps.selection-noop.outcome == 'success' && steps.selection-noop.outputs.reusable == 'true' && 'true' || 'false' }}
     concurrency:
       group: agent-handoff-${{ github.event.issue.number }}
       cancel-in-progress: false
@@ -39,7 +42,16 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node agent-handoff/issue-broker.mjs
+      - name: Verify all pending selection receipts without writing
+        id: selection-noop
+        if: github.ref == 'refs/heads/main'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node agent-handoff/queue-dispatcher.mjs --verify-noop
   record-verified-return:
+    outputs:
+      selection_reused: ${{ steps.selection-noop.outcome == 'success' && steps.selection-noop.outputs.reusable == 'true' && 'true' || 'false' }}
     concurrency:
       group: agent-handoff-${{ github.event.issue.number }}
       cancel-in-progress: false
@@ -75,7 +87,16 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node agent-handoff/result-entry.mjs
+      - name: Verify all pending selection receipts without writing
+        id: selection-noop
+        if: github.ref == 'refs/heads/main'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node agent-handoff/queue-dispatcher.mjs --verify-noop
   record-work-progress:
+    outputs:
+      selection_reused: ${{ steps.selection-noop.outcome == 'success' && steps.selection-noop.outputs.reusable == 'true' && 'true' || 'false' }}
     concurrency:
       group: agent-handoff-${{ github.event.issue.number }}
       cancel-in-progress: false
@@ -109,6 +130,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node agent-handoff/work-progress-broker.mjs
+      - name: Verify all pending selection receipts without writing
+        id: selection-noop
+        if: github.ref == 'refs/heads/main'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node agent-handoff/queue-dispatcher.mjs --verify-noop
   # Continue only after at least one successful intake job and no failed/cancelled intake.
   verify-and-select-after-intake:
     needs: [route-sanitized-incident, record-verified-return, record-work-progress]
@@ -117,6 +145,9 @@ jobs:
       (needs.route-sanitized-incident.result == 'success' ||
        needs.record-verified-return.result == 'success' ||
        needs.record-work-progress.result == 'success') &&
+      ((needs.route-sanitized-incident.result == 'success' && needs.route-sanitized-incident.outputs.selection_reused != 'true') ||
+       (needs.record-verified-return.result == 'success' && needs.record-verified-return.outputs.selection_reused != 'true') ||
+       (needs.record-work-progress.result == 'success' && needs.record-work-progress.outputs.selection_reused != 'true')) &&
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
       github.event.repository.private == true &&
       vars.ZGMINI_AGENT_HANDOFF_ENABLED == 'true' &&
@@ -147,9 +178,21 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: node agent-handoff/queue-dispatcher.mjs
   authenticated-readonly-board-after-selection:
-    needs: verify-and-select-after-intake
+    needs: [route-sanitized-incident, record-verified-return, record-work-progress, verify-and-select-after-intake]
     if: >-
-      needs.verify-and-select-after-intake.result == 'success' &&
+      !cancelled() && !failure() &&
+      (needs.route-sanitized-incident.result == 'success' ||
+       needs.record-verified-return.result == 'success' ||
+       needs.record-work-progress.result == 'success') &&
+      (needs.verify-and-select-after-intake.result == 'success' ||
+       (needs.verify-and-select-after-intake.result == 'skipped' &&
+        (needs.route-sanitized-incident.result != 'success' || needs.route-sanitized-incident.outputs.selection_reused == 'true') &&
+         (needs.record-verified-return.result != 'success' || needs.record-verified-return.outputs.selection_reused == 'true') &&
+         (needs.record-work-progress.result != 'success' || needs.record-work-progress.outputs.selection_reused == 'true'))) &&
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      vars.ZGMINI_AGENT_HANDOFF_ENABLED == 'true' &&
+      github.actor == 'ansqhd5774-Choi' &&
       github.ref == 'refs/heads/main'
     permissions:
       contents: read

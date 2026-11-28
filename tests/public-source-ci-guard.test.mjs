@@ -319,3 +319,7 @@ import './publication-preflight.test.mjs';
 import './publication-executor.test.mjs';
 import './shared-resource-issue-admission.test.mjs';
 import './shared-resource-controller-independent.test.mjs';
+
+// Reuse the existing hosted fixture harness without changing pinned workflow bytes.
+import './agent-handoff-job-concurrency.test.mjs';
+import './agent-handoff-queue-selector.test.mjs';
