@@ -350,3 +350,4 @@ for(const [name,mutate,code] of [
 
 // Execute the real receiver snapshot regressions in the existing hosted source suite.
 import './ci-native-receiver-observe.test.mjs';
+import './ci-native-publisher-entry.test.mjs';

@@ -99,7 +99,7 @@ test('installed proof must have an exact approved B receipt and policy hash',asy
 });
 test('unrelated historical successful B cannot authorize native CI effect',async()=>{
  const p=fixture().policy;
- const proof={effect:'A_READONLY',installationReceiptPath:'results/maintenance-pc-update-12345678-1234-4234-8234-123456789abc.json',
+ const proof={schema:'ZGMINI_CI_NATIVE_B_INSTALLED_PROOF_V1',effect:'A_READONLY',installationReceiptPath:'results/maintenance-pc-update-12345678-1234-4234-8234-123456789abc.json',
   installationReceiptSha256:'0'.repeat(64),nativePolicySha256:hash(Buffer.from(JSON.stringify(p))),installationRequestId:'pc-update-12345678-1234-4234-8234-123456789abc',actualControllerSha:'d'.repeat(40),policy:p};
  const old=Buffer.from(JSON.stringify({schema:'ZGMINI_PC_MAINTENANCE_RESULT_V1',requestId:proof.installationRequestId,
   actualControllerSha:proof.actualControllerSha,targetControllerSha:proof.actualControllerSha,status:'SUCCEEDED',protectedStateUnchanged:true}));
@@ -256,4 +256,42 @@ test('both native publisher jobs inject separate installed policy root but never
  assert.match(y,/vars.ZGMINI_CI_NATIVE_A_ENABLED == 'true'/);
  assert.match(y,/vars.ZGMINI_CI_NATIVE_WRITER_B_ENABLED == 'true'/);
  assert.doesNotMatch(y,/mkdir|New-Item|Copy-Item|icacls|runner-smoke|controller\\entry\.mjs/);
+});
+
+test('common installed proof validation binds exact request, policy digest and optional Controller pin before REST',async t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-native-proof-binding-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ for(const effect of ['A_READONLY','B_WRITER_SOURCE']){
+  const p=fixture(effect).policy;
+  p.installedControllerSha='d'.repeat(40);
+  const proof={schema:'ZGMINI_CI_NATIVE_B_INSTALLED_PROOF_V1',effect,policy:p,
+   nativePolicySha256:hash(Buffer.from(JSON.stringify(p))),
+   installationRequestId:'pc-update-12345678-1234-4234-8234-123456789abc',
+   installationReceiptPath:'results/maintenance-pc-update-12345678-1234-4234-8234-123456789abc.json',
+   installationReceiptSha256:'0'.repeat(64),actualControllerSha:p.installedControllerSha};
+  const receipt={schema:'ZGMINI_PC_MAINTENANCE_RESULT_V1',requestId:proof.installationRequestId,
+   actualControllerSha:proof.actualControllerSha,targetControllerSha:proof.actualControllerSha,
+   status:'SUCCEEDED',protectedStateUnchanged:true,ciNativeEffect:effect,
+   ciNativePolicySha256:proof.nativePolicySha256};
+  const bytes=Buffer.from(JSON.stringify(receipt));proof.installationReceiptSha256=hash(bytes);
+  const file=path.join(root,effect==='A_READONLY'?'ci-native-a-installed-proof.json':'ci-native-writer-b-installed-proof.json');
+  let reads=0;
+  const getJson=async()=>{reads++;return {type:'file',path:proof.installationReceiptPath,encoding:'base64',content:bytes.toString('base64')}};
+  fs.writeFileSync(file,JSON.stringify(proof));
+  assert.deepEqual(readNativeInstalledProof(effect,{root}).policy,p);
+  assert.deepEqual(await verifyNativeInstalledProof(effect,proof,{getJson}),p);
+  assert.equal(reads,1);
+  for(const [change,code] of [
+   [v=>{delete v.schema},'CI_NATIVE_PROOF_INVALID'],
+   [v=>{v.installationReceiptPath='results/maintenance-pc-update-22345678-1234-4234-8234-123456789abc.json'},'CI_NATIVE_PROOF_INVALID'],
+   [v=>{v.policy={...v.policy,policyRevision:'f'.repeat(40)}},'CI_NATIVE_PROOF_POLICY_SHA_UNVERIFIED'],
+   [v=>{v.policy={...v.policy,installedControllerSha:'e'.repeat(40)};v.nativePolicySha256=hash(Buffer.from(JSON.stringify(v.policy)))},'CI_NATIVE_PROOF_CONTROLLER_PIN_MISMATCH']
+  ]){
+   const bad=structuredClone(proof);change(bad);
+   fs.writeFileSync(file,JSON.stringify(bad));
+   assert.throws(()=>readNativeInstalledProof(effect,{root}),new RegExp(code));
+   await assert.rejects(()=>verifyNativeInstalledProof(effect,bad,{getJson}),new RegExp(code));
+   assert.equal(reads,1);
+  }
+ }
 });

@@ -36,19 +36,27 @@ const scoped=(pathValue,root)=>{
   fail('CI_NATIVE_PROOF_FILE_UNVERIFIED');
  return full;
 };
+function validateNativeInstalledProof(effect,v){
+ if(!Object.hasOwn(INSTALLED,effect)||v?.schema!=='ZGMINI_CI_NATIVE_B_INSTALLED_PROOF_V1'||v.effect!==effect||
+    !sha256(v.nativePolicySha256)||!sha256(v.installationReceiptSha256)||
+    !/^pc-update-[a-f0-9-]{36}$/.test(v.installationRequestId??'')||
+    v.installationReceiptPath!=='results/maintenance-'+v.installationRequestId+'.json'||
+    !sha(v.actualControllerSha)||!v.policy||v.policy.effect!==effect)
+  fail('CI_NATIVE_PROOF_INVALID');
+ const actual=digest(Buffer.from(JSON.stringify(v.policy)));
+ if(actual!==v.nativePolicySha256)fail('CI_NATIVE_PROOF_POLICY_SHA_UNVERIFIED');
+ // Historical transport-only policy may omit this pin; if supplied it
+ // must identify the exact Controller attested by the installation receipt.
+ if(Object.hasOwn(v.policy,'installedControllerSha')&&
+    v.policy.installedControllerSha!==v.actualControllerSha)
+  fail('CI_NATIVE_PROOF_CONTROLLER_PIN_MISMATCH');
+}
 export function readNativeInstalledProof(effect,{root='E:\\ZGmini\\data\\pc-writer\\ci-native'}={}){
  const file=INSTALLED[effect];
  if(!file)fail('CI_NATIVE_PROOF_EFFECT_DENIED');
  const raw=fs.readFileSync(scoped(file,root),'utf8');
  let v;try{v=JSON.parse(raw)}catch{fail('CI_NATIVE_PROOF_INVALID')}
- if(v?.schema!=='ZGMINI_CI_NATIVE_B_INSTALLED_PROOF_V1'||v.effect!==effect||
-    !sha256(v.nativePolicySha256)||!sha256(v.installationReceiptSha256)||
-    !/^results\/maintenance-pc-update-[a-z0-9-]{36}\.json$/.test(v.installationReceiptPath??'')||
-    !/^pc-update-[a-f0-9-]{36}$/.test(v.installationRequestId??'')||
-    !sha(v.actualControllerSha)||!v.policy||v.policy.effect!==effect)
-  fail('CI_NATIVE_PROOF_INVALID');
- const actual=digest(Buffer.from(JSON.stringify(v.policy)));
- if(actual!==v.nativePolicySha256)fail('CI_NATIVE_PROOF_POLICY_SHA_UNVERIFIED');
+ validateNativeInstalledProof(effect,v);
  return Object.freeze(v);
 }
 // The publisher runs on the isolated handoff host, not the operating PC.
@@ -97,6 +105,7 @@ function decodeContents(f,pathValue){
 export async function verifyNativeInstalledProof(effect,proof,{getJson}={}){
  if(proof?.effect!==effect||typeof getJson!=='function')
   fail('CI_NATIVE_PROOF_INDEPENDENT_EVIDENCE_REQUIRED');
+ validateNativeInstalledProof(effect,proof);
  let file;
  try{file=await getJson('contents/'+proof.installationReceiptPath+'?ref=main')}catch{fail('CI_NATIVE_PROOF_RECEIPT_UNAVAILABLE')}
  const bytes=decodeContents(file,proof.installationReceiptPath);
