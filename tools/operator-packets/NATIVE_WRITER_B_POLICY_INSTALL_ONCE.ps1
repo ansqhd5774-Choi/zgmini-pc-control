@@ -13,6 +13,9 @@ param(
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
+# The reversible interval starts only after both exact directory renames succeed.
+$transitionSwapped=$false
+$transitionCommitted=$false
 function Stop-N([string]$code){throw $code}
 function Plain-Path([string]$p){
  for($cur=[IO.Path]::GetFullPath($p);$cur;$cur=[IO.Path]::GetDirectoryName($cur)){
@@ -187,6 +190,90 @@ try{
  }
  $transition=[bool]$TransitionFromScopeSha256
  $backup=$null
+ function Restore-VerifiedTransitionPreimage {
+  # A failed post-swap report is not a new grant. Never remove either tree.
+  # The new tree is preserved separately, and the old one is restored only
+  # when exact ACL, bytes, unconsumed claims and both roots can be re-read.
+  if(Test-Path -LiteralPath $OutputFile){Stop-N 'NATIVE_POLICY_TRANSITION_RESULT_EXISTS_STOP'}
+  if(-not (Test-Path -LiteralPath $root) -or -not (Test-Path -LiteralPath $backup)){
+   Stop-N 'NATIVE_POLICY_TRANSITION_RECOVERY_REQUIRED'
+  }
+  $quarantine=$root+'.failed-'+$ScopeSha256
+  if(Test-Path -LiteralPath $quarantine){Stop-N 'NATIVE_POLICY_TRANSITION_RECOVERY_REQUIRED'}
+  Plain-Path $root
+  Plain-Path $backup
+  [void](Exact-Acl $root $scopeAcl)
+  [void](Exact-Acl $backup $scopeAcl)
+  $newNames=@(Get-ChildItem -LiteralPath $root -Force | ForEach-Object {$_.Name} | Sort-Object)
+  if(($newNames -join '|') -cne 'ci-native-writer-b-approved.json' -and
+     ($newNames -join '|') -cne 'ci-native-writer-b-approved.json|installation-observation.json'){
+   Stop-N 'NATIVE_POLICY_TRANSITION_NEW_STATE_DRIFT_STOP'
+  }
+  $oldNames=@(Get-ChildItem -LiteralPath $backup -Force | ForEach-Object {$_.Name} | Sort-Object)
+  if(($oldNames -join '|') -cne 'ci-native-writer-b-approved.json|installation-observation.json'){
+   Stop-N 'NATIVE_POLICY_TRANSITION_BACKUP_DRIFT_STOP'
+  }
+  $newScope=[IO.Path]::Combine($root,'ci-native-writer-b-approved.json')
+  $oldScope=[IO.Path]::Combine($backup,'ci-native-writer-b-approved.json')
+  $oldObservation=[IO.Path]::Combine($backup,'installation-observation.json')
+  foreach($file in @($newScope,$oldScope,$oldObservation)){
+   $item=Get-Item -LiteralPath $file -Force
+   if($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+      $item.Length -lt 2 -or $item.Length -gt 131072 -or $item.LinkType){
+    Stop-N 'NATIVE_POLICY_TRANSITION_FILE_DRIFT_STOP'
+   }
+   [void](Exact-Acl $file (New-PolicyFileAcl))
+  }
+  if((Hash-Bytes ([IO.File]::ReadAllBytes($newScope))) -cne $ScopeSha256 -or
+     (Hash-Bytes ([IO.File]::ReadAllBytes($oldScope))) -cne $TransitionFromScopeSha256){
+   Stop-N 'NATIVE_POLICY_TRANSITION_SCOPE_CAS_STOP'
+  }
+  $observed=Get-Content -LiteralPath $oldObservation -Raw|ConvertFrom-Json
+  if($observed.host -cne $hostName -or $observed.status -cne 'SCOPE_INSTALLED_VERIFIED' -or
+     $observed.scopeSha256 -cne $TransitionFromScopeSha256 -or
+     $observed.aclVerified -ne $true -or $observed.reservedClaimAbsent -ne $true){
+   Stop-N 'NATIVE_POLICY_TRANSITION_BACKUP_OBSERVATION_DRIFT_STOP'
+  }
+  if($newNames.Count -eq 2){
+   $newObservation=[IO.Path]::Combine($root,'installation-observation.json')
+   $item=Get-Item -LiteralPath $newObservation -Force
+   if($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+      $item.Length -lt 2 -or $item.Length -gt 131072 -or $item.LinkType){
+    Stop-N 'NATIVE_POLICY_TRANSITION_NEW_OBSERVATION_DRIFT_STOP'
+   }
+   [void](Exact-Acl $newObservation (New-PolicyFileAcl))
+   $state=Get-Content -LiteralPath $newObservation -Raw|ConvertFrom-Json
+   if($state.host -cne $hostName -or $state.scopeSha256 -cne $ScopeSha256 -or
+      $state.status -cne 'SCOPE_INSTALLED_VERIFIED'){
+    Stop-N 'NATIVE_POLICY_TRANSITION_NEW_OBSERVATION_DRIFT_STOP'
+   }
+  }
+  if($hostName -eq 'PC'){
+   $live=Get-Content -LiteralPath 'E:\ZGmini\automation\pc-control\host.json' -Raw|ConvertFrom-Json
+   if($live.controllerSourceSha -cne $p.installedControllerSha -or
+      (Test-Path -LiteralPath 'E:\ZGmini\data\pc-writer\writer-b-install-once\db6a4814-d8ea-5343-9539-cf797835c231')){
+    Stop-N 'NATIVE_POLICY_TRANSITION_CLAIM_OR_CONTROLLER_DRIFT_STOP'
+   }
+  }else{
+   [void](Exact-Acl $receiptRoot (New-Acl 'Modify'))
+   if(Test-Path -LiteralPath ([IO.Path]::Combine($receiptRoot,
+      'native-287c32ba0ae695f2b17176b48bdbf1828797d04e53f5d6d346ae4f66c7b818b4.json'))){
+    Stop-N 'NATIVE_POLICY_RESERVED_PUBLISHER_CLAIM_STOP'
+   }
+  }
+  [IO.Directory]::Move($root,$quarantine)
+  # If the second rename fails, preserve backup and quarantine for a manual
+  # read-only reconcile. Do not silently move an unverified tree back.
+  [IO.Directory]::Move($backup,$root)
+  Plain-Path $root
+  [void](Exact-Acl $root $scopeAcl)
+  [void](Exact-Acl ([IO.Path]::Combine($root,'ci-native-writer-b-approved.json')) (New-PolicyFileAcl))
+  if((Hash-Bytes ([IO.File]::ReadAllBytes([IO.Path]::Combine($root,
+     'ci-native-writer-b-approved.json')))) -cne $TransitionFromScopeSha256){
+   Stop-N 'NATIVE_POLICY_TRANSITION_RECOVERY_REQUIRED'
+  }
+  [void](Exact-Acl $quarantine $scopeAcl)
+ }
  function Verify-TransitionPreimage {
   if($TransitionFromScopeSha256 -cne 'df097365ebc641a551f6e0b233ad333662f4ae12b82a2180cfb97637656f5736'){
    Stop-N 'NATIVE_POLICY_TRANSITION_PREIMAGE_STOP'
@@ -292,7 +379,7 @@ try{
   $backup=$root+'.backup-'+$TransitionFromScopeSha256
   if(Test-Path -LiteralPath $backup){Stop-N 'NATIVE_POLICY_TRANSITION_BACKUP_EXISTS_STOP'}
   [IO.Directory]::Move($root,$backup)
-  try{[IO.Directory]::Move($staging,$root)}catch{
+  try{[IO.Directory]::Move($staging,$root);$transitionSwapped=$true}catch{
    # Restore only the verified original when the new destination is absent.
    if(-not (Test-Path -LiteralPath $root)){
     [void](Exact-Acl $backup $scopeAcl)
@@ -320,12 +407,26 @@ try{
  }
  Write-Once ([IO.Path]::Combine($root,'installation-observation.json')) ([Text.Encoding]::UTF8.GetBytes(($report|ConvertTo-Json -Compress))) $true
  Write-Once $OutputFile ([Text.Encoding]::UTF8.GetBytes(($report|ConvertTo-Json -Compress)))
+ if($transition){$transitionCommitted=$true}
  Write-Output 'status=SCOPE_INSTALLED_VERIFIED'
  Write-Output 'variablesEnabled=false;dispatched=false;writerChanged=false'
  exit 0
 }catch{
  $code=[string]$_.Exception.Message
- if($code -notmatch '^NATIVE_POLICY_[A-Z_]+$'){$code='NATIVE_POLICY_STATE_UNKNOWN'}
+ if($transitionSwapped -and -not $transitionCommitted){
+  try{
+   Restore-VerifiedTransitionPreimage
+   $code='NATIVE_POLICY_TRANSITION_ROLLED_BACK_VERIFIED_STOP'
+  }catch{
+   $code='NATIVE_POLICY_TRANSITION_RECOVERY_REQUIRED'
+  }
+ }
+ if($code -notmatch '^NATIVE_POLICY_[A-Z_]+
+ Write-Output ('status=STOPPED;code='+$code)
+ # Never delete partial state or retry a rename/write automatically.
+ exit 1
+}
+){$code='NATIVE_POLICY_STATE_UNKNOWN'}
  Write-Output ('status=STOPPED;code='+$code)
  # Never delete partial state or retry a rename/write automatically.
  exit 1
