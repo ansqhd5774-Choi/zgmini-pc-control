@@ -168,3 +168,36 @@ jobs:
           ZGMINI_CI_CONTROLLER_B_ENABLED: ${{ vars.ZGMINI_CI_CONTROLLER_B_ENABLED }}
           ZGMINI_CI_CONTROLLER_B_RECEIPT_ROOT: ${{ vars.ZGMINI_CI_CONTROLLER_B_RECEIPT_ROOT }}
         run: node tools/ci-controller-b-receipt-proof.mjs
+
+  # Owner-only fixed read on the existing isolated host. No B publication.
+  public-controller-b-host-state:
+    if: >-
+      github.event_name == 'issues' &&
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.id == 1442936296 &&
+      github.event.repository.private == false &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.issue.user.id == 327938088 &&
+      github.event.issue.title == 'ci-controller-b-state-readonly' &&
+      github.run_attempt == 1
+    permissions:
+      contents: read
+      issues: write
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 4
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: d2c29d27c3552880b4874473578a54bbd4d24c89
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Observe fixed local policy state without installing or publishing
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ZGMINI_CI_STATE_SOURCE_SHA: d2c29d27c3552880b4874473578a54bbd4d24c89
+        run: node tools/ci-controller-b-host-state-readonly.mjs
