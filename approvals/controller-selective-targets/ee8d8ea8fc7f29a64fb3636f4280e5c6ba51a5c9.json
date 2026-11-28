@@ -1,0 +1,15 @@
+{
+  "schema": "ZGMINI_CONTROLLER_SELECTIVE_PIN_V1",
+  "installedSha": "66b8a66c6112441576917e0ac9fbe4d39cbd5eea",
+  "targetSha": "ee8d8ea8fc7f29a64fb3636f4280e5c6ba51a5c9",
+  "sourceMainSha": "adfd7f954d5289923d185b359d26d780c7b37b48",
+  "targetBranch": "codex/controller-ops-lessons-20261105-s6-nullish",
+  "customPaths": [],
+  "allowFiles": [
+    {
+      "path": "controller/s6-journal-readonly.mjs",
+      "sha256": "79a0480ac66454829bd7cfe6fb93d2a3fd3c57371c1ea2537f58e92624af4a52"
+    }
+  ],
+  "approvalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/4341"
+}
