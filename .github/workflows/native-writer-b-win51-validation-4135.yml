@@ -28,7 +28,7 @@ jobs:
         run: git config --global core.autocrlf false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: 7d30a968efa2672355cbf5fd4067cbef6d16d7ba
+          ref: e05fa600d048ca5b27a4f615bfb38a4c7132f71a
           persist-credentials: false
           fetch-depth: 1
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -38,7 +38,7 @@ jobs:
         shell: powershell
         run: |
           $sha=(& git rev-parse HEAD).Trim()
-          if($sha -cne '7d30a968efa2672355cbf5fd4067cbef6d16d7ba'){throw 'NATIVE_POLICY_CHECKOUT_SHA_STOP'}
+          if($sha -cne 'e05fa600d048ca5b27a4f615bfb38a4c7132f71a'){throw 'NATIVE_POLICY_CHECKOUT_SHA_STOP'}
           if($PSVersionTable.PSEdition -cne 'Desktop' -or $PSVersionTable.PSVersion.Major -ne 5){throw 'NATIVE_POLICY_WINDOWS51_REQUIRED_STOP'}
           Write-Output 'EXACT_SOURCE_SHA_VERIFIED'
           Write-Output ('WINDOWS_POWERSHELL_VERSION='+$PSVersionTable.PSVersion.ToString())
