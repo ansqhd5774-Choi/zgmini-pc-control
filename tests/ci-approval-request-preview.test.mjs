@@ -80,3 +80,55 @@ for(const [name,edit,state] of [
  const v=existingInput(fixture());edit(v);const r=prepareExisting(v);
  check(r,state);assert.equal(Object.hasOwn(r,'preview'),false);
 });
+
+
+import {preparePublicWriter4135PolicyPreview,PUBLIC_WRITER_4135} from '../ci-approval/request-preview.mjs';
+function public4135Fixture(){
+ const fixed=PUBLIC_WRITER_4135;
+ const bytes=readFileSync(new URL('../'+fixed.manifestPath,import.meta.url));
+ const m=JSON.parse(bytes);
+ const pin={repository:repo,revision:'a'.repeat(40),path:fixed.manifestPath,
+  blobSha:hash('sha1',Buffer.concat([Buffer.from('blob '+bytes.length+'\0'),bytes])),
+  sha256:hash('sha256',bytes)};
+ const sourceHeadSha='b'.repeat(40),controlHead='c'.repeat(40);
+ const file=(revision,path)=>{
+  const bytes=Buffer.from('source-only fixture '+path);
+  return {repository:repo,revision,path,bytes,
+   blobSha:hash('sha1',Buffer.concat([Buffer.from('blob '+bytes.length+'\0'),bytes]))};
+ };
+ return {requestInput:{effect:'B_WRITER_SOURCE',pin,observation:{repository:repo,
+  revision:pin.revision,path:pin.path,blobSha:pin.blobSha,bytes},
+  requestIdentity:{requestId:'12345678-1234-4234-8234-123456789abc',
+   chatId:'12345678-1234-4234-8234-123456789abd'},requestState:'NEW',
+  targetSha:m.candidateSourceSha,context:{observedHead:m.baseHead,observedConfigSha:m.baseConfigSourceSha}},
+  sourceHeadSha,controlHead,installedControllerSha:'d'.repeat(40),
+  sourceWorkflow:file(sourceHeadSha,fixed.sourceWorkflowPath),
+  receiverWorkflow:file(controlHead,fixed.receiverWorkflowPath),
+  adapter:file(controlHead,fixed.adapterPath)};
+}
+test('exact #4135 native preview binds future first attempt and separate final main pin without an installed grant',()=>{
+ const x=public4135Fixture(),r=preparePublicWriter4135PolicyPreview(x);
+ check(r,'PUBLIC_WRITER_POLICY_PREVIEW_ONLY');assert.equal(r.canInstall,false);
+ assert.equal(r.operationalWrites,0);assert.equal(r.proposedPolicy.effect,'B_WRITER_SOURCE');
+ assert.equal(r.proposedPolicy.sourceRunMode,'EVENT_COMPLETION_V1');
+ assert.equal(Object.hasOwn(r.proposedPolicy,'sourceRunId'),false);
+ assert.equal(r.proposedPolicy.sourceAttempt,1);
+ assert.equal(r.proposedPolicy.nativeWriterBControlSha,x.controlHead);
+ assert.equal(r.proposedPolicy.nativeWriterBAdapterSha256,hash('sha256',x.adapter.bytes));
+ assert.equal(r.proposedPolicy.approvedRequestSha256,hash('sha256',r.body));
+ assert.equal(r.proposedPolicySha256,hash('sha256',JSON.stringify(r.proposedPolicy)));
+ assert.deepEqual(r,preparePublicWriter4135PolicyPreview(x));
+ assert.equal(Object.hasOwn(r,'installedProof'),false);
+});
+for(const [name,edit,state] of [
+ ['original request',x=>{x.requestInput.requestIdentity.requestId=PUBLIC_WRITER_4135.originalRequestId},'REJECTED'],
+ ['different approval',x=>{x.requestInput.pin.sha256='0'.repeat(64)},'REJECTED'],
+ ['consumed',x=>{x.requestInput.requestState='CONSUMED'},'WAIT_RESOURCE'],
+ ['missing main',x=>{delete x.controlHead},'EVIDENCE_MISSING'],
+ ['same source and main',x=>{x.sourceHeadSha=x.controlHead},'EVIDENCE_MISSING'],
+ ['receiver revision drift',x=>{x.receiverWorkflow.revision=x.sourceHeadSha},'EVIDENCE_MISSING'],
+ ['adapter changed bytes',x=>{x.adapter.bytes=Buffer.from('other')},'EVIDENCE_MISSING']
+])test('exact #4135 policy preview refuses '+name,()=>{
+ const x=public4135Fixture();edit(x);const r=preparePublicWriter4135PolicyPreview(x);
+ check(r,state);assert.equal(Object.hasOwn(r,'proposedPolicy'),false);
+});

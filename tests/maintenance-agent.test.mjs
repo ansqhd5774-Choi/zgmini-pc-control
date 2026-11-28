@@ -2519,3 +2519,6 @@ const approval=()=>({authorized:true,effect:'S6_4078_BACKLOG_ONLY_REPLAY',
  assert.deepEqual(after.replays['4078'],marker);
  assert.equal(after.replays['8000'],undefined);assert.equal(posts,1);
 });
+
+// Reuse hosted CI for exact #4135 source-only policy preparation.
+import './ci-approval-request-preview.test.mjs';
