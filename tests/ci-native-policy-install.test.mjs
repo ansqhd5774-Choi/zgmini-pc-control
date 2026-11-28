@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {makeIndependentPolicyScope,makeIndependentPolicyProof,verifyIndependentPolicyReceipt,
- POLICY_INSTALL as F,policyDigest as hash} from '../ci-approval/native-policy-install.mjs';
+ verifyPolicyTransportTransition,verifyFirstScopeTransition,POLICY_INSTALL as F,policyDigest as hash} from '../ci-approval/native-policy-install.mjs';
 import {verifyNativeInstalledProof} from '../ci-approval/native-publisher-entry.mjs';
 function fixture(){
  const approvalBytes=fs.readFileSync(new URL('../'+F.approvalPath,import.meta.url));
@@ -76,4 +76,244 @@ test('Windows installer refuses non-Apply invocation before reading files or cre
   '-RunnerSid','S-1-5-21-1-2-3-1001','-OutputFile',output],{encoding:'utf8',windowsHide:true});
  assert.equal(result.status,1);assert.match(result.stdout,/NATIVE_POLICY_INDEPENDENT_APPLY_REQUIRED/);
  assert.equal(fs.existsSync(output),false);fs.rmdirSync(dir);
+});
+
+test('transport-only transition preserves original exact business effect and source event',()=>{
+ const x=fixture();
+ const policy={...x.policy,policyRevision:'2'.repeat(40),nativeWriterBControlSha:'2'.repeat(40),
+  nativeWriterBAdapterSha256:'3'.repeat(64),receiverWorkflowBlobSha:'4'.repeat(40),
+  nativeWriterBControlMode:'PINNED_CHECKOUT_V1'};
+ const next=makeIndependentPolicyScope({...x,policy});
+ const v=verifyPolicyTransportTransition(x.scope,next);
+ assert.equal(v.beforeScopeSha256,hash(x.scope));
+ assert.equal(v.afterScopeSha256,hash(next));
+ // A fixture can never become the exact deployed first-scope preimage.
+ assert.throws(()=>verifyFirstScopeTransition(x.scope,next),/TRANSITION_PREIMAGE_STOP/);
+ for(const edit of [
+  p=>{p.sourceHeadSha='5'.repeat(40)},p=>{p.installedControllerSha='6'.repeat(40)},
+  p=>{p.sourceWorkflowBlobSha='7'.repeat(40)},p=>{p.extra=true},
+  p=>{delete p.nativeWriterBControlMode},p=>{p.nativeWriterBControlSha=p.policyRevision=x.policy.policyRevision}
+ ]){
+  const p={...policy};edit(p);
+  assert.throws(()=>verifyPolicyTransportTransition(x.scope,makeIndependentPolicyScope({...x,policy:p})));
+ }
+});
+
+test('new pinned policy receipt requires both preserved original host backups',()=>{
+ const x=fixture(),policy={...x.policy,nativeWriterBControlMode:'PINNED_CHECKOUT_V1'};
+ const receipt={...x.receipt,nativePolicySha256:hash(JSON.stringify(policy)),
+  hosts:x.receipt.hosts.map(h=>({...h,policySha256:hash(JSON.stringify(policy))}))};
+ assert.throws(()=>verifyIndependentPolicyReceipt(receipt,policy),/TRANSITION_HOST_BACKUP_STOP/);
+ const old='df097365ebc641a551f6e0b233ad333662f4ae12b82a2180cfb97637656f5736';
+ for(const h of receipt.hosts){h.previousScopeSha256=old;h.backupVerified=true}
+ assert.equal(verifyIndependentPolicyReceipt(receipt,policy),receipt);
+ receipt.hosts[1].backupVerified=false;
+ assert.throws(()=>verifyIndependentPolicyReceipt(receipt,policy),/TRANSITION_HOST_BACKUP_STOP/);
+});
+test('Windows transition installer keeps elevated gate, exact preimage, protected backup and claims',()=>{
+ const s=fs.readFileSync(new URL('../tools/operator-packets/NATIVE_WRITER_B_POLICY_INSTALL_ONCE.ps1',import.meta.url),'utf8');
+ const apply=s.indexOf("if(-not $Apply");
+ const admin=s.indexOf("NATIVE_POLICY_ADMIN_REQUIRED");
+ const preimage=s.indexOf("function Verify-TransitionPreimage");
+ const move=s.indexOf("[IO.Directory]::Move($root,$backup)");
+ assert.ok(apply>=0&&admin>apply&&preimage>admin&&move>preimage);
+ assert.match(s,/NATIVE_POLICY_TRANSITION_SCOPE_CAS_STOP/);
+ assert.match(s,/NATIVE_POLICY_RESERVED_PUBLISHER_CLAIM_STOP/);
+ assert.match(s,/NATIVE_POLICY_RESERVED_WRITER_CLAIM_STOP/);
+ assert.match(s,/\[IO.Directory\]::Move\(\$backup,\$root\)/);
+ assert.match(s,/Verify-TransitionPreimage \$backup/);
+ assert.doesNotMatch(s,/Remove-Item|Set-ExecutionPolicy|Stop-Process/);
+});
+
+test('transition stages observation before the first rename and covers post-swap output errors',()=>{
+ const s=fs.readFileSync(new URL('../tools/operator-packets/NATIVE_WRITER_B_POLICY_INSTALL_ONCE.ps1',import.meta.url),'utf8');
+ assert.equal((s.match(/^param\(/gm)||[]).length,1);
+ assert.equal((s.match(/^Set-StrictMode/gm)||[]).length,1);
+ const stage=s.indexOf("Write-Once ([IO.Path]::Combine($staging,'installation-observation.json'))");
+ const verify=s.indexOf('Verify-NewScope $staging',stage);
+ const intent=s.indexOf('Write-Once $intentPath',verify);
+ const move=s.indexOf('[IO.Directory]::Move($root,$backup)',intent);
+ const swap=s.indexOf('[IO.Directory]::Move($staging,$root)',move);
+ const output=s.indexOf('Write-Once $OutputFile $reportBytes',swap);
+ const recovery=s.indexOf('Restore-VerifiedTransitionPreimage',s.indexOf('}catch{',output));
+ const helper=s.slice(s.indexOf(' function Restore-VerifiedTransitionPreimage {'),s.indexOf(' # End compensation helpers.'));
+ const guard=helper.indexOf('Test-Path -LiteralPath $OutputFile');
+ const claim=helper.indexOf('Verify-TransitionClaimAbsent');
+ const quarantine=helper.indexOf('[IO.Directory]::Move($root,$failed)');
+ const restore=helper.indexOf('[IO.Directory]::Move($backup,$root)');
+ assert.ok(stage>=0&&verify>stage&&intent>verify&&move>intent&&swap>move&&output>swap&&recovery>output);
+ assert.ok(guard>=0&&claim>guard&&quarantine>claim&&restore>quarantine);
+ assert.equal((helper.match(/Test-Path -LiteralPath \$OutputFile/g)||[]).length,2);
+ assert.equal((helper.match(/Verify-TransitionClaimAbsent/g)||[]).length,2);
+ assert.match(s,/NATIVE_POLICY_TRANSITION_RECOVERY_REQUIRED_STOP/);
+ assert.match(s,/NATIVE_POLICY_TRANSITION_RESTORED_STOP/);
+});
+
+test('Windows parser and TEMP rollback guard refuse surviving output and claims', {skip:process.platform!=='win32'},t=>{
+ const file=new URL('../tools/operator-packets/NATIVE_WRITER_B_POLICY_INSTALL_ONCE.ps1',import.meta.url);
+ const s=fs.readFileSync(file,'utf8');
+ const start=s.indexOf(' function Restore-VerifiedTransitionPreimage {');
+ const end=s.indexOf(' # End compensation helpers.',start);
+ assert.ok(start>=0&&end>start);
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'native-policy-restore-'));
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const literal=v=>v.replace(/'/g,"''");
+ const target=literal(decodeURIComponent(file.pathname.slice(1)));
+ const code=[
+  "$ErrorActionPreference='Stop'",
+  "$tokens=$null;$errors=$null",
+  "[void][System.Management.Automation.Language.Parser]::ParseFile('"+target+"',[ref]$tokens,[ref]$errors)",
+  "if($errors.Count -gt 0){throw 'INSTALLER_PARSE_FAILED'}",
+  "$base='"+literal(dir)+"'",
+  "$root=Join-Path $base 'active'",
+  "$backup=Join-Path $base 'backup'",
+  "$failed=Join-Path $base 'failed'",
+  "$OutputFile=Join-Path $base 'result.json'",
+  "$claim=Join-Path $base 'claim'",
+  "function Stop-N([string]$code){throw $code}",
+  "function Require-Unactivated {}",
+  "function Verify-TransitionClaimAbsent {if(Test-Path -LiteralPath $claim){throw 'CLAIM_EXISTS'}}",
+  "function Verify-TransitionPreimage([string]$dir){if([IO.File]::ReadAllText((Join-Path $dir 'scope')) -cne 'OLD'){throw 'OLD_DRIFT'}}",
+  "function Verify-NewScope([string]$dir){if([IO.File]::ReadAllText((Join-Path $dir 'scope')) -cne 'NEW'){throw 'NEW_DRIFT'}}",
+  s.slice(start,end),
+  "[void][IO.Directory]::CreateDirectory($root)",
+  "[void][IO.Directory]::CreateDirectory($backup)",
+  "[IO.File]::WriteAllText((Join-Path $root 'scope'),'NEW')",
+  "[IO.File]::WriteAllText((Join-Path $backup 'scope'),'OLD')",
+  "function Check-Unchanged {if([IO.File]::ReadAllText((Join-Path $root 'scope')) -cne 'NEW' -or [IO.File]::ReadAllText((Join-Path $backup 'scope')) -cne 'OLD' -or (Test-Path $failed)){throw 'UNEXPECTED_MOVE'}}",
+  "[IO.File]::WriteAllText($OutputFile,'{\"status\":\"SCOPE_INSTALLED_VERIFIED\"}')",
+  "try{Restore-VerifiedTransitionPreimage;throw 'ACCEPTED_OUTPUT'}catch{if($_.Exception.Message -cne 'NATIVE_POLICY_TRANSITION_RESULT_EXISTS_STOP'){throw}}",
+  "Check-Unchanged",
+  "[IO.File]::Delete($OutputFile)",
+  "[IO.File]::WriteAllText($claim,'claimed')",
+  "try{Restore-VerifiedTransitionPreimage;throw 'ACCEPTED_CLAIM'}catch{if($_.Exception.Message -cne 'CLAIM_EXISTS'){throw}}",
+  "Check-Unchanged",
+  "[IO.File]::Delete($claim)",
+  "Restore-VerifiedTransitionPreimage",
+  "if([IO.File]::ReadAllText((Join-Path $root 'scope')) -cne 'OLD' -or [IO.File]::ReadAllText((Join-Path $failed 'scope')) -cne 'NEW' -or (Test-Path $backup)){throw 'RESTORE_FAILED'}",
+  "Write-Output 'TEMP_RESTORE_PASS'"
+ ].join('\n');
+ // The fixture runs only extracted compensation code in a newly created TEMP
+ // directory; ACL/claim/byte readers are fixture ports, not live host proof.
+ const result=spawnSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',code],
+  {encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:65536});
+ assert.equal(result.error,undefined);
+ assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
+ assert.match(result.stdout,/TEMP_RESTORE_PASS/);
+});
+
+test('Owner policy lease and interrupted recovery stay within the fixed unactivated scope',()=>{
+ const s=fs.readFileSync(new URL('../tools/operator-packets/NATIVE_WRITER_B_POLICY_INSTALL_ONCE.ps1',import.meta.url),'utf8');
+ const lease=s.indexOf('$policyLease=[Threading.Mutex]::new');
+ const wait=s.indexOf('$policyLease.WaitOne(0)',lease);
+ const recover=s.indexOf('if($transition -and $RecoverIntent)',wait);
+ const stage=s.indexOf("$staging=$root+'.staging-'",recover);
+ const move=s.indexOf('[IO.Directory]::Move($root,$backup)',stage);
+ const release=s.indexOf('$policyLease.ReleaseMutex()',move);
+ assert.ok(lease>=0&&wait>lease&&recover>wait&&stage>recover&&move>stage&&release>move);
+ assert.match(s,/NATIVE_POLICY_OWNER_LEASE_ACL_STOP/);
+ assert.match(s,/NATIVE_POLICY_OWNER_LEASE_BUSY_STOP/);
+ const recovery=s.slice(recover,stage);
+ for(const check of [
+  'Exact-Acl $intentPath','intent.requestId','intent.outputFile','intent.beforeScopeSha256',
+  'intent.afterScopeSha256','intent.afterObservationSha256','Verify-TransitionClaimAbsent',
+  'Restore-VerifiedTransitionPreimage','TRANSITION_OLD_SCOPE_VERIFIED'
+ ])assert.ok(recovery.includes(check),check);
+ assert.doesNotMatch(recovery,/Write-Once|CreateDirectory|SCOPE_INSTALLED_VERIFIED/);
+ assert.match(s,/existingIntents.Count -ne 0/);
+ const pack=fs.readFileSync(new URL('../tools/native-writer-b-policy-package.mjs',import.meta.url),'utf8');
+ assert.match(pack,/merged.merge_commit_sha===reviewedControlSha/);
+ assert.match(pack,/git\('rev-parse','HEAD'\)===controlHead/);
+ assert.match(pack,/verifyPinnedDeployment\(preview.proposedPolicy/);
+});
+
+test('Windows TEMP recovery reads the durable intent without rerunning transition', {skip:process.platform!=='win32'},t=>{
+ const script=fs.readFileSync(new URL('../tools/operator-packets/NATIVE_WRITER_B_POLICY_INSTALL_ONCE.ps1',import.meta.url),'utf8');
+ const start=script.indexOf(' if($transition -and $RecoverIntent){');
+ const end=script.indexOf('\n if($transition){\n  $existingIntents=',start);
+ const helperStart=script.indexOf(' function Restore-VerifiedTransitionPreimage {');
+ const helperEnd=script.indexOf(' # End compensation helpers.',helperStart);
+ assert.ok(start>=0&&end>start&&helperStart>=0&&helperEnd>helperStart);
+ const base=fs.mkdtempSync(path.join(os.tmpdir(),'native-policy-intent-'));
+ t.after(()=>fs.rmSync(base,{recursive:true,force:true}));
+ const literal=v=>v.replace(/'/g,"''");
+ for(const state of ['before-rename','after-old-rename','after-new-rename','surviving-output','intent-drift']){
+  const dir=path.join(base,state),root=path.join(dir,'active'),old='a'.repeat(64),next='b'.repeat(64);
+  const stage=root+'.staging-12345678-1234-4234-8234-123456789abc';
+  const backup=root+'.backup-'+old,failed=stage+'.failed',intent=stage+'.intent.json';
+  const output=path.join(dir,'result.json');
+  fs.mkdirSync(dir);
+  const put=(p,bytes)=>{fs.mkdirSync(p);fs.writeFileSync(path.join(p,'scope'),bytes)};
+  if(state==='before-rename'||state==='intent-drift'){put(root,'OLD');put(stage,'NEW')}
+  else if(state==='after-old-rename'){put(backup,'OLD');put(stage,'NEW')}
+  else{put(root,'NEW');put(backup,'OLD')}
+  if(state==='surviving-output')fs.writeFileSync(output,'success');
+  fs.writeFileSync(intent,JSON.stringify({schema:'ZGMINI_NATIVE_POLICY_TRANSITION_INTENT_V1',
+   host:'fixture',requestId:'fixture-request',root,backup,staging:stage,failed,
+   outputFile:state==='intent-drift'?output+'.other':output,beforeScopeSha256:old,
+   afterScopeSha256:next,afterObservationSha256:'c'.repeat(64)}));
+  const code=[
+   "$ErrorActionPreference='Stop'",
+   "$transition=$true;$hostName='fixture';$request=@{requestId='fixture-request'}",
+   "$root='"+literal(root)+"'",
+   "$OutputFile='"+literal(output)+"'",
+   "$RecoverIntent='"+literal(intent)+"'",
+   "$TransitionFromScopeSha256='"+old+"';$ScopeSha256='"+next+"'",
+   "function Stop-N([string]$code){throw $code}",
+   "function Exact-Acl {return 'fixture'}",
+   "function New-PolicyFileAcl {return 'fixture'}",
+   "function Require-Unactivated {}",
+   "function Verify-TransitionClaimAbsent {}",
+   "function Verify-TransitionPreimage([string]$dir){if([IO.File]::ReadAllText((Join-Path $dir 'scope')) -cne 'OLD'){throw 'OLD_DRIFT'}}",
+   "function Verify-NewScope([string]$dir){if([IO.File]::ReadAllText((Join-Path $dir 'scope')) -cne 'NEW'){throw 'NEW_DRIFT'}}",
+   script.slice(helperStart,helperEnd),
+   script.slice(start,end)
+  ].join('\n');
+  const result=spawnSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',code],
+   {encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:65536});
+  assert.equal(result.error,undefined);
+  if(['surviving-output','intent-drift'].includes(state)){
+   assert.notEqual(result.status,0,state);
+   assert.match(result.stderr+result.stdout,state==='surviving-output'?/RESULT_EXISTS_STOP/:/INTENT_DRIFT_STOP/);
+   assert.equal(fs.readFileSync(path.join(root,'scope'),'utf8'),state==='surviving-output'?'NEW':'OLD');
+   assert.equal(fs.existsSync(backup),state==='surviving-output');
+  }else{
+   assert.equal(result.status,0,result.stderr+result.stdout);
+   assert.match(result.stdout,/TRANSITION_OLD_SCOPE_VERIFIED/);
+   assert.equal(fs.readFileSync(path.join(root,'scope'),'utf8'),'OLD');
+   assert.equal(fs.existsSync(backup),false);
+   assert.equal(fs.readFileSync(path.join(state==='after-new-rename'?failed:stage,'scope'),'utf8'),'NEW');
+  }
+  assert.equal(fs.existsSync(intent),true);
+ }
+});
+test('Windows elevated synthetic Owner mutex denies concurrent acquisition', {skip:process.platform!=='win32'},t=>{
+ const script=fs.readFileSync(new URL('../tools/operator-packets/NATIVE_WRITER_B_POLICY_INSTALL_ONCE.ps1',import.meta.url),'utf8');
+ const start=script.indexOf('function New-OwnerPolicyMutexSecurity {');
+ const end=script.indexOf('function Require-Unactivated {',start);
+ assert.ok(start>=0&&end>start);
+ const name='Global\\ZGMINI-NativeWriterB-4135-Test-'+process.pid+'-'+Date.now();
+ const child="$m=[Threading.Mutex]::OpenExisting('"+name+"');try{if($m.WaitOne(0)){$m.ReleaseMutex();exit 9};exit 0}finally{$m.Dispose()}";
+ const code=[
+  "$ErrorActionPreference='Stop'",
+  "$principal=[Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())",
+  "if(-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)){exit 77}",
+  script.slice(start,end),
+  "$security=New-OwnerPolicyMutexSecurity;$created=$false",
+  "$mutex=[Threading.Mutex]::new($false,'"+name+"',[ref]$created,$security)",
+  "try{",
+  "if(-not $created){throw 'FIXTURE_COLLISION'}",
+  "if($mutex.GetAccessControl().GetSecurityDescriptorSddlForm('Access,Owner') -cne $security.GetSecurityDescriptorSddlForm('Access,Owner')){throw 'ACL_MISMATCH'}",
+  "if(-not $mutex.WaitOne(0)){throw 'FIXTURE_LEASE_FAILED'}",
+  "try{& powershell.exe -NoProfile -NonInteractive -EncodedCommand '"+Buffer.from(child,'utf16le').toString('base64')+"'",
+  "if($LASTEXITCODE -ne 0){throw 'CONCURRENT_LEASE_ACQUIRED'}}finally{$mutex.ReleaseMutex()}",
+  "Write-Output 'MUTEX_ACL_CONTENTION_PASS'",
+  "}finally{$mutex.Dispose()}"
+ ].join('\n');
+ const result=spawnSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',code],
+  {encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:65536});
+ assert.equal(result.error,undefined);
+ if(result.status===77){t.skip('independent elevated Owner fixture required');return;}
+ assert.equal(result.status,0,result.stderr+result.stdout);
+ assert.match(result.stdout,/MUTEX_ACL_CONTENTION_PASS/);
 });

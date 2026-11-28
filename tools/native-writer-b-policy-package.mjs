@@ -9,7 +9,7 @@ import {preparePublicWriter4135PolicyPreview} from '../ci-approval/request-previ
 import {readNativeScope} from '../ci-approval/native-receiver-observe.mjs';
 import {readNativeInstalledProof,verifyNativeInstalledProof} from '../ci-approval/native-publisher-entry.mjs';
 import {POLICY_INSTALL as F,makeIndependentPolicyScope,makeIndependentPolicyProof,
- policyDigest as hash} from '../ci-approval/native-policy-install.mjs';
+ policyDigest as hash,verifyFirstScopeTransition,FIRST_SOURCE_HEAD,FIRST_SCOPE_SHA256} from '../ci-approval/native-policy-install.mjs';
 const repo='ansqhd5774-Choi/zgmini-pc-control';
 const need=(v,c)=>{if(!v)throw Error(c)};
 const api=(route,method='GET',body)=>JSON.parse(execFileSync('gh',
@@ -33,17 +33,64 @@ function authenticate(){
   approval.body.includes(F.approvalSha256)&&approval.body.includes('Public Native Writer B'),
   'NATIVE_POLICY_OWNER_APPROVAL_STOP');
 }
-const [mode,arg,output]=process.argv.slice(2);
+const beforeScopePath='E:/ZGmini/data/pc-writer/ci-native/ci-native-writer-b-approved.json';
+function requireUnactivated(){
+ const list=api('repos/'+repo+'/actions/variables?per_page=100');
+ need(list.total_count===list.variables.length,'NATIVE_POLICY_VARIABLE_LIST_INCOMPLETE_STOP');
+ for(const name of ['ZGMINI_CI_NATIVE_WRITER_B_ENABLED','ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED',
+  'ZGMINI_CI_NATIVE_WRITER_B_EXEC_ENABLED']){
+  const old=list.variables.find(x=>x.name===name);
+  need(!old||old.value==='false','NATIVE_POLICY_TRANSITION_ACTIVATION_STOP');
+ }
+}
+function verifyPinnedDeployment(p,pack){
+ need(p.nativeWriterBControlMode==='PINNED_CHECKOUT_V1'&&
+  p.sourceHeadSha===FIRST_SOURCE_HEAD&&p.policyRevision===p.nativeWriterBControlSha&&
+  pack.controlHead===p.nativeWriterBControlSha&&pack.sourceHeadSha===p.sourceHeadSha,
+  'NATIVE_POLICY_PINNED_DEPLOYMENT_STOP');
+ const head=api('repos/'+repo+'/commits/main').sha;
+ const cmp=api('repos/'+repo+'/compare/'+p.nativeWriterBControlSha+'...'+head);
+ need(['ahead','identical'].includes(cmp.status)&&cmp.merge_base_commit?.sha===p.nativeWriterBControlSha,
+  'NATIVE_POLICY_CONTROL_ANCESTRY_STOP');
+ need(read(p.receiverWorkflowPath,head).blobSha===p.receiverWorkflowBlobSha&&
+  read(p.receiverWorkflowPath,p.nativeWriterBControlSha).blobSha===p.receiverWorkflowBlobSha&&
+  read(p.sourceWorkflowPath,p.sourceHeadSha).blobSha===p.sourceWorkflowBlobSha&&
+  hash(read('ci-approval/native-writer-b-execute.mjs',p.nativeWriterBControlSha).bytes)===p.nativeWriterBAdapterSha256,
+  'NATIVE_POLICY_DEPLOYMENT_PIN_DRIFT_STOP');
+ const past=api('repos/'+repo+'/actions/runs?head_sha='+p.sourceHeadSha+'&event=pull_request&per_page=100');
+ need(past.total_count===0,'NATIVE_POLICY_SOURCE_EVENT_ALREADY_STARTED_STOP');
+}
+const [mode,arg,output,reviewedControlSha]=process.argv.slice(2);
 try{
  authenticate();
- if(mode==='prepare'){
+ if(mode==='prepare'||mode==='prepare-transition'){
+  const transition=mode==='prepare-transition';
+  if(transition){requireUnactivated();need(arg===FIRST_SOURCE_HEAD,'NATIVE_POLICY_TRANSITION_SOURCE_STOP');}
   need(/^[a-f0-9]{40}$/.test(arg??'')&&output&&path.isAbsolute(output)&&!fs.existsSync(output),
    'NATIVE_POLICY_PREPARE_ARGS_STOP');
-  const controlHead=api('repos/'+repo+'/commits/main').sha;
+  const liveMain=api('repos/'+repo+'/commits/main').sha;
+  let controlHead=liveMain;
+  if(transition){
+   need(/^[a-f0-9]{40}$/.test(reviewedControlSha??''),'NATIVE_POLICY_REVIEWED_CONTROL_REQUIRED_STOP');
+   const merged=api('repos/'+repo+'/pulls/4387');
+   need(merged.merged===true&&merged.base?.ref==='main'&&
+    merged.merge_commit_sha===reviewedControlSha,'NATIVE_POLICY_REVIEWED_MERGE_STOP');
+   const cmp=api('repos/'+repo+'/compare/'+reviewedControlSha+'...'+liveMain);
+   need(['ahead','identical'].includes(cmp.status)&&cmp.merge_base_commit?.sha===reviewedControlSha,
+    'NATIVE_POLICY_CONTROL_ANCESTRY_STOP');
+   controlHead=reviewedControlSha;
+  }
   const past=api('repos/'+repo+'/actions/runs?head_sha='+arg+'&event=pull_request&per_page=100');
   need(past.total_count===0,'NATIVE_POLICY_SOURCE_EVENT_ALREADY_STARTED_STOP');
   // Source tooling must itself be the reviewed, immutable main bytes.
   const sourceRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+  if(transition){
+   const git=(...args)=>execFileSync('git',['-C',sourceRoot,...args],
+    {encoding:'utf8',windowsHide:true}).trim();
+   need(git('rev-parse','HEAD')===controlHead&&
+    git('status','--porcelain','--untracked-files=no')==='',
+    'NATIVE_POLICY_REVIEWED_CHECKOUT_STOP');
+  }
   for(const rel of ['tools/native-writer-b-policy-package.mjs','ci-approval/native-policy-install.mjs',
    'ci-approval/native-publisher-entry.mjs','tools/operator-packets/NATIVE_WRITER_B_POLICY_INSTALL_ONCE.ps1']){
    need(fs.readFileSync(path.join(sourceRoot,rel)).equals(read(rel,controlHead).bytes),
@@ -73,23 +120,36 @@ try{
   need(preview.state==='PUBLIC_WRITER_POLICY_PREVIEW_ONLY','NATIVE_POLICY_PREVIEW_STOP');
   const scope=makeIndependentPolicyScope({policy:preview.proposedPolicy,approvalBytes:m.bytes,
    requestBytes:Buffer.from(preview.body)});
+  const migration=transition?verifyFirstScopeTransition(fs.readFileSync(beforeScopePath),scope):null;
+  if(transition)verifyPinnedDeployment(preview.proposedPolicy,{controlHead,sourceHeadSha:arg});
   fs.mkdirSync(output,{recursive:false});
   write(output,'scope.json',scope);write(output,'policy.json',JSON.stringify(preview.proposedPolicy));
   const ps=read('tools/operator-packets/NATIVE_WRITER_B_POLICY_INSTALL_ONCE.ps1',controlHead).bytes;
   write(output,'INSTALL_ONCE.ps1',ps);
   write(output,'package.json',JSON.stringify({schema:'ZGMINI_NATIVE_POLICY_PACKAGE_V1',controlHead,
-   scopeSha256:hash(scope),installerSha256:hash(ps),requestId:F.requestId,sourceHeadSha:arg},null,2));
+   scopeSha256:hash(scope),installerSha256:hash(ps),requestId:F.requestId,sourceHeadSha:arg,
+   ...(migration?{migration}:{})},null,2));
   console.log(JSON.stringify({status:'PACKAGE_PREPARED_NOT_INSTALLED',scopeSha256:hash(scope),
    installerSha256:hash(ps),requestId:F.requestId,variablesEnabled:false,dispatched:false}));
  }else if(mode==='finalize'){
   need(arg&&path.isAbsolute(arg),'NATIVE_POLICY_FINALIZE_ARGS_STOP');
   const dir=arg,p=JSON.parse(fs.readFileSync(path.join(dir,'policy.json')));
+  const pack=JSON.parse(fs.readFileSync(path.join(dir,'package.json')));
+  requireUnactivated();verifyPinnedDeployment(p,pack);
+  need(hash(fs.readFileSync(path.join(dir,'scope.json')))===pack.scopeSha256,
+   'NATIVE_POLICY_PACKAGE_SCOPE_DRIFT_STOP');
   const hosts=F.hosts.map(host=>JSON.parse(fs.readFileSync(path.join(dir,host+'.json'))));
   const receipt={schema:'ZGMINI_NATIVE_POLICY_INSTALL_RECEIPT_V1',effect:'B_WRITER_SOURCE',
    requestId:F.requestId,status:'POLICY_INSTALLED_VERIFIED',nativePolicySha256:hash(JSON.stringify(p)),
    actualControllerSha:p.installedControllerSha,approvalSha256:F.approvalSha256,
    requestSha256:F.requestSha256,controllerChanged:false,writerChanged:false,
    variablesEnabled:false,dispatched:false,hosts};
+  need(hosts.every(x=>x.scopeSha256===pack.scopeSha256)&&
+   pack.migration?.beforeScopeSha256===FIRST_SCOPE_SHA256&&
+   pack.migration.afterScopeSha256===pack.scopeSha256&&
+   pack.migration.afterPolicySha256===receipt.nativePolicySha256&&
+   hosts.every(x=>x.previousScopeSha256===FIRST_SCOPE_SHA256&&x.backupVerified===true),
+   'NATIVE_POLICY_PACKAGE_HOST_SCOPE_STOP');
   const receiptBytes=Buffer.from(JSON.stringify(receipt)+'\n');
   const installationRequestId='native-policy-'+randomUUID();
   const proof=makeIndependentPolicyProof({policy:p,receipt,receiptBytes,installationRequestId});
@@ -105,6 +165,7 @@ try{
   need(arg&&path.isAbsolute(arg),'NATIVE_POLICY_ACTIVATE_ARGS_STOP');
   const dir=arg,pack=JSON.parse(fs.readFileSync(path.join(dir,'package.json')));
   const proofBytes=fs.readFileSync(path.join(dir,'proof.json')),proof=JSON.parse(proofBytes);
+  verifyPinnedDeployment(proof.policy,pack);
   for(const host of F.hosts){
    const report=JSON.parse(fs.readFileSync(path.join(dir,host+'.final.json')));
    need(report.host===host&&report.status==='POLICY_PROOF_INSTALLED_VERIFIED'&&
@@ -123,7 +184,8 @@ try{
   const existing=api('repos/'+repo+'/actions/variables?per_page=100').variables;
   const before=Object.fromEntries(Object.keys(variables).map(name=>[name,
    existing.find(x=>x.name===name)?.value??null]));
-  need(Object.entries(before).every(([name,value])=>value===null||value===variables[name]),
+  need(Object.entries(before).every(([name,value])=>value===null||value===variables[name]||
+   (name.startsWith('ZGMINI_CI_NATIVE_WRITER_B_')&&value==='false')),
    'NATIVE_POLICY_VARIABLE_PREIMAGE_DRIFT_STOP');
   write(dir,'activation-intent.json',JSON.stringify({before,desired:variables,requestId:F.requestId}));
   for(const [name,value] of Object.entries(variables)){

@@ -71,6 +71,24 @@ jobs:
           ZGMINI_CI_NATIVE_EFFECT: B_WRITER_SOURCE
           ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED: ${{ vars.ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED }}
         run: '"E:\ZGmini\runtime\node.exe" ci-approval\native-receiver-observe.mjs'
+      # Public execution uses a separately approved immutable control checkout.
+      # The dispatch main SHA remains unchanged for receiver-origin verification.
+      - name: Resolve exact independently installed Public control source
+        id: native-writer-control
+        if: github.event.repository.private == false && steps.native-writer-admission.outcome == 'success' && vars.ZGMINI_CI_NATIVE_WRITER_B_EXEC_ENABLED == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ZGMINI_CI_NATIVE_WRITER_B_EXEC_ENABLED: ${{ vars.ZGMINI_CI_NATIVE_WRITER_B_EXEC_ENABLED }}
+          ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED: ${{ vars.ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED }}
+        run: '"E:\ZGmini\runtime\node.exe" ci-approval\native-writer-b-execute.mjs --resolve-control'
+      - name: Checkout only independently approved Public control SHA
+        id: native-writer-control-checkout
+        if: steps.native-writer-control.outcome == 'success'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ steps.native-writer-control.outputs.controlSha }}
+          path: writer-b-control
+          persist-credentials: false
       # Independent opt-in: receiver admission alone must never install Writer B.
       - name: Verify installed native Writer B grant and emit exact approved candidate
         id: native-writer-preflight
@@ -82,6 +100,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           ZGMINI_CI_NATIVE_WRITER_B_EXEC_ENABLED: ${{ vars.ZGMINI_CI_NATIVE_WRITER_B_EXEC_ENABLED }}
           ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED: ${{ vars.ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED }}
+        working-directory: ${{ steps.native-writer-control-checkout.outcome == 'success' && 'writer-b-control' || '.' }}
         run: '"E:\ZGmini\runtime\node.exe" ci-approval\native-writer-b-execute.mjs --preflight'
       - name: Checkout only the independently approved Writer B candidate SHA
         if: steps.native-writer-admission.outcome == 'success' && steps.native-writer-preflight.outcome == 'success'
@@ -97,6 +116,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           ZGMINI_CI_NATIVE_WRITER_B_EXEC_ENABLED: ${{ vars.ZGMINI_CI_NATIVE_WRITER_B_EXEC_ENABLED }}
           ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED: ${{ vars.ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED }}
+        working-directory: ${{ steps.native-writer-control-checkout.outcome == 'success' && 'writer-b-control' || '.' }}
         run: '"E:\ZGmini\runtime\node.exe" ci-approval\native-writer-b-execute.mjs --execute'
       - name: Upload bounded native Writer B result pair
         if: always() && vars.ZGMINI_CI_NATIVE_WRITER_B_EXEC_ENABLED == 'true'

@@ -20,7 +20,8 @@ export function makeIndependentPolicyScope({policy,approvalBytes,requestBytes}){
   request.approvalManifestSha256===f.approvalSha256,'NATIVE_POLICY_REQUEST_SCOPE_STOP');
  need(policy?.schema==='ZGMINI_CI_NATIVE_DISPATCH_V1'&&policy.enabled===true&&
   policy.effect==='B_WRITER_SOURCE'&&policy.repositoryVisibility==='public'&&
-  policy.nativeWriterBExecutionEnabled===true&&policy.sourceAttempt===1&&
+  policy.nativeWriterBExecutionEnabled===true&&
+  (policy.nativeWriterBControlMode===undefined||policy.nativeWriterBControlMode==='PINNED_CHECKOUT_V1')&&policy.sourceAttempt===1&&
   policy.sourceRunMode==='EVENT_COMPLETION_V1'&&!Object.hasOwn(policy,'sourceRunId')&&
   policy.sourceWorkflowId===416355595&&
   policy.sourceWorkflowPath==='.github/workflows/controller-maintenance-source-tests.yml'&&
@@ -35,6 +36,44 @@ export function makeIndependentPolicyScope({policy,approvalBytes,requestBytes}){
  return Buffer.from(JSON.stringify({schema:'ZGMINI_CI_NATIVE_READONLY_SCOPE_V1',policy,
   approvalBytesBase64:approvalBytes.toString('base64'),
   requestBytesBase64:requestBytes.toString('base64')})+'\n');
+}
+// This first, still-unactivated #4135 deployment has a known exact preimage.
+// The transition does not grant an additional request or change the effect key.
+export const FIRST_SCOPE_SHA256='df097365ebc641a551f6e0b233ad333662f4ae12b82a2180cfb97637656f5736';
+export const FIRST_POLICY_SHA256='03460ff9cc6effa88162bc4369f248a055f2346d9997a2535ee9bba9cbf44828';
+export const FIRST_CONTROL_SHA='b2dead3c87f88b35f1a05de77d72f33e3a618a10';
+export const FIRST_SOURCE_HEAD='55e40e183d5d85fa4897e6449f3c8a13161f9adf';
+export function verifyPolicyTransportTransition(before,after){
+ const a=JSON.parse(before),b=JSON.parse(after);
+ for(const [raw,s] of [[before,a],[after,b]]){
+  need(Buffer.isBuffer(raw)&&makeIndependentPolicyScope({policy:s.policy,
+   approvalBytes:Buffer.from(s.approvalBytesBase64,'base64'),
+   requestBytes:Buffer.from(s.requestBytesBase64,'base64')}).equals(raw),
+   'NATIVE_POLICY_TRANSITION_SCOPE_BYTES_STOP');
+ }
+ const old=a.policy,p=b.policy;
+ const changed=new Set(['policyRevision','nativeWriterBControlSha',
+  'nativeWriterBAdapterSha256','receiverWorkflowBlobSha','nativeWriterBControlMode']);
+ need(!Object.hasOwn(old,'nativeWriterBControlMode')&&
+  p.nativeWriterBControlMode==='PINNED_CHECKOUT_V1'&&
+  Object.keys(p).length===Object.keys(old).length+1&&
+  p.policyRevision!==old.policyRevision&&
+  p.nativeWriterBAdapterSha256!==old.nativeWriterBAdapterSha256&&
+  p.receiverWorkflowBlobSha!==old.receiverWorkflowBlobSha&&
+  a.approvalBytesBase64===b.approvalBytesBase64&&a.requestBytesBase64===b.requestBytesBase64&&
+  Object.keys(old).every(k=>Object.hasOwn(p,k)&&(changed.has(k)||p[k]===old[k])),
+  'NATIVE_POLICY_TRANSITION_EFFECT_DRIFT_STOP');
+ return Object.freeze({beforeScopeSha256:policyDigest(before),
+  afterScopeSha256:policyDigest(after),beforePolicySha256:policyDigest(JSON.stringify(old)),
+  afterPolicySha256:policyDigest(JSON.stringify(p))});
+}
+export function verifyFirstScopeTransition(before,after){
+ const v=verifyPolicyTransportTransition(before,after);
+ const old=JSON.parse(before).policy;
+ need(v.beforeScopeSha256===FIRST_SCOPE_SHA256&&v.beforePolicySha256===FIRST_POLICY_SHA256&&
+  old.nativeWriterBControlSha===FIRST_CONTROL_SHA&&old.sourceHeadSha===FIRST_SOURCE_HEAD,
+  'NATIVE_POLICY_TRANSITION_PREIMAGE_STOP');
+ return v;
 }
 export function verifyIndependentPolicyReceipt(receipt,policy){
  need(receipt?.schema==='ZGMINI_NATIVE_POLICY_INSTALL_RECEIPT_V1'&&
@@ -59,6 +98,9 @@ export function verifyIndependentPolicyReceipt(receipt,policy){
    /^[a-f0-9]{64}$/.test(x.aclSha256??'')&&
    typeof x.observedAt==='string'&&Number.isFinite(Date.parse(x.observedAt)),
    'NATIVE_POLICY_INSTALL_HOST_PROOF_STOP');
+  if(policy.nativeWriterBControlMode==='PINNED_CHECKOUT_V1')
+   need(x.previousScopeSha256===FIRST_SCOPE_SHA256&&x.backupVerified===true,
+    'NATIVE_POLICY_TRANSITION_HOST_BACKUP_STOP');
  }
  need(receipt.hosts[0].scopeSha256===receipt.hosts[1].scopeSha256,
   'NATIVE_POLICY_INSTALL_HOST_BYTES_STOP');

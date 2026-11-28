@@ -223,7 +223,7 @@ export function authorizeWriterBIssue({event,env,manifestBytes}){
 const VERIFIED_NATIVE=new WeakSet();
 // A public Writer receiver cannot inherit a Private or Controller B grant.
 export function authorizeWriterBNative({
- observation,scope,env,controlHead,adapterBytes,installedControllerSha
+ observation,scope,env,controlHead,adapterBytes,installedControllerSha,dispatchControlHead
 }={}){
  const p=scope?.policy;
  need(observation?.state==='CONTRACT_MATCH_ONLY'&&
@@ -251,7 +251,10 @@ export function authorizeWriterBNative({
    env.GITHUB_RUN_ATTEMPT==='1'&&
    /^zgmini-pc-0[1-6]$/.test(env.RUNNER_NAME??'')&&
    /^[1-9][0-9]{0,18}$/.test(env.GITHUB_RUN_ID??'')&&
-   SHA40.test(controlHead??'')&&env.GITHUB_SHA===controlHead&&
+   SHA40.test(controlHead??'')&&
+   (p.nativeWriterBControlMode===undefined?env.GITHUB_SHA===controlHead:
+    p.repositoryVisibility==='public'&&p.nativeWriterBControlMode==='PINNED_CHECKOUT_V1'&&
+    SHA40.test(dispatchControlHead??'')&&env.GITHUB_SHA===dispatchControlHead)&&
    // Pin the full reviewed control tree including all installer transitive files.
    controlHead===p.nativeWriterBControlSha&&
    Buffer.isBuffer(adapterBytes)&&sha256(adapterBytes)===p.nativeWriterBAdapterSha256,
