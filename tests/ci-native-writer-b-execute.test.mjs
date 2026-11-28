@@ -2,6 +2,9 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {readInstalledControllerSha} from '../ci-approval/native-writer-b-execute.mjs';
 import {authorizeWriterBNative,assertAuthenticatedWriterBIssue,
  validateWriterBRequestManifest,ISSUE_LABEL}
  from '../writer-b/contract.mjs';
@@ -120,6 +123,7 @@ test('public Writer B seal remains bound to exact independent execution opt-in',
  Object.assign(x.scope.policy,{repositoryVisibility:'public',installedControllerSha:'f'.repeat(40)});
  assert.throws(()=>authorizeWriterBNative(x),{code:'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP'});
  x.env.ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED='true';
+ x.installedControllerSha=x.scope.policy.installedControllerSha;
  const a=authorizeWriterBNative(x);
  assert.equal(a.issueNumber,null);
  const wrong=fixture();
@@ -162,4 +166,50 @@ test('#4135 paid MarketParquet four-file manifest is exact native B scope, never
  const noLabel={...input,labels:[]};
  assert.throws(()=>validateWriterBRequestManifest(noLabel),
   {code:'WRITER_B_ISSUE_AUTH_STOP'});
+});
+
+test('Public Writer B rejects a missing or stale installed Controller identity',()=>{
+ const x=fixture();
+ Object.assign(x.scope.policy,{repositoryVisibility:'public',installedControllerSha:'f'.repeat(40)});
+ x.env.ZGMINI_CI_NATIVE_WRITER_B_PUBLIC_ENABLED='true';
+ for(const actual of [undefined,null,'e'.repeat(40),'not-a-sha']){
+  x.installedControllerSha=actual;
+  assert.throws(()=>authorizeWriterBNative(x),{code:'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP'});
+ }
+ x.installedControllerSha='f'.repeat(40);
+ assert.equal(authorizeWriterBNative(x).issueNumber,null);
+ x.scope.policy.installedControllerSha='e'.repeat(40);
+ assert.throws(()=>authorizeWriterBNative(x),{code:'WRITER_B_NATIVE_SOURCE_OR_HOST_STOP'});
+ // Private pre-existing grant has no new host-read dependency.
+ const old=fixture();
+ assert.equal(authorizeWriterBNative(old).issueNumber,null);
+});
+test('Public Writer B reads the actual fixed host.json bytes, refusing absence and drift',t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'writer-b-installed-controller-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const file=path.join(root,'host.json'),sourceSha='f'.repeat(40);
+ fs.writeFileSync(file,JSON.stringify({controllerSourceSha:sourceSha}));
+ assert.equal(readInstalledControllerSha({root}),sourceSha);
+ fs.writeFileSync(file,'{"controllerSourceSha":"stale"}');
+ assert.throws(()=>readInstalledControllerSha({root}),
+  {code:'WRITER_B_NATIVE_INSTALLED_CONTROLLER_UNVERIFIED_STOP'});
+ fs.unlinkSync(file);
+ assert.throws(()=>readInstalledControllerSha({root}));
+ fs.writeFileSync(file,JSON.stringify({controllerSourceSha:sourceSha}));
+ const bytes=fs.readFileSync(file);
+ let calls=0;
+ const changed={
+  lstatSync:p=>fs.lstatSync(p),
+  readFileSync:p=>{
+   calls++;
+   return calls===2?Buffer.concat([bytes,Buffer.from(' ')]):Buffer.from(bytes);
+  }
+ };
+ assert.throws(()=>readInstalledControllerSha({root,io:changed}),
+  {code:'WRITER_B_NATIVE_INSTALLED_CONTROLLER_UNVERIFIED_STOP'});
+ // Existing immutable root policy forbids redirected metadata.
+ fs.renameSync(file,path.join(root,'real.json'));
+ fs.symlinkSync(path.join(root,'real.json'),file);
+ assert.throws(()=>readInstalledControllerSha({root}),
+  {code:'WRITER_B_NATIVE_INSTALLED_CONTROLLER_UNVERIFIED_STOP'});
 });
