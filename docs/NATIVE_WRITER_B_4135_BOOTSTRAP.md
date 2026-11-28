@@ -59,3 +59,29 @@
 `POLICY_AND_VARIABLES_READY_NOT_EXECUTED`는 일반챗 시험 준비 완료이며 Writer 설치 완료가 아니다.
 실제 설치 결과·4파일 SHA·Task 복원·원격 영수증까지 확인해야 #4135 설치 완료다.
 R2 실제 계산·게시에는 별도의 기존 유효 업무 승인과 실행 결과가 필요하며 이 최초 설치 승인으로 확대하지 않는다.
+
+## #4135 기존 미활성 scope의 단회 교정 전환 (#4387)
+
+이 절차는 이미 두 호스트에 설치된 최초 scope를 재설치하는 절차가 아니다.
+기존 scope의 정확 SHA256 `df097365ebc641a551f6e0b233ad333662f4ae12b82a2180cfb97637656f5736`,
+policy SHA256 `03460ff9cc6effa88162bc4369f248a055f2346d9997a2535ee9bba9cbf44828`,
+control SHA `b2dead3c87f88b35f1a05de77d72f33e3a618a10`,
+준비 source SHA `55e40e183d5d85fa4897e6449f3c8a13161f9adf`를 보존한다.
+최초 배치 원본과 관측은 보호된 backup으로 유지한다. 다른 정책/요청에 재사용하지 않는다.
+
+- **병합 후 Owner 준비:** 정확 병합 source 및 기존 승인 원본 확인 후
+  `node tools/native-writer-b-policy-package.mjs prepare-transition 55e40e183d5d85fa4897e6449f3c8a13161f9adf <새 TEMP 절대경로>`.
+  기존 운영 PC scope bytes 및 고정 preimage hash, Writer 기존 4파일 CAS, 예약 claim 부재,
+  비활성 변수, source CI 미시작을 확인한다. 바뀌는 값은 실행 control/adapter/receiver pin 및 명시된 checkout mode뿐.
+- 양쪽 독립 관리자에게 새 sealed package를 전달한다. 기존 최초 설치 명령에
+  `-TransitionFromScopeSha256 <package.json migration.beforeScopeSha256>`만 추가한다.
+  각 호스트 한 번, 기존 원본 두 파일 및 정확 ACL/관측/claim 부재/backup 경로 확인 후에만 보호된 stage를 교체한다.
+  기존 영수증 root는 그대로 검증·재사용한다. `SCOPE_INSTALLED_VERIFIED` 및
+  `previousScopeSha256`, `backupVerified=true`를 회수한다. STOPPED/UNKNOWN이면 재실행·삭제 금지.
+  중간 rename 실패로 새 root가 없는 경우에만 기존 backup의 ACL/hash 검증 후 원복한다.
+- 두 호스트 새 scope/원본 backup 검증 결과를 회수한 뒤 기존 finalize/proof/activate를 수행한다.
+  finalize 및 activate는 현재 main ancestry, 정확 receiver workflow blob과 승인 runtime adapter,
+  준비 source의 CI 미시작을 다시 확인한다. 기존 source HEAD와 단회 요청 ID는 변경하지 않는다.
+  이전 패키지/결과를 사용해 새 proof를 만들지 않는다.
+- 실제 Windows 관리자 transition/backup/ACL readback 전에는 완료로 표시하지 않는다.
+  일반챗은 `POLICY_AND_VARIABLES_READY_NOT_EXECUTED`가 확인될 때만 기존 준비 PR을 한 번 연다.
