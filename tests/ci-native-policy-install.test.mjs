@@ -1,0 +1,79 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {spawnSync} from 'node:child_process';
+import {makeIndependentPolicyScope,makeIndependentPolicyProof,verifyIndependentPolicyReceipt,
+ POLICY_INSTALL as F,policyDigest as hash} from '../ci-approval/native-policy-install.mjs';
+import {verifyNativeInstalledProof} from '../ci-approval/native-publisher-entry.mjs';
+function fixture(){
+ const approvalBytes=fs.readFileSync(new URL('../'+F.approvalPath,import.meta.url));
+ const requestBytes=Buffer.from(JSON.stringify({schema:'ZGMINI_PC_WRITER_SOURCE_B_REQUEST_V1',
+  requestId:F.requestId,chatId:'a67cd0f6-508a-4a73-87e3-88174bd8e52e',operation:'pc-writer-source-install',
+  controlRepository:'ansqhd5774-Choi/zgmini-pc-control',approvalManifestPath:F.approvalPath,
+  approvalManifestSha256:F.approvalSha256}));
+ const policy={schema:'ZGMINI_CI_NATIVE_DISPATCH_V1',enabled:true,effect:'B_WRITER_SOURCE',
+  repositoryVisibility:'public',nativeWriterBExecutionEnabled:true,sourceAttempt:1,
+  sourceRunMode:'EVENT_COMPLETION_V1',sourceWorkflowId:416355595,
+  sourceWorkflowPath:'.github/workflows/controller-maintenance-source-tests.yml',
+  receiverWorkflowPath:'.github/workflows/ci-approved-writer-b-once.yml',
+  policyRevision:'a'.repeat(40),nativeWriterBControlSha:'a'.repeat(40),sourceHeadSha:'b'.repeat(40),
+  installedControllerSha:'c'.repeat(40),sourceWorkflowBlobSha:'d'.repeat(40),
+  receiverWorkflowBlobSha:'e'.repeat(40),nativeWriterBAdapterSha256:'f'.repeat(64),
+  businessApprovalSha256:F.approvalSha256,approvedRequestSha256:F.requestSha256};
+ const scope=makeIndependentPolicyScope({policy,approvalBytes,requestBytes});
+ // Synthetic host observations are fixtures only, never installation evidence.
+ const receipt={schema:'ZGMINI_NATIVE_POLICY_INSTALL_RECEIPT_V1',effect:'B_WRITER_SOURCE',
+  requestId:F.requestId,status:'POLICY_INSTALLED_VERIFIED',nativePolicySha256:hash(JSON.stringify(policy)),
+  actualControllerSha:policy.installedControllerSha,approvalSha256:F.approvalSha256,
+  requestSha256:F.requestSha256,controllerChanged:false,writerChanged:false,
+  variablesEnabled:false,dispatched:false,hosts:F.hosts.map(host=>({host,status:'SCOPE_INSTALLED_VERIFIED',
+   aclVerified:true,independentOperatorVerified:true,reservedClaimAbsent:true,
+   policySha256:hash(JSON.stringify(policy)),scopeSha256:hash(scope),aclSha256:'1'.repeat(64),
+   observedAt:'2026-11-28T06:00:00Z'}))};
+ return {policy,approvalBytes,requestBytes,scope,receipt};
+}
+test('fixed reserved request and approved manifest produce only the exact scope',()=>{
+ const x=fixture();assert.equal(hash(x.requestBytes),F.requestSha256);
+ assert.equal(JSON.parse(x.scope).policy.effect,'B_WRITER_SOURCE');
+ assert.equal(Object.hasOwn(JSON.parse(x.scope),'installationReceipt'),false);
+});
+for(const [name,edit] of [
+ ['approval drift',x=>x.approvalBytes=Buffer.from('other')],
+ ['request drift',x=>x.requestBytes=Buffer.from('{}')],
+ ['other effect',x=>x.policy.effect='A_READONLY'],
+ ['private policy',x=>x.policy.repositoryVisibility='private'],
+ ['past CI run',x=>x.policy.sourceRunId=123],
+ ['other workflow',x=>x.policy.sourceWorkflowId=123]
+])test('scope rejects '+name,()=>{const x=fixture();edit(x);assert.throws(()=>makeIndependentPolicyScope(x));});
+for(const [name,edit] of [
+ ['missing isolated host',x=>x.receipt.hosts.pop()],
+ ['duplicate host',x=>x.receipt.hosts[1].host='PC'],
+ ['unverified ACL',x=>x.receipt.hosts[0].aclVerified=false],
+ ['existing claim',x=>x.receipt.hosts[1].reservedClaimAbsent=false],
+ ['different installed bytes',x=>x.receipt.hosts[1].scopeSha256='2'.repeat(64)],
+ ['controller effect',x=>x.receipt.controllerChanged=true],
+ ['dispatch already made',x=>x.receipt.dispatched=true]
+])test('receipt rejects '+name,()=>{const x=fixture();edit(x);assert.throws(()=>verifyIndependentPolicyReceipt(x.receipt,x.policy));});
+test('publisher verifies genuine-format independent receipt without requiring Controller reinstall',async()=>{
+ const x=fixture(),receiptBytes=Buffer.from(JSON.stringify(x.receipt));
+ const proof=makeIndependentPolicyProof({...x,receiptBytes,installationRequestId:'native-policy-12345678-1234-4234-8234-123456789abc'});
+ const policy=await verifyNativeInstalledProof('B_WRITER_SOURCE',proof,{getJson:async route=>{
+  assert.equal(route,'contents/'+proof.installationReceiptPath+'?ref=main');
+  return {type:'file',path:proof.installationReceiptPath,encoding:'base64',content:receiptBytes.toString('base64')};
+ }});assert.deepEqual(policy,x.policy);
+ await assert.rejects(()=>verifyNativeInstalledProof('A_READONLY',proof,{getJson:async()=>{throw Error('must not read')}}));
+ await assert.rejects(()=>verifyNativeInstalledProof('B_WRITER_SOURCE',proof,{getJson:async()=>({type:'file',path:proof.installationReceiptPath,encoding:'base64',content:Buffer.from('{}').toString('base64')})}));
+});
+test('Windows installer refuses non-Apply invocation before reading files or creating state',
+ {skip:process.platform!=='win32'},()=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'native-policy-denial-'));
+ const output=path.join(dir,'never-created.json');
+ const script=new URL('../tools/operator-packets/NATIVE_WRITER_B_POLICY_INSTALL_ONCE.ps1',import.meta.url);
+ const result=spawnSync('powershell.exe',['-NoProfile','-File',decodeURIComponent(script.pathname.slice(1)),
+  '-ScopeFile',path.join(dir,'absent.json'),'-ScopeSha256','0'.repeat(64),
+  '-RunnerSid','S-1-5-21-1-2-3-1001','-OutputFile',output],{encoding:'utf8',windowsHide:true});
+ assert.equal(result.status,1);assert.match(result.stdout,/NATIVE_POLICY_INDEPENDENT_APPLY_REQUIRED/);
+ assert.equal(fs.existsSync(output),false);fs.rmdirSync(dir);
+});

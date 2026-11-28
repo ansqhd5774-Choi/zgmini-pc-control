@@ -8,6 +8,7 @@ import {pathToFileURL} from 'node:url';
 import {readNativeScope} from './native-receiver-observe.mjs';
 import {nativeVisibilityMatches,publicWriterEventOptIn} from './native-visibility.mjs';
 import {dispatchApprovedCiEffect,createCiNativeReceiptStore} from './native-dispatch.mjs';
+import {verifyIndependentPolicyReceipt} from './native-policy-install.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control',REPO_ID=1442936296;
 const RECEIVERS=Object.freeze({
@@ -39,6 +40,17 @@ const scoped=(pathValue,root,{io=fs,singleLink=false}={})=>{
  return full;
 };
 function validateNativeInstalledProof(effect,v){
+ if(v?.schema==='ZGMINI_CI_NATIVE_POLICY_INSTALLED_PROOF_V1'){
+  if(effect!=='B_WRITER_SOURCE'||v.effect!==effect||
+     !/^native-policy-[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(v.installationRequestId??'')||
+     v.installationReceiptPath!=='results/'+v.installationRequestId+'.json'||
+     !sha256(v.installationReceiptSha256)||!sha256(v.nativePolicySha256)||
+     !sha(v.actualControllerSha)||v.policy?.effect!==effect||
+     v.policy.installedControllerSha!==v.actualControllerSha||
+     digest(JSON.stringify(v.policy))!==v.nativePolicySha256)
+   fail('CI_NATIVE_PROOF_INVALID');
+  return;
+ }
  if(!Object.hasOwn(INSTALLED,effect)||v?.schema!=='ZGMINI_CI_NATIVE_B_INSTALLED_PROOF_V1'||v.effect!==effect||
     !sha256(v.nativePolicySha256)||!sha256(v.installationReceiptSha256)||
     !/^pc-update-[a-f0-9-]{36}$/.test(v.installationRequestId??'')||
@@ -128,6 +140,10 @@ export async function verifyNativeInstalledProof(effect,proof,{getJson}={}){
  if(digest(bytes)!==proof.installationReceiptSha256)
   fail('CI_NATIVE_PROOF_RECEIPT_SHA_MISMATCH');
  let receipt;try{receipt=JSON.parse(bytes.toString('utf8'))}catch{fail('CI_NATIVE_PROOF_RECEIPT_INVALID')}
+ if(proof.schema==='ZGMINI_CI_NATIVE_POLICY_INSTALLED_PROOF_V1'){
+  verifyIndependentPolicyReceipt(receipt,proof.policy);
+  return Object.freeze(proof.policy);
+ }
  // Existing B result without these explicit native-effect attestations is
  // deliberately insufficient; an unrelated successful B cannot grant CI rights.
  if(receipt?.schema!=='ZGMINI_PC_MAINTENANCE_RESULT_V1'||
@@ -200,7 +216,7 @@ async function main(){
  const token=env.GITHUB_TOKEN;
  if(!token||token.length>1024){console.log(JSON.stringify(out('EVIDENCE_MISSING','CI_NATIVE_PUBLISH_TOKEN_UNAVAILABLE')));return 1}
  const getJson=async route=>{
-  if(typeof route!=='string'||route.includes('..')||!/^(?:actions\/runs\/[0-9]+\/attempts\/[0-9]+|contents\/(?:\.github\/workflows\/[a-z0-9-]+\.yml\?ref=(?:main|[a-f0-9]{40})|results\/maintenance-pc-update-[a-z0-9-]{36}\.json\?ref=main))$/.test(route))
+  if(typeof route!=='string'||route.includes('..')||!/^(?:actions\/runs\/[0-9]+\/attempts\/[0-9]+|contents\/(?:\.github\/workflows\/[a-z0-9-]+\.yml\?ref=(?:main|[a-f0-9]{40})|results\/(?:maintenance-pc-update-[a-z0-9-]{36}|native-policy-[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})\.json\?ref=main))$/.test(route))
    fail('CI_NATIVE_PUBLISH_READ_ROUTE_DENIED');
   const res=await fetch('https://api.github.com/repos/'+REPO+'/'+route,{
    method:'GET',signal:AbortSignal.timeout(15000),
