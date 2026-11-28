@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import test from 'node:test';import assert from 'node:assert/strict';import{createHash}from'node:crypto';
 import{observePublisherHostState,requireReadonlyOwnerContext}from'../tools/ci-controller-b-host-state-readonly.mjs';
 const root='E:/ZGmini/automation/pc-maintenance',receipts='C:/ProgramData/ZGMINI-CI/ControllerBReceipts';
@@ -18,4 +19,16 @@ test('only exact Owner issue on actual isolated host enters read-only probe',()=
  assert.equal(requireReadonlyOwnerContext(event,env,'DESKTOP-N62L0NG'),true);
  for(const mutate of [e=>e.sender.id=1,e=>e.issue.title='pc-job',e=>e.issue.body+=' ',e=>e.repository.private=true,e=>e.issue.state='closed']){const bad=structuredClone(event);mutate(bad);assert.throws(()=>requireReadonlyOwnerContext(bad,env,'DESKTOP-N62L0NG'));}
  assert.throws(()=>requireReadonlyOwnerContext(event,env,'PC'));assert.throws(()=>requireReadonlyOwnerContext(event,{...env,GITHUB_RUN_ATTEMPT:'2'},'DESKTOP-N62L0NG'));
+});
+
+test('public host observation uses immutable source and cannot publish B',()=>{
+ const yaml=fs.readFileSync(new URL('../.github/workflows/pc-process-inventory-readonly.yml',import.meta.url),'utf8');
+ const block=yaml.slice(yaml.indexOf('  public-controller-b-host-state:'));
+ assert.match(block,/github.event.repository.private == false/);
+ assert.match(block,/github.actor == 'ansqhd5774-Choi'/);
+ assert.match(block,/github.event.issue.user.id == 327938088/);
+ assert.match(block,/ref: d2c29d27c3552880b4874473578a54bbd4d24c89/);
+ assert.match(block,/contents: read/);assert.match(block,/issues: write/);
+ assert.doesNotMatch(block,/contents: write|--publish|PUBLIC_EFFECT_APPROVED|controller-b-operator|workflow_dispatch/);
+ assert.match(yaml,/handoff-process-snapshot:[\s\S]*?github.event.repository.private == true/);
 });
